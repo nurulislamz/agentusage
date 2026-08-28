@@ -24,6 +24,15 @@ func (s *Service) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+func (s *Service) handlePoll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	s.RequestPoll()
+	writeJSON(w, http.StatusOK, map[string]any{"status": "kicked"})
+}
+
 func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
 	if r.Method != http.MethodPost {
@@ -74,6 +83,12 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 		Failed:    tally.failed,
 		Warnings:  warnings,
 	})
+
+	// Antigravity tile gauges come from Fetch()/limit_snapshot. Kick an
+	// immediate poll so the dashboard does not wait for the next ticker.
+	if strings.EqualFold(sourceName, "antigravity") {
+		s.RequestPoll()
+	}
 
 	durationMs := time.Since(started).Milliseconds()
 	logLevel := "hook_ingest"
