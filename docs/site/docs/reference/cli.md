@@ -444,6 +444,28 @@ openusage integrations upgrade --all
 
 Reinstalls integrations whose embedded version is newer than the installed version.
 
+## `openusage export`
+
+Collects the current usage snapshots and writes them as a versioned JSON envelope (or a flattened CSV). Prefers the telemetry daemon and falls back to a one-shot direct provider poll — the same collection path `openusage serve` uses.
+
+```
+openusage export --output PATH [--format json|csv] [--source auto|direct|daemon]
+```
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--output`, `-o` | (required) | File path. Use `-` for stdout. |
+| `--format` | `json` | `json` or `csv`. |
+| `--source` | `auto` | `auto`, `direct`, or `daemon`. |
+
+API keys and snapshot `Raw` maps are stripped. The envelope includes `schema_version`, `generated_at`, `openusage_version`, `source`, and `snapshots`.
+
+```bash
+openusage export --output ~/usage.json
+openusage export --output - --format json
+openusage export --output /tmp/usage.csv --format csv --source direct
+```
+
 ## `openusage hub`
 
 Runs an HTTP server that aggregates `UsageSnapshot` batches pushed from one or more worker machines, then renders the merged view in the same TUI as the local dashboard. See [Multi-machine aggregation](../guides/multi-machine.md) for the end-to-end setup.
