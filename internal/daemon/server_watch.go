@@ -10,12 +10,13 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 )
 
 // runWatchLoop watches local provider data directories for changes and triggers
 // immediate collection when files are modified. This replaces fixed-interval
 // polling with event-driven collection for local providers (claude_code, cursor,
-// codex, gemini_cli, copilot, ollama).
+// codex, gemini_cli, copilot, ollama, antigravity).
 //
 // Only top-level directories are watched (not individual files) to stay well
 // within macOS kqueue descriptor limits.
@@ -40,7 +41,7 @@ func (s *Service) runWatchLoop(ctx context.Context) {
 	}
 	s.infof("watch_loop_start", "directories=%d", watchCount)
 
-	// Debounce: batch rapid changes into a single collect trigger.
+	// Debounce non-antigravity changes into a single read-model refresh.
 	var debounceTimer *time.Timer
 	debounceInterval := 2 * time.Second
 
@@ -57,19 +58,24 @@ func (s *Service) runWatchLoop(ctx context.Context) {
 			if !ok {
 				return
 			}
-			if event.Op&(fsnotify.Write|fsnotify.Create) == 0 {
+			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) == 0 {
 				continue
 			}
-			// Reset debounce timer on each event. Capture the event's
-			// fields by value into the closure — a literal `event` capture
-			// is by reference and would only print whichever event the loop
-			// landed on when the timer fires.
+
+			// Antigravity status-line writes need a full Fetch poll so
+			// limit_snapshot gauges update. RequestPoll already coalesces.
+			if isAntigravityStatusFile(event.Name) {
+				s.RequestPoll()
+				core.Tracef("[watch] antigravity status change: %s op=%s → poll kick", event.Name, event.Op)
+				continue
+			}
+
 			if debounceTimer != nil {
 				debounceTimer.Stop()
 			}
 			eventName, eventOp := event.Name, event.Op
 			debounceTimer = time.AfterFunc(debounceInterval, func() {
-				s.markDataIngested() // trigger read model refresh
+				s.markDataIngested()
 				core.Tracef("[watch] change detected: %s op=%s", eventName, eventOp)
 			})
 
@@ -82,6 +88,19 @@ func (s *Service) runWatchLoop(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// isAntigravityStatusFile reports whether path is an OpenUsage Antigravity
+// status-line state file (default or per-account variants).
+func isAntigravityStatusFile(path string) bool {
+	base := strings.ToLower(filepath.Base(strings.TrimSpace(path)))
+	if !strings.HasSuffix(base, ".json") {
+		return false
+	}
+	if strings.HasPrefix(base, ".") {
+		return false // ignore atomic write temps like .antigravity-status-*.tmp
+	}
+	return strings.HasPrefix(base, "antigravity") && strings.Contains(base, "status")
 }
 
 // collectWatchDirs returns the set of directories to watch for changes.
@@ -98,6 +117,10 @@ func collectWatchDirs() []string {
 		filepath.Join(home, ".codex", "sessions"),
 		filepath.Join(home, ".copilot"),
 		filepath.Join(home, ".gemini"),
+	}
+
+	if stateDir, err := telemetry.DefaultStateDir(); err == nil && strings.TrimSpace(stateDir) != "" {
+		candidates = append(candidates, stateDir)
 	}
 
 	// Add platform-specific paths.

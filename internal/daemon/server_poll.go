@@ -22,6 +22,9 @@ func (s *Service) runPollLoop(ctx context.Context) {
 			return
 		case <-ticker.C:
 			s.pollProviders(ctx)
+		case <-s.pollKick:
+			s.infof("poll_kick", "reason=on_demand")
+			s.pollProviders(ctx)
 		}
 	}
 }

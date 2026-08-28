@@ -44,10 +44,27 @@ type Service struct {
 	pollStateMu sync.Mutex
 	pollState   map[string]*providerPollState // per-account change detection state
 
+	// pollKick coalesces on-demand poll requests (status-line notify, fsnotify).
+	// Capacity 1 so bursts of Antigravity updates collapse into one Fetch cycle.
+	pollKick chan struct{}
+
 	// clock provides the wall-clock used for snapshot timestamps and any
 	// state that needs to be reproducible in tests. Defaults to
 	// core.SystemClock{}; tests can override via WithClock.
 	clock core.Clock
+}
+
+// RequestPoll asks the poll loop to run provider Fetch() as soon as possible.
+// Safe to call from any goroutine; no-ops when the service is nil. Extra
+// kicks while one is already pending are dropped (coalesced).
+func (s *Service) RequestPoll() {
+	if s == nil || s.pollKick == nil {
+		return
+	}
+	select {
+	case s.pollKick <- struct{}{}:
+	default:
+	}
 }
 
 // now is the canonical "what time is it?" hook for the daemon. Code that
@@ -160,6 +177,7 @@ func startService(ctx context.Context, cfg Config) (*Service, error) {
 		rmCache:       newReadModelCache(),
 		pollScheduler: newPollScheduler(cfg.PollInterval),
 		pollState:     make(map[string]*providerPollState),
+		pollKick:      make(chan struct{}, 1),
 		clock:         core.SystemClock{},
 	}
 
@@ -339,6 +357,7 @@ func (s *Service) startSocketServer(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.handleHealth)
 	mux.HandleFunc("/v1/hook/", s.handleHook)
+	mux.HandleFunc("/v1/poll", s.handlePoll)
 	mux.HandleFunc("/v1/read-model", s.handleReadModel)
 
 	server := &http.Server{

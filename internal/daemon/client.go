@@ -155,3 +155,24 @@ func (c *Client) IngestHook(
 	}
 	return out, nil
 }
+
+// RequestPoll asks the daemon to run provider Fetch() immediately.
+func (c *Client) RequestPoll(ctx context.Context) error {
+	if c == nil || strings.TrimSpace(c.SocketPath) == "" {
+		return fmt.Errorf("daemon client is not configured")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://unix/v1/poll", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("daemon poll kick failed: %s", strings.TrimSpace(string(body)))
+	}
+	return nil
+}
