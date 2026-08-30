@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/tui"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/tui"
 )
 
 func TestRenderTUIFrame_MatchesBrandAndAccount(t *testing.T) {
@@ -25,7 +25,7 @@ func TestRenderTUIFrame_MatchesBrandAndAccount(t *testing.T) {
 
 	frame := renderTUIFrame(cfg, snaps, 0, 120, 36)
 	plain := tui.StripANSI(frame)
-	if !strings.Contains(plain, "OpenUsage") {
+	if !strings.Contains(plain, "agentUsage") {
 		t.Fatalf("missing brand:\n%s", plain)
 	}
 	if !strings.Contains(plain, "claude-code") {

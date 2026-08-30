@@ -64,8 +64,17 @@ func (s *Server) Handler() http.Handler {
 		return mux
 	}
 	fileServer := http.FileServer(http.FS(sub))
-	mux.Handle("/", fileServer)
+	mux.Handle("/", noCacheUI(fileServer))
 	return mux
+}
+
+// noCacheUI disables browser caching of the embedded SPA so serve upgrades
+// (especially frame_html changes) are visible after a normal reload.
+func noCacheUI(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {

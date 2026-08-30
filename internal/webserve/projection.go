@@ -27,7 +27,6 @@ const (
 	webDetailWidth = 96
 	webStripWidth  = 5
 )
-)
 
 func buildViews(opts Options, meta collectorMeta, snaps []core.UsageSnapshot) ([]AccountView, ThemeTokens) {
 	ensureTrueColor()
