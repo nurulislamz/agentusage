@@ -1,5 +1,6 @@
 # Binary
 /openusage
+/agentusage
 /agentquota
 bin/
 dist/
