@@ -444,7 +444,7 @@ func StatusBadge(s core.Status) string {
 		text = "OK"
 	case core.StatusNearLimit:
 		style = badgeWarnStyle
-		text = "WARN"
+		text = "LOW"
 	case core.StatusLimited:
 		style = badgeCritStyle
 		text = "LIMIT"
@@ -462,25 +462,40 @@ func StatusBadge(s core.Status) string {
 }
 
 // SnapshotStatusBadge returns a styled status badge that specifies the exact limit window
-// (e.g. WEEKLY LIMIT, MONTHLY LIMIT, 5H LIMIT) when an account is limited.
+// (e.g. WEEKLY LIMIT, MONTHLY LIMIT, 5H LIMIT, 5H LOW) when an account is limited or near limit.
 func SnapshotStatusBadge(snap core.UsageSnapshot) string {
 	status := core.EffectiveStatus(snap)
-	if status != core.StatusLimited {
-		return StatusBadge(status)
+	if status == core.StatusLimited {
+		limitType := resolveExhaustedLimitType(snap)
+		text := "LIMIT"
+		if limitType != "" {
+			text = limitType + " LIMIT"
+		}
+		return badgeCritStyle.Render(text)
 	}
 
-	limitType := resolveExhaustedLimitType(snap)
-	text := "LIMIT"
-	if limitType != "" {
-		text = limitType + " LIMIT"
+	if status == core.StatusNearLimit {
+		nearType := resolveNearLimitType(snap)
+		text := "LOW"
+		if nearType != "" {
+			text = nearType + " LOW"
+		}
+		return badgeWarnStyle.Render(text)
 	}
-	return badgeCritStyle.Render(text)
+
+	return StatusBadge(status)
 }
 
 func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 	model := strings.ToLower(snap.Attributes["model"])
 	if model == "" {
 		model = strings.ToLower(snap.Attributes["model_id"])
+	}
+	if model == "" {
+		model = strings.ToLower(snap.Attributes["active_model"])
+	}
+	if model == "" {
+		model = strings.ToLower(snap.Message)
 	}
 
 	activePool := ""
@@ -502,6 +517,26 @@ func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 		}
 		if activePool == "claude" && strings.Contains(k, "gemini") {
 			return false
+		}
+		if activePool == "" && snap.ProviderID == "antigravity" {
+			// If Gemini has remaining quota, Claude exhaustion is not relevant to available capacity
+			if strings.Contains(k, "claude") || strings.Contains(k, "3p") || strings.Contains(k, "opus") || strings.Contains(k, "sonnet") {
+				if g5h, ok := snap.Metrics["quota_gemini_5h"]; ok && g5h.Remaining != nil && *g5h.Remaining > 0 {
+					return false
+				}
+				if gwk, ok := snap.Metrics["quota_gemini_weekly"]; ok && gwk.Remaining != nil && *gwk.Remaining > 0 {
+					return false
+				}
+			}
+			// If Claude has remaining quota, Gemini exhaustion is not relevant
+			if strings.Contains(k, "gemini") {
+				if c5h, ok := snap.Metrics["quota_claude_5h"]; ok && c5h.Remaining != nil && *c5h.Remaining > 0 {
+					return false
+				}
+				if cwk, ok := snap.Metrics["quota_claude_weekly"]; ok && cwk.Remaining != nil && *cwk.Remaining > 0 {
+					return false
+				}
+			}
 		}
 		return true
 	}
@@ -537,8 +572,23 @@ func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 		}
 	}
 
-	// Safeguard: If exhausted["WEEKLY"] is set, but there is ANY relevant weekly metric
-	// with Remaining > 0 (e.g. quota_gemini_weekly has 37.87% remaining), do NOT report WEEKLY limit!
+	// Safeguards: If ANY relevant metric for the active pool (or across available pools)
+	// has Remaining > 0, do NOT report MONTHLY or WEEKLY limit!
+	if exhausted["MONTHLY"] {
+		for key, met := range snap.Metrics {
+			if !isRelevantKey(key) {
+				continue
+			}
+			k := strings.ToLower(key)
+			w := strings.ToLower(met.Window)
+			if strings.Contains(k, "month") || strings.Contains(w, "month") || strings.Contains(w, "30d") {
+				if met.Remaining != nil && *met.Remaining > 0 {
+					exhausted["MONTHLY"] = false
+					break
+				}
+			}
+		}
+	}
 	if exhausted["WEEKLY"] {
 		for key, met := range snap.Metrics {
 			if !isRelevantKey(key) {
@@ -621,6 +671,118 @@ func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 	}
 	if hasResetFor("5H") {
 		return "5H"
+	}
+
+	return ""
+}
+
+func resolveNearLimitType(snap core.UsageSnapshot) string {
+	model := strings.ToLower(snap.Attributes["model"])
+	if model == "" {
+		model = strings.ToLower(snap.Attributes["model_id"])
+	}
+	if model == "" {
+		model = strings.ToLower(snap.Attributes["active_model"])
+	}
+	if model == "" {
+		model = strings.ToLower(snap.Message)
+	}
+
+	activePool := ""
+	if strings.Contains(model, "gemini") {
+		activePool = "gemini"
+	} else if strings.Contains(model, "claude") || strings.Contains(model, "sonnet") || strings.Contains(model, "opus") || strings.Contains(model, "3p") || strings.Contains(model, "gpt") {
+		activePool = "claude"
+	}
+
+	claudeDisabled := snap.Attributes["claude_disabled"] == "true" || snap.Attributes["3p_disabled"] == "true"
+
+	isRelevantKey := func(key string) bool {
+		k := strings.ToLower(key)
+		if claudeDisabled && (strings.Contains(k, "claude") || strings.Contains(k, "3p") || strings.Contains(k, "opus") || strings.Contains(k, "sonnet")) {
+			return false
+		}
+		if activePool == "gemini" && (strings.Contains(k, "claude") || strings.Contains(k, "3p") || strings.Contains(k, "opus") || strings.Contains(k, "sonnet")) {
+			return false
+		}
+		if activePool == "claude" && strings.Contains(k, "gemini") {
+			return false
+		}
+		if activePool == "" && snap.ProviderID == "antigravity" {
+			// If Gemini has remaining quota, Claude low metrics are not relevant to available capacity
+			if strings.Contains(k, "claude") || strings.Contains(k, "3p") || strings.Contains(k, "opus") || strings.Contains(k, "sonnet") {
+				if g5h, ok := snap.Metrics["quota_gemini_5h"]; ok && g5h.Remaining != nil && *g5h.Remaining > 0 {
+					return false
+				}
+				if gwk, ok := snap.Metrics["quota_gemini_weekly"]; ok && gwk.Remaining != nil && *gwk.Remaining > 0 {
+					return false
+				}
+			}
+			// If Claude has remaining quota, Gemini low metrics are not relevant
+			if strings.Contains(k, "gemini") {
+				if c5h, ok := snap.Metrics["quota_claude_5h"]; ok && c5h.Remaining != nil && *c5h.Remaining > 0 {
+					return false
+				}
+				if cwk, ok := snap.Metrics["quota_claude_weekly"]; ok && cwk.Remaining != nil && *cwk.Remaining > 0 {
+					return false
+				}
+			}
+		}
+		return true
+	}
+
+	// 1. Check metrics for near-limit short-term windows.
+	// As per precedence rules: ignore monthly and weekly for LOW badges unless they hit LIMIT.
+	lowWindows := make(map[string]bool)
+	for key, met := range snap.Metrics {
+		if !isRelevantKey(key) {
+			continue
+		}
+
+		isLow := false
+		if met.Remaining != nil && *met.Remaining > 0 && *met.Remaining <= 15.0 {
+			isLow = true
+		} else if met.Used != nil && *met.Used >= 85.0 && *met.Used < 100.0 && met.Unit == "%" {
+			isLow = true
+		} else if met.Limit != nil && met.Used != nil && *met.Limit > 0 {
+			pct := (*met.Used / *met.Limit) * 100
+			if pct >= 85.0 && pct < 100.0 {
+				isLow = true
+			}
+		}
+
+		if isLow {
+			k := strings.ToLower(key)
+			w := strings.ToLower(met.Window)
+			// Ignore monthly and weekly for LOW badges
+			if strings.Contains(k, "month") || strings.Contains(w, "month") || strings.Contains(w, "30d") ||
+				strings.Contains(k, "weekly") || strings.Contains(k, "week") || strings.Contains(k, "7d") || strings.Contains(w, "weekly") || strings.Contains(w, "7d") {
+				continue
+			}
+
+			if strings.Contains(k, "5h") || strings.Contains(k, "five_hour") || strings.Contains(k, "rolling") || strings.Contains(w, "5h") {
+				lowWindows["5H"] = true
+			} else if strings.Contains(k, "daily") || strings.Contains(k, "day") || strings.Contains(k, "1d") || strings.Contains(k, "24h") || strings.Contains(w, "daily") || strings.Contains(w, "1d") {
+				lowWindows["DAILY"] = true
+			}
+		}
+	}
+
+	// Priority: 5H > DAILY
+	if lowWindows["5H"] {
+		return "5H"
+	}
+	if lowWindows["DAILY"] {
+		return "DAILY"
+	}
+
+	// 2. Check message or attributes (ignoring monthly and weekly)
+	msg := strings.ToLower(snap.Message + " " + snap.Attributes["limit_type"] + " " + snap.Attributes["rate_limit"])
+	if strings.Contains(msg, "5h") || strings.Contains(msg, "5 hour") || strings.Contains(msg, "five hour") {
+		return "5H"
+	}
+	if strings.Contains(msg, "daily") || strings.Contains(msg, "day") {
+		return "DAILY"
 	}
 
 	return ""

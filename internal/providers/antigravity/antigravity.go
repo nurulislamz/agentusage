@@ -74,6 +74,9 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 	if box := boxName(acct); box != "" {
 		snap.SetAttribute("box", box)
 	}
+	if model := acct.Hint("model", ""); model != "" {
+		snap.SetAttribute("model", model)
+	}
 
 	accessToken, tokenPath, tokenRefreshed, err := ensureAccessToken(ctx, acct, p.Client())
 	if tokenPath != "" {
@@ -153,9 +156,6 @@ func projectSnapshot(snap *core.UsageSnapshot, payload statusLinePayload) {
 		return
 	}
 
-	snap.Timestamp = payloadReceivedAt(payload)
-	snap.Status = statusFromQuota(payload)
-
 	if payload.Product != "" {
 		snap.SetAttribute("product", payload.Product)
 	}
@@ -165,6 +165,17 @@ func projectSnapshot(snap *core.UsageSnapshot, payload statusLinePayload) {
 	if payload.Email != "" {
 		snap.SetAttribute("account_email", payload.Email)
 	}
+	if payload.Model.DisplayName != "" {
+		snap.SetAttribute("model", payload.Model.DisplayName)
+	} else if payload.Model.ID != "" {
+		snap.SetAttribute("model", payload.Model.ID)
+	}
+	if payload.Model.ID != "" {
+		snap.SetAttribute("model_id", payload.Model.ID)
+	}
+
+	snap.Timestamp = payloadReceivedAt(payload)
+	snap.Status = statusFromQuota(snap, payload)
 
 	projectQuotaMetrics(snap, payload)
 
@@ -194,6 +205,12 @@ func projectQuotaMetrics(snap *core.UsageSnapshot, payload statusLinePayload) {
 
 	modelID := strings.TrimSpace(payload.Model.ID)
 	modelName := strings.TrimSpace(payload.Model.DisplayName)
+	if modelName == "" && snap != nil {
+		modelName = snap.Attributes["model"]
+	}
+	if modelID == "" && snap != nil {
+		modelID = snap.Attributes["model_id"]
+	}
 	if modelName == "" {
 		modelName = modelID
 	}
@@ -393,8 +410,17 @@ func getPoolRemainingFraction(payload statusLinePayload, poolKeywords ...string)
 	return worst, found
 }
 
-func statusFromQuota(payload statusLinePayload) core.Status {
-	model := strings.ToLower(payload.Model.DisplayName)
+func statusFromQuota(snap *core.UsageSnapshot, payload statusLinePayload) core.Status {
+	model := ""
+	if snap != nil {
+		model = strings.ToLower(snap.Attributes["model"])
+		if model == "" {
+			model = strings.ToLower(snap.Attributes["model_id"])
+		}
+	}
+	if model == "" {
+		model = strings.ToLower(payload.Model.DisplayName)
+	}
 	if model == "" {
 		model = strings.ToLower(payload.Model.ID)
 	}
@@ -428,6 +454,9 @@ func statusFromQuota(payload statusLinePayload) core.Status {
 			return core.StatusLimited
 		}
 		if geminiRem < quotaNearLimitRatio && claudeRem < quotaNearLimitRatio {
+			return core.StatusNearLimit
+		}
+		if (geminiRem <= 0 && claudeRem < quotaNearLimitRatio) || (claudeRem <= 0 && geminiRem < quotaNearLimitRatio) {
 			return core.StatusNearLimit
 		}
 		return core.StatusOK

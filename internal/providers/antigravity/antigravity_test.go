@@ -246,6 +246,107 @@ func TestParseHookPayloadRejected(t *testing.T) {
 	}
 }
 
+func TestFetchQuotaNearLimitIsStatusNearLimit(t *testing.T) {
+	quotaServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{
+			"groups": [
+				{
+					"displayName": "Gemini Models",
+					"buckets": [
+						{"bucketId":"gemini-weekly","remainingFraction":0.80,"resetTime":"2030-09-02T03:31:19Z","window":"weekly"},
+						{"bucketId":"gemini-5h","remainingFraction":0.03,"resetTime":"2030-08-29T16:49:43Z","window":"5h"}
+					]
+				},
+				{
+					"displayName": "Claude and GPT models",
+					"buckets": [
+						{"bucketId":"3p-weekly","remainingFraction":0.90,"resetTime":"2030-09-02T23:42:57Z","window":"weekly"},
+						{"bucketId":"3p-5h","remainingFraction":0.85,"resetTime":"2030-08-29T19:39:50Z","window":"5h"}
+					]
+				}
+			]
+		}`))
+	}))
+	defer quotaServer.Close()
+
+	configDir := t.TempDir()
+	writeTestToken(t, filepath.Join(configDir, oauthTokenFile), "access-token", "2030-01-01T00:00:00Z", "refresh-token")
+
+	p := New()
+	p.HTTPClient = quotaServer.Client()
+	snap, err := p.Fetch(context.Background(), core.AccountConfig{
+		ID:       "antigravity-chaos",
+		Provider: "antigravity",
+		ProviderPaths: map[string]string{
+			"config_dir": configDir,
+		},
+		RuntimeHints: map[string]string{
+			"box_name":       "chaos",
+			"model":          "gemini",
+			"quota_endpoint": quotaServer.URL + "/v1internal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch() error = %v", err)
+	}
+	if snap.Status != core.StatusNearLimit {
+		t.Fatalf("status = %q, want %q", snap.Status, core.StatusNearLimit)
+	}
+	if got := *snap.Metrics["quota_gemini_5h"].Remaining; math.Abs(got-3.0) > 0.001 {
+		t.Errorf("quota_gemini_5h = %v, want 3.0", got)
+	}
+}
+
+func TestFetchQuotaClaudeLimitedGeminiHealthyIsStatusOK(t *testing.T) {
+	quotaServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{
+			"groups": [
+				{
+					"displayName": "Gemini Models",
+					"buckets": [
+						{"bucketId":"gemini-weekly","remainingFraction":0.80,"resetTime":"2030-09-02T03:31:19Z","window":"weekly"},
+						{"bucketId":"gemini-5h","remainingFraction":0.50,"resetTime":"2030-08-29T16:49:43Z","window":"5h"}
+					]
+				},
+				{
+					"displayName": "Claude and GPT models",
+					"buckets": [
+						{"bucketId":"3p-weekly","remainingFraction":0.0,"resetTime":"2030-09-02T23:42:57Z","window":"weekly"},
+						{"bucketId":"3p-5h","remainingFraction":0.0,"resetTime":"2030-08-29T19:39:50Z","window":"5h"}
+					]
+				}
+			]
+		}`))
+	}))
+	defer quotaServer.Close()
+
+	configDir := t.TempDir()
+	writeTestToken(t, filepath.Join(configDir, oauthTokenFile), "access-token", "2030-01-01T00:00:00Z", "refresh-token")
+
+	p := New()
+	p.HTTPClient = quotaServer.Client()
+	snap, err := p.Fetch(context.Background(), core.AccountConfig{
+		ID:       "antigravity-chaos",
+		Provider: "antigravity",
+		ProviderPaths: map[string]string{
+			"config_dir": configDir,
+		},
+		RuntimeHints: map[string]string{
+			"box_name":       "chaos",
+			"quota_endpoint": quotaServer.URL + "/v1internal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch() error = %v", err)
+	}
+	if snap.Status != core.StatusOK {
+		t.Fatalf("status = %q, want %q", snap.Status, core.StatusOK)
+	}
+	if got := *snap.Metrics["quota_gemini_5h"].Remaining; math.Abs(got-50.0) > 0.001 {
+		t.Errorf("quota_gemini_5h = %v, want 50.0", got)
+	}
+}
+
 func writeTestToken(t *testing.T, path, access, expiry, refresh string) {
 	t.Helper()
 	payload := oauthTokenFilePayload{
