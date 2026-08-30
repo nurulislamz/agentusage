@@ -76,6 +76,14 @@ type AccountView struct {
 	DetailSections []DetailSection  `json:"detail_sections"`
 	Resets         []ResetPill      `json:"resets,omitempty"`
 	DailyCost      []core.TimePoint `json:"daily_cost,omitempty"`
+
+	// HTML fragments rendered from the same TUI functions the terminal uses.
+	DetailHTML  string `json:"detail_html,omitempty"`
+	BadgeHTML   string `json:"badge_html,omitempty"`
+	IconHTML    string `json:"icon_html,omitempty"`
+	StripHTML   string `json:"strip_html,omitempty"`
+	SummaryHTML string `json:"summary_html,omitempty"`
+	ResetHint   string `json:"reset_hint,omitempty"`
 }
 
 type DetailSection struct {

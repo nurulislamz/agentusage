@@ -11,14 +11,14 @@
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-  <div id="app" class="dash" hidden>
-    <header id="header" class="dash-header" aria-label="Dashboard header"></header>
-    <div class="dash-body">
-      <nav id="nav" class="dash-nav" aria-label="Providers"></nav>
-      <div class="dash-vsep" aria-hidden="true"></div>
-      <main id="panel" class="dash-panel" aria-label="Provider detail"></main>
+  <div id="app" class="term" hidden>
+    <header id="header" class="term-header"></header>
+    <div class="term-body">
+      <nav id="nav" class="term-nav" aria-label="Providers"></nav>
+      <div class="term-vsep" aria-hidden="true"></div>
+      <main id="panel" class="term-panel" aria-label="Detail"></main>
     </div>
-    <footer id="footer" class="dash-footer" aria-label="Status bar"></footer>
+    <footer id="footer" class="term-footer"></footer>
   </div>
 
   <div id="splash" class="splash">
@@ -42,6 +42,12 @@
       <p id="token-error" class="error" hidden></p>
       <button type="submit">Continue</button>
     </form>
+  </div>
+
+  <div id="filter-bar" class="filter-bar" hidden>
+    <label for="filter-input">/</label>
+    <input id="filter-input" type="text" spellcheck="false" autocomplete="off" placeholder="filter providers…">
+    <span class="dim">Esc cancel · Enter apply</span>
   </div>
 
   <script src="/app.js"></script>

@@ -2,6 +2,8 @@
   "use strict";
 
   const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  const SEP = "━".repeat(160);
+  const VSEP = Array.from({ length: 80 }, () => "┃").join("\n");
 
   const state = {
     envelope: null,
@@ -14,6 +16,7 @@
     refreshing: false,
     spinnerFrame: 0,
     error: null,
+    filterOpen: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -24,8 +27,9 @@
       if (k === "class") node.className = v;
       else if (k === "text") node.textContent = v;
       else if (k === "html") node.innerHTML = v;
-      else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2).toLowerCase(), v);
-      else if (v != null) node.setAttribute(k, v);
+      else if (k.startsWith("on") && typeof v === "function") {
+        node.addEventListener(k.slice(2).toLowerCase(), v);
+      } else if (v != null) node.setAttribute(k, v);
     }
     for (const child of children) {
       if (child != null) node.append(child);
@@ -40,25 +44,28 @@
       case "LIMITED":
       case "ERROR": return "crit";
       case "AUTH_REQUIRED": return "auth";
-      default: return "";
+      default: return "dim";
     }
-  }
-
-  function renderMiniGauge(percent, width = 8) {
-    if (percent < 0 || !Number.isFinite(percent)) return "";
-    const pct = Math.min(100, Math.max(0, percent));
-    const filled = Math.round((pct / 100) * width);
-    return "█".repeat(filled) + "░".repeat(Math.max(0, width - filled));
   }
 
   function applyThemeTokens(tokens, override) {
     const root = document.documentElement;
     if (override === "light") {
       root.dataset.theme = "light";
+      root.style.cssText = [
+        "--base:#f4f1ea", "--mantle:#fffdf8", "--surface0:#ebe6dc",
+        "--surface1:#ddd6c8", "--surface2:#cfc7b8", "--text:#2c2823",
+        "--subtext:#6d6760", "--dim:#9c958d", "--accent:#7c5cbf",
+        "--blue:#3d6fb8", "--sapphire:#2f8f86", "--green:#2f9e6d",
+        "--yellow:#b5811a", "--red:#c65746", "--peach:#c67a3a",
+        "--teal:#2f8f86", "--lavender:#6b5cae", "--mauve:#6b5cae",
+        "--ok:#2f9e6d", "--warn:#b5811a", "--crit:#c65746", "--auth:#c67a3a",
+      ].join(";");
       return;
     }
     if (!tokens || !tokens.base) {
       root.dataset.theme = "deep-space";
+      root.style.cssText = "";
       return;
     }
     root.dataset.theme = "dynamic";
@@ -86,9 +93,10 @@
       "--crit": tokens.red,
       "--auth": tokens.peach,
     };
-    for (const [key, val] of Object.entries(map)) {
-      if (val) root.style.setProperty(key, val);
-    }
+    root.style.cssText = Object.entries(map)
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}:${v}`)
+      .join(";");
   }
 
   function cycleThemeOverride() {
@@ -135,7 +143,9 @@
       state.error = null;
       applyThemeTokens(state.envelope.theme_tokens, state.themeOverride);
       const visible = filteredViews();
-      if (state.selected >= visible.length) state.selected = Math.max(0, visible.length - 1);
+      if (state.selected >= visible.length) {
+        state.selected = Math.max(0, visible.length - 1);
+      }
       showDashboard(state.views.length > 0);
       render();
     } catch (err) {
@@ -191,20 +201,24 @@
     if (counts.err) countParts.push(el("span", { class: "crit", text: `${counts.err}✗` }));
 
     const filterLabel = state.filter ? " (filtered)" : "";
-    const line = el("div", { class: "dash-header-line" }, [
+    const usageMode = env?.usage_mode || "remaining";
+    const modeLabel = usageMode === "used" ? "Used" : "Remaining";
+
+    const line = el("div", { class: "header-line" }, [
       el("span", { class: "brand-bolt", text: "⚡" }),
       el("span", { class: "brand-name", text: "agentUsage" }),
+      el("span", { class: "screen-tab active", text: "1:Dashboard" }),
       el("span", { class: "header-counts" }, countParts),
       spinner,
       el("span", {
         class: "header-meta",
         text: env
-          ? `⊞ ${views.length} provider${views.length === 1 ? "" : "s"}${filterLabel} · ${env.time_window || ""} · ${env.source}`
+          ? `⊞ ${views.length} provider${views.length === 1 ? "" : "s"}${filterLabel} · ${modeLabel} · ${env.time_window || ""}`
           : "connecting…",
       }),
     ]);
 
-    root.append(line, el("div", { class: "header-sep", text: "━".repeat(120) }));
+    root.append(line, el("div", { class: "header-sep", text: SEP }));
   }
 
   function renderFooter() {
@@ -213,7 +227,10 @@
     root.replaceChildren();
 
     const line = el("div", { class: "footer-line" }, [
-      el("span", {}, [el("kbd", { text: "↑" }), document.createTextNode(" "), el("kbd", { text: "↓" }), document.createTextNode(" navigate")]),
+      el("span", {}, [
+        el("kbd", { text: "↑" }), document.createTextNode(" "),
+        el("kbd", { text: "↓" }), document.createTextNode(" navigate"),
+      ]),
       el("span", { text: "·" }),
       el("span", {}, [el("kbd", { text: "/" }), document.createTextNode(" filter")]),
       el("span", { text: "·" }),
@@ -224,12 +241,12 @@
       el("span", {
         class: "dim",
         text: env
-          ? `${env.theme || ""} · ${env.usage_mode || "remaining"} · refresh ${env.refresh_interval_seconds || 30}s · ${new Date(env.generated_at).toLocaleTimeString()}`
+          ? `${env.theme || ""} · ${env.source || ""} · refresh ${env.refresh_interval_seconds || 30}s · ${new Date(env.generated_at).toLocaleTimeString()}`
           : state.error || "offline",
       }),
     ]);
 
-    root.append(el("div", { class: "footer-sep", text: "━".repeat(120) }), line);
+    root.append(el("div", { class: "footer-sep", text: SEP }), line);
   }
 
   function renderNav() {
@@ -253,16 +270,40 @@
       if (isFirst) {
         const groupCount = views.filter((v) => v.provider_id === pID).length;
         const active = pID === selectedProvider;
+        const prefix = active ? "✦ " : "◈ ";
         root.append(el("div", {
-          class: `nav-group-header ${active ? "active" : "inactive"}`,
-          style: active ? `color:${view.accent_color}` : "",
-          text: `${pID.toUpperCase()} (${groupCount})`,
+          class: `nav-group${active ? " active" : ""}`,
+          style: active ? `--item-accent:${view.accent_color};color:${view.accent_color}` : "",
+          text: `${prefix}${pID.toUpperCase()} (${groupCount})`,
         }));
       }
 
       const inGroup = pID === selectedProvider;
       const selected = index === state.selected;
-      const mini = view.gauge_percent >= 0 ? renderMiniGauge(view.gauge_percent) : "";
+      const railChar = selected ? "┃" : (inGroup ? "│" : " ");
+
+      const summaryNode = view.summary_html
+        ? el("span", { class: "nav-summary", html: view.summary_html })
+        : el("span", { class: "nav-summary", text: view.summary || "—" });
+
+      const stripNode = view.strip_html
+        ? el("span", { class: "nav-strip", html: view.strip_html })
+        : null;
+
+      const badgeNode = view.badge_html
+        ? el("span", { class: "nav-badge", html: view.badge_html })
+        : el("span", { class: `nav-badge ${statusClass(view.status)}`, text: view.status_badge || "" });
+
+      const iconNode = view.icon_html
+        ? el("span", { html: view.icon_html })
+        : el("span", { class: statusClass(view.status), text: view.status_icon || "·" });
+
+      const resetNode = view.reset_hint
+        ? el("span", {
+          class: `nav-reset${view.resets?.[0]?.urgent ? " urgent" : ""}`,
+          text: ` · ${view.reset_hint}`,
+        })
+        : null;
 
       root.append(el("button", {
         class: `nav-item${selected ? " selected" : ""}${inGroup && !selected ? " in-group" : ""}`,
@@ -270,100 +311,55 @@
         style: `--item-accent:${view.accent_color}`,
         onclick: () => { state.selected = index; render(); },
       }, [
-        el("div", { class: "nav-row1" }, [
-          el("span", { class: `nav-status ${statusClass(view.status)}`, text: view.status_icon }),
-          el("span", { class: "nav-name", text: view.account_id }),
-          el("span", { class: `nav-badge ${statusClass(view.status)}`, text: view.status_badge }),
+        el("span", { class: "rail", text: railChar }),
+        el("div", { class: "nav-rows" }, [
+          el("div", { class: "nav-row1" }, [
+            iconNode,
+            el("span", { class: "nav-name", text: view.account_id }),
+            badgeNode,
+          ]),
+          el("div", { class: "nav-row2" }, [
+            stripNode,
+            summaryNode,
+            resetNode,
+          ]),
+          el("hr", { class: "nav-sep" }),
         ]),
-        el("div", { class: "nav-row2" }, [
-          el("span", { class: "nav-summary", text: view.summary || "—" }),
-          mini ? el("span", { class: "nav-mini-gauge dim", text: mini }) : null,
-        ]),
-        el("hr", { class: "nav-sep" }),
       ]));
     });
 
     root.querySelector(".nav-item.selected")?.scrollIntoView({ block: "nearest" });
   }
 
-  function renderSparkline(points) {
-    if (!points?.length) return null;
-    const series = points.slice(-14);
-    const max = Math.max(...series.map((p) => p.value || 0), 0.01);
-    const row = el("div", { class: "spark-row" });
-    for (const pt of series) {
-      const bar = el("span", { class: "spark-bar", title: `${pt.date}: $${(pt.value || 0).toFixed(2)}` });
-      bar.style.height = `${Math.max(4, ((pt.value || 0) / max) * 100)}%`;
-      row.append(bar);
-    }
-    return el("div", { class: "spark-wrap" }, [
-      el("div", { class: "tile-section-title", text: "Daily spend" }),
-      row,
-    ]);
-  }
-
   function renderPanel() {
     const views = filteredViews();
     const root = $("panel");
     root.replaceChildren();
-    if (!views.length) return;
+    if (!views.length) {
+      root.append(el("div", { class: "detail-empty", text: "No provider selected." }));
+      return;
+    }
 
     const view = views[state.selected];
-    const tile = el("article", { class: "tile", style: `--tile-accent:${view.accent_color}` });
-
-    tile.append(el("div", { class: "tile-header" }, [
-      el("span", { class: statusClass(view.status), text: view.status_icon }),
-      el("span", { class: "tile-title", text: view.account_id }),
-      el("span", { class: `nav-badge ${statusClass(view.status)}`, text: view.status_badge }),
-      el("span", { class: "dim", text: view.provider_name }),
-    ]));
-    tile.append(el("hr", { class: "tile-accent-sep" }));
-
-    if (view.tag_label || view.tag_emoji) {
-      tile.append(el("div", { class: "tile-tagline" }, [
-        el("span", { text: `${view.tag_emoji || ""} ${view.tag_label || ""}`.trim() }),
-        view.detail ? el("span", { class: "dim", text: view.detail }) : null,
-      ]));
+    if (view.detail_html) {
+      root.append(el("pre", { class: "detail-term", html: view.detail_html }));
+      return;
     }
 
-    if (view.message) {
-      tile.append(el("div", { class: "tile-hero", text: view.message }));
-    } else if (view.summary) {
-      tile.append(el("div", { class: "tile-hero", text: view.summary }));
-    }
-
-    if (view.resets?.length) {
-      tile.append(el("div", { class: "reset-pills" }, view.resets.map((p) =>
-        el("span", { class: `reset-pill${p.urgent ? " urgent" : ""}`, html: `◷ ${p.label} <strong>${p.duration}</strong>` }),
-      )));
-    }
-
-    const spark = renderSparkline(view.daily_cost);
-    if (spark) tile.append(spark);
-
-    if (view.tile_lines?.length) {
-      tile.append(el("pre", { class: "tile-pre", text: view.tile_lines.join("\n") }));
-    }
-
+    // Fallback if detail_html missing (should not happen in current API).
+    const lines = [];
     for (const sec of view.detail_sections || []) {
-      if (!sec.lines?.length) continue;
       const title = [sec.icon, sec.title].filter(Boolean).join(" ");
-      if (title.trim()) tile.append(el("div", { class: "tile-section-title", text: title }));
-      const block = el("pre", { class: "detail-pre" });
-      block.textContent = sec.lines.join("\n");
-      tile.append(block);
+      if (title) lines.push(title);
+      lines.push(...(sec.lines || []));
+      lines.push("");
     }
+    root.append(el("pre", { class: "detail-term", text: lines.join("\n") || view.summary || "—" }));
+  }
 
-    if (view.timestamp) {
-      const ts = new Date(view.timestamp);
-      const diff = Date.now() - ts.getTime();
-      const age = diff > 60000
-        ? `${Math.floor(diff / 60000)}m ago`
-        : ts.toLocaleTimeString();
-      tile.append(el("div", { class: "tile-footer", text: `⏱ ${age}` }));
-    }
-
-    root.append(tile);
+  function renderVSep() {
+    const sep = document.querySelector(".term-vsep");
+    if (sep) sep.textContent = VSEP;
   }
 
   function render() {
@@ -372,6 +368,7 @@
     renderNav();
     renderPanel();
     renderFooter();
+    renderVSep();
   }
 
   function moveSelection(delta) {
@@ -381,11 +378,25 @@
     render();
   }
 
-  function startFilter() {
-    const q = window.prompt("Filter providers", state.filter);
-    if (q == null) return;
-    state.filter = q;
-    state.selected = 0;
+  function openFilter() {
+    state.filterOpen = true;
+    const bar = $("filter-bar");
+    const input = $("filter-input");
+    bar.hidden = false;
+    input.value = state.filter;
+    input.focus();
+    input.select();
+  }
+
+  function closeFilter(apply) {
+    const bar = $("filter-bar");
+    const input = $("filter-input");
+    if (apply) {
+      state.filter = input.value;
+      state.selected = 0;
+    }
+    state.filterOpen = false;
+    bar.hidden = true;
     render();
   }
 
@@ -396,8 +407,19 @@
     load().catch(console.error);
   });
 
+  $("filter-input").addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      closeFilter(true);
+    } else if (ev.key === "Escape") {
+      ev.preventDefault();
+      closeFilter(false);
+    }
+  });
+
   document.addEventListener("keydown", (ev) => {
     if ($("token-modal").hidden === false) return;
+    if (state.filterOpen) return;
     if (ev.target.matches("input, textarea")) return;
     switch (ev.key) {
       case "ArrowUp":
@@ -412,7 +434,7 @@
         break;
       case "/":
         ev.preventDefault();
-        startFilter();
+        openFilter();
         break;
       case "r":
       case "R":
