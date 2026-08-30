@@ -109,52 +109,6 @@ Background data collection system with server/client architecture:
 
 Scans for installed tools (Cursor, Claude Code, Codex, Copilot, Gemini CLI, Antigravity, OpenCode, Aider, Ollama, Amp, Goose, etc.) and environment variables for API keys. Auto-detected accounts merge with manually configured ones; configured accounts take precedence.
 
-## Skills
-
-### Full Lifecycle (end-to-end)
-
-`/develop-feature <name>` — Orchestrates the full lifecycle from idea to PR. Chains all skills below with user decision points between each phase. Start here for new features.
-
-Full specification: `docs/skills/develop-feature/SKILL.md`
-
-### Individual Skills
-
-Use these directly when you need a specific phase, or let `/develop-feature` chain them:
-
-| Command | Skill | Purpose |
-|---------|-------|---------|
-| `/design-feature <name>` | [SKILL.md](docs/skills/design-feature/SKILL.md) | Design a feature: quiz, explore codebase, write design doc with tasks |
-| `/review-design <name>` | [SKILL.md](docs/skills/review-design/SKILL.md) | Validate design doc against codebase, fix discrepancies via quiz loop |
-| `/implement-feature <name>` | [SKILL.md](docs/skills/implement-feature/SKILL.md) | Execute design tasks with tests, parallel where possible |
-| `/validate-feature <name>` | [SKILL.md](docs/skills/validate-feature/SKILL.md) | Verify build, tests, design compliance, code quality |
-| `/iterate-feature <name>` | [SKILL.md](docs/skills/iterate-feature/SKILL.md) | Triage and fix issues from validation or PR review |
-| `/finalize-feature <name>` | [SKILL.md](docs/skills/finalize-feature/SKILL.md) | Create branch, commit, open PR with summary |
-| `/add-new-provider <name>` | [add-new-provider.md](docs/skills/add-new-provider.md) | Add a new AI provider (specialized 7-phase process) |
-
-### Release
-
-| Command | Skill | Purpose |
-|---------|-------|---------|
-| `/cut-release` | [SKILL.md](docs/skills/cut-release/SKILL.md) | Tag, push, and publish a GitHub release with hand-crafted notes |
-
-### Meta / Tooling
-
-| Command | Skill | Purpose |
-|---------|-------|---------|
-| `/dev-workflow-improvements` | [SKILL.md](docs/skills/dev-workflow-improvements/SKILL.md) | Audit dev workflow, sync tool configs, validate skill completeness |
-
-### Lifecycle Flow
-
-```
-/design-feature  →  /review-design  →  /implement-feature  →  /validate-feature  →  /iterate-feature  →  [docs sweep]  →  /finalize-feature
-```
-
-Each skill has a design doc in `docs/skills/<name>/` and a slash command in `.claude/commands/<name>.md`.
-
-### Documentation is unified in README.md
-
-All user-facing documentation is unified into `README.md` as the single source of truth. Every PR that modifies user-facing features, commands, flags, or providers must update `README.md` to keep documentation accurate, self-contained, and complete.
-
 ## Key design notes
 
 - CGO is required due to `github.com/mattn/go-sqlite3` (Cursor provider + telemetry store). This affects cross-compilation.

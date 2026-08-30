@@ -67,7 +67,6 @@ internal/
   version/              build metadata injected by ldflags
 plugins/                integration install scripts/templates
 configs/                example settings
-docs/skills/            feature and provider implementation workflows
 ```
 
 ## Provider Model
@@ -132,9 +131,6 @@ Current provider set (37 providers): `openai`, `anthropic`, `azure_openai`,
 
 ## Adding a Provider
 
-For complete workflow and checklists, follow:
-[`docs/skills/add-new-provider.md`](docs/skills/add-new-provider.md)
-
 Minimum sequence:
 
 1. Quiz requirements and auth/data model.
@@ -143,19 +139,6 @@ Minimum sequence:
 4. Add widget/detail config (`Spec`, optional `widget.go`).
 5. Register in `registry.go`, detection in `internal/detect/`, and example config.
 6. Verify with `go build`, `go test`, `make vet`.
-
-## Repo Skills
-
-For larger changes, use these workflow docs in `docs/skills/`:
-
-- `develop-feature`
-- `design-feature`
-- `review-design`
-- `implement-feature`
-- `validate-feature`
-- `iterate-feature`
-- `finalize-feature`
-- `agentusage-provider` (provider-specific guidance)
 
 ## Commit Style
 
