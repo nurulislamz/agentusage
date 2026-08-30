@@ -102,16 +102,16 @@ func TestLookupCustomOverride_NormalizesID(t *testing.T) {
 func TestLoadCustomOverrides_ReadsXDGPath(t *testing.T) {
 	tmp := t.TempDir()
 	xdg := filepath.Join(tmp, "xdg")
-	if err := os.MkdirAll(filepath.Join(xdg, "openusage"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(xdg, "agentusage"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	path := filepath.Join(xdg, "openusage", CustomOverridesFilename)
+	path := filepath.Join(xdg, "agentusage", CustomOverridesFilename)
 	body := []byte(`{"models": {"override-target": {"input_cost_per_million_tokens": 7, "output_cost_per_million_tokens": 21}}}`)
 	if err := os.WriteFile(path, body, 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", xdg)
-	t.Setenv("OPENUSAGE_CUSTOM_PRICING", "")
+	t.Setenv("AGENTUSAGE_CUSTOM_PRICING", "")
 
 	table, err := LoadCustomOverrides()
 	if err != nil {
@@ -129,7 +129,7 @@ func TestLoadCustomOverrides_ReadsXDGPath(t *testing.T) {
 func TestLoadCustomOverrides_MissingFileIsNotError(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmp)
-	t.Setenv("OPENUSAGE_CUSTOM_PRICING", "")
+	t.Setenv("AGENTUSAGE_CUSTOM_PRICING", "")
 	table, err := LoadCustomOverrides()
 	if err != nil {
 		t.Fatalf("err: %v", err)

@@ -13,17 +13,17 @@ var (
 
 func isTraceEnabled() bool {
 	traceEnabledOnce.Do(func() {
-		traceEnabled = os.Getenv("OPENUSAGE_DEBUG") != ""
+		traceEnabled = os.Getenv("AGENTUSAGE_DEBUG") != ""
 	})
 	return traceEnabled
 }
 
-// DebugEnabled reports whether OPENUSAGE_DEBUG is enabled.
+// DebugEnabled reports whether AGENTUSAGE_DEBUG is enabled.
 func DebugEnabled() bool {
 	return isTraceEnabled()
 }
 
-// Tracef logs a formatted message to stderr when OPENUSAGE_DEBUG is set.
+// Tracef logs a formatted message to stderr when AGENTUSAGE_DEBUG is set.
 // The env check result is cached after the first call.
 func Tracef(format string, args ...any) {
 	if !DebugEnabled() {

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func float64Ptr(v float64) *float64 {
@@ -206,7 +206,7 @@ func TestCollectProviderClientMix_IgnoresSourceSeriesWhenClientSeriesExists(t *t
 				{Date: "2026-03-04", Value: 4},
 				{Date: "2026-03-05", Value: 6},
 			},
-			"usage_source_openusage": {
+			"usage_source_agentusage": {
 				{Date: "2026-03-04", Value: 40},
 				{Date: "2026-03-05", Value: 60},
 			},
@@ -219,7 +219,7 @@ func TestCollectProviderClientMix_IgnoresSourceSeriesWhenClientSeriesExists(t *t
 
 	clients, _ := collectProviderClientMix(snap)
 
-	if _, ok := clientByName(clients, "openusage"); ok {
+	if _, ok := clientByName(clients, "agentusage"); ok {
 		t.Fatalf("unexpected workspace-derived client bucket present: %+v", clients)
 	}
 	if _, ok := clientByName(clients, "codex"); ok {
@@ -261,8 +261,8 @@ func TestCollectProviderClientMix_DoesNotDoubleCountRequestsTodayFallback(t *tes
 func TestCollectProviderProjectMix_UsesMetricsAndDailySeriesFallback(t *testing.T) {
 	snap := core.UsageSnapshot{
 		Metrics: map[string]core.Metric{
-			"project_openusage_requests":               {Used: float64Ptr(4), Unit: "requests"},
-			"project_openusage_requests_today":         {Used: float64Ptr(1), Unit: "requests"},
+			"project_agentusage_requests":              {Used: float64Ptr(4), Unit: "requests"},
+			"project_agentusage_requests_today":        {Used: float64Ptr(1), Unit: "requests"},
 			"project_garage_tracker_requests_today":    {Used: float64Ptr(2), Unit: "requests"},
 			"project_garage_tracker_notes_requests":    {Used: nil, Unit: "requests"},
 			"project_garage_tracker_notes_other_field": {Used: float64Ptr(9), Unit: "count"},
@@ -277,15 +277,15 @@ func TestCollectProviderProjectMix_UsesMetricsAndDailySeriesFallback(t *testing.
 
 	projects, usedKeys := collectProviderProjectMix(snap)
 
-	openusage, ok := projectByName(projects, "openusage")
+	agentusage, ok := projectByName(projects, "agentusage")
 	if !ok {
-		t.Fatalf("missing openusage project bucket: %+v", projects)
+		t.Fatalf("missing agentusage project bucket: %+v", projects)
 	}
-	if openusage.requests != 4 {
-		t.Fatalf("openusage requests = %.0f, want 4", openusage.requests)
+	if agentusage.requests != 4 {
+		t.Fatalf("agentusage requests = %.0f, want 4", agentusage.requests)
 	}
-	if openusage.requests1d != 1 {
-		t.Fatalf("openusage requests1d = %.0f, want 1", openusage.requests1d)
+	if agentusage.requests1d != 1 {
+		t.Fatalf("agentusage requests1d = %.0f, want 1", agentusage.requests1d)
 	}
 
 	garageTracker, ok := projectByName(projects, "garage_tracker")
@@ -299,7 +299,7 @@ func TestCollectProviderProjectMix_UsesMetricsAndDailySeriesFallback(t *testing.
 		t.Fatalf("garage_tracker requests1d = %.0f, want 2", garageTracker.requests1d)
 	}
 
-	if !usedKeys["project_openusage_requests"] || !usedKeys["project_garage_tracker_requests_today"] {
+	if !usedKeys["project_agentusage_requests"] || !usedKeys["project_garage_tracker_requests_today"] {
 		t.Fatalf("expected project metric keys to be consumed, got: %+v", usedKeys)
 	}
 }
@@ -308,7 +308,7 @@ func TestBuildProviderProjectBreakdownLines_RendersBreakdown(t *testing.T) {
 	snap := core.UsageSnapshot{
 		AccountID: "codex-cli",
 		Metrics: map[string]core.Metric{
-			"project_openusage_requests":            {Used: float64Ptr(2), Unit: "requests"},
+			"project_agentusage_requests":           {Used: float64Ptr(2), Unit: "requests"},
 			"project_garage_tracker_requests":       {Used: float64Ptr(3), Unit: "requests"},
 			"project_garage_tracker_requests_today": {Used: float64Ptr(1), Unit: "requests"},
 		},
@@ -322,10 +322,10 @@ func TestBuildProviderProjectBreakdownLines_RendersBreakdown(t *testing.T) {
 	if !strings.Contains(joined, "Project Breakdown") {
 		t.Fatalf("missing project breakdown heading: %q", joined)
 	}
-	if !strings.Contains(joined, "openusage") || !strings.Contains(joined, "garage_tracker") {
+	if !strings.Contains(joined, "agentusage") || !strings.Contains(joined, "garage_tracker") {
 		t.Fatalf("missing project rows in breakdown: %q", joined)
 	}
-	if !used["project_openusage_requests"] || !used["project_garage_tracker_requests"] {
+	if !used["project_agentusage_requests"] || !used["project_garage_tracker_requests"] {
 		t.Fatalf("expected project metric keys to be marked used: %+v", used)
 	}
 }

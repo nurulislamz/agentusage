@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // PathHintTasksDirKey is the AccountConfig hint key used to override the
@@ -103,7 +103,7 @@ func (v VSCodeVariant) rootsFor(home string) []string {
 // VSCodeGlobalStorageRoots returns every candidate VS Code globalStorage
 // root we should probe for installed Roo Code / Kilo Code extensions.
 // The list is OS-aware; on Linux we additionally probe Windows-mounted
-// WSL paths under /mnt/c/Users so a user running OpenUsage inside WSL can
+// WSL paths under /mnt/c/Users so a user running agentUsage inside WSL can
 // still see usage logged by their Windows-side VS Code install.
 func VSCodeGlobalStorageRoots() []string {
 	home, err := os.UserHomeDir()

@@ -32,7 +32,7 @@ func builtinSegments() map[string]segmentFunc {
 }
 
 // SegmentNames returns the list of built-in segment names. Used by the
-// `openusage tmux variables` command.
+// `agentusage tmux variables` command.
 func SegmentNames() []string {
 	segs := builtinSegments()
 	out := make([]string, 0, len(segs))

@@ -10,7 +10,7 @@ func TestDetectKimiCLI_None(t *testing.T) {
 	home := t.TempDir()
 	setHome(t, home)
 	t.Setenv("PATH", t.TempDir())
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", t.TempDir())
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", t.TempDir())
 
 	var result Result
 	detectKimiCLI(&result)
@@ -26,7 +26,7 @@ func TestDetectKimiCLI_FromSessionsDir(t *testing.T) {
 	home := t.TempDir()
 	setHome(t, home)
 	t.Setenv("PATH", t.TempDir())
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", t.TempDir())
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", t.TempDir())
 
 	if err := os.MkdirAll(filepath.Join(home, ".kimi", "sessions"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -53,7 +53,7 @@ func TestDetectKimiCLI_FromConfigFile(t *testing.T) {
 	home := t.TempDir()
 	setHome(t, home)
 	t.Setenv("PATH", t.TempDir())
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", t.TempDir())
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", t.TempDir())
 
 	if err := os.MkdirAll(filepath.Join(home, ".kimi"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -86,7 +86,7 @@ func TestDetectKimiCLI_DoesNotCollideWithMoonshot(t *testing.T) {
 	home := t.TempDir()
 	setHome(t, home)
 	t.Setenv("PATH", t.TempDir())
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", t.TempDir())
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", t.TempDir())
 
 	if err := os.MkdirAll(filepath.Join(home, ".kimi", "sessions"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -109,7 +109,7 @@ func TestDetectKimiCLI_FromBinaryOnPATH(t *testing.T) {
 	binDir := t.TempDir()
 	writeFakeBinary(t, binDir, "kimi")
 	t.Setenv("PATH", binDir)
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", binDir)
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", binDir)
 
 	var result Result
 	detectKimiCLI(&result)

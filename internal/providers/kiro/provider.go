@@ -35,9 +35,9 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 // ID is the canonical provider identifier registered in the providers
@@ -75,7 +75,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Install Kiro CLI (the renamed Amazon Q Developer CLI) and run at least one chat session.",
-					"openusage auto-detects data.sqlite3 in the Kiro CLI data directory; no configuration required.",
+					"agentusage auto-detects data.sqlite3 in the Kiro CLI data directory; no configuration required.",
 					"Token estimation is experimental — please file an issue with your data.sqlite3 .schema output if values look wrong.",
 				},
 			},

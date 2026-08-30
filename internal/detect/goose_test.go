@@ -8,7 +8,7 @@ import (
 
 func TestDetectGoose_NeitherBinNorDB(t *testing.T) {
 	// Force PATH lookup to find nothing.
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", t.TempDir())
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", t.TempDir())
 	t.Setenv("PATH", "")
 	t.Setenv("GOOSE_PATH_ROOT", filepath.Join(t.TempDir(), "missing-root"))
 	setHome(t, t.TempDir())
@@ -39,7 +39,7 @@ func TestDetectGoose_DBOnlyRegistersAccount(t *testing.T) {
 
 	t.Setenv("GOOSE_PATH_ROOT", root)
 	// Prevent finding a real goose binary on the dev machine.
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", t.TempDir())
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", t.TempDir())
 	t.Setenv("PATH", "")
 
 	var result Result
@@ -67,7 +67,7 @@ func TestDetectGoose_BinaryRegistersTool(t *testing.T) {
 	// Fabricate a goose binary on PATH.
 	binDir := t.TempDir()
 	binPath := writeFakeBinary(t, binDir, "goose")
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", binDir)
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", binDir)
 	t.Setenv("PATH", "")
 	t.Setenv("GOOSE_PATH_ROOT", filepath.Join(t.TempDir(), "missing-root"))
 	setHome(t, t.TempDir())

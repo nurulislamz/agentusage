@@ -26,6 +26,7 @@ func AllDefinitions() []Definition {
 		claudeCodeDef(),
 		codexDef(),
 		opencodeDef(),
+		antigravityDef(),
 		cursorDef(),
 	}
 }
@@ -113,7 +114,7 @@ func opencodeDef() Definition {
 		Template:    opencodeTemplate,
 
 		TargetFileFunc: func(dirs Dirs) string {
-			return filepath.Join(dirs.ConfigRoot, "opencode", "plugins", "openusage-telemetry.ts")
+			return filepath.Join(dirs.ConfigRoot, "opencode", "plugins", "agentusage-telemetry.ts")
 		},
 		ConfigFileFunc: func(dirs Dirs) string {
 			return filepath.Join(dirs.ConfigRoot, "opencode", "opencode.json")
@@ -129,15 +130,46 @@ func opencodeDef() Definition {
 	}
 }
 
-func cursorDef() Definition {
+func antigravityDef() Definition {
 	return Definition{
-		ID:          CursorID,
-		Name:        "Cursor Status Line",
-		Description: "Status-line bridge for Cursor CLI",
-		Type:        TypeHookScript,
+		ID:             AntigravityID,
+		Name:           "Antigravity Status Line",
+		Description:    "Status-line bridge for Antigravity CLI",
+		Type:           TypeHookScript,
 		WritesArtifact: func(Dirs) bool { return false },
 		TargetFileFunc: func(dirs Dirs) string {
-			return dirs.OpenusageBin
+			return dirs.AgentusageBin
+		},
+		ConfigFileFunc: func(dirs Dirs) string {
+			if f := strings.TrimSpace(os.Getenv("ANTIGRAVITY_SETTINGS_FILE")); f != "" {
+				return f
+			}
+			configDir := strings.TrimSpace(os.Getenv("ANTIGRAVITY_CONFIG_DIR"))
+			if configDir == "" {
+				configDir = filepath.Join(dirs.Home, ".gemini", "antigravity-cli")
+			}
+			return filepath.Join(configDir, "settings.json")
+		},
+		ConfigFormat:  ConfigJSON,
+		ConfigPatcher: patchAntigravityConfig,
+		Detector:      detectAntigravityStatus,
+
+		MatchProviderIDs:  []string{"antigravity"},
+		MatchToolNameHint: "Antigravity CLI",
+		TemplateFileMode:  0o755,
+		EscapeBin:         escapeForShellString,
+	}
+}
+
+func cursorDef() Definition {
+	return Definition{
+		ID:             CursorID,
+		Name:           "Cursor Status Line",
+		Description:    "Status-line bridge for Cursor CLI",
+		Type:           TypeHookScript,
+		WritesArtifact: func(Dirs) bool { return false },
+		TargetFileFunc: func(dirs Dirs) string {
+			return dirs.AgentusageBin
 		},
 		ConfigFileFunc: func(dirs Dirs) string {
 			if f := strings.TrimSpace(os.Getenv("CURSOR_SETTINGS_FILE")); f != "" {
@@ -227,7 +259,7 @@ func patchClaudeCodeConfig(configData []byte, targetFile string, install bool) (
 }
 
 func patchCodexConfig(configData []byte, targetFile string, install bool) ([]byte, error) {
-	// targetFile is the script path on Unix or the openusage binary path on
+	// targetFile is the script path on Unix or the agentusage binary path on
 	// Windows; codexNotifyTOML renders the platform-correct notify assignment
 	// (basic string array on Unix, literal string array invoking the binary on
 	// Windows so backslashes survive).
@@ -305,7 +337,7 @@ func patchOpenCodeConfig(configData []byte, targetFile string, install bool) ([]
 		}
 	} else {
 		plugins = slices.DeleteFunc(plugins, func(s string) bool {
-			return s == pluginURL || strings.Contains(s, "openusage-telemetry.ts")
+			return s == pluginURL || strings.Contains(s, "agentusage-telemetry.ts")
 		})
 	}
 	cfg["plugin"] = plugins
@@ -315,6 +347,62 @@ func patchOpenCodeConfig(configData []byte, targetFile string, install bool) ([]
 		return nil, fmt.Errorf("serialize opencode config: %w", err)
 	}
 	return append(payload, '\n'), nil
+}
+
+func patchAntigravityConfig(configData []byte, targetFile string, install bool) ([]byte, error) {
+	if !install && len(bytes.TrimSpace(configData)) == 0 {
+		return configData, nil
+	}
+
+	cfg := map[string]any{}
+	if len(bytes.TrimSpace(configData)) > 0 {
+		if err := json.Unmarshal(configData, &cfg); err != nil {
+			return nil, fmt.Errorf("parse antigravity settings: %w", err)
+		}
+	}
+
+	statusLine, _ := cfg["statusLine"].(map[string]any)
+	existingCommand := ""
+	if statusLine != nil {
+		existingCommand = strings.TrimSpace(stringOrEmpty(statusLine["command"]))
+	}
+
+	if install {
+		if existingCommand != "" && !isAntigravityagentUsageCommand(existingCommand) {
+			return nil, fmt.Errorf("antigravity statusLine.command is already configured with another command")
+		}
+		if statusLine == nil {
+			statusLine = map[string]any{}
+		}
+		statusLine["type"] = "command"
+		statusLine["command"] = antigravityStatuslineCommand(targetFile)
+		statusLine["enabled"] = true
+		statusLine["stack_with_default"] = true
+		cfg["statusLine"] = statusLine
+	} else if isAntigravityagentUsageCommand(existingCommand) {
+		delete(cfg, "statusLine")
+	} else {
+		return configData, nil
+	}
+
+	payload, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("serialize antigravity settings: %w", err)
+	}
+	return append(payload, '\n'), nil
+}
+
+func antigravityStatuslineCommand(targetFile string) string {
+	targetFile = strings.TrimSpace(targetFile)
+	if targetFile == "" {
+		targetFile = "agentusage"
+	}
+	return fmt.Sprintf("\"%s\" antigravity statusline", escapeForShellString(targetFile))
+}
+
+func isAntigravityagentUsageCommand(command string) bool {
+	command = strings.ToLower(strings.TrimSpace(command))
+	return strings.Contains(command, "antigravity statusline") || strings.Contains(command, "agentusage antigravity")
 }
 
 func patchCursorConfig(configData []byte, targetFile string, install bool) ([]byte, error) {
@@ -336,7 +424,7 @@ func patchCursorConfig(configData []byte, targetFile string, install bool) ([]by
 	}
 
 	if install {
-		if existingCommand != "" && !isCursorOpenUsageCommand(existingCommand) {
+		if existingCommand != "" && !isCursoragentUsageCommand(existingCommand) {
 			return nil, fmt.Errorf("cursor statusLine.command is already configured with another command")
 		}
 		if statusLine == nil {
@@ -345,7 +433,7 @@ func patchCursorConfig(configData []byte, targetFile string, install bool) ([]by
 		statusLine["type"] = "command"
 		statusLine["command"] = cursorStatuslineCommand(targetFile)
 		cfg["statusLine"] = statusLine
-	} else if isCursorOpenUsageCommand(existingCommand) {
+	} else if isCursoragentUsageCommand(existingCommand) {
 		delete(cfg, "statusLine")
 	} else {
 		return configData, nil
@@ -361,12 +449,12 @@ func patchCursorConfig(configData []byte, targetFile string, install bool) ([]by
 func cursorStatuslineCommand(targetFile string) string {
 	targetFile = strings.TrimSpace(targetFile)
 	if targetFile == "" {
-		targetFile = "openusage"
+		targetFile = "agentusage"
 	}
 	return fmt.Sprintf("\"%s\" cursor statusline", escapeForShellString(targetFile))
 }
 
-func isCursorOpenUsageCommand(command string) bool {
+func isCursoragentUsageCommand(command string) bool {
 	command = strings.ToLower(strings.TrimSpace(command))
 	return strings.Contains(command, "cursor statusline")
 }
@@ -410,7 +498,7 @@ func detectCodexStatus(dirs Dirs) Status {
 		DesiredVersion: IntegrationVersion,
 	}
 
-	// On platforms where Codex registers the openusage binary directly (no
+	// On platforms where Codex registers the agentusage binary directly (no
 	// script artifact), "installed" tracks the config registration rather than
 	// a file on disk; deriveState then keys off Configured.
 	if def.WritesArtifact == nil || def.WritesArtifact(dirs) {
@@ -467,7 +555,7 @@ func detectOpenCodeStatus(dirs Dirs) Status {
 					if !ok {
 						continue
 					}
-					if text == "file://"+pluginFile || strings.Contains(text, "openusage-telemetry.ts") {
+					if text == "file://"+pluginFile || strings.Contains(text, "agentusage-telemetry.ts") {
 						configured = true
 						break
 					}
@@ -476,6 +564,35 @@ func detectOpenCodeStatus(dirs Dirs) Status {
 		}
 	}
 	st.Configured = configured
+	deriveState(&st)
+	return st
+}
+
+func detectAntigravityStatus(dirs Dirs) Status {
+	def := antigravityDef()
+	st := Status{
+		ID:             AntigravityID,
+		Name:           def.Name,
+		DesiredVersion: IntegrationVersion,
+	}
+
+	configFile := def.ConfigFileFunc(dirs)
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		deriveState(&st)
+		return st
+	}
+
+	var cfg map[string]any
+	if json.Unmarshal(data, &cfg) == nil {
+		if statusLine, ok := cfg["statusLine"].(map[string]any); ok {
+			st.Configured = isAntigravityagentUsageCommand(stringOrEmpty(statusLine["command"]))
+		}
+	}
+	st.Installed = st.Configured
+	if st.Installed {
+		st.InstalledVersion = IntegrationVersion
+	}
 	deriveState(&st)
 	return st
 }
@@ -498,7 +615,7 @@ func detectCursorStatus(dirs Dirs) Status {
 	var cfg map[string]any
 	if json.Unmarshal(data, &cfg) == nil {
 		if statusLine, ok := cfg["statusLine"].(map[string]any); ok {
-			st.Configured = isCursorOpenUsageCommand(stringOrEmpty(statusLine["command"]))
+			st.Configured = isCursoragentUsageCommand(stringOrEmpty(statusLine["command"]))
 		}
 	}
 	st.Installed = st.Configured

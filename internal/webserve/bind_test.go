@@ -56,8 +56,8 @@ func TestValidateExposure(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error for addr=%q", tc.addr)
 				}
-				if !strings.Contains(err.Error(), "OPENUSAGE_SERVE_TOKEN") {
-					t.Errorf("error should mention OPENUSAGE_SERVE_TOKEN, got: %v", err)
+				if !strings.Contains(err.Error(), "AGENTUSAGE_SERVE_TOKEN") {
+					t.Errorf("error should mention AGENTUSAGE_SERVE_TOKEN, got: %v", err)
 				}
 				if !strings.Contains(err.Error(), "--allow-public") {
 					t.Errorf("error should mention --allow-public, got: %v", err)

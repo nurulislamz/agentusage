@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
 )
 
 // ID is the canonical provider identifier registered in the providers
@@ -48,7 +48,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Install the Roo Code VS Code extension and run at least one task.",
-					"openusage discovers the extension's task logs from VS Code globalStorage; no configuration required.",
+					"agentusage discovers the extension's task logs from VS Code globalStorage; no configuration required.",
 				},
 			},
 			Dashboard: dashboardWidget(core.DashboardColorRolePeach),

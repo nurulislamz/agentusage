@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/export"
-	"github.com/janekbaraniewski/openusage/internal/tui"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/daemon"
+	"github.com/nurulislamz/agentusage/internal/export"
+	"github.com/nurulislamz/agentusage/internal/tui"
 )
 
 func (c *collector) fetchSnapshots(ctx context.Context) ([]core.UsageSnapshot, string, error) {

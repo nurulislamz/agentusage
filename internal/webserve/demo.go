@@ -3,7 +3,7 @@ package webserve
 import (
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func f64(v float64) *float64 { return &v }

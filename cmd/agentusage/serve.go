@@ -13,15 +13,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/tui"
-	"github.com/janekbaraniewski/openusage/internal/version"
-	"github.com/janekbaraniewski/openusage/internal/webserve"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/tui"
+	"github.com/nurulislamz/agentusage/internal/version"
+	"github.com/nurulislamz/agentusage/internal/webserve"
 	"github.com/spf13/cobra"
 )
 
-const envServeToken = "OPENUSAGE_SERVE_TOKEN"
+const envServeToken = "AGENTUSAGE_SERVE_TOKEN"
 
 func newServeCommand() *cobra.Command {
 	var (
@@ -42,16 +42,16 @@ func newServeCommand() *cobra.Command {
 			"",
 			"By default the server binds to 127.0.0.1:8080 and opens your browser.",
 			"Collection prefers the telemetry daemon and falls back to a direct provider poll",
-			"(same as `openusage export --source auto`).",
+			"(same as `agentusage export --source auto`).",
 			"",
-			"Security: without OPENUSAGE_SERVE_TOKEN the server refuses to bind a non-loopback",
+			"Security: without AGENTUSAGE_SERVE_TOKEN the server refuses to bind a non-loopback",
 			"interface unless you pass --allow-public.",
 		}, "\n"),
 		Example: strings.Join([]string{
-			"  openusage serve",
-			"  openusage serve --demo",
-			"  openusage serve --listen 127.0.0.1:9090 --no-open",
-			"  OPENUSAGE_SERVE_TOKEN=s3cret openusage serve --listen :8080",
+			"  agentusage serve",
+			"  agentusage serve --demo",
+			"  agentusage serve --listen 127.0.0.1:9090 --no-open",
+			"  AGENTUSAGE_SERVE_TOKEN=s3cret agentusage serve --listen :8080",
 		}, "\n"),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -91,7 +91,7 @@ func newServeCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&demo, "demo", false, "Serve synthetic snapshots (no daemon or API keys required)")
 	cmd.Flags().BoolVar(&openBrowser, "open", false, "Open the dashboard in the default browser")
 	cmd.Flags().BoolVar(&noOpen, "no-open", false, "Do not open a browser")
-	cmd.Flags().BoolVar(&allowPublic, "allow-public", false, "Allow binding a non-loopback interface without OPENUSAGE_SERVE_TOKEN")
+	cmd.Flags().BoolVar(&allowPublic, "allow-public", false, "Allow binding a non-loopback interface without AGENTUSAGE_SERVE_TOKEN")
 	return cmd
 }
 
@@ -127,7 +127,7 @@ func runServe(opts webserve.Options, openBrowser bool) error {
 	if srv.AuthEnabled() {
 		authLabel = "bearer-token"
 	}
-	fmt.Printf("OpenUsage web dashboard listening on %s\n", displayURL)
+	fmt.Printf("agentUsage web dashboard listening on %s\n", displayURL)
 	fmt.Printf("  source=%s  auth=%s\n", source, authLabel)
 	fmt.Printf("  press Ctrl+C to stop\n")
 

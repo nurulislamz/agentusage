@@ -32,7 +32,7 @@ func UsageCachePath() string {
 	if err != nil || home == "" {
 		return ""
 	}
-	return filepath.Join(home, ".cache", "openusage", "statusline-5h.json")
+	return filepath.Join(home, ".cache", "agentusage", "statusline-5h.json")
 }
 
 // WriteFiveHourCache overwrites the shared cache atomically (temp + rename) so

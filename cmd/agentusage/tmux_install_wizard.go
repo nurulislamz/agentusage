@@ -10,9 +10,9 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/tmux"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/tmux"
 )
 
 // templateComponent is one toggleable piece of the custom segment builder. The
@@ -97,7 +97,7 @@ func validateTemplate(s string) error {
 	return nil
 }
 
-// runTmuxInstallWizard is the interactive front-end of `openusage tmux install`.
+// runTmuxInstallWizard is the interactive front-end of `agentusage tmux install`.
 // It collects position, preset, and icon preference in one small form, then
 // applies everything — writes the tmux.conf snippet, installs the icon font,
 // and configures the terminal — so the user ends up with a working setup from a
@@ -234,8 +234,8 @@ func patchTerminalFontAuto(base string) (string, error) {
 		return "", fmt.Errorf("could not resolve a font directory")
 	}
 	stem := strings.TrimSuffix(filepath.Base(base), filepath.Ext(base))
-	out := filepath.Join(dir, stem+"-OpenUsage"+filepath.Ext(base))
-	cmd := exec.Command(py, script, "--base", base, "--out", out, "--name-suffix", " +OpenUsage")
+	out := filepath.Join(dir, stem+"-agentUsage"+filepath.Ext(base))
+	cmd := exec.Command(py, script, "--base", base, "--out", out, "--name-suffix", " +agentUsage")
 	if combined, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("patch failed: %v\n%s", err, strings.TrimSpace(string(combined)))
 	}

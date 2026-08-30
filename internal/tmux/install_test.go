@@ -29,7 +29,7 @@ func TestInstallPrintModeEmitsSnippet(t *testing.T) {
 	if !strings.Contains(out, sentinelStart) || !strings.Contains(out, sentinelEnd) {
 		t.Fatalf("snippet missing sentinels:\n%s", out)
 	}
-	if !strings.Contains(out, "openusage tmux --preset compact") {
+	if !strings.Contains(out, "agentusage tmux --preset compact") {
 		t.Fatalf("snippet missing status-line command:\n%s", out)
 	}
 }

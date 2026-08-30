@@ -6,11 +6,11 @@ import (
 	"io"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/report"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/report"
 )
 
-// JSONOutput is the structured payload emitted by `openusage tmux --json`.
+// JSONOutput is the structured payload emitted by `agentusage tmux --json`.
 // It mirrors the rendering context so downstream callers (scripts, polybar,
 // xbar, custom tmux wrappers) can re-render without re-running the
 // formatter.
@@ -37,7 +37,7 @@ func WriteJSON(out io.Writer, payload JSONOutput) error {
 }
 
 // BuildJSON assembles the JSONOutput from a Context and a rendered string.
-// It is a small convenience so cmd/openusage/tmux.go does not have to know
+// It is a small convenience so cmd/agentusage/tmux.go does not have to know
 // the shape of the payload.
 func BuildJSON(ctx Context, rendered string, detected *DetectResult) JSONOutput {
 	out := JSONOutput{

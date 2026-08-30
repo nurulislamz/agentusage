@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 type codexCLIRateLimitsSnapshot struct {
@@ -137,7 +137,7 @@ func fetchCodexRateLimitsRPCProcess(ctx context.Context, acct core.AccountConfig
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 4*1024), 512*1024)
 
-	if err := writeCodexRPCRequest(stdin, `{"id":1,"method":"initialize","params":{"clientInfo":{"name":"openusage","version":"dev"}}}`); err != nil {
+	if err := writeCodexRPCRequest(stdin, `{"id":1,"method":"initialize","params":{"clientInfo":{"name":"agentusage","version":"dev"}}}`); err != nil {
 		return codexCLIRateLimitsResult{}, err
 	}
 	if _, err := readCodexRPCResponse(scanner, 1); err != nil {

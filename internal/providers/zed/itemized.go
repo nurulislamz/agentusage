@@ -3,7 +3,7 @@ package zed
 import (
 	"context"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // ItemizedUsage returns one event per Zed thread, reusing the same SQLite

@@ -4,11 +4,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 	"github.com/samber/lo"
 )
 

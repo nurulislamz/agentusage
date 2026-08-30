@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/export"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/agentusage/internal/export"
+	"github.com/nurulislamz/agentusage/internal/version"
 )
 
 type collector struct {
@@ -116,7 +116,7 @@ func (c *collector) decorate(env Envelope) Envelope {
 	out := env
 	out.SchemaVersion = schemaVersion
 	out.GeneratedAt = c.now()
-	out.OpenUsageVersion = c.meta.version
+	out.AgentUsageVersion = c.meta.version
 	out.TimeWindow = c.meta.timeWindow
 	out.Theme = c.meta.theme
 	out.RefreshIntervalSeconds = c.meta.refreshSeconds

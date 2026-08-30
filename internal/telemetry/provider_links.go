@@ -3,7 +3,7 @@ package telemetry
 import (
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func normalizeProviderLinks(in map[string]string) map[string]string {

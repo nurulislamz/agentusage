@@ -12,8 +12,8 @@ import (
 
 func TestMain(m *testing.M) {
 	// Do not read the developer's real Cursor state.vscdb during tests.
-	if os.Getenv("OPENUSAGE_CURSOR_STATE_DB") == "" {
-		_ = os.Setenv("OPENUSAGE_CURSOR_STATE_DB", filepath.Join(os.TempDir(), "openusage-cursor-tests-missing.vscdb"))
+	if os.Getenv("AGENTUSAGE_CURSOR_STATE_DB") == "" {
+		_ = os.Setenv("AGENTUSAGE_CURSOR_STATE_DB", filepath.Join(os.TempDir(), "agentusage-cursor-tests-missing.vscdb"))
 	}
 	os.Exit(m.Run())
 }

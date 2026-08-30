@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestPollScheduler_ShouldPoll_FirstPollAlwaysRuns(t *testing.T) {

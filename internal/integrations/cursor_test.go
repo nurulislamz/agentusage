@@ -9,7 +9,7 @@ import (
 func TestPatchCursorConfig(t *testing.T) {
 	input := []byte(`{"version":1,"statusLine":{"type":"command","command":"some-old-cmd"}}`)
 	// Refuses unrelated command
-	if _, err := patchCursorConfig(input, "/tmp/openusage", true); err == nil {
+	if _, err := patchCursorConfig(input, "/tmp/agentusage", true); err == nil {
 		t.Fatal("patchCursorConfig() should refuse to overwrite unrelated custom command")
 	}
 
@@ -47,10 +47,10 @@ func TestPatchCursorConfig(t *testing.T) {
 func TestCursorInstallLifecycle(t *testing.T) {
 	root := t.TempDir()
 	dirs := Dirs{
-		Home:         root,
-		ConfigRoot:   filepath.Join(root, ".config"),
-		HooksDir:     filepath.Join(root, ".config", "openusage", "hooks"),
-		OpenusageBin: filepath.Join(root, "bin", "openusage"),
+		Home:          root,
+		ConfigRoot:    filepath.Join(root, ".config"),
+		HooksDir:      filepath.Join(root, ".config", "agentusage", "hooks"),
+		AgentusageBin: filepath.Join(root, "bin", "agentusage"),
 	}
 	def, ok := DefinitionByID(CursorID)
 	if !ok {

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestProviderID(t *testing.T) {
@@ -760,8 +760,8 @@ func TestFetchBuildsModelAndClientUsageSplits(t *testing.T) {
 }
 
 func TestClassifyClient_NormalizesCodexWrapperSources(t *testing.T) {
-	if got := classifyClient("openusage", ""); got != "CLI" {
-		t.Fatalf("classifyClient(openusage) = %q, want CLI", got)
+	if got := classifyClient("agentusage", ""); got != "CLI" {
+		t.Fatalf("classifyClient(agentusage) = %q, want CLI", got)
 	}
 	if got := classifyClient("codex", ""); got != "CLI" {
 		t.Fatalf("classifyClient(codex) = %q, want CLI", got)

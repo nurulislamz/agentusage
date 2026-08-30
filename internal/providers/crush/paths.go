@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // PathHintDBsKey is the AccountConfig path hint used to inject an
@@ -17,7 +17,7 @@ import (
 const PathHintDBsKey = "db_paths"
 
 // PathHintSingleDBKey is a per-account override for a single Crush DB
-// path. Useful when a user wants to point openusage at one specific
+// path. Useful when a user wants to point agentusage at one specific
 // project DB.
 const PathHintSingleDBKey = "db_path"
 
@@ -28,7 +28,7 @@ const PathHintRegistryKey = "registry_path"
 
 // EnvRegistry overrides the registry path across all accounts. Useful
 // for sandboxed installs.
-const EnvRegistry = "OPENUSAGE_CRUSH_REGISTRY"
+const EnvRegistry = "AGENTUSAGE_CRUSH_REGISTRY"
 
 // projectDBName is the basename of the per-project Crush SQLite store.
 const projectDBName = "crush.db"
@@ -106,7 +106,7 @@ func splitPathList(value string) []string {
 //
 //  1. Explicit list pre-resolved by the detector via PathHintDBsKey.
 //  2. Single explicit override via PathHintSingleDBKey.
-//  3. Crush's own project registry (registry_path / OPENUSAGE_CRUSH_REGISTRY
+//  3. Crush's own project registry (registry_path / AGENTUSAGE_CRUSH_REGISTRY
 //     / platform default).
 //
 // Non-existent paths are filtered out so a stale settings.json or a
@@ -125,7 +125,7 @@ func resolveDBPaths(acct core.AccountConfig) []string {
 }
 
 // DiscoverDBPaths reads Crush's project registry (using the platform
-// default location, or the OPENUSAGE_CRUSH_REGISTRY override) and
+// default location, or the AGENTUSAGE_CRUSH_REGISTRY override) and
 // returns every `crush.db` Crush itself has registered. Exported so
 // the detect package can seed `db_paths` on the auto-detected account
 // without re-reading the registry at Fetch time.

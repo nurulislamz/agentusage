@@ -1,4 +1,4 @@
-// Package export provides the `openusage export` command implementation.
+// Package export provides the `agentusage export` command implementation.
 //
 // It collects current usage snapshots from either the running telemetry daemon
 // (preferred when available) or by running a one-shot direct provider poll, and
@@ -13,7 +13,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // SchemaVersion is the version of the export envelope format. Bumped on
@@ -54,11 +54,11 @@ const (
 // encoder also strips snapshot Raw maps defensively since they sometimes carry
 // credential hints from provider probes.
 type ExportEnvelope struct {
-	SchemaVersion    string               `json:"schema_version"`
-	GeneratedAt      time.Time            `json:"generated_at"`
-	OpenUsageVersion string               `json:"openusage_version"`
-	Source           Source               `json:"source"`
-	Snapshots        []core.UsageSnapshot `json:"snapshots"`
+	SchemaVersion     string               `json:"schema_version"`
+	GeneratedAt       time.Time            `json:"generated_at"`
+	AgentUsageVersion string               `json:"agentusage_version"`
+	Source            Source               `json:"source"`
+	Snapshots         []core.UsageSnapshot `json:"snapshots"`
 }
 
 // Options captures the parameters parsed from CLI flags. The orchestrator
@@ -75,7 +75,7 @@ type Options struct {
 	// deterministic envelopes. Zero value means time.Now().UTC().
 	Now time.Time
 
-	// Version overrides the embedded openusage_version. Used by tests so
+	// Version overrides the embedded agentusage_version. Used by tests so
 	// they don't depend on the build-injected version string. Empty means
 	// the value from internal/version.
 	Version string

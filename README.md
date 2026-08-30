@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./assets/logo.gif" alt="OpenUsage logo">
+  <img src="./assets/logo.gif" alt="agentUsage logo">
 </p>
 
-<p align="center"><strong>OpenUsage.sh: terminal-first local quota and usage tracking for Claude Code, Codex CLI, Cursor, Copilot, and OpenRouter.</strong></p>
+<p align="center"><strong>agentUsage.sh: terminal-first local quota and usage tracking for Claude Code, Codex CLI, Cursor, Copilot, and OpenRouter.</strong></p>
 
 <p align="center">
   <a href="#install">Install</a> &middot;
@@ -14,16 +14,16 @@
 
 ---
 
-OpenUsage is the terminal-first local dashboard published at [openusage.sh](https://openusage.sh/). Publicly, the clearest brand reference is **OpenUsage.sh**. It auto-detects AI coding tools and API keys on your workstation and shows live quota, usage, spend, resets, rate limits, and model data in your terminal. It is built for mixed-tool workflows across Claude Code, Codex CLI, Cursor, Copilot, Gemini CLI, OpenRouter, OpenAI, Anthropic, and more. Zero config required — just run `openusage`.
+agentUsage is the terminal-first local dashboard published at [agentusage.sh](https://agentusage.sh/). Publicly, the clearest brand reference is **agentUsage.sh**. It auto-detects AI coding tools and API keys on your workstation and shows live quota, usage, spend, resets, rate limits, and model data in your terminal. It is built for mixed-tool workflows across Claude Code, Codex CLI, Cursor, Copilot, Gemini CLI, OpenRouter, OpenAI, Anthropic, and more. Zero config required — just run `agentusage`.
 
-![OpenUsage dashboard](./assets/dashboard.png)
+![agentUsage dashboard](./assets/dashboard.png)
 
 Run it side-by-side with your coding agent:
 
 <p align="center">
-  <img src="./assets/sidebyside.png" alt="OpenUsage side by side">
+  <img src="./assets/sidebyside.png" alt="agentUsage side by side">
   <br>
-  <em>OpenUsage running alongside OpenCode monitoring live OpenRouter usage.</em>
+  <em>agentUsage running alongside OpenCode monitoring live OpenRouter usage.</em>
 </p>
 
 ## Install
@@ -31,41 +31,41 @@ Run it side-by-side with your coding agent:
 ### macOS (Homebrew, recommended)
 
 ```bash
-brew install janekbaraniewski/tap/openusage
+brew install nurulislamz/tap/agentusage
 ```
 
 ### All platforms (quick install script)
 
 ```bash
-curl -fsSL https://github.com/janekbaraniewski/openusage/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/nurulislamz/agentusage/releases/latest/download/install.sh | bash
 ```
 
 ### From source (Go 1.25+)
 
 ```bash
-go install github.com/janekbaraniewski/openusage/cmd/openusage@latest
+go install github.com/nurulislamz/agentusage/cmd/agentusage@latest
 ```
 
-Requires CGO (`CGO_ENABLED=1`). Pre-built binaries are also available on the [Releases](https://github.com/janekbaraniewski/openusage/releases) page.
+Requires CGO (`CGO_ENABLED=1`). Pre-built binaries are also available on the [Releases](https://github.com/nurulislamz/agentusage/releases) page.
 
 ## Run
 
 ```bash
-openusage
+agentusage
 ```
 
 Auto-detection picks up local tools and common API key env vars. No config needed.
 
 ## Command-line reports & statusline
 
-Besides the live dashboard, OpenUsage has headless subcommands that reuse the same parsing and pricing — handy for scripts, CI, and quick checks:
+Besides the live dashboard, agentUsage has headless subcommands that reuse the same parsing and pricing — handy for scripts, CI, and quick checks:
 
 ```bash
-openusage daily                # usage & cost by day (also: weekly, monthly)
-openusage session              # grouped by session
-openusage blocks               # by 5-hour billing block, with burn rate + projection
-openusage daily --json         # machine-readable output for scripts/CI
-openusage statusline install   # one-line status bar for Claude Code
+agentusage daily                # usage & cost by day (also: weekly, monthly)
+agentusage session              # grouped by session
+agentusage blocks               # by 5-hour billing block, with burn rate + projection
+agentusage daily --json         # machine-readable output for scripts/CI
+agentusage statusline install   # one-line status bar for Claude Code
 ```
 
 What each report can show, by provider:
@@ -89,7 +89,7 @@ Show your Claude Code, Codex, Cursor, Copilot, and OpenRouter usage — cost, qu
 </td>
 <td width="45%" valign="middle">
 
-![OpenUsage in the tmux status bar](./assets/tmux-ccode.png)
+![agentUsage in the tmux status bar](./assets/tmux-ccode.png)
 
 </td>
 </tr>
@@ -98,21 +98,21 @@ Show your Claude Code, Codex, Cursor, Copilot, and OpenRouter usage — cost, qu
 One command to set it up. Tweak the layout and segments live, then reload:
 
 ```bash
-openusage tmux install                         # interactive setup
+agentusage tmux install                         # interactive setup
 tmux source-file ~/.config/tmux/tmux.conf      # reload
 ```
 
 <p align="center">
-  <img src="./assets/install-tmux.gif" alt="Installing the OpenUsage tmux status segment" width="720">
+  <img src="./assets/install-tmux.gif" alt="Installing the agentUsage tmux status segment" width="720">
 </p>
 
 Want real provider logos instead of emoji? The installer can drop in a bundled icon font and wire up your terminal. See [provider icons](docs/site/docs/guides/tmux-integration.md#provider-icons-custom-font).
 
 ```bash
-openusage tmux install --write                 # non-interactive (scripting): just write the snippet
-openusage tmux --preset claude-focused         # preview other presets (12 built-in)
-openusage tmux font setup                       # configure icons for kitty/Ghostty/WezTerm
-openusage tmux doctor                          # diagnose if something is off
+agentusage tmux install --write                 # non-interactive (scripting): just write the snippet
+agentusage tmux --preset claude-focused         # preview other presets (12 built-in)
+agentusage tmux font setup                       # configure icons for kitty/Ghostty/WezTerm
+agentusage tmux doctor                          # diagnose if something is off
 ```
 
 See the [tmux integration guide](docs/site/docs/guides/tmux-integration.md) for the format grammar, theming, the icon font, and watch-mode alerts.
@@ -121,12 +121,12 @@ See the [tmux integration guide](docs/site/docs/guides/tmux-integration.md) for 
 
 Your cost, burn rate, how much of the 5-hour limit you've used, and how full the context window is. Right in the **Claude Code status bar**:
 
-![OpenUsage statusline in Claude Code](./assets/claudecodestatus.png)
+![agentUsage statusline in Claude Code](./assets/claudecodestatus.png)
 
 Same deal as tmux: one command, pick your segments, apply.
 
 ```bash
-openusage statusline install
+agentusage statusline install
 ```
 
 <p align="center">
@@ -139,7 +139,7 @@ See the [statusline guide](docs/site/docs/guides/claude-code-statusline.md) for 
 
 ## Track coding agent usage across multiple platforms
 
-Native dashboards show one provider at a time. OpenUsage gives you one local-first view across coding agents, API platforms, and local runtimes so you can answer:
+Native dashboards show one provider at a time. agentUsage gives you one local-first view across coding agents, API platforms, and local runtimes so you can answer:
 
 - Which tool or provider is burning budget?
 - Which model caused the spike?
@@ -148,13 +148,13 @@ Native dashboards show one provider at a time. OpenUsage gives you one local-fir
 
 It is built for end-user tool tracking, not for instrumenting a separate AI app with tracing SDKs or a billing backend.
 
-If you want the full positioning argument, read the guide: [best way to track coding agent usage and quotas across providers](https://openusage.sh/best-way-track-coding-agent-usage-quotas-across-providers/).
+If you want the full positioning argument, read the guide: [best way to track coding agent usage and quotas across providers](https://agentusage.sh/best-way-track-coding-agent-usage-quotas-across-providers/).
 
 If the question is whether this is the right fit versus a simpler local limits tracker, use:
 
-- [OpenUsage.sh vs OpenUsage.ai](https://openusage.sh/docs/openusage-sh-vs-openusage-ai/)
-- [Capability matrix](https://openusage.sh/docs/capability-matrix/)
-- [Docs hub](https://openusage.sh/docs/)
+- [agentUsage.sh vs agentUsage.ai](https://agentusage.sh/docs/agentusage-sh-vs-agentusage-ai/)
+- [Capability matrix](https://agentusage.sh/docs/capability-matrix/)
+- [Docs hub](https://agentusage.sh/docs/)
 
 ## Features
 
@@ -229,8 +229,8 @@ Tracks credits, activity, generation stats, and per-model breakdown across multi
 
 No config file needed — auto-detection handles everything. Override or extend via:
 
-- macOS/Linux: `~/.config/openusage/settings.json`
-- Windows: `%APPDATA%\openusage\settings.json`
+- macOS/Linux: `~/.config/agentusage/settings.json`
+- Windows: `%APPDATA%\agentusage\settings.json`
 
 ```json
 {
@@ -253,9 +253,9 @@ Full reference: [`configs/example_settings.json`](configs/example_settings.json)
 
 You can define custom themes as JSON files loaded at startup from:
 
-- `~/.config/openusage/themes/*.json` (macOS/Linux)
-- `%APPDATA%\\openusage\\themes\\*.json` (Windows)
-- Any extra directory in `OPENUSAGE_THEME_DIR` (path-list separated)
+- `~/.config/agentusage/themes/*.json` (macOS/Linux)
+- `%APPDATA%\\agentusage\\themes\\*.json` (Windows)
+- Any extra directory in `AGENTUSAGE_THEME_DIR` (path-list separated)
 
 Theme files use the same color token fields as built-ins. Browse the bundled examples for reference shapes — every shipped theme lives at [`internal/tui/bundled_themes/`](internal/tui/bundled_themes/).
 
@@ -264,22 +264,22 @@ Theme files use the same color token fields as built-ins. Browse the bundled exa
 Background data collection, even when the dashboard isn't open:
 
 ```bash
-openusage telemetry daemon                # Run in foreground
-openusage telemetry daemon install        # Install as system service (launchd / systemd)
-openusage telemetry daemon status         # Check status
-openusage telemetry daemon uninstall      # Uninstall
+agentusage telemetry daemon                # Run in foreground
+agentusage telemetry daemon install        # Install as system service (launchd / systemd)
+agentusage telemetry daemon status         # Check status
+agentusage telemetry daemon uninstall      # Uninstall
 ```
 
 Installed services snapshot the provider env vars currently set in your shell.
-If you change API key env vars later, rerun `openusage telemetry daemon install`
+If you change API key env vars later, rerun `agentusage telemetry daemon install`
 to refresh the service environment.
 
 Manage tool integrations:
 
 ```bash
-openusage integrations list [--all]       # List integration statuses
-openusage integrations install <id>       # Install hook/plugin
-openusage integrations uninstall <id>     # Remove
+agentusage integrations list [--all]       # List integration statuses
+agentusage integrations install <id>       # Install hook/plugin
+agentusage integrations uninstall <id>     # Remove
 ```
 
 ## Keybindings
@@ -305,14 +305,14 @@ openusage integrations uninstall <id>     # Remove
 ## Development
 
 ```bash
-make build    # Build binary to ./bin/openusage
+make build    # Build binary to ./bin/agentusage
 make test     # Run tests with -race and coverage
 make lint     # golangci-lint
-make run      # go run cmd/openusage/main.go
+make run      # go run cmd/agentusage/main.go
 make demo     # Preview with simulated data (no API keys needed)
 ```
 
-Debug mode: `OPENUSAGE_DEBUG=1 openusage`
+Debug mode: `AGENTUSAGE_DEBUG=1 agentusage`
 
 ## License
 

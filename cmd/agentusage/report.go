@@ -9,13 +9,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/janekbaraniewski/openusage/internal/ccevents"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/export"
-	"github.com/janekbaraniewski/openusage/internal/providers"
-	"github.com/janekbaraniewski/openusage/internal/providers/claude_code"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
-	"github.com/janekbaraniewski/openusage/internal/report"
+	"github.com/nurulislamz/agentusage/internal/ccevents"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/export"
+	"github.com/nurulislamz/agentusage/internal/providers"
+	"github.com/nurulislamz/agentusage/internal/providers/claude_code"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/report"
 )
 
 // telemetryCollectTimeout bounds a single provider's local-log collection.
@@ -39,7 +39,7 @@ type reportFlags struct {
 }
 
 // newReportCommands returns the headless usage-report subcommands. They expose
-// OpenUsage's parsing and pricing as scriptable tables/JSON for use in CI and
+// agentUsage's parsing and pricing as scriptable tables/JSON for use in CI and
 // other automation.
 func newReportCommands() []*cobra.Command {
 	specs := []struct {
@@ -242,7 +242,7 @@ func gatherReportEvents(kind report.Kind, f *reportFlags) ([]report.Event, strin
 // claudeCodeConversationEvents maps Claude Code's per-turn usage stats into the
 // report event stream. Shared by the report subcommands and the statusline.
 // The real implementation lives in internal/ccevents so internal/tmux and other
-// callers can use it without depending on cmd/openusage.
+// callers can use it without depending on cmd/agentusage.
 func claudeCodeConversationEvents(mode claude_code.CostMode, offline bool) ([]report.Event, error) {
 	return ccevents.Conversations(mode, offline)
 }
@@ -277,10 +277,10 @@ func reportLongHelp(kind report.Kind) string {
 
 func reportExamples(use string) string {
 	return strings.Join([]string{
-		"  openusage " + use,
-		"  openusage " + use + " --json",
-		"  openusage " + use + " --breakdown",
-		"  openusage " + use + " --since 2026-05-01 --until 2026-05-31",
-		"  openusage " + use + " --provider claude_code --offline",
+		"  agentusage " + use,
+		"  agentusage " + use + " --json",
+		"  agentusage " + use + " --breakdown",
+		"  agentusage " + use + " --since 2026-05-01 --until 2026-05-31",
+		"  agentusage " + use + " --provider claude_code --offline",
 	}, "\n")
 }

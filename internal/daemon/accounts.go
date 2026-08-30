@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/detect"
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/detect"
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 )
 
 func ResolveAccounts(cfg *config.Config) []core.AccountConfig {
@@ -106,7 +106,7 @@ func ResolveSocketPath() string {
 }
 
 func ResolveSocketPathWithError() (string, error) {
-	if value := strings.TrimSpace(os.Getenv("OPENUSAGE_TELEMETRY_SOCKET")); value != "" {
+	if value := strings.TrimSpace(os.Getenv("AGENTUSAGE_TELEMETRY_SOCKET")); value != "" {
 		return value, nil
 	}
 	return telemetry.DefaultSocketPath()

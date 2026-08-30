@@ -23,8 +23,8 @@ func TestParseColorMode(t *testing.T) {
 	}
 }
 
-func TestHexTo256_RoundTripsOpenUsagePalette(t *testing.T) {
-	// Spot-check 18 representative OpenUsage palette hex codes. We do not
+func TestHexTo256_RoundTripsagentUsagePalette(t *testing.T) {
+	// Spot-check 18 representative agentUsage palette hex codes. We do not
 	// assert an exact palette index because the xterm 256 cube is lossy by
 	// design; we assert the index is in the legal 16..255 range and that
 	// identical inputs map to identical outputs (determinism).

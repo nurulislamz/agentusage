@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestReadSessions_EmitsModelTokenMetrics(t *testing.T) {

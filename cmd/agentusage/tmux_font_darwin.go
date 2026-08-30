@@ -14,13 +14,13 @@ var itermNormalFontRe = regexp.MustCompile(`"Normal Font"\s*=\s*"([^"]+)"`)
 
 // detectTerminalFontFile resolves the font file backing iTerm2's configured
 // font so it can be augmented. Returns a clear error when the font cannot be
-// determined or is already an OpenUsage-augmented font.
+// determined or is already an agentUsage-augmented font.
 func detectTerminalFontFile() (string, error) {
 	ps := itermNormalFontPSName()
 	if ps == "" {
 		return "", fmt.Errorf("could not read iTerm2's configured font; pass --base <font file>")
 	}
-	if strings.Contains(strings.ToLower(ps), "openusage") {
+	if strings.Contains(strings.ToLower(ps), "agentusage") {
 		return "", fmt.Errorf("iTerm2 already uses an augmented font (%s) — nothing to do", ps)
 	}
 	file := resolveFontFileByPSName(ps)

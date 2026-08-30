@@ -1,6 +1,6 @@
 // Package browsercookies extracts session cookies from the user's installed
 // browsers (Chrome, Firefox, Safari, Edge, Brave). It is the foundation for
-// openusage's browser-session-auth path — the credential-acquisition mechanism
+// agentusage's browser-session-auth path — the credential-acquisition mechanism
 // for providers whose billing / usage / account data lives behind dashboard
 // session cookies and isn't reachable via API key.
 //
@@ -29,7 +29,7 @@ import (
 	_ "github.com/browserutils/kooky/browser/all"
 )
 
-// Cookie is the openusage-internal representation of a browser cookie. We
+// Cookie is the agentusage-internal representation of a browser cookie. We
 // don't expose kooky's full type because we never need 95% of it — name,
 // value, domain, path, expiry are all that matter for HTTP replay.
 type Cookie struct {
@@ -76,7 +76,7 @@ var keychainProtectedBrowsers = map[string]bool{
 // a browser (rare — the TUI always picks one).
 var noKeychainBrowsers = []string{"firefox", "safari"}
 
-// Reader is a small surface around kooky for openusage's needs. The interface
+// Reader is a small surface around kooky for agentusage's needs. The interface
 // exists so tests can swap in a fake without spinning up a real browser
 // store on disk. The concrete implementation is &kookyReader{}.
 type Reader interface {

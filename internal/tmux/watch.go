@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/export"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/export"
 )
 
 // AlertMode controls what tmux command(s) fire when a threshold trips.
@@ -68,7 +68,7 @@ type WatchOptions struct {
 	// Out receives log lines (one per alert fire and lifecycle events).
 	Out io.Writer
 	// PIDFile is the path used by --background to coordinate single
-	// ownership. Empty means default `~/.cache/openusage/tmux-watch.pid`.
+	// ownership. Empty means default `~/.cache/agentusage/tmux-watch.pid`.
 	PIDFile string
 }
 
@@ -229,7 +229,7 @@ func DefaultPIDFile() string {
 	if err != nil || home == "" {
 		return ""
 	}
-	return filepath.Join(home, ".cache", "openusage", "tmux-watch.pid")
+	return filepath.Join(home, ".cache", "agentusage", "tmux-watch.pid")
 }
 
 // WritePIDFile records the current pid to path, replacing whatever was

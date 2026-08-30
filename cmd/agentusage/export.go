@@ -5,10 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/janekbaraniewski/openusage/internal/export"
+	"github.com/nurulislamz/agentusage/internal/export"
 )
 
-// newExportCommand wires the `openusage export` subcommand. It collects the
+// newExportCommand wires the `agentusage export` subcommand. It collects the
 // current usage snapshots from the running telemetry daemon (when reachable)
 // or from a one-shot direct provider poll, and serializes them into a
 // versioned JSON envelope.
@@ -35,13 +35,13 @@ By default the command prefers the running telemetry daemon when available
 the daemon is not running. Use --source to force a specific path.
 
 API keys and tokens are never written to the output file. The envelope
-contains schema_version, generated_at, openusage_version, source, and the
+contains schema_version, generated_at, agentusage_version, source, and the
 collected snapshots.`,
 		Example: strings.Join([]string{
-			"  openusage export --output ~/usage.json",
-			"  openusage export --output - --format json",
-			"  openusage export --output /tmp/usage.csv --format csv",
-			"  openusage export --output ~/usage.json --source direct",
+			"  agentusage export --output ~/usage.json",
+			"  agentusage export --output - --format json",
+			"  agentusage export --output /tmp/usage.csv --format csv",
+			"  agentusage export --output ~/usage.json --source direct",
 		}, "\n"),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			opts := export.Options{

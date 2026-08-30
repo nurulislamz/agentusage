@@ -10,10 +10,10 @@ import (
 
 func testDirs(root string) Dirs {
 	return Dirs{
-		Home:         root,
-		ConfigRoot:   filepath.Join(root, ".config"),
-		HooksDir:     filepath.Join(root, ".config", "openusage", "hooks"),
-		OpenusageBin: "/usr/local/bin/openusage",
+		Home:          root,
+		ConfigRoot:    filepath.Join(root, ".config"),
+		HooksDir:      filepath.Join(root, ".config", "agentusage", "hooks"),
+		AgentusageBin: "/usr/local/bin/agentusage",
 	}
 }
 
@@ -44,13 +44,13 @@ func TestInstallClaudeCode(t *testing.T) {
 		t.Fatalf("read template file: %v", err)
 	}
 	templateStr := string(templateData)
-	if !strings.Contains(templateStr, "openusage-integration-version: "+IntegrationVersion) {
+	if !strings.Contains(templateStr, "agentusage-integration-version: "+IntegrationVersion) {
 		t.Fatalf("template missing version marker, got:\n%s", templateStr[:200])
 	}
-	if strings.Contains(templateStr, "__OPENUSAGE_INTEGRATION_VERSION__") {
+	if strings.Contains(templateStr, "__AGENTUSAGE_INTEGRATION_VERSION__") {
 		t.Fatal("template still contains unreplaced version placeholder")
 	}
-	if strings.Contains(templateStr, "__OPENUSAGE_BIN_DEFAULT__") {
+	if strings.Contains(templateStr, "__AGENTUSAGE_BIN_DEFAULT__") {
 		t.Fatal("template still contains unreplaced bin placeholder")
 	}
 
@@ -98,7 +98,7 @@ func TestInstallCodex(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read template file: %v", err)
 		}
-		if !strings.Contains(string(templateData), "openusage-integration-version: "+IntegrationVersion) {
+		if !strings.Contains(string(templateData), "agentusage-integration-version: "+IntegrationVersion) {
 			t.Fatal("template missing version marker")
 		}
 	}
@@ -117,7 +117,7 @@ func TestInstallCodex(t *testing.T) {
 			t.Fatal("config missing hook file reference")
 		}
 	} else {
-		// Windows: the openusage binary is registered directly with the
+		// Windows: the agentusage binary is registered directly with the
 		// telemetry hook subcommand instead of a script file.
 		if !strings.Contains(configStr, "telemetry") || !strings.Contains(configStr, "hook") || !strings.Contains(configStr, "codex") {
 			t.Fatalf("config missing binary notify registration: %s", configStr)
@@ -146,7 +146,7 @@ func TestInstallOpenCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read template file: %v", err)
 	}
-	if !strings.Contains(string(templateData), "openusage-integration-version: "+IntegrationVersion) {
+	if !strings.Contains(string(templateData), "agentusage-integration-version: "+IntegrationVersion) {
 		t.Fatal("template missing version marker")
 	}
 
@@ -410,7 +410,7 @@ func TestLifecycle_InstallDetectUpgradeUninstall(t *testing.T) {
 
 			// Phases 4-6 simulate an on-disk version downgrade then upgrade.
 			// These only apply to integrations that write an artifact file;
-			// integrations that register the openusage binary directly (e.g.
+			// integrations that register the agentusage binary directly (e.g.
 			// Codex on Windows) have no on-disk version to downgrade.
 			if writesArtifact {
 				// Phase 4: Simulate old version → detect as outdated.
@@ -420,8 +420,8 @@ func TestLifecycle_InstallDetectUpgradeUninstall(t *testing.T) {
 				}
 				// Replace version marker with an old one.
 				oldStr := strings.ReplaceAll(string(oldContent),
-					"openusage-integration-version: "+IntegrationVersion,
-					"openusage-integration-version: 2020-01-01.0")
+					"agentusage-integration-version: "+IntegrationVersion,
+					"agentusage-integration-version: 2020-01-01.0")
 				if err := os.WriteFile(targetFile, []byte(oldStr), def.TemplateFileMode); err != nil {
 					t.Fatalf("write old version: %v", err)
 				}
@@ -496,7 +496,7 @@ func TestUpgrade(t *testing.T) {
 				if err := os.MkdirAll(filepath.Dir(targetFile), 0o755); err != nil {
 					t.Fatalf("mkdir: %v", err)
 				}
-				oldContent := "# openusage-integration-version: 2025-01-01.0\nold content\n"
+				oldContent := "# agentusage-integration-version: 2025-01-01.0\nold content\n"
 				if err := os.WriteFile(targetFile, []byte(oldContent), def.TemplateFileMode); err != nil {
 					t.Fatalf("write old template: %v", err)
 				}

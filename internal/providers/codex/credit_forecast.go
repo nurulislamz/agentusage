@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // creditLimitDetails is the shape returned by the Codex app-server
@@ -145,7 +145,7 @@ func (p *Provider) applyCreditForecast(snap *core.UsageSnapshot, accountID strin
 	// Codex exposes the effective individual limit as a monthly quota and
 	// gives us the next reset, but not the current period start. When the next
 	// reset is available, use the corresponding calendar-month boundary so the
-	// rate includes usage that happened before OpenUsage began observing it.
+	// rate includes usage that happened before agentUsage began observing it.
 	if resetAt, ok := snap.Resets["codex_credit_limit"]; ok {
 		if periodStart, ok := inferCreditPeriodStart(resetAt, snap.Timestamp); ok {
 			elapsed := snap.Timestamp.Sub(periodStart)

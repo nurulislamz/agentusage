@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestApplyEnrich_ScopesToAccount(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 // Terminal font setup.
 //
 // The *preferred* way to render provider icons is per-range font fallback: tell
-// the terminal "for codepoints U+E900..E912, use OpenUsage Icons", leaving the
+// the terminal "for codepoints U+E900..E912, use agentUsage Icons", leaving the
 // user's main font untouched. kitty, Ghostty, and WezTerm support this. iTerm2,
 // Terminal.app, and Alacritty do NOT — for those the only option is augmenting
 // the user's font (see scripts/patch-terminal-font.py / `tmux font patch`).
@@ -19,8 +19,8 @@ import (
 // sentinel-bracketed block) and reports clear next steps for the rest.
 
 const (
-	termSentinelStart = "# >>> openusage icons >>> (managed; do not edit between sentinels)"
-	termSentinelEnd   = "# <<< openusage icons <<<"
+	termSentinelStart = "# >>> agentusage icons >>> (managed; do not edit between sentinels)"
+	termSentinelEnd   = "# <<< agentusage icons <<<"
 )
 
 // TermSetupResult is the outcome of configuring one terminal.
@@ -115,7 +115,7 @@ func setupGhostty() (TermSetupResult, bool) {
 	}
 	return TermSetupResult{
 		Terminal: "ghostty", Action: "configured", Path: path,
-		Message: "added OpenUsage Icons as a fallback font-family; restart Ghostty",
+		Message: "added agentUsage Icons as a fallback font-family; restart Ghostty",
 	}, true
 }
 
@@ -142,10 +142,10 @@ func weztermGuidance() (TermSetupResult, bool) {
 	if path == "" {
 		return TermSetupResult{}, false
 	}
-	msg := "WezTerm config is Lua; add OpenUsage Icons to your font fallback by hand:\n" +
+	msg := "WezTerm config is Lua; add agentUsage Icons to your font fallback by hand:\n" +
 		"    config.font = wezterm.font_with_fallback {\n" +
 		"      '<your current font>',\n" +
-		"      'OpenUsage Icons',\n" +
+		"      'agentUsage Icons',\n" +
 		"    }"
 	return TermSetupResult{Terminal: "wezterm", Action: "manual", Path: path, Message: msg}, true
 }
@@ -160,7 +160,7 @@ func iterm2Guidance() []TermSetupResult {
 	if _, err := os.Stat("/Applications/iTerm.app"); err == nil {
 		out = append(out, TermSetupResult{
 			Terminal: "iTerm2", Action: "patch",
-			Message: "iTerm2 has no per-range fallback. Run `openusage tmux font patch` to install an augmented copy of your terminal font (your original is untouched), then select it in iTerm2.",
+			Message: "iTerm2 has no per-range fallback. Run `agentusage tmux font patch` to install an augmented copy of your terminal font (your original is untouched), then select it in iTerm2.",
 		})
 	}
 	return out
@@ -168,7 +168,7 @@ func iterm2Guidance() []TermSetupResult {
 
 // --- managed-block writer ---------------------------------------------------
 
-// writeManagedBlock appends or replaces the openusage sentinel block in a
+// writeManagedBlock appends or replaces the agentusage sentinel block in a
 // config file, creating the file and parent dir if needed, with a .bak of any
 // prior non-empty content. The block edit itself uses the shared helper in
 // managed.go (same semantics as the tmux.conf install).

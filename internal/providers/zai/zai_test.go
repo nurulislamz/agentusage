@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func testAccount(baseURL string) core.AccountConfig {
@@ -328,8 +328,8 @@ func TestFetch_EnrichesUsageDimensionsAndSummaries(t *testing.T) {
 						{
 							"date": "%s",
 							"model": {"name":"glm-4.5"},
-							"client": "openusage",
-							"source": "openusage",
+							"client": "agentusage",
+							"source": "agentusage",
 							"provider": "z-ai",
 							"interface": "cli",
 							"language": "go",
@@ -342,8 +342,8 @@ func TestFetch_EnrichesUsageDimensionsAndSummaries(t *testing.T) {
 						{
 							"date": "%s",
 							"modelName": "glm-5",
-							"clientName": "openusage",
-							"source_name": "openusage",
+							"clientName": "agentusage",
+							"source_name": "agentusage",
 							"provider_name": "z-ai",
 							"interface_name": "cli",
 							"programming_language": "go",
@@ -390,14 +390,14 @@ func TestFetch_EnrichesUsageDimensionsAndSummaries(t *testing.T) {
 		t.Fatalf("Status = %v, want %v", snap.Status, core.StatusOK)
 	}
 
-	if metric, ok := snap.Metrics["client_openusage_total_tokens"]; !ok || metric.Used == nil || *metric.Used != 650 {
-		t.Fatalf("client_openusage_total_tokens missing or invalid: %+v", metric)
+	if metric, ok := snap.Metrics["client_agentusage_total_tokens"]; !ok || metric.Used == nil || *metric.Used != 650 {
+		t.Fatalf("client_agentusage_total_tokens missing or invalid: %+v", metric)
 	}
-	if metric, ok := snap.Metrics["client_openusage_requests"]; !ok || metric.Used == nil || *metric.Used != 4 {
-		t.Fatalf("client_openusage_requests missing or invalid: %+v", metric)
+	if metric, ok := snap.Metrics["client_agentusage_requests"]; !ok || metric.Used == nil || *metric.Used != 4 {
+		t.Fatalf("client_agentusage_requests missing or invalid: %+v", metric)
 	}
-	if metric, ok := snap.Metrics["source_openusage_requests_today"]; !ok || metric.Used == nil || *metric.Used != 4 {
-		t.Fatalf("source_openusage_requests_today missing or invalid: %+v", metric)
+	if metric, ok := snap.Metrics["source_agentusage_requests_today"]; !ok || metric.Used == nil || *metric.Used != 4 {
+		t.Fatalf("source_agentusage_requests_today missing or invalid: %+v", metric)
 	}
 	if metric, ok := snap.Metrics["provider_z-ai_requests"]; !ok || metric.Used == nil || *metric.Used != 4 {
 		t.Fatalf("provider_z-ai_requests missing or invalid: %+v", metric)

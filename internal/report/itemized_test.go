@@ -3,7 +3,7 @@ package report
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestFromItemized_UsesRecordedCost(t *testing.T) {

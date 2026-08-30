@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/openrouter"
-	"github.com/janekbaraniewski/openusage/internal/providers/zai"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/openrouter"
+	"github.com/nurulislamz/agentusage/internal/providers/zai"
 )
 
 // TestDetailedCredits_OpenRouterScopesLifetimeSpend covers issue #175: the

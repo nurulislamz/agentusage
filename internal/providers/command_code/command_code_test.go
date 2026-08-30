@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestCommandCode_Fetch_Success(t *testing.T) {
@@ -173,10 +173,10 @@ func TestCommandCode_Fetch_LimitedFlagWithoutExhaustion(t *testing.T) {
 	defer srv.Close()
 
 	snap, err := New().Fetch(context.Background(), core.AccountConfig{
-		ID:      "command_code",
+		ID:       "command_code",
 		Provider: "command_code",
-		APIKey:  "test-key",
-		BaseURL: srv.URL,
+		APIKey:   "test-key",
+		BaseURL:  srv.URL,
 	})
 	if err != nil {
 		t.Fatalf("Fetch failed: %v", err)

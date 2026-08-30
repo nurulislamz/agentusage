@@ -8,7 +8,7 @@ import (
 
 const (
 	defaultListenAddr = "127.0.0.1:8080"
-	envServeToken     = "OPENUSAGE_SERVE_TOKEN"
+	envServeToken     = "AGENTUSAGE_SERVE_TOKEN"
 )
 
 // IsLoopbackAddr reports whether addr binds only to a loopback interface.
@@ -53,7 +53,7 @@ func ValidateExposure(addr, authToken string, allowPublic bool) error {
 	return fmt.Errorf(
 		"serve: refusing to listen on %q without auth token.\n"+
 			"  Choose one:\n"+
-			"    1. export OPENUSAGE_SERVE_TOKEN=<secret> to enable Bearer auth, OR\n"+
+			"    1. export AGENTUSAGE_SERVE_TOKEN=<secret> to enable Bearer auth, OR\n"+
 			"    2. bind to loopback only:  --listen 127.0.0.1:8080, OR\n"+
 			"    3. pass --allow-public if you have a network-level firewall in place",
 		addr,

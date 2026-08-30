@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func ptr(v float64) *float64 { return &v }

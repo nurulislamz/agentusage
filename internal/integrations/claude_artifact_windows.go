@@ -9,7 +9,7 @@ import (
 //go:embed assets/claude-hook.cmd.tpl
 var claudeCmdTemplate string
 
-// escapeForWindowsCmd transforms the openusage binary path for substitution
+// escapeForWindowsCmd transforms the agentusage binary path for substitution
 // into a .cmd batch file where the path is wrapped in double quotes. Unlike a
 // POSIX shell, cmd.exe treats backslashes literally and does not perform $
 // expansion, so backslashes in a Windows path (C:\...) must NOT be escaped.

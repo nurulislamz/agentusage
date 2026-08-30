@@ -11,7 +11,7 @@ import (
 func (m ServiceManager) Install() error {
 	if isTransientExecutablePath(m.exePath) {
 		return fmt.Errorf(
-			"refusing to install telemetry daemon service from transient executable %q (likely from `go run`); build a stable binary first, then run `./bin/openusage telemetry daemon install`",
+			"refusing to install telemetry daemon service from transient executable %q (likely from `go run`); build a stable binary first, then run `./bin/agentusage telemetry daemon install`",
 			m.exePath,
 		)
 	}
@@ -62,7 +62,7 @@ func (m ServiceManager) uninstallSystemdUser() error {
 
 func systemdUnit(exePath, socketPath, envFilePath string) string {
 	return fmt.Sprintf(`[Unit]
-Description=OpenUsage Telemetry Daemon
+Description=agentUsage Telemetry Daemon
 After=default.target
 
 [Service]

@@ -3,8 +3,8 @@ package webserve
 import (
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 const schemaVersion = "1"
@@ -19,7 +19,7 @@ type CatalogEntry struct {
 type Envelope struct {
 	SchemaVersion          string               `json:"schema_version"`
 	GeneratedAt            time.Time            `json:"generated_at"`
-	OpenUsageVersion       string               `json:"openusage_version"`
+	AgentUsageVersion      string               `json:"agentusage_version"`
 	Source                 string               `json:"source"`
 	TimeWindow             string               `json:"time_window"`
 	Theme                  string               `json:"theme"`
@@ -57,24 +57,24 @@ type ThemeTokens struct {
 
 // AccountView is a TUI-projected account payload for the web dashboard.
 type AccountView struct {
-	Key            string          `json:"key"`
-	ProviderID     string          `json:"provider_id"`
-	ProviderName   string          `json:"provider_name"`
-	AccountID      string          `json:"account_id"`
-	Status         string          `json:"status"`
-	StatusBadge    string          `json:"status_badge"`
-	StatusIcon     string          `json:"status_icon"`
-	AccentColor    string          `json:"accent_color"`
-	Summary        string          `json:"summary"`
-	Detail         string          `json:"detail,omitempty"`
-	TagEmoji       string          `json:"tag_emoji,omitempty"`
-	TagLabel       string          `json:"tag_label,omitempty"`
-	GaugePercent   float64         `json:"gauge_percent,omitempty"`
-	Message        string          `json:"message,omitempty"`
-	Timestamp      time.Time       `json:"timestamp"`
-	TileLines      []string        `json:"tile_lines"`
-	DetailSections []DetailSection `json:"detail_sections"`
-	Resets         []ResetPill     `json:"resets,omitempty"`
+	Key            string           `json:"key"`
+	ProviderID     string           `json:"provider_id"`
+	ProviderName   string           `json:"provider_name"`
+	AccountID      string           `json:"account_id"`
+	Status         string           `json:"status"`
+	StatusBadge    string           `json:"status_badge"`
+	StatusIcon     string           `json:"status_icon"`
+	AccentColor    string           `json:"accent_color"`
+	Summary        string           `json:"summary"`
+	Detail         string           `json:"detail,omitempty"`
+	TagEmoji       string           `json:"tag_emoji,omitempty"`
+	TagLabel       string           `json:"tag_label,omitempty"`
+	GaugePercent   float64          `json:"gauge_percent,omitempty"`
+	Message        string           `json:"message,omitempty"`
+	Timestamp      time.Time        `json:"timestamp"`
+	TileLines      []string         `json:"tile_lines"`
+	DetailSections []DetailSection  `json:"detail_sections"`
+	Resets         []ResetPill      `json:"resets,omitempty"`
 	DailyCost      []core.TimePoint `json:"daily_cost,omitempty"`
 }
 

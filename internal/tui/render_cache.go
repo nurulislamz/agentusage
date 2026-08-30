@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 type detailRenderCacheEntry struct {

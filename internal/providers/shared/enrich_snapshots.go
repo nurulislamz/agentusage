@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // SnapshotUsable reports whether a fetch result is worth applying during refresh.

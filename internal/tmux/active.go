@@ -13,8 +13,8 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers"
 )
 
 // LocalSourceProvider is an optional capability for providers whose primary
@@ -82,7 +82,7 @@ type DetectOptions struct {
 	// CacheTTL overrides how long a cached detection is reused. Zero means
 	// defaultCacheTTL.
 	CacheTTL time.Duration
-	// CachePath overrides the default `~/.cache/openusage/tmux-active.json`.
+	// CachePath overrides the default `~/.cache/agentusage/tmux-active.json`.
 	// Mainly for tests.
 	CachePath string
 	// Providers overrides the provider list. Empty means
@@ -420,7 +420,7 @@ func defaultCachePath() string {
 	if home == "" {
 		return ""
 	}
-	return filepath.Join(home, ".cache", "openusage", "tmux-active.json")
+	return filepath.Join(home, ".cache", "agentusage", "tmux-active.json")
 }
 
 func readCache(path string, now time.Time, ttl time.Duration, key string) (DetectResult, bool) {

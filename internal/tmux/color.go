@@ -1,5 +1,5 @@
 // Package tmux is the provider-agnostic formatter and tmux-specific helpers
-// that drive the `openusage tmux` subcommand. It must not import internal/tui
+// that drive the `agentusage tmux` subcommand. It must not import internal/tui
 // (heavy bubbletea + lipgloss dependency for a once-per-status-interval
 // binary); theme data is passed in as plain hex strings instead.
 package tmux

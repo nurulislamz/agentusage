@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 const telemetrySchemaVersion = "cursor_statusline_v1"
@@ -55,7 +55,7 @@ func (p *Provider) Collect(ctx context.Context, opts shared.TelemetryCollectOpti
 }
 
 // ParseHookPayload accepts a raw Cursor status-line document for callers
-// that explicitly route it through `openusage telemetry hook cursor`.
+// that explicitly route it through `agentusage telemetry hook cursor`.
 func (p *Provider) ParseHookPayload(raw []byte, opts shared.TelemetryCollectOptions) ([]shared.TelemetryEvent, error) {
 	payload, err := parseStatusLinePayload(raw)
 	if err != nil {

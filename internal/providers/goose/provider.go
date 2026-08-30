@@ -15,9 +15,9 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 // ID is the canonical provider identifier registered in the providers
@@ -58,7 +58,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Install Goose and start at least one session so sessions.db is created.",
-					"openusage auto-detects the database; no configuration required.",
+					"agentusage auto-detects the database; no configuration required.",
 				},
 			},
 			Dashboard: dashboardWidget(),

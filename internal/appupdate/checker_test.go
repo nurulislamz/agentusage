@@ -41,27 +41,27 @@ func TestDetectInstallMethod(t *testing.T) {
 	}{
 		{
 			name: "homebrew cellar",
-			path: "/opt/homebrew/Cellar/openusage/1.2.3/bin/openusage",
+			path: "/opt/homebrew/Cellar/agentusage/1.2.3/bin/agentusage",
 			want: InstallMethodHomebrew,
 		},
 		{
 			name: "go install default",
-			path: "/Users/test/go/bin/openusage",
+			path: "/Users/test/go/bin/agentusage",
 			want: InstallMethodGoInstall,
 		},
 		{
 			name: "install script default",
-			path: "/usr/local/bin/openusage",
+			path: "/usr/local/bin/agentusage",
 			want: InstallMethodInstallScript,
 		},
 		{
 			name: "scoop",
-			path: "C:/Users/test/scoop/apps/openusage/current/openusage.exe",
+			path: "C:/Users/test/scoop/apps/agentusage/current/agentusage.exe",
 			want: InstallMethodScoop,
 		},
 		{
 			name: "unknown",
-			path: "/tmp/openusage",
+			path: "/tmp/agentusage",
 			want: InstallMethodUnknown,
 		},
 	}
@@ -85,7 +85,7 @@ func TestCheckUpdateAvailable(t *testing.T) {
 
 	result, err := Check(context.Background(), CheckOptions{
 		CurrentVersion:   "v1.2.0",
-		ExecutablePath:   "/opt/homebrew/Cellar/openusage/1.2.0/bin/openusage",
+		ExecutablePath:   "/opt/homebrew/Cellar/agentusage/1.2.0/bin/agentusage",
 		LatestReleaseURL: server.URL,
 		HTTPClient:       server.Client(),
 		Timeout:          time.Second,
@@ -99,7 +99,7 @@ func TestCheckUpdateAvailable(t *testing.T) {
 	if result.LatestVersion != "v1.3.0" {
 		t.Fatalf("LatestVersion = %q, want v1.3.0", result.LatestVersion)
 	}
-	if result.UpgradeHint != "brew upgrade janekbaraniewski/tap/openusage" {
+	if result.UpgradeHint != "brew upgrade nurulislamz/tap/agentusage" {
 		t.Fatalf("UpgradeHint = %q", result.UpgradeHint)
 	}
 }
@@ -112,7 +112,7 @@ func TestCheckNoUpdate(t *testing.T) {
 
 	result, err := Check(context.Background(), CheckOptions{
 		CurrentVersion:   "v1.2.0",
-		ExecutablePath:   "/usr/local/bin/openusage",
+		ExecutablePath:   "/usr/local/bin/agentusage",
 		LatestReleaseURL: server.URL,
 		HTTPClient:       server.Client(),
 	})
@@ -164,7 +164,7 @@ func TestCheckUnknownInstallMethodUsesActionableHint(t *testing.T) {
 
 	result, err := Check(context.Background(), CheckOptions{
 		CurrentVersion:   "v1.2.0",
-		ExecutablePath:   "/tmp/openusage-old",
+		ExecutablePath:   "/tmp/agentusage-old",
 		LatestReleaseURL: server.URL,
 		HTTPClient:       server.Client(),
 	})
@@ -197,15 +197,15 @@ func (c *captureTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 func TestCheckForwardsGitHubTokenHeaderForGitHubHTTPS(t *testing.T) {
-	t.Setenv("OPENUSAGE_GITHUB_TOKEN", "test-token-123")
+	t.Setenv("AGENTUSAGE_GITHUB_TOKEN", "test-token-123")
 
 	transport := &captureTransport{}
 	client := &http.Client{Transport: transport}
 
 	result, err := Check(context.Background(), CheckOptions{
 		CurrentVersion:   "v1.2.0",
-		ExecutablePath:   "/tmp/openusage-old",
-		LatestReleaseURL: "https://api.github.com/repos/janekbaraniewski/openusage/releases/latest",
+		ExecutablePath:   "/tmp/agentusage-old",
+		LatestReleaseURL: "https://api.github.com/repos/nurulislamz/agentusage/releases/latest",
 		HTTPClient:       client,
 	})
 	if err != nil {
@@ -226,20 +226,20 @@ func TestCheckForwardsGitHubTokenHeaderForGitHubHTTPS(t *testing.T) {
 	if gotAccept != "application/vnd.github+json" {
 		t.Fatalf("Accept header = %q, want application/vnd.github+json", gotAccept)
 	}
-	if gotAgent != "openusage/v1.2.0" {
-		t.Fatalf("User-Agent header = %q, want openusage/v1.2.0", gotAgent)
+	if gotAgent != "agentusage/v1.2.0" {
+		t.Fatalf("User-Agent header = %q, want agentusage/v1.2.0", gotAgent)
 	}
 }
 
 func TestCheckDoesNotForwardGitHubTokenHeaderForNonGitHubURL(t *testing.T) {
-	t.Setenv("OPENUSAGE_GITHUB_TOKEN", "test-token-123")
+	t.Setenv("AGENTUSAGE_GITHUB_TOKEN", "test-token-123")
 
 	transport := &captureTransport{}
 	client := &http.Client{Transport: transport}
 
 	result, err := Check(context.Background(), CheckOptions{
 		CurrentVersion:   "v1.2.0",
-		ExecutablePath:   "/tmp/openusage-old",
+		ExecutablePath:   "/tmp/agentusage-old",
 		LatestReleaseURL: "https://example.com/releases/latest",
 		HTTPClient:       client,
 	})

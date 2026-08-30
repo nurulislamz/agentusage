@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 // ID is the canonical provider identifier registered in the providers
@@ -53,7 +53,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Install Mux and run at least one workspace.",
-					"openusage auto-detects ~/.mux/sessions/<workspaceId>/session-usage.json; no configuration required.",
+					"agentusage auto-detects ~/.mux/sessions/<workspaceId>/session-usage.json; no configuration required.",
 				},
 			},
 			Dashboard: dashboardWidget(),

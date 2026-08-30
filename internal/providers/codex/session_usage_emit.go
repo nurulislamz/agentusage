@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 func emitClientRequestMetrics(clientRequests map[string]int, snap *core.UsageSnapshot) {

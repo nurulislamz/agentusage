@@ -229,7 +229,7 @@ func (m Model) renderHelpOverlay(screenW, screenH int) string {
 	}
 
 	creditLine := fmt.Sprintf("%s  •  %s",
-		dimHintStyle.Render("OpenUsage"),
+		dimHintStyle.Render("agentUsage"),
 		dimHintStyle.Render(ThemeName()),
 	)
 	creditW := lipgloss.Width(creditLine)
@@ -349,11 +349,11 @@ func (m Model) splashProgressLines() []string {
 			lines = append(lines, spin("Setting up background helper..."))
 		} else {
 			lines = append(lines, "")
-			lines = append(lines, "  "+dim.Render("OpenUsage uses a small background helper to"))
+			lines = append(lines, "  "+dim.Render("agentUsage uses a small background helper to"))
 			lines = append(lines, "  "+dim.Render("collect and cache usage data from your providers."))
 			lines = append(lines, "")
 			lines = append(lines, "  "+hint.Render("▸ Press Enter to set it up"))
-			lines = append(lines, "  "+dim.Render("  or run: openusage telemetry daemon install"))
+			lines = append(lines, "  "+dim.Render("  or run: agentusage telemetry daemon install"))
 		}
 
 	case DaemonOutdated:
@@ -386,8 +386,8 @@ func (m Model) splashProgressLines() []string {
 			}
 		}
 		lines = append(lines, "  "+errStyle.Render("✗")+" "+errStyle.Render(msg))
-		lines = append(lines, "  "+dim.Render("Try: openusage telemetry daemon status"))
-		lines = append(lines, "  "+dim.Render("If needed: openusage telemetry daemon install"))
+		lines = append(lines, "  "+dim.Render("Try: agentusage telemetry daemon status"))
+		lines = append(lines, "  "+dim.Render("If needed: agentusage telemetry daemon install"))
 
 	default: // DaemonRunning or any other state.
 		if m.daemon.installDone {

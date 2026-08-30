@@ -31,7 +31,7 @@ func TestFiveHourCacheRoundTrip(t *testing.T) {
 
 	// The on-disk file must live at the shared statusline path so the bar and
 	// the statusline read the same cache.
-	want := filepath.Join(home, ".cache", "openusage", "statusline-5h.json")
+	want := filepath.Join(home, ".cache", "agentusage", "statusline-5h.json")
 	if got := UsageCachePath(); got != want {
 		t.Errorf("UsageCachePath() = %q, want %q", got, want)
 	}

@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // detectCredentialFiles probes a small set of well-known credential files
@@ -27,8 +27,8 @@ import (
 //
 // We never extract OAuth refresh values into Token here — those need a
 // provider-specific refresh exchange before they're usable. We surface
-// presence with a credential_source hint so the user can see "yes, OpenUsage
-// found your credential" via `openusage detect`.
+// presence with a credential_source hint so the user can see "yes, agentUsage
+// found your credential" via `agentusage detect`.
 func detectCredentialFiles(result *Result) {
 	probeClaudeCodeCredentialsFile(result)
 	probeGHHostsFile(result)
@@ -113,7 +113,7 @@ func probeGHHostsFile(result *Result) {
 // a Vertex provider account — the file's mere presence is informational.
 // When the gemini_api or gemini_cli account is already registered we
 // annotate it with "you also have ADC" so users can see the relationship in
-// `openusage detect`.
+// `agentusage detect`.
 func probeGcloudADCFile(result *Result) {
 	home := homeDir()
 	if home == "" {

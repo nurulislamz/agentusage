@@ -5,7 +5,7 @@ package integrations
 import "testing"
 
 func TestCodexNotifyTOMLUnixUnchanged(t *testing.T) {
-	script := "/home/user/.config/openusage/hooks/codex-notify.sh"
+	script := "/home/user/.config/agentusage/hooks/codex-notify.sh"
 	got := codexNotifyTOML(script)
 	want := "notify = [\"" + script + "\"]"
 	if got != want {
@@ -24,12 +24,12 @@ func TestCodexArtifactUnixWritesScript(t *testing.T) {
 	if art.Template == "" {
 		t.Fatal("Unix codex template should be non-empty")
 	}
-	dirs := Dirs{HooksDir: "/home/user/.config/openusage/hooks"}
+	dirs := Dirs{HooksDir: "/home/user/.config/agentusage/hooks"}
 	path, writes := codexTargetFile(dirs)
 	if !writes {
 		t.Fatal("codexTargetFile should report writesArtifact=true on Unix")
 	}
-	if path != "/home/user/.config/openusage/hooks/codex-notify.sh" {
+	if path != "/home/user/.config/agentusage/hooks/codex-notify.sh" {
 		t.Fatalf("unexpected target path %q", path)
 	}
 }

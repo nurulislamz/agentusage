@@ -12,11 +12,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/export"
-	"github.com/janekbaraniewski/openusage/internal/providers/claude_code"
-	"github.com/janekbaraniewski/openusage/internal/providers/cursor"
-	"github.com/janekbaraniewski/openusage/internal/report"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/export"
+	"github.com/nurulislamz/agentusage/internal/providers/claude_code"
+	"github.com/nurulislamz/agentusage/internal/providers/cursor"
+	"github.com/nurulislamz/agentusage/internal/report"
 )
 
 // statuslineInput is the JSON Claude Code pipes to a statusLine command on
@@ -92,7 +92,7 @@ Or add this to ~/.claude/settings.json by hand:
   {
     "statusLine": {
       "type": "command",
-      "command": "openusage statusline",
+      "command": "agentusage statusline",
       "padding": 0
     }
   }`
@@ -185,7 +185,7 @@ command. A .bak backup of settings.json is created.`,
 func newStatuslineUninstallCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "uninstall",
-		Short: "Remove the OpenUsage statusline from ~/.claude/settings.json",
+		Short: "Remove the agentUsage statusline from ~/.claude/settings.json",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return uninstallStatusline(os.Stdout)
 		},
@@ -208,7 +208,7 @@ func claudeSettingsPath() string {
 func statuslineCommandString(opts statuslineOptions) string {
 	bin, err := os.Executable()
 	if err != nil || strings.TrimSpace(bin) == "" {
-		bin = "openusage"
+		bin = "agentusage"
 	}
 	cmd := bin + " statusline"
 	// Only persist a subset; an empty/full selection is the implicit default.
@@ -278,7 +278,7 @@ func uninstallStatusline(out io.Writer) error {
 		return err
 	}
 	if sl, ok := cfg["statusLine"].(map[string]any); ok {
-		if cmd, _ := sl["command"].(string); strings.Contains(cmd, "statusline") && strings.Contains(cmd, "openusage") {
+		if cmd, _ := sl["command"].(string); strings.Contains(cmd, "statusline") && strings.Contains(cmd, "agentusage") {
 			delete(cfg, "statusLine")
 			if err := writeJSONObjectWithBackup(path, cfg); err != nil {
 				return err

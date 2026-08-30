@@ -24,7 +24,7 @@ func Install(def Definition, dirs Dirs) (InstallResult, error) {
 	configFile := def.ConfigFileFunc(dirs)
 
 	// writesArtifact defaults to true; only integrations that register the
-	// openusage binary directly (no hook script on this platform) opt out.
+	// agentusage binary directly (no hook script on this platform) opt out.
 	writesArtifact := def.WritesArtifact == nil || def.WritesArtifact(dirs)
 
 	// Determine previous version (if any) for the result action.
@@ -46,8 +46,8 @@ func Install(def Definition, dirs Dirs) (InstallResult, error) {
 	}
 
 	// Render template with version and binary placeholders.
-	content := strings.ReplaceAll(def.Template, "__OPENUSAGE_INTEGRATION_VERSION__", IntegrationVersion)
-	content = strings.ReplaceAll(content, "__OPENUSAGE_BIN_DEFAULT__", def.EscapeBin(dirs.OpenusageBin))
+	content := strings.ReplaceAll(def.Template, "__AGENTUSAGE_INTEGRATION_VERSION__", IntegrationVersion)
+	content = strings.ReplaceAll(content, "__AGENTUSAGE_BIN_DEFAULT__", def.EscapeBin(dirs.AgentusageBin))
 
 	// Backup existing files before overwriting.
 	if writesArtifact {
@@ -78,6 +78,8 @@ func Install(def Definition, dirs Dirs) (InstallResult, error) {
 	if err := os.WriteFile(configFile, patched, 0o600); err != nil {
 		return InstallResult{}, fmt.Errorf("integrations: write config: %w", err)
 	}
+
+	syncContainerBoxes(def, dirs, targetFile, true)
 
 	action := "installed"
 	if previousVer != "" {
@@ -115,8 +117,10 @@ func Uninstall(def Definition, dirs Dirs) error {
 		}
 	}
 
+	syncContainerBoxes(def, dirs, targetFile, false)
+
 	// Remove the template file (unless this integration writes no artifact on
-	// this platform, e.g. it registers the openusage binary directly).
+	// this platform, e.g. it registers the agentusage binary directly).
 	if def.WritesArtifact == nil || def.WritesArtifact(dirs) {
 		if err := os.Remove(targetFile); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("integrations: remove template: %w", err)
@@ -124,6 +128,53 @@ func Uninstall(def Definition, dirs Dirs) error {
 	}
 
 	return nil
+}
+
+func syncContainerBoxes(def Definition, dirs Dirs, targetFile string, install bool) {
+	if def.ID == AntigravityID {
+		containersDir := filepath.Join(dirs.Home, ".agy-containers")
+		entries, err := os.ReadDir(containersDir)
+		if err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					continue
+				}
+				boxDir := filepath.Join(containersDir, entry.Name(), ".gemini", "antigravity-cli")
+				boxConfigFile := filepath.Join(boxDir, "settings.json")
+				configData, _ := os.ReadFile(boxConfigFile)
+				if !install && len(configData) == 0 {
+					continue
+				}
+				_ = os.MkdirAll(boxDir, 0o755)
+				if patched, err := def.ConfigPatcher(configData, targetFile, install); err == nil {
+					_ = os.WriteFile(boxConfigFile, patched, 0o600)
+				}
+			}
+		}
+	}
+	if def.ID == CursorID {
+		for _, cDirName := range []string{".agent-containers", ".cursor-containers"} {
+			containersDir := filepath.Join(dirs.Home, cDirName)
+			entries, err := os.ReadDir(containersDir)
+			if err == nil {
+				for _, entry := range entries {
+					if !entry.IsDir() {
+						continue
+					}
+					boxDir := filepath.Join(containersDir, entry.Name(), ".cursor")
+					boxConfigFile := filepath.Join(boxDir, "cli-config.json")
+					configData, _ := os.ReadFile(boxConfigFile)
+					if !install && len(configData) == 0 {
+						continue
+					}
+					_ = os.MkdirAll(boxDir, 0o755)
+					if patched, err := def.ConfigPatcher(configData, targetFile, install); err == nil {
+						_ = os.WriteFile(boxConfigFile, patched, 0o600)
+					}
+				}
+			}
+		}
+	}
 }
 
 // Upgrade re-installs the integration, always reporting the action as "upgraded".

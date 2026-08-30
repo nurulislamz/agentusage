@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func newTestServer(t *testing.T) (*Server, *Store) {
@@ -186,7 +186,7 @@ func TestAuth_DisabledWhenNoToken(t *testing.T) {
 }
 
 func TestAuth_PushRequiresToken(t *testing.T) {
-	t.Setenv("OPENUSAGE_HUB_TOKEN", "")
+	t.Setenv("AGENTUSAGE_HUB_TOKEN", "")
 	store := NewStore(time.Minute)
 	srv := NewServerWithAuth(":0", store, "secret-token")
 	if !srv.AuthEnabled() {
@@ -227,7 +227,7 @@ func TestAuth_PushRequiresToken(t *testing.T) {
 }
 
 func TestAuth_SnapshotsRequiresToken(t *testing.T) {
-	t.Setenv("OPENUSAGE_HUB_TOKEN", "")
+	t.Setenv("AGENTUSAGE_HUB_TOKEN", "")
 	store := NewStore(time.Minute)
 	srv := NewServerWithAuth(":0", store, "s3cret")
 	store.Ingest(core.RemoteEnvelope{Machine: "m", Snapshots: []core.UsageSnapshot{makeSnap("openai", "a")}})
@@ -252,7 +252,7 @@ func TestAuth_SnapshotsRequiresToken(t *testing.T) {
 }
 
 func TestAuth_HealthNeverRequiresToken(t *testing.T) {
-	t.Setenv("OPENUSAGE_HUB_TOKEN", "")
+	t.Setenv("AGENTUSAGE_HUB_TOKEN", "")
 	store := NewStore(time.Minute)
 	srv := NewServerWithAuth(":0", store, "any-token")
 

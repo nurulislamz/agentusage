@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/daemon"
 )
 
 // daemonHealthTimeout caps the probe used to decide whether the daemon is
@@ -73,7 +73,7 @@ func (c *daemonCollector) collect(ctx context.Context) ([]core.UsageSnapshot, er
 	cancel()
 	if healthErr != nil {
 		return nil, fmt.Errorf(
-			"export: telemetry daemon unreachable at %s: %w (start it with 'openusage telemetry daemon install' or rerun with --source direct)",
+			"export: telemetry daemon unreachable at %s: %w (start it with 'agentusage telemetry daemon install' or rerun with --source direct)",
 			c.socketPath, healthErr,
 		)
 	}

@@ -4,18 +4,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/config"
 )
 
 // TestResolveHubRuntime covers the defaulting and auth-token resolution paths
 // of resolveHubRuntime. The shape follows detect_test.go: table-driven with
-// per-case t.Setenv to control OPENUSAGE_HUB_TOKEN without leaking between
+// per-case t.Setenv to control AGENTUSAGE_HUB_TOKEN without leaking between
 // cases.
 func TestResolveHubRuntime(t *testing.T) {
 	cases := []struct {
 		name           string
 		cfg            config.HubConfig
-		envToken       string // value to set for OPENUSAGE_HUB_TOKEN ("" → unset)
+		envToken       string // value to set for AGENTUSAGE_HUB_TOKEN ("" → unset)
 		wantAddr       string
 		wantStaleSecs  int
 		wantAuthToken  string
@@ -104,7 +104,7 @@ func TestResolveHubRuntime(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// t.Setenv with "" unsets safely for the duration of the test.
-			t.Setenv("OPENUSAGE_HUB_TOKEN", tc.envToken)
+			t.Setenv("AGENTUSAGE_HUB_TOKEN", tc.envToken)
 
 			rt := resolveHubRuntime(config.Config{Hub: tc.cfg})
 
@@ -133,7 +133,7 @@ func TestResolveHubRuntime(t *testing.T) {
 
 // TestValidateHubExposure covers the unsafe-default guard added for the
 // --allow-public flag. The matrix is (addr × authToken × allowPublic) →
-// either nil error (safe) or an error mentioning OPENUSAGE_HUB_TOKEN.
+// either nil error (safe) or an error mentioning AGENTUSAGE_HUB_TOKEN.
 func TestValidateHubExposure(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -174,8 +174,8 @@ func TestValidateHubExposure(t *testing.T) {
 						tc.addr, tc.authToken, tc.allowPublic)
 				}
 				// Error should mention the env var so operators know how to fix it.
-				if !strings.Contains(err.Error(), "OPENUSAGE_HUB_TOKEN") {
-					t.Errorf("error should mention OPENUSAGE_HUB_TOKEN, got: %v", err)
+				if !strings.Contains(err.Error(), "AGENTUSAGE_HUB_TOKEN") {
+					t.Errorf("error should mention AGENTUSAGE_HUB_TOKEN, got: %v", err)
 				}
 				if !strings.Contains(err.Error(), "--allow-public") {
 					t.Errorf("error should mention --allow-public, got: %v", err)

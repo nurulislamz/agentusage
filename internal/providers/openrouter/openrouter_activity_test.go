@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestFetch_ActivityEndpointNewSchema(t *testing.T) {
@@ -314,8 +314,8 @@ func TestFetch_GenerationUsesUpstreamProviderResponsesForProviderBreakdown(t *te
 	if got := snap.Raw["provider_z-ai_requests"]; got != "1" {
 		t.Fatalf("provider_z-ai_requests = %q, want 1", got)
 	}
-	if _, ok := snap.Metrics["provider_openusage_requests"]; ok {
-		t.Fatal("provider_openusage_requests should not be emitted when upstream provider_responses are present")
+	if _, ok := snap.Metrics["provider_agentusage_requests"]; ok {
+		t.Fatal("provider_agentusage_requests should not be emitted when upstream provider_responses are present")
 	}
 	if got := snap.Raw["model_moonshotai_kimi-k2.5_providers"]; got != "Novita" {
 		t.Fatalf("model_moonshotai_kimi-k2.5_providers = %q, want Novita", got)
@@ -420,8 +420,8 @@ func TestFetch_GenerationProviderDetailEnrichmentForGenericProviderLabel(t *test
 	if got := snap.Raw["provider_novita_requests"]; got != "1" {
 		t.Fatalf("provider_novita_requests = %q, want 1", got)
 	}
-	if _, ok := snap.Metrics["provider_openusage_requests"]; ok {
-		t.Fatal("provider_openusage_requests should not be emitted after detail enrichment")
+	if _, ok := snap.Metrics["provider_agentusage_requests"]; ok {
+		t.Fatal("provider_agentusage_requests should not be emitted after detail enrichment")
 	}
 }
 

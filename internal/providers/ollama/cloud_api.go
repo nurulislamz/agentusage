@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/parsers"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/parsers"
 )
 
 func (p *Provider) fetchCloudAPI(ctx context.Context, acct core.AccountConfig, apiKey string, snap *core.UsageSnapshot) (hasData, authFailed, limited bool, err error) {

@@ -3,8 +3,8 @@ package integrations
 import (
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/detect"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/detect"
 )
 
 // Match pairs an integration Definition with auto-detection results.

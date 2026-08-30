@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	defaultLatestReleaseURL = "https://api.github.com/repos/janekbaraniewski/openusage/releases/latest"
-	defaultInstallScriptURL = "https://github.com/janekbaraniewski/openusage/releases/latest/download/install.sh"
+	defaultLatestReleaseURL = "https://api.github.com/repos/nurulislamz/agentusage/releases/latest"
+	defaultInstallScriptURL = "https://github.com/nurulislamz/agentusage/releases/latest/download/install.sh"
 	defaultRequestTimeout   = 1500 * time.Millisecond
 )
 
@@ -99,8 +99,8 @@ func fetchLatestReleaseVersion(ctx context.Context, opts CheckOptions, currentVe
 		return "", fmt.Errorf("build latest release request: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "openusage/"+currentVersion)
-	if token := strings.TrimSpace(os.Getenv("OPENUSAGE_GITHUB_TOKEN")); token != "" && shouldAttachGitHubToken(latestURL) {
+	req.Header.Set("User-Agent", "agentusage/"+currentVersion)
+	if token := strings.TrimSpace(os.Getenv("AGENTUSAGE_GITHUB_TOKEN")); token != "" && shouldAttachGitHubToken(latestURL) {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
@@ -157,11 +157,11 @@ func detectInstallMethod(executablePath string) InstallMethod {
 	}
 
 	switch {
-	case strings.Contains(path, "/cellar/openusage/"), strings.Contains(path, "/homebrew/cellar/openusage/"), path == "/opt/homebrew/bin/openusage":
+	case strings.Contains(path, "/cellar/agentusage/"), strings.Contains(path, "/homebrew/cellar/agentusage/"), path == "/opt/homebrew/bin/agentusage":
 		return InstallMethodHomebrew
-	case strings.Contains(path, "/scoop/apps/openusage/"):
+	case strings.Contains(path, "/scoop/apps/agentusage/"):
 		return InstallMethodScoop
-	case strings.Contains(path, "/chocolatey/lib/openusage/"), strings.Contains(path, "/chocolatey/bin/openusage"):
+	case strings.Contains(path, "/chocolatey/lib/agentusage/"), strings.Contains(path, "/chocolatey/bin/agentusage"):
 		return InstallMethodChocolatey
 	case looksLikeGoInstallPath(path):
 		return InstallMethodGoInstall
@@ -173,12 +173,12 @@ func detectInstallMethod(executablePath string) InstallMethod {
 }
 
 func looksLikeGoInstallPath(path string) bool {
-	if strings.HasSuffix(path, "/go/bin/openusage") || strings.HasSuffix(path, "/go/bin/openusage.exe") {
+	if strings.HasSuffix(path, "/go/bin/agentusage") || strings.HasSuffix(path, "/go/bin/agentusage.exe") {
 		return true
 	}
 
 	if gobin := normalizePathForMatch(os.Getenv("GOBIN")); gobin != "" {
-		if path == gobin+"/openusage" || path == gobin+"/openusage.exe" {
+		if path == gobin+"/agentusage" || path == gobin+"/agentusage.exe" {
 			return true
 		}
 	}
@@ -188,7 +188,7 @@ func looksLikeGoInstallPath(path string) bool {
 		if gopath == "" {
 			continue
 		}
-		if path == gopath+"/bin/openusage" || path == gopath+"/bin/openusage.exe" {
+		if path == gopath+"/bin/agentusage" || path == gopath+"/bin/agentusage.exe" {
 			return true
 		}
 	}
@@ -196,7 +196,7 @@ func looksLikeGoInstallPath(path string) bool {
 	if home, err := os.UserHomeDir(); err == nil {
 		homePath := normalizePathForMatch(home)
 		if homePath != "" {
-			if path == homePath+"/go/bin/openusage" || path == homePath+"/go/bin/openusage.exe" {
+			if path == homePath+"/go/bin/agentusage" || path == homePath+"/go/bin/agentusage.exe" {
 				return true
 			}
 		}
@@ -206,14 +206,14 @@ func looksLikeGoInstallPath(path string) bool {
 }
 
 func looksLikeInstallScriptPath(path string) bool {
-	if path == "/usr/local/bin/openusage" || path == "/usr/bin/openusage" {
+	if path == "/usr/local/bin/agentusage" || path == "/usr/bin/agentusage" {
 		return true
 	}
 
 	if home, err := os.UserHomeDir(); err == nil {
 		homePath := normalizePathForMatch(home)
 		if homePath != "" {
-			if path == homePath+"/.local/bin/openusage" || path == homePath+"/bin/openusage" || path == homePath+"/bin/openusage.exe" {
+			if path == homePath+"/.local/bin/agentusage" || path == homePath+"/bin/agentusage" || path == homePath+"/bin/agentusage.exe" {
 				return true
 			}
 		}
@@ -225,15 +225,15 @@ func looksLikeInstallScriptPath(path string) bool {
 func upgradeHint(method InstallMethod) string {
 	switch method {
 	case InstallMethodHomebrew:
-		return "brew upgrade janekbaraniewski/tap/openusage"
+		return "brew upgrade nurulislamz/tap/agentusage"
 	case InstallMethodGoInstall:
-		return "go install github.com/janekbaraniewski/openusage/cmd/openusage@latest"
+		return "go install github.com/nurulislamz/agentusage/cmd/agentusage@latest"
 	case InstallMethodInstallScript:
 		return "curl -fsSL " + defaultInstallScriptURL + " | bash"
 	case InstallMethodScoop:
-		return "scoop update openusage"
+		return "scoop update agentusage"
 	case InstallMethodChocolatey:
-		return "choco upgrade openusage -y"
+		return "choco upgrade agentusage -y"
 	default:
 		return "curl -fsSL " + defaultInstallScriptURL + " | bash"
 	}

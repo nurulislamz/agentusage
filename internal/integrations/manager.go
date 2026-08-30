@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/agentusage/internal/version"
 )
 
 var IntegrationVersion = version.Version
@@ -17,6 +17,7 @@ const (
 	OpenCodeID    ID = "opencode"
 	CodexID       ID = "codex"
 	ClaudeCodeID  ID = "claude_code"
+	AntigravityID ID = "antigravity"
 	CursorID      ID = "cursor"
 )
 
@@ -36,7 +37,7 @@ type Manager struct {
 	dirs Dirs
 }
 
-var integrationVersionRe = regexp.MustCompile(`openusage-integration-version:\s*([^\s]+)`)
+var integrationVersionRe = regexp.MustCompile(`agentusage-integration-version:\s*([^\s]+)`)
 
 func NewDefaultManager() Manager {
 	return Manager{dirs: NewDefaultDirs()}

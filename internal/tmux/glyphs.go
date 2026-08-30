@@ -13,10 +13,10 @@ import (
 // GlyphTier selects the icon set used by `:icon` and preset glyph references.
 // The ladder (best to safest) is:
 //
-//	customfont — OpenUsage's bundled provider-icon font (real brand glyphs at
+//	customfont — agentUsage's bundled provider-icon font (real brand glyphs at
 //	             Private Use Area codepoints). Requires the font to be installed
 //	             so the terminal can fall back to it for those codepoints
-//	             (`openusage tmux font install`).
+//	             (`agentusage tmux font install`).
 //	nerdfont   — assumes a Nerd Font is installed.
 //	unicode    — emoji/symbols, the default; works in most terminals.
 //	ascii      — always-safe bracketed labels, e.g. [claude].
@@ -39,7 +39,7 @@ func ParseGlyphTier(s string) GlyphTier {
 		return GlyphTierASCII
 	case "nerdfont", "nerd", "nf":
 		return GlyphTierNerdfont
-	case "customfont", "custom", "openusage":
+	case "customfont", "custom", "agentusage":
 		return GlyphTierCustomFont
 	case "unicode", "":
 		return GlyphTierUnicode
@@ -67,7 +67,7 @@ type iconManifest struct {
 var (
 	customFontOnce  sync.Once
 	customFontMap   map[string]string
-	iconFamilyName  = "OpenUsage Icons"
+	iconFamilyName  = "agentUsage Icons"
 	iconFontVersion = "0"
 )
 

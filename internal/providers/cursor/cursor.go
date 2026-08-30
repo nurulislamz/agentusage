@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 	defaultAccountID     = "cursor"
 	defaultUsageWindow   = "session"
 	quotaNearLimitRatio  = 0.15
-	statusFilePathEnvVar = "OPENUSAGE_CURSOR_STATUS_FILE"
+	statusFilePathEnvVar = "AGENTUSAGE_CURSOR_STATUS_FILE"
 )
 
 // Provider exposes Cursor usage from the local status line plus DashboardService plan buckets.
@@ -49,7 +49,7 @@ func New() *Provider {
 				DocsURL: "https://www.cursor.com/",
 				Quickstart: []string{
 					"Install and run Cursor CLI so ~/.cursor exists.",
-					"Run `openusage integrations install cursor` to connect the status line.",
+					"Run `agentusage integrations install cursor` to connect the status line.",
 				},
 			},
 			Dashboard: dashboardWidget(),
@@ -188,7 +188,7 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 
 			snap.Status = core.StatusAuth
 			snap.Message = "No Cursor status-line data yet"
-			snap.SetDiagnostic("setup", "Run `openusage integrations install cursor`, then start cursor")
+			snap.SetDiagnostic("setup", "Run `agentusage integrations install cursor`, then start cursor")
 			p.applyLivePlanUsage(ctx, acct, &snap)
 			if _, ok := snap.Metrics["plan_percent_used"]; ok {
 				snap.Status = core.StatusOK

@@ -9,7 +9,7 @@ import "strings"
 // same way as values pulled from env vars.
 //
 // This is the single source of truth for credential redaction across both
-// the internal/detect package and the cmd/openusage detect subcommand.
+// the internal/detect package and the cmd/agentusage detect subcommand.
 func MaskKey(key string) string {
 	key = strings.TrimSpace(key)
 	if len(key) <= 12 {

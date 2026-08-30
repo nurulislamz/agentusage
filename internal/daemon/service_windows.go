@@ -20,7 +20,7 @@ import (
 func (m ServiceManager) Install() error {
 	if isTransientExecutablePath(m.exePath) {
 		return fmt.Errorf(
-			"refusing to install telemetry daemon service from transient executable %q (likely from `go run`); build a stable binary first, then run `openusage telemetry daemon install`",
+			"refusing to install telemetry daemon service from transient executable %q (likely from `go run`); build a stable binary first, then run `agentusage telemetry daemon install`",
 			m.exePath,
 		)
 	}
@@ -80,12 +80,12 @@ func (m ServiceManager) taskXML() (string, error) {
 	userID := xmlEscape(u.Username)
 	// Run the binary directly (not via cmd.exe). schtasks /End terminates the
 	// task's own process, so a wrapper shell would be killed while orphaning the
-	// daemon child — running openusage directly lets uninstall actually stop it.
+	// daemon child — running agentusage directly lets uninstall actually stop it.
 	args := fmt.Sprintf(`telemetry daemon run --socket-path "%s"`, m.socketPath)
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>OpenUsage Telemetry Daemon</Description>
+    <Description>agentUsage Telemetry Daemon</Description>
   </RegistrationInfo>
   <Triggers>
     <LogonTrigger>

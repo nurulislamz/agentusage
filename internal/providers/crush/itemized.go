@@ -3,7 +3,7 @@ package crush
 import (
 	"context"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // ItemizedUsage returns one event per Crush session, reusing the same SQLite

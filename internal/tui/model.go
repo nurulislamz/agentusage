@@ -5,9 +5,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/integrations"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/integrations"
 	"github.com/samber/lo"
 )
 
@@ -240,9 +240,9 @@ type Model struct {
 	analyticsScrollY     int             // vertical scroll offset for analytics content
 
 	animFrame  int // monotonically increasing frame counter
-	refreshing  bool
-	refreshAll  bool // true when the active refresh covers every account (R)
-	hasData     bool
+	refreshing bool
+	refreshAll bool // true when the active refresh covers every account (R)
+	hasData    bool
 
 	tickRunning     bool      // true while the tick chain is active
 	lastInteraction time.Time // last user keypress/mouse event
@@ -305,9 +305,9 @@ func NewModel(
 		analyticsCache:        analyticsRenderCacheEntry{},
 		detailCache:           detailRenderCacheEntry{},
 		daemon:                daemonState{status: DaemonConnecting},
-		timeWindow:      timeWindow,
-		refreshInterval: defaultRefreshInterval,
-		tickRunning:     true, // Init() starts the first tick chain
+		timeWindow:            timeWindow,
+		refreshInterval:       defaultRefreshInterval,
+		tickRunning:           true, // Init() starts the first tick chain
 	}
 
 	model.applyDashboardConfig(dashboardCfg, accounts)

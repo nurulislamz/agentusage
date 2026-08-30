@@ -7,17 +7,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/detect"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/detect"
 )
 
 func TestMatchDetected_AccountsByProviderID(t *testing.T) {
 	tmpDir := t.TempDir()
 	dirs := Dirs{
-		Home:         tmpDir,
-		ConfigRoot:   filepath.Join(tmpDir, ".config"),
-		HooksDir:     filepath.Join(tmpDir, ".config", "openusage", "hooks"),
-		OpenusageBin: "/usr/local/bin/openusage",
+		Home:          tmpDir,
+		ConfigRoot:    filepath.Join(tmpDir, ".config"),
+		HooksDir:      filepath.Join(tmpDir, ".config", "agentusage", "hooks"),
+		AgentusageBin: "/usr/local/bin/agentusage",
 	}
 
 	detected := detect.Result{
@@ -60,10 +60,10 @@ func TestMatchDetected_AccountsByProviderID(t *testing.T) {
 func TestMatchDetected_OpenCodeNoTool(t *testing.T) {
 	tmpDir := t.TempDir()
 	dirs := Dirs{
-		Home:         tmpDir,
-		ConfigRoot:   filepath.Join(tmpDir, ".config"),
-		HooksDir:     filepath.Join(tmpDir, ".config", "openusage", "hooks"),
-		OpenusageBin: "/usr/local/bin/openusage",
+		Home:          tmpDir,
+		ConfigRoot:    filepath.Join(tmpDir, ".config"),
+		HooksDir:      filepath.Join(tmpDir, ".config", "agentusage", "hooks"),
+		AgentusageBin: "/usr/local/bin/agentusage",
 	}
 
 	detected := detect.Result{
@@ -104,10 +104,10 @@ func TestMatchDetected_OpenCodeNoTool(t *testing.T) {
 func TestMatchDetected_UnmatchedAccountNoExtraMatch(t *testing.T) {
 	tmpDir := t.TempDir()
 	dirs := Dirs{
-		Home:         tmpDir,
-		ConfigRoot:   filepath.Join(tmpDir, ".config"),
-		HooksDir:     filepath.Join(tmpDir, ".config", "openusage", "hooks"),
-		OpenusageBin: "/usr/local/bin/openusage",
+		Home:          tmpDir,
+		ConfigRoot:    filepath.Join(tmpDir, ".config"),
+		HooksDir:      filepath.Join(tmpDir, ".config", "agentusage", "hooks"),
+		AgentusageBin: "/usr/local/bin/agentusage",
 	}
 
 	detected := detect.Result{
@@ -136,10 +136,10 @@ func TestMatchDetected_UnmatchedAccountNoExtraMatch(t *testing.T) {
 func TestMatchDetected_InstalledIntegrationNotActionable(t *testing.T) {
 	tmpDir := t.TempDir()
 	dirs := Dirs{
-		Home:         tmpDir,
-		ConfigRoot:   filepath.Join(tmpDir, ".config"),
-		HooksDir:     filepath.Join(tmpDir, ".config", "openusage", "hooks"),
-		OpenusageBin: "/usr/local/bin/openusage",
+		Home:          tmpDir,
+		ConfigRoot:    filepath.Join(tmpDir, ".config"),
+		HooksDir:      filepath.Join(tmpDir, ".config", "agentusage", "hooks"),
+		AgentusageBin: "/usr/local/bin/agentusage",
 	}
 
 	// Create the claude hook file with correct version to make it "installed".
@@ -151,7 +151,7 @@ func TestMatchDetected_InstalledIntegrationNotActionable(t *testing.T) {
 	if err := os.MkdirAll(hookDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	hookContent := "#!/bin/bash\n# OPENUSAGE_INTEGRATION_VERSION=" + IntegrationVersion + "\n"
+	hookContent := "#!/bin/bash\n# AGENTUSAGE_INTEGRATION_VERSION=" + IntegrationVersion + "\n"
 	if err := os.WriteFile(hookFile, []byte(hookContent), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -242,10 +242,10 @@ func TestMatchDetected_InstalledIntegrationNotActionable(t *testing.T) {
 func TestMatchDetected_ToolNameMatching(t *testing.T) {
 	tmpDir := t.TempDir()
 	dirs := Dirs{
-		Home:         tmpDir,
-		ConfigRoot:   filepath.Join(tmpDir, ".config"),
-		HooksDir:     filepath.Join(tmpDir, ".config", "openusage", "hooks"),
-		OpenusageBin: "/usr/local/bin/openusage",
+		Home:          tmpDir,
+		ConfigRoot:    filepath.Join(tmpDir, ".config"),
+		HooksDir:      filepath.Join(tmpDir, ".config", "agentusage", "hooks"),
+		AgentusageBin: "/usr/local/bin/agentusage",
 	}
 
 	detected := detect.Result{

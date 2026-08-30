@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/detect"
-	"github.com/janekbaraniewski/openusage/internal/integrations"
-	"github.com/janekbaraniewski/openusage/internal/providers"
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/daemon"
+	"github.com/nurulislamz/agentusage/internal/detect"
+	"github.com/nurulislamz/agentusage/internal/integrations"
+	"github.com/nurulislamz/agentusage/internal/providers"
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -52,10 +52,10 @@ func newTelemetryHookCommand() *cobra.Command {
 			"This supports tools (e.g. Codex's notify) that pass the event JSON as argv.",
 		}, "\n"),
 		Example: strings.Join([]string{
-			"  openusage telemetry hook opencode < /tmp/opencode-hook-event.json",
-			"  openusage telemetry hook codex < /tmp/codex-notify-payload.json",
-			"  openusage telemetry hook claude_code < /tmp/claude-hook-payload.json",
-			"  openusage telemetry hook codex '{\"type\":\"agent-turn-complete\"}'",
+			"  agentusage telemetry hook opencode < /tmp/opencode-hook-event.json",
+			"  agentusage telemetry hook codex < /tmp/codex-notify-payload.json",
+			"  agentusage telemetry hook claude_code < /tmp/claude-hook-payload.json",
+			"  agentusage telemetry hook codex '{\"type\":\"agent-turn-complete\"}'",
 		}, "\n"),
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -218,7 +218,7 @@ func newTelemetryDaemonCommand() *cobra.Command {
 		}
 		if len(actionableIDs) > 0 {
 			fmt.Fprintf(os.Stderr, "hint: detected tools with missing integrations: %s\n", strings.Join(actionableIDs, ", "))
-			fmt.Fprintf(os.Stderr, "hint: run 'openusage integrations install <id>' to set up telemetry hooks\n")
+			fmt.Fprintf(os.Stderr, "hint: run 'agentusage integrations install <id>' to set up telemetry hooks\n")
 		}
 
 		return daemon.RunServer(daemon.Config{
@@ -237,12 +237,12 @@ func newTelemetryDaemonCommand() *cobra.Command {
 		Short: "Run the telemetry daemon server",
 		Long:  "Start the telemetry daemon. Use subcommands to install, uninstall, or check status.",
 		Example: strings.Join([]string{
-			"  openusage telemetry daemon",
-			"  openusage telemetry daemon run",
-			"  openusage telemetry daemon --verbose",
-			"  openusage telemetry daemon install",
-			"  openusage telemetry daemon status",
-			"  openusage telemetry daemon uninstall",
+			"  agentusage telemetry daemon",
+			"  agentusage telemetry daemon run",
+			"  agentusage telemetry daemon --verbose",
+			"  agentusage telemetry daemon install",
+			"  agentusage telemetry daemon status",
+			"  agentusage telemetry daemon uninstall",
 		}, "\n"),
 		RunE: runDaemon,
 	}

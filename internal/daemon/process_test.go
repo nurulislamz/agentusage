@@ -3,7 +3,7 @@ package daemon
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/agentusage/internal/version"
 )
 
 func TestIsReleaseSemver(t *testing.T) {

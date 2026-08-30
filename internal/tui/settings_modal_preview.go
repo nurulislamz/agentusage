@@ -3,7 +3,7 @@ package tui
 import (
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func settingsWidgetSectionsPreviewSnapshot() core.UsageSnapshot {

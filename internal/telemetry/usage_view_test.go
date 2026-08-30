@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -873,7 +873,7 @@ func TestApplyCanonicalUsageView_DedupsCodexMessageUsageByTurnID(t *testing.T) {
 		OccurredAt:    now,
 		ProviderID:    "codex",
 		AccountID:     "codex-cli",
-		WorkspaceID:   "openusage",
+		WorkspaceID:   "agentusage",
 		AgentName:     "codex",
 		EventType:     EventTypeMessageUsage,
 		SessionID:     "sess-dedup-1",
@@ -896,7 +896,7 @@ func TestApplyCanonicalUsageView_DedupsCodexMessageUsageByTurnID(t *testing.T) {
 		OccurredAt:    now.Add(1 * time.Second),
 		ProviderID:    "codex",
 		AccountID:     "codex-cli",
-		WorkspaceID:   "openusage",
+		WorkspaceID:   "agentusage",
 		AgentName:     "codex",
 		EventType:     EventTypeMessageUsage,
 		SessionID:     "sess-dedup-1",
@@ -948,7 +948,7 @@ func TestApplyCanonicalUsageView_UsesClientFromPayloadBeforeWorkspace(t *testing
 		OccurredAt:    now,
 		ProviderID:    "codex",
 		AccountID:     "codex-cli",
-		WorkspaceID:   "openusage",
+		WorkspaceID:   "agentusage",
 		AgentName:     "codex",
 		EventType:     EventTypeMessageUsage,
 		SessionID:     "sess-clients-1",
@@ -972,7 +972,7 @@ func TestApplyCanonicalUsageView_UsesClientFromPayloadBeforeWorkspace(t *testing
 		OccurredAt:    now.Add(1 * time.Second),
 		ProviderID:    "codex",
 		AccountID:     "codex-cli",
-		WorkspaceID:   "openusage",
+		WorkspaceID:   "agentusage",
 		AgentName:     "codex",
 		EventType:     EventTypeMessageUsage,
 		SessionID:     "sess-clients-1",
@@ -1010,8 +1010,8 @@ func TestApplyCanonicalUsageView_UsesClientFromPayloadBeforeWorkspace(t *testing
 	if got := metricUsed(snap.Metrics["client_desktop_app_requests"]); got != 1 {
 		t.Fatalf("client_desktop_app_requests = %v, want 1", got)
 	}
-	if _, ok := snap.Metrics["client_openusage_requests"]; ok {
-		t.Fatalf("unexpected workspace-derived client metric client_openusage_requests present")
+	if _, ok := snap.Metrics["client_agentusage_requests"]; ok {
+		t.Fatalf("unexpected workspace-derived client metric client_agentusage_requests present")
 	}
 }
 
@@ -1031,7 +1031,7 @@ func TestApplyCanonicalUsageView_EmitsProjectMetricsFromWorkspace(t *testing.T) 
 		OccurredAt:    dayStart,
 		ProviderID:    "codex",
 		AccountID:     "codex-cli",
-		WorkspaceID:   "openusage",
+		WorkspaceID:   "agentusage",
 		AgentName:     "codex",
 		EventType:     EventTypeMessageUsage,
 		SessionID:     "sess-projects-1",
@@ -1047,7 +1047,7 @@ func TestApplyCanonicalUsageView_EmitsProjectMetricsFromWorkspace(t *testing.T) 
 			"client": "CLI",
 		},
 	}); err != nil {
-		t.Fatalf("ingest openusage event: %v", err)
+		t.Fatalf("ingest agentusage event: %v", err)
 	}
 	if _, err := store.Ingest(context.Background(), IngestRequest{
 		SourceSystem:  SourceSystem("codex"),
@@ -1110,8 +1110,8 @@ func TestApplyCanonicalUsageView_EmitsProjectMetricsFromWorkspace(t *testing.T) 
 	}
 	snap := merged["codex-cli"]
 
-	if got := metricUsed(snap.Metrics["project_openusage_requests"]); got != 1 {
-		t.Fatalf("project_openusage_requests = %v, want 1", got)
+	if got := metricUsed(snap.Metrics["project_agentusage_requests"]); got != 1 {
+		t.Fatalf("project_agentusage_requests = %v, want 1", got)
 	}
 	if got := metricUsed(snap.Metrics["project_garage_tracker_requests"]); got != 1 {
 		t.Fatalf("project_garage_tracker_requests = %v, want 1", got)
@@ -1121,8 +1121,8 @@ func TestApplyCanonicalUsageView_EmitsProjectMetricsFromWorkspace(t *testing.T) 
 	}
 
 	day := dayStart.Format("2006-01-02")
-	if got := seriesValueByDate(snap.DailySeries["usage_project_openusage"], day); got != 1 {
-		t.Fatalf("usage_project_openusage[%s] = %v, want 1", day, got)
+	if got := seriesValueByDate(snap.DailySeries["usage_project_agentusage"], day); got != 1 {
+		t.Fatalf("usage_project_agentusage[%s] = %v, want 1", day, got)
 	}
 	if got := seriesValueByDate(snap.DailySeries["usage_project_garage_tracker"], day); got != 1 {
 		t.Fatalf("usage_project_garage_tracker[%s] = %v, want 1", day, got)
@@ -1139,7 +1139,7 @@ func TestApplyCanonicalUsageView_UsesClientDimensionForSourceDailySeries(t *test
 		OccurredAt:    now,
 		ProviderID:    "codex",
 		AccountID:     "codex-cli",
-		WorkspaceID:   "openusage",
+		WorkspaceID:   "agentusage",
 		AgentName:     "codex",
 		EventType:     EventTypeMessageUsage,
 		SessionID:     "sess-source-daily-1",
@@ -1173,8 +1173,8 @@ func TestApplyCanonicalUsageView_UsesClientDimensionForSourceDailySeries(t *test
 	if got := seriesValueByDate(snap.DailySeries["usage_source_desktop_app"], now.Format("2006-01-02")); got != 1 {
 		t.Fatalf("usage_source_desktop_app = %v, want 1", got)
 	}
-	if _, ok := snap.DailySeries["usage_source_openusage"]; ok {
-		t.Fatalf("unexpected workspace-derived source daily series usage_source_openusage present")
+	if _, ok := snap.DailySeries["usage_source_agentusage"]; ok {
+		t.Fatalf("unexpected workspace-derived source daily series usage_source_agentusage present")
 	}
 }
 

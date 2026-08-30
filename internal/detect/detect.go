@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/samber/lo"
 )
 
@@ -143,10 +143,10 @@ func findBinary(name string) string {
 func candidateBinaryDirs() []string {
 	var dirs []string
 
-	// When OPENUSAGE_DETECT_BIN_DIRS is explicitly set (even to empty), use
+	// When AGENTUSAGE_DETECT_BIN_DIRS is explicitly set (even to empty), use
 	// only its dirs + PATH and skip hardcoded system dirs. This gives tests
 	// full control over binary lookup isolation.
-	customVal, customSet := os.LookupEnv("OPENUSAGE_DETECT_BIN_DIRS")
+	customVal, customSet := os.LookupEnv("AGENTUSAGE_DETECT_BIN_DIRS")
 	if customSet && customVal != "" {
 		parts := strings.Split(customVal, string(os.PathListSeparator))
 		for _, part := range parts {
@@ -394,9 +394,6 @@ func detectGeminiCLI(result *Result) {
 
 func detectAntigravity(result *Result) {
 	bin := findBinary("agy")
-	if bin == "" {
-		return
-	}
 
 	home := homeDir()
 	if home == "" {
@@ -415,6 +412,7 @@ func detectAntigravity(result *Result) {
 				}
 				boxName := entry.Name()
 				boxConfigDir := filepath.Join(containersDir, boxName, ".gemini", "antigravity-cli")
+				boxStatusFile := filepath.Join(home, ".local", "state", "agentusage", fmt.Sprintf("antigravity-%s-status.json", boxName))
 
 				acct := core.AccountConfig{
 					ID:           fmt.Sprintf("antigravity-%s", boxName),
@@ -425,6 +423,7 @@ func detectAntigravity(result *Result) {
 				}
 				acct.SetHint("config_dir", boxConfigDir)
 				acct.SetHint("box_name", boxName)
+				acct.SetHint("status_file", boxStatusFile)
 				addAccount(result, acct)
 				hasBoxes = true
 			}
@@ -436,25 +435,23 @@ func detectAntigravity(result *Result) {
 	if configDir == "" {
 		configDir = filepath.Join(home, ".gemini", "antigravity-cli")
 	}
-	if !dirExists(configDir) {
+	defaultStatusFile := filepath.Join(home, ".local", "state", "agentusage", "antigravity-status.json")
+
+	if !dirExists(configDir) && bin == "" && !fileExists(defaultStatusFile) && !hasBoxes {
 		return
 	}
 
-	settingsFile := filepath.Join(configDir, "settings.json")
-	brainDir := filepath.Join(configDir, "brain")
-	if !fileExists(settingsFile) && !dirExists(brainDir) {
-		return
+	if bin != "" {
+		log.Printf("[detect] Found Antigravity CLI at %s", bin)
+		result.Tools = append(result.Tools, DetectedTool{
+			Name:       "Antigravity CLI",
+			BinaryPath: bin,
+			ConfigDir:  configDir,
+			Type:       "cli",
+		})
 	}
 
-	log.Printf("[detect] Found Antigravity CLI at %s", bin)
-	result.Tools = append(result.Tools, DetectedTool{
-		Name:       "Antigravity CLI",
-		BinaryPath: bin,
-		ConfigDir:  configDir,
-		Type:       "cli",
-	})
-
-	if !hasBoxes {
+	if dirExists(configDir) || fileExists(defaultStatusFile) || !hasBoxes {
 		acct := core.AccountConfig{
 			ID:           "antigravity",
 			Provider:     "antigravity",
@@ -463,6 +460,7 @@ func detectAntigravity(result *Result) {
 			RuntimeHints: make(map[string]string),
 		}
 		acct.SetHint("config_dir", configDir)
+		acct.SetHint("status_file", defaultStatusFile)
 		addAccount(result, acct)
 	}
 }

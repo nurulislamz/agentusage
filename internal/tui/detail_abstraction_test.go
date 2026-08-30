@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestDetailTabs_SingleAllTab(t *testing.T) {
@@ -61,7 +61,7 @@ func TestBuildDetailTrendsSection_IncludesBreakdownCharts(t *testing.T) {
 				{Date: "2026-02-19", Value: 1100},
 				{Date: "2026-02-20", Value: 1400},
 			},
-			"usage_project_openusage": {
+			"usage_project_agentusage": {
 				{Date: "2026-02-18", Value: 6},
 				{Date: "2026-02-19", Value: 9},
 				{Date: "2026-02-20", Value: 11},

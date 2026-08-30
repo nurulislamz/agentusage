@@ -10,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/providers"
+	"github.com/nurulislamz/agentusage/internal/providers"
 )
 
 func shortSocketPath(t *testing.T, suffix string) string {
 	t.Helper()
 	// Use the OS temp dir (short enough to stay under the AF_UNIX sun_path
 	// limit) rather than a hardcoded /tmp, which does not exist on Windows.
-	return filepath.Join(os.TempDir(), fmt.Sprintf("openusage-%d-%s.sock", time.Now().UnixNano(), strings.TrimSpace(suffix)))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("agentusage-%d-%s.sock", time.Now().UnixNano(), strings.TrimSpace(suffix)))
 }
 
 func TestEnsureSocketPathAvailable_ActiveSocketReturnsError(t *testing.T) {

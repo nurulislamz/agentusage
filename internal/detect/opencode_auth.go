@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // opencodeAuthEntry mirrors one provider's slot inside OpenCode's auth.json.
@@ -22,14 +22,14 @@ type opencodeAuthEntry struct {
 }
 
 // opencodeAuthMapping maps an OpenCode auth.json provider key to the matching
-// openusage provider id and the canonical account id we want the credential
+// agentusage provider id and the canonical account id we want the credential
 // to land on. The account id is intentionally aligned with what
 // detectEnvKeys produces — addAccount() de-dupes by id, so when the user
 // has both an env var and an OpenCode-stored key the env-var path wins
 // (it runs first in AutoDetect).
 //
 // Both "opencode" (the Zen catalog) and "opencode-go" (the lower-cost Go
-// subscription) land on the same openusage account id because they share the
+// subscription) land on the same agentusage account id because they share the
 // OPENCODE_API_KEY env var upstream and there's no operational benefit to
 // representing them as two separate tiles — they hit the same Zen models
 // endpoint with the same key (see github.com/anomalyco/opencode dialog-
@@ -102,7 +102,7 @@ func opencodeAuthPath() string {
 
 // detectOpenCodeAuth reads OpenCode's auth.json and registers an account for
 // every provider whose entry is an API key (type=="api"). OAuth entries are
-// skipped: openusage's anthropic/openai/google providers expect API keys for
+// skipped: agentusage's anthropic/openai/google providers expect API keys for
 // their poll-time probes; using OpenCode's chat-scoped OAuth tokens against
 // /v1/usage / rate-limit endpoints would mostly 401.
 func detectOpenCodeAuth(result *Result) {

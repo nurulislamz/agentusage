@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // fetchAnalytics is the orchestrator for OpenRouter's activity analytics.

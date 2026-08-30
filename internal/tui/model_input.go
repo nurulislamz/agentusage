@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // applyPersisted is the shared handler for the seven simple "save settings"
@@ -500,7 +500,7 @@ func (m Model) handleMouseLeftClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					lipgloss.NewStyle().Foreground(colorDim).Bold(true).Render("⚡"),
 					m.animFrame,
 				)
-				brandText := RenderGradientText("OpenUsage", m.animFrame)
+				brandText := RenderGradientText("agentUsage", m.animFrame)
 				startX := lipgloss.Width(bolt) + 1 + lipgloss.Width(brandText) + 1
 
 				for i, screen := range screens {

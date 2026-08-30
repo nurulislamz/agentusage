@@ -5,9 +5,9 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/detect"
-	"github.com/janekbaraniewski/openusage/internal/integrations"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/detect"
+	"github.com/nurulislamz/agentusage/internal/integrations"
 	"github.com/spf13/cobra"
 )
 
@@ -75,7 +75,7 @@ func newIntegrationsInstallCommand() *cobra.Command {
 			id := integrations.ID(args[0])
 			def, ok := integrations.DefinitionByID(id)
 			if !ok {
-				return fmt.Errorf("unknown integration %q; run 'openusage integrations list --all' to see options", id)
+				return fmt.Errorf("unknown integration %q; run 'agentusage integrations list --all' to see options", id)
 			}
 
 			dirs := integrations.NewDefaultDirs()

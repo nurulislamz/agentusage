@@ -42,7 +42,7 @@ type Definition struct {
 	// TargetFileFunc returns the absolute path where the rendered template is
 	// written. When WritesArtifact reports false, this path is NOT written to;
 	// it is still passed to the ConfigPatcher as the registration target (e.g.
-	// the openusage binary path on platforms that register it directly).
+	// the agentusage binary path on platforms that register it directly).
 	TargetFileFunc func(dirs Dirs) string
 
 	// WritesArtifact reports whether Install should render and write the
@@ -50,7 +50,7 @@ type Definition struct {
 	// artifact file is always written). When it returns false, Install skips
 	// writing/backing-up the target file and Uninstall skips removing it; only
 	// the tool config is patched. This supports platforms where an integration
-	// registers the openusage binary directly instead of a hook script.
+	// registers the agentusage binary directly instead of a hook script.
 	WritesArtifact func(dirs Dirs) bool
 
 	// ConfigFileFunc returns the absolute path to the target tool's config file.
@@ -75,7 +75,7 @@ type Definition struct {
 	// TemplateFileMode is the file permission for the rendered template file.
 	TemplateFileMode os.FileMode
 
-	// EscapeBin transforms the openusage binary path for template substitution.
+	// EscapeBin transforms the agentusage binary path for template substitution.
 	EscapeBin func(string) string
 }
 
@@ -94,16 +94,16 @@ type artifactSpec struct {
 	Basename string
 	// FileMode is the permission applied to the rendered artifact file.
 	FileMode os.FileMode
-	// EscapeBin transforms the openusage binary path for template substitution.
+	// EscapeBin transforms the agentusage binary path for template substitution.
 	EscapeBin func(string) string
 }
 
 // Dirs holds resolved filesystem paths shared across all integrations.
 type Dirs struct {
-	Home         string
-	ConfigRoot   string // XDG_CONFIG_HOME or ~/.config
-	HooksDir     string // ~/.config/openusage/hooks
-	OpenusageBin string // resolved binary path
+	Home          string
+	ConfigRoot    string // XDG_CONFIG_HOME or ~/.config
+	HooksDir      string // ~/.config/agentusage/hooks
+	AgentusageBin string // resolved binary path
 }
 
 // NewDefaultDirs resolves Dirs from environment variables and platform defaults.
@@ -114,25 +114,25 @@ func NewDefaultDirs() Dirs {
 		configRoot = filepath.Join(home, ".config")
 	}
 
-	openusageBin := strings.TrimSpace(os.Getenv("OPENUSAGE_BIN"))
-	if openusageBin == "" {
+	agentusageBin := strings.TrimSpace(os.Getenv("AGENTUSAGE_BIN"))
+	if agentusageBin == "" {
 		if exe, err := os.Executable(); err == nil {
-			openusageBin = exe
+			agentusageBin = exe
 		}
 	}
-	if openusageBin == "" {
-		openusageBin = "openusage"
+	if agentusageBin == "" {
+		agentusageBin = "agentusage"
 	}
 
 	return Dirs{
 		Home:       home,
 		ConfigRoot: configRoot,
-		// HooksDir is OpenUsage's OWN directory. configRoot stays the XDG-style
+		// HooksDir is agentUsage's OWN directory. configRoot stays the XDG-style
 		// base because it also locates third-party tool dirs (e.g. OpenCode,
 		// which resolves opencode.json/plugins via xdg-basedir and so uses
 		// %USERPROFILE%\.config\opencode even on Windows), whereas HooksDir tracks
 		// settings.json — see platformHooksDir() in hooks_dir_*.go.
-		HooksDir:     platformHooksDir(configRoot),
-		OpenusageBin: openusageBin,
+		HooksDir:      platformHooksDir(configRoot),
+		AgentusageBin: agentusageBin,
 	}
 }

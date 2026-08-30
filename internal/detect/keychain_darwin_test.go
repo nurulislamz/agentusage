@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // shimSecurityCLI replaces the system `security` binary with a stub that
@@ -23,7 +23,7 @@ func TestKeychainGenericPasswordExists_MissingServiceReturnsFalse(t *testing.T) 
 		t.Skip("darwin only")
 	}
 	// Pick a service name that is overwhelmingly unlikely to exist.
-	ok := keychainGenericPasswordExists("openusage-fake-service-does-not-exist-9876543210")
+	ok := keychainGenericPasswordExists("agentusage-fake-service-does-not-exist-9876543210")
 	if ok {
 		t.Errorf("keychainGenericPasswordExists for nonexistent service = true, want false")
 	}

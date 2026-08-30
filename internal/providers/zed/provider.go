@@ -17,9 +17,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 // ID is the canonical provider identifier registered in the providers
@@ -55,7 +55,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Open Zed and use the Agent panel against the hosted zed.dev models so the threads database is populated.",
-					"openusage auto-detects threads.db at the OS-appropriate Zed data directory; no configuration required.",
+					"agentusage auto-detects threads.db at the OS-appropriate Zed data directory; no configuration required.",
 				},
 			},
 			Dashboard: dashboardWidget(),

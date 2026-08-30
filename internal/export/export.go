@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/daemon"
+	"github.com/nurulislamz/agentusage/internal/version"
 )
 
 // runner bundles the orchestration dependencies so tests can swap them out.
@@ -37,7 +37,7 @@ func Run(opts Options) error {
 
 // Collect resolves the requested source and returns the current usage
 // snapshots without encoding them. It is the reusable headless data path
-// behind both `openusage export` and the report subcommands. The returned
+// behind both `agentusage export` and the report subcommands. The returned
 // Source reflects what was actually used (SourceAuto may resolve to either
 // daemon or direct).
 func Collect(ctx context.Context, src Source) ([]core.UsageSnapshot, Source, error) {
@@ -102,11 +102,11 @@ func (r *runner) run(ctx context.Context, opts Options) error {
 	}
 
 	env := ExportEnvelope{
-		SchemaVersion:    SchemaVersion,
-		GeneratedAt:      r.now(),
-		OpenUsageVersion: resolveVersion(opts.Version),
-		Source:           resolvedSource,
-		Snapshots:        snaps,
+		SchemaVersion:     SchemaVersion,
+		GeneratedAt:       r.now(),
+		AgentUsageVersion: resolveVersion(opts.Version),
+		Source:            resolvedSource,
+		Snapshots:         snaps,
 	}
 	if env.Snapshots == nil {
 		env.Snapshots = []core.UsageSnapshot{}

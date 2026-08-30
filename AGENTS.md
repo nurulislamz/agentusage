@@ -1,14 +1,14 @@
-# AGENTS.md — OpenUsage
+# AGENTS.md — agentUsage
 
 Guidelines for coding agents working in this repository.
 
 ## Project Overview
 
-OpenUsage is a Go terminal dashboard (Bubble Tea) for monitoring AI coding tool usage and spend.
+agentUsage is a Go terminal dashboard (Bubble Tea) for monitoring AI coding tool usage and spend.
 It supports two runtime paths:
 
-- Dashboard mode (`openusage`) reads usage snapshots through the local telemetry daemon runtime.
-- Daemon mode (`openusage telemetry ...`) collects provider data + hook events into SQLite.
+- Dashboard mode (`agentusage`) reads usage snapshots through the local telemetry daemon runtime.
+- Daemon mode (`agentusage telemetry ...`) collects provider data + hook events into SQLite.
 
 CGO is required (`CGO_ENABLED=1`) due to `mattn/go-sqlite3` usage (Cursor + telemetry store).
 
@@ -16,18 +16,18 @@ CGO is required (`CGO_ENABLED=1`) due to `mattn/go-sqlite3` usage (Cursor + tele
 
 ```bash
 # Build
-make build                    # binary -> ./bin/openusage (with version ldflags)
-go build ./cmd/openusage      # quick build without ldflags
+make build                    # binary -> ./bin/agentusage (with version ldflags)
+go build ./cmd/agentusage      # quick build without ldflags
 
 # Run
-make run                      # go run ./cmd/openusage
-OPENUSAGE_DEBUG=1 make run    # enable debug logging to stderr
+make run                      # go run ./cmd/agentusage
+AGENTUSAGE_DEBUG=1 make run    # enable debug logging to stderr
 make demo                     # run demo binary with simulated data
 
 # Telemetry daemon
-go run ./cmd/openusage telemetry daemon
-go run ./cmd/openusage telemetry daemon status
-go run ./cmd/openusage telemetry hook codex < /tmp/codex-hook.json
+go run ./cmd/agentusage telemetry daemon
+go run ./cmd/agentusage telemetry daemon status
+go run ./cmd/agentusage telemetry hook codex < /tmp/codex-hook.json
 
 # Test
 make test                     # go test -race -coverprofile=coverage.out -covermode=atomic ./...
@@ -49,7 +49,7 @@ make tidy                     # go mod tidy
 ## Current Structure
 
 ```text
-cmd/openusage/          cobra CLI entrypoint
+cmd/agentusage/          cobra CLI entrypoint
   main.go               root command
   dashboard.go          Bubble Tea runtime wiring
   telemetry.go          telemetry daemon / hook subcommands
@@ -122,7 +122,7 @@ Current provider set: `openai`, `anthropic`, `alibaba_cloud`, `openrouter`, `gro
 ## Security and Data Handling
 
 - Never print raw API keys in logs.
-- Settings are stored at `~/.config/openusage/settings.json` (or `%APPDATA%\openusage\settings.json` on Windows).
+- Settings are stored at `~/.config/agentusage/settings.json` (or `%APPDATA%\agentusage\settings.json` on Windows).
 - User-entered API keys are stored in `credentials.json` with `0600` permissions.
 - `AccountConfig.Token` and `AccountConfig.ExtraData` are runtime-only (`json:"-"`).
 - Redact or avoid storing sensitive headers/body data in snapshot diagnostics/raw metadata.
@@ -152,7 +152,7 @@ For larger changes, use these workflow docs in `docs/skills/`:
 - `validate-feature`
 - `iterate-feature`
 - `finalize-feature`
-- `openusage-provider` (provider-specific guidance)
+- `agentusage-provider` (provider-specific guidance)
 
 ## Commit Style
 

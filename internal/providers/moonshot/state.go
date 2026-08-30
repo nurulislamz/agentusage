@@ -16,7 +16,7 @@ import (
 // approximation by remembering the maximum balance we've ever seen.
 //
 // Self-corrects: on the next top-up the peak is bumped to the new high. Worst
-// case (openusage installed mid-cycle, no top-up since) is a stable
+// case (agentusage installed mid-cycle, no top-up since) is a stable
 // "essentially full" gauge until the next top-up — which is honest about what
 // we actually know.
 type peakState struct {
@@ -39,9 +39,9 @@ const stateFileVersion = 1
 var stateMu sync.Mutex
 
 // stateFilePath returns the canonical location for the provider's peak state.
-// Override via OPENUSAGE_MOONSHOT_STATE_PATH for tests.
+// Override via AGENTUSAGE_MOONSHOT_STATE_PATH for tests.
 func stateFilePath() (string, error) {
-	if override := os.Getenv("OPENUSAGE_MOONSHOT_STATE_PATH"); override != "" {
+	if override := os.Getenv("AGENTUSAGE_MOONSHOT_STATE_PATH"); override != "" {
 		return override, nil
 	}
 	dir, err := stateBaseDir()
@@ -61,13 +61,13 @@ func stateBaseDir() (string, error) {
 		if appData == "" {
 			return "", fmt.Errorf("no LOCALAPPDATA/APPDATA in environment")
 		}
-		return filepath.Join(appData, "openusage"), nil
+		return filepath.Join(appData, "agentusage"), nil
 	default:
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return "", err
 		}
-		return filepath.Join(home, ".local", "state", "openusage"), nil
+		return filepath.Join(home, ".local", "state", "agentusage"), nil
 	}
 }
 

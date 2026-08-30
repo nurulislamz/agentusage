@@ -10,7 +10,7 @@ import (
 
 // detectShellRC parses common shell startup files for `export VAR=...` lines
 // matching env vars in envKeyMapping. This catches the case where a user sets
-// API keys only in their shell rc and launches openusage from a GUI launcher
+// API keys only in their shell rc and launches agentusage from a GUI launcher
 // (Spotlight/Dock/desktop launcher) which never sources those files — so
 // os.Getenv() returns empty even though the key is "set" from the user's POV.
 //

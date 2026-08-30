@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func buildCursorDemoSnapshot(now time.Time) core.UsageSnapshot {

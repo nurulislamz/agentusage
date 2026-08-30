@@ -11,17 +11,17 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/appupdate"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/dashboardapp"
-	"github.com/janekbaraniewski/openusage/internal/exporter"
-	"github.com/janekbaraniewski/openusage/internal/providers/antigravity"
-	"github.com/janekbaraniewski/openusage/internal/providers/cursor"
-	"github.com/janekbaraniewski/openusage/internal/providers/opencode"
-	"github.com/janekbaraniewski/openusage/internal/tui"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/agentusage/internal/appupdate"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/daemon"
+	"github.com/nurulislamz/agentusage/internal/dashboardapp"
+	"github.com/nurulislamz/agentusage/internal/exporter"
+	"github.com/nurulislamz/agentusage/internal/providers/antigravity"
+	"github.com/nurulislamz/agentusage/internal/providers/cursor"
+	"github.com/nurulislamz/agentusage/internal/providers/opencode"
+	"github.com/nurulislamz/agentusage/internal/tui"
+	"github.com/nurulislamz/agentusage/internal/version"
 )
 
 func runDashboard(cfg config.Config) {

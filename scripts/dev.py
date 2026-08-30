@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 
-BIN = "./tmp/openusage-dev"
+BIN = "./tmp/agentusage-dev"
 
 def restore_terminal():
     # Disable xterm mouse tracking modes
@@ -30,8 +30,8 @@ signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
 def build():
-    print("\n🔨 Compiling OpenUsage...")
-    res = subprocess.run(["go", "build", "-o", BIN, "./cmd/openusage"], capture_output=True, text=True)
+    print("\n🔨 Compiling agentUsage...")
+    res = subprocess.run(["go", "build", "-o", BIN, "./cmd/agentusage"], capture_output=True, text=True)
     if res.returncode == 0:
         print("✅ Build succeeded!")
         return True
@@ -107,7 +107,7 @@ def main():
 
         if not edit_occurred:
             # User quit the app cleanly
-            print("Exiting OpenUsage dev mode.")
+            print("Exiting agentUsage dev mode.")
             break
 
         # Stop app immediately and restore terminal so the banner is clear
@@ -126,7 +126,7 @@ def main():
             watcher.stdout.readline()
             wait_for_settled_edits(watcher)
 
-        print("🚀 Launching OpenUsage...")
+        print("🚀 Launching agentUsage...")
         time.sleep(0.3)
 
     watcher.terminate()

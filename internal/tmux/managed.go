@@ -4,7 +4,7 @@ import "bytes"
 
 // Managed config blocks.
 //
-// Several integrations write an openusage-owned block, bracketed by sentinel
+// Several integrations write an agentusage-owned block, bracketed by sentinel
 // comments, into a user config file (tmux.conf, kitty.conf, ghostty config),
 // and need to replace it in place on re-run or strip it on uninstall. These
 // helpers are the one implementation of that edit, parameterized by the

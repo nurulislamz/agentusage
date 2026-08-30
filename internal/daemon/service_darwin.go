@@ -14,7 +14,7 @@ import (
 func (m ServiceManager) Install() error {
 	if isTransientExecutablePath(m.exePath) {
 		return fmt.Errorf(
-			"refusing to install telemetry daemon service from transient executable %q (likely from `go run`); build a stable binary first, then run `./bin/openusage telemetry daemon install`",
+			"refusing to install telemetry daemon service from transient executable %q (likely from `go run`); build a stable binary first, then run `./bin/agentusage telemetry daemon install`",
 			m.exePath,
 		)
 	}

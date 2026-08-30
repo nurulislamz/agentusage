@@ -12,13 +12,13 @@ import (
 	"github.com/samber/lo"
 )
 
-// Sentinel markers bracket the openusage-managed snippet inside tmux.conf so
+// Sentinel markers bracket the agentusage-managed snippet inside tmux.conf so
 // install/uninstall can find and rewrite it in place without disturbing
 // adjacent user config. The markers also let the doctor command verify that
 // the snippet is still installed.
 const (
-	sentinelStart = "# >>> openusage tmux >>> (managed; do not edit between sentinels)"
-	sentinelEnd   = "# <<< openusage tmux <<<"
+	sentinelStart = "# >>> agentusage tmux >>> (managed; do not edit between sentinels)"
+	sentinelEnd   = "# <<< agentusage tmux <<<"
 )
 
 // InstallOptions configures the tmux.conf snippet emitted by Install. Each
@@ -41,7 +41,7 @@ type InstallOptions struct {
 	// LeftLength sets status-left-length. Zero means 80.
 	LeftLength int
 	// BindPopup, when non-empty, is a key letter (e.g. "u") that gets
-	// bound to a display-popup running `openusage`. Requires tmux 3.2+.
+	// bound to a display-popup running `agentusage`. Requires tmux 3.2+.
 	BindPopup string
 	// BindRefresh, when non-empty, is a key letter that triggers a
 	// status-bar refresh on demand.
@@ -49,8 +49,8 @@ type InstallOptions struct {
 	// Write controls whether Install applies the snippet to tmux.conf
 	// (true) or only prints it to the writer (false).
 	Write bool
-	// Binary overrides the openusage binary path used in the snippet's
-	// status-line command. Empty means `openusage`.
+	// Binary overrides the agentusage binary path used in the snippet's
+	// status-line command. Empty means `agentusage`.
 	Binary string
 	// ConfPath overrides the auto-detected tmux.conf location. Tests use
 	// it to point at a temp file.
@@ -115,7 +115,7 @@ func BuildSnippet(opts InstallOptions) string {
 	opts = withInstallDefaults(opts)
 	binary := strings.TrimSpace(opts.Binary)
 	if binary == "" {
-		binary = "openusage"
+		binary = "agentusage"
 	}
 
 	var b strings.Builder
@@ -140,7 +140,7 @@ func BuildSnippet(opts InstallOptions) string {
 	}
 
 	if key := strings.TrimSpace(opts.BindPopup); key != "" {
-		fmt.Fprintf(&b, "bind-key %s display-popup -E -w 90%% -h 90%% -T \" openusage \" %s\n", key, binary)
+		fmt.Fprintf(&b, "bind-key %s display-popup -E -w 90%% -h 90%% -T \" agentusage \" %s\n", key, binary)
 	}
 	if key := strings.TrimSpace(opts.BindRefresh); key != "" {
 		fmt.Fprintf(&b, "bind-key %s run-shell '%s tmux preview' \\; refresh-client -S\n", key, binary)
@@ -151,7 +151,7 @@ func BuildSnippet(opts InstallOptions) string {
 	return b.String()
 }
 
-// prependStatusRight returns a run-shell line that inserts the openusage
+// prependStatusRight returns a run-shell line that inserts the agentusage
 // segment at the inner (left) edge of status-right at config-load time,
 // instead of appending it to the far-right edge. This places the usage
 // info next to the center of the bar, ahead of the user's existing
@@ -162,12 +162,12 @@ func BuildSnippet(opts InstallOptions) string {
 //
 // We deliberately avoid writing a literal "#(" into the conf. tmux expands
 // #(...) inside run-shell arguments at parse time, which would execute
-// openusage immediately and freeze its output into the option. Instead the
+// agentusage immediately and freeze its output into the option. Instead the
 // shell rebuilds the leading "#" at runtime via printf (so tmux never sees a
 // command substitution to expand) and `tmux set` (no -F) stores the segment
 // unexpanded, preserving both our segment and the user's existing #(...)
 // segments for live rendering.
-// segmentInners returns the inner `(openusage tmux …)` command(s) — WITHOUT the
+// segmentInners returns the inner `(agentusage tmux …)` command(s) — WITHOUT the
 // leading `#` — for the configured providers. With no providers it is a single
 // auto-detecting segment; with providers it is one pinned segment each, so
 // multiple tools show side by side, each with its own metrics.
@@ -182,14 +182,14 @@ func segmentInners(binary, preset string, providers []string) []string {
 
 func prependStatusRight(binary, preset string, providers []string) string {
 	// Quote each inner command as a shell word for the for-loop. A " │ "
-	// separator divides the openusage segment(s) from the user's existing
+	// separator divides the agentusage segment(s) from the user's existing
 	// right-side segments (clock, battery, …) and from each other; it is a
 	// plain box-drawing bar (no "#[" styling) so it inherits surrounding colors.
 	items := strings.Join(lo.Map(segmentInners(binary, preset, providers), func(i string, _ int) string {
 		return fmt.Sprintf("%q", i)
 	}), " ")
 	// We deliberately keep a literal "#(" out of the conf: tmux expands #(...)
-	// inside run-shell arguments at parse time, which would run openusage
+	// inside run-shell arguments at parse time, which would run agentusage
 	// immediately and freeze its output. The shell rebuilds the leading "#" per
 	// segment at runtime via printf, joins them with the separator, and
 	// `tmux set` (no -F) stores everything unexpanded for live rendering. The
@@ -305,7 +305,7 @@ func Uninstall(out io.Writer, confPath string) error {
 	}
 
 	if !bytes.Contains(existing, []byte(sentinelStart)) {
-		fmt.Fprintf(out, "no openusage block in %s; nothing to uninstall\n", path)
+		fmt.Fprintf(out, "no agentusage block in %s; nothing to uninstall\n", path)
 		return nil
 	}
 
@@ -319,23 +319,23 @@ func Uninstall(out io.Writer, confPath string) error {
 		return fmt.Errorf("tmux: writing %s: %w", path, err)
 	}
 
-	fmt.Fprintf(out, "removed openusage block from %s\n", path)
+	fmt.Fprintf(out, "removed agentusage block from %s\n", path)
 	return nil
 }
 
-// replaceOrAppendSnippet replaces/appends the openusage tmux.conf block. Thin
+// replaceOrAppendSnippet replaces/appends the agentusage tmux.conf block. Thin
 // wrapper over the shared managed-block helper (see managed.go).
 func replaceOrAppendSnippet(existing []byte, snippet string) []byte {
 	return replaceOrAppendBlock(existing, sentinelStart, sentinelEnd, snippet)
 }
 
-// removeSentinelBlock strips the openusage tmux.conf block. Thin wrapper over
+// removeSentinelBlock strips the agentusage tmux.conf block. Thin wrapper over
 // the shared managed-block helper (see managed.go).
 func removeSentinelBlock(existing []byte) []byte {
 	return removeBlock(existing, sentinelStart, sentinelEnd)
 }
 
-// SentinelPresent reports whether path contains the openusage-managed
+// SentinelPresent reports whether path contains the agentusage-managed
 // snippet. Used by the doctor command to verify install state.
 func SentinelPresent(path string) (bool, error) {
 	data, err := os.ReadFile(path)

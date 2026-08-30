@@ -1,6 +1,6 @@
 // Package report builds headless usage/cost reports (daily, weekly, monthly,
 // session and 5-hour blocks) from a unified stream of usage events. It is the
-// data layer behind the `openusage daily|weekly|monthly|session|blocks`
+// data layer behind the `agentusage daily|weekly|monthly|session|blocks`
 // subcommands and is deliberately free of any TUI dependency.
 //
 // Events come from two sources:

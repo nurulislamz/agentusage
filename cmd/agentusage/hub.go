@@ -12,11 +12,11 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/hub"
-	"github.com/janekbaraniewski/openusage/internal/tui"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/daemon"
+	"github.com/nurulislamz/agentusage/internal/hub"
+	"github.com/nurulislamz/agentusage/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +33,7 @@ type hubRuntime struct {
 // the store+server pair. Called by both the interactive TUI and headless paths.
 //
 // Auth-token resolution happens here so rt.authToken is the single source of
-// truth: explicit config wins, falling back to OPENUSAGE_HUB_TOKEN when config
+// truth: explicit config wins, falling back to AGENTUSAGE_HUB_TOKEN when config
 // is empty. Without this, only the server saw the env var and the headless
 // log line would falsely report auth=disabled.
 func resolveHubRuntime(cfg config.Config) hubRuntime {
@@ -69,17 +69,17 @@ func newHubCommand() *cobra.Command {
 		Use:   "hub",
 		Short: "Run a hub that aggregates usage snapshots from multiple machines",
 		Long: strings.Join([]string{
-			"Start the OpenUsage hub server. Worker machines push snapshots here; the TUI shows an aggregated view.",
+			"Start the agentUsage hub server. Worker machines push snapshots here; the TUI shows an aggregated view.",
 			"",
 			"Security: by default the hub has NO authentication. Without an auth token, the hub refuses to bind to a",
 			"non-loopback interface unless you pass --allow-public to explicitly opt in.",
-			"To require a Bearer token, export OPENUSAGE_HUB_TOKEN.",
+			"To require a Bearer token, export AGENTUSAGE_HUB_TOKEN.",
 			"Do not expose the hub to untrusted networks without enabling auth.",
 		}, "\n"),
 		Example: strings.Join([]string{
-			"  openusage hub                                        # TUI on 127.0.0.1:9190",
-			"  openusage hub --listen :9190 --allow-public          # bind 0.0.0.0 without auth (trusted LAN only)",
-			"  OPENUSAGE_HUB_TOKEN=s3cret openusage hub --headless  # bind 0.0.0.0 with Bearer auth",
+			"  agentusage hub                                        # TUI on 127.0.0.1:9190",
+			"  agentusage hub --listen :9190 --allow-public          # bind 0.0.0.0 without auth (trusted LAN only)",
+			"  AGENTUSAGE_HUB_TOKEN=s3cret agentusage hub --headless  # bind 0.0.0.0 with Bearer auth",
 		}, "\n"),
 		Run: func(_ *cobra.Command, _ []string) {
 			cfg, err := config.Load()
@@ -107,7 +107,7 @@ func newHubCommand() *cobra.Command {
 // validateHubExposure refuses to start the hub when it would bind to a
 // non-loopback interface with no Bearer auth configured, unless the operator
 // explicitly opts in with --allow-public. This catches the common footgun of
-// `openusage hub --listen :9190` on a host reachable from the public internet
+// `agentusage hub --listen :9190` on a host reachable from the public internet
 // without a token. Returns nil when the configuration is safe.
 func validateHubExposure(addr, authToken string, allowPublic bool) error {
 	if authToken != "" {
@@ -122,7 +122,7 @@ func validateHubExposure(addr, authToken string, allowPublic bool) error {
 	return fmt.Errorf(
 		"hub: refusing to listen on %q without auth_token.\n"+
 			"  Choose one:\n"+
-			"    1. export OPENUSAGE_HUB_TOKEN=<secret> to enable Bearer auth, OR\n"+
+			"    1. export AGENTUSAGE_HUB_TOKEN=<secret> to enable Bearer auth, OR\n"+
 			"    2. bind to loopback only:  --listen 127.0.0.1:9190, OR\n"+
 			"    3. pass --allow-public if you have a network-level firewall in place",
 		addr,
@@ -159,7 +159,7 @@ func isLoopbackAddr(addr string) bool {
 }
 
 func runHub(cfg config.Config, allowPublic bool) {
-	verbose := os.Getenv("OPENUSAGE_DEBUG") != ""
+	verbose := os.Getenv("AGENTUSAGE_DEBUG") != ""
 
 	if err := tui.LoadThemes(config.ConfigDir()); err != nil && verbose {
 		log.Printf("theme load: %v", err)

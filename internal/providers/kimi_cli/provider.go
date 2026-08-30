@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 // ID is the canonical provider identifier registered in the providers
@@ -54,7 +54,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Install Kimi CLI and run at least one session.",
-					"openusage auto-detects ~/.kimi/sessions/<group>/<session>/wire.jsonl; no configuration required.",
+					"agentusage auto-detects ~/.kimi/sessions/<group>/<session>/wire.jsonl; no configuration required.",
 				},
 			},
 			Dashboard: dashboardWidget(),

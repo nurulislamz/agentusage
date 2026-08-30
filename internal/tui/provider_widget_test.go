@@ -3,8 +3,8 @@ package tui
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestDashboardWidget_AppliesSectionOverride(t *testing.T) {

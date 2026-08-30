@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/mod/semver"
 
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/agentusage/internal/version"
 )
 
 func ClassifyEnsureError(err error) DaemonState {
@@ -23,7 +23,7 @@ func ClassifyEnsureError(err error) DaemonState {
 		return DaemonState{
 			Status:      DaemonStatusNotInstalled,
 			Message:     "Background helper is not set up.",
-			InstallHint: "openusage telemetry daemon install",
+			InstallHint: "agentusage telemetry daemon install",
 		}
 	case strings.Contains(msg, "out of date"):
 		return DaemonState{

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func testServer(t *testing.T, opts Options) *Server {
@@ -76,8 +76,8 @@ func TestSnapshotsDemoStripsRaw(t *testing.T) {
 	if env.SchemaVersion != schemaVersion {
 		t.Errorf("schema = %q", env.SchemaVersion)
 	}
-	if env.OpenUsageVersion != "test" {
-		t.Errorf("version = %q", env.OpenUsageVersion)
+	if env.AgentUsageVersion != "test" {
+		t.Errorf("version = %q", env.AgentUsageVersion)
 	}
 	if len(env.Snapshots) != 1 {
 		t.Fatalf("snapshots = %d", len(env.Snapshots))
@@ -130,8 +130,8 @@ func TestIndexServed(t *testing.T) {
 	}
 	body, _ := io.ReadAll(w.Body)
 	html := string(body)
-	if !strings.Contains(html, "OpenUsage") {
-		t.Error("index.html should mention OpenUsage")
+	if !strings.Contains(html, "agentUsage") {
+		t.Error("index.html should mention agentUsage")
 	}
 	if !strings.Contains(html, "/app.js") {
 		t.Error("index.html should load app.js")

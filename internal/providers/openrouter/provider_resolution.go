@@ -146,8 +146,8 @@ func isLikelyRouterClientProviderName(name string) bool {
 	}
 	clean := strings.NewReplacer(" ", "", "-", "", "_", "", ".", "").Replace(n)
 	switch clean {
-	case "unknown", "openrouter", "openrouterauto", "openusage":
+	case "unknown", "openrouter", "openrouterauto", "openusage", "agentusage":
 		return true
 	}
-	return strings.Contains(clean, "openrouter") || strings.Contains(clean, "openusage")
+	return strings.Contains(clean, "openrouter") || strings.Contains(clean, "openusage") || strings.Contains(clean, "agentusage")
 }

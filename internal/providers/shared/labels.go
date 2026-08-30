@@ -1,6 +1,6 @@
 package shared
 
-import "github.com/janekbaraniewski/openusage/internal/core"
+import "github.com/nurulislamz/agentusage/internal/core"
 
 // DefaultCodeStatsConfig returns the standard CodeStatsConfig used by coding-tool providers.
 func DefaultCodeStatsConfig() core.CodeStatsConfig {

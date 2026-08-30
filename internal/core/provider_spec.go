@@ -20,7 +20,7 @@ const (
 	ProviderAuthTypeBrowserSession ProviderAuthType = "browser_session"
 )
 
-// BrowserCookieRef points at the (domain, cookie name) pair openusage should
+// BrowserCookieRef points at the (domain, cookie name) pair agentUsage should
 // extract from the user's browser to authenticate console-API requests for a
 // provider. The actual cookie value is never persisted in this struct — it
 // lives in the credentials store and is re-extracted from the browser on
@@ -58,7 +58,7 @@ type ProviderAuthSpec struct {
 	BrowserCookieDomain string
 	BrowserCookieName   string
 
-	// BrowserConsoleURL is the URL openusage opens in the user's default
+	// BrowserConsoleURL is the URL agentUsage opens in the user's default
 	// browser when they click "Connect via browser" for this provider.
 	// Optional — falls back to "https://" + BrowserCookieDomain if empty.
 	BrowserConsoleURL string

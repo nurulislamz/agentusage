@@ -35,7 +35,7 @@ type BrowserSession struct {
 	// avoids triggering keychain prompts on others.
 	SourceBrowser string `json:"source_browser,omitempty"`
 
-	// CapturedAt is when openusage last successfully extracted this cookie
+	// CapturedAt is when agentusage last successfully extracted this cookie
 	// from the browser. ExpiresAt is the cookie's own Set-Cookie expiry —
 	// zero for session-only cookies. Both are RFC3339 strings on the wire
 	// for human readability.

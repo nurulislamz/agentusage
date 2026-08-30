@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/pricing"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/pricing"
 )
 
 func TestSanitizeModelName(t *testing.T) {
@@ -765,7 +765,7 @@ func TestReadConversationJSONL_ExtractsLanguageAndCodeStatsMetrics(t *testing.T)
 	}
 
 	now := time.Now().UTC()
-	line := fmt.Sprintf(`{"type":"assistant","sessionId":"sess-lang","requestId":"req-lang-1","timestamp":"%s","cwd":"/tmp/openusage","message":{"id":"msg-lang-1","model":"claude-sonnet-4-5","role":"assistant","content":[{"type":"tool_use","id":"tool-edit","name":"Edit","input":{"file_path":"internal/providers/claude_code/claude_code.go","old_string":"one\ntwo","new_string":"one\ntwo\nthree"}},{"type":"tool_use","id":"tool-write","name":"Write","input":{"path":"docs/notes.md","content":"alpha\nbeta"}},{"type":"tool_use","id":"tool-bash","name":"Bash","input":{"command":"git commit -m \"track metrics\""}}],"usage":{"input_tokens":200,"output_tokens":40,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`,
+	line := fmt.Sprintf(`{"type":"assistant","sessionId":"sess-lang","requestId":"req-lang-1","timestamp":"%s","cwd":"/tmp/agentusage","message":{"id":"msg-lang-1","model":"claude-sonnet-4-5","role":"assistant","content":[{"type":"tool_use","id":"tool-edit","name":"Edit","input":{"file_path":"internal/providers/claude_code/claude_code.go","old_string":"one\ntwo","new_string":"one\ntwo\nthree"}},{"type":"tool_use","id":"tool-write","name":"Write","input":{"path":"docs/notes.md","content":"alpha\nbeta"}},{"type":"tool_use","id":"tool-bash","name":"Bash","input":{"command":"git commit -m \"track metrics\""}}],"usage":{"input_tokens":200,"output_tokens":40,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`,
 		now.Format(time.RFC3339),
 	)
 

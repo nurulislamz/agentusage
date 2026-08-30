@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
@@ -36,25 +36,25 @@ type WebProjector struct {
 
 // WebAccountView is the structured payload for one provider account in the browser UI.
 type WebAccountView struct {
-	Key            string            `json:"key"`
-	ProviderID     string            `json:"provider_id"`
-	ProviderName   string            `json:"provider_name"`
-	AccountID      string            `json:"account_id"`
-	Status         string            `json:"status"`
-	StatusBadge    string            `json:"status_badge"`
-	StatusIcon     string            `json:"status_icon"`
-	AccentColor    string            `json:"accent_color"`
-	Summary        string            `json:"summary"`
-	Detail         string            `json:"detail,omitempty"`
-	TagEmoji       string            `json:"tag_emoji,omitempty"`
-	TagLabel       string            `json:"tag_label,omitempty"`
-	GaugePercent   float64           `json:"gauge_percent,omitempty"`
-	Message        string            `json:"message,omitempty"`
-	Timestamp      time.Time         `json:"timestamp"`
-	TileLines      []string          `json:"tile_lines"`
+	Key            string             `json:"key"`
+	ProviderID     string             `json:"provider_id"`
+	ProviderName   string             `json:"provider_name"`
+	AccountID      string             `json:"account_id"`
+	Status         string             `json:"status"`
+	StatusBadge    string             `json:"status_badge"`
+	StatusIcon     string             `json:"status_icon"`
+	AccentColor    string             `json:"accent_color"`
+	Summary        string             `json:"summary"`
+	Detail         string             `json:"detail,omitempty"`
+	TagEmoji       string             `json:"tag_emoji,omitempty"`
+	TagLabel       string             `json:"tag_label,omitempty"`
+	GaugePercent   float64            `json:"gauge_percent,omitempty"`
+	Message        string             `json:"message,omitempty"`
+	Timestamp      time.Time          `json:"timestamp"`
+	TileLines      []string           `json:"tile_lines"`
 	DetailSections []WebDetailSection `json:"detail_sections"`
-	Resets         []WebResetPill    `json:"resets,omitempty"`
-	DailyCost      []core.TimePoint  `json:"daily_cost,omitempty"`
+	Resets         []WebResetPill     `json:"resets,omitempty"`
+	DailyCost      []core.TimePoint   `json:"daily_cost,omitempty"`
 }
 
 type WebDetailSection struct {
@@ -71,26 +71,26 @@ type WebResetPill struct {
 
 // WebThemeTokens exposes the active palette for CSS variable injection.
 type WebThemeTokens struct {
-	Name string `json:"name"`
-	Icon string `json:"icon,omitempty"`
-	Base string `json:"base"`
-	Mantle string `json:"mantle"`
+	Name     string `json:"name"`
+	Icon     string `json:"icon,omitempty"`
+	Base     string `json:"base"`
+	Mantle   string `json:"mantle"`
 	Surface0 string `json:"surface0"`
 	Surface1 string `json:"surface1"`
 	Surface2 string `json:"surface2"`
-	Text string `json:"text"`
-	Subtext string `json:"subtext"`
-	Dim string `json:"dim"`
-	Accent string `json:"accent"`
-	Blue string `json:"blue"`
+	Text     string `json:"text"`
+	Subtext  string `json:"subtext"`
+	Dim      string `json:"dim"`
+	Accent   string `json:"accent"`
+	Blue     string `json:"blue"`
 	Sapphire string `json:"sapphire"`
-	Green string `json:"green"`
-	Yellow string `json:"yellow"`
-	Red string `json:"red"`
-	Peach string `json:"peach"`
-	Teal string `json:"teal"`
+	Green    string `json:"green"`
+	Yellow   string `json:"yellow"`
+	Red      string `json:"red"`
+	Peach    string `json:"peach"`
+	Teal     string `json:"teal"`
 	Lavender string `json:"lavender"`
-	Mauve string `json:"mauve"`
+	Mauve    string `json:"mauve"`
 }
 
 func NewWebProjectorFromConfig(cfg config.Config) WebProjector {

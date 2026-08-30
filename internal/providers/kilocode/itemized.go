@@ -1,8 +1,8 @@
 package kilocode
 
 import (
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/roocode"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/roocode"
 )
 
 // ItemizedUsage implements core.ItemizedUsageProvider for Kilo Code, reusing

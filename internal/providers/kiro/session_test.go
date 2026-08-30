@@ -11,7 +11,7 @@ func TestParseKiroSession_AggregatesJSONLAndHeaderMetadata(t *testing.T) {
 	headerPath := filepath.Join(dir, "session-1.json")
 	header := `{
 		"session_id": "session-1",
-		"cwd": "/work/openusage",
+		"cwd": "/work/agentusage",
 		"updated_at": "2026-05-18T09:00:00Z",
 		"session_state": {
 			"rts_model_state": {
@@ -55,8 +55,8 @@ func TestParseKiroSession_AggregatesJSONLAndHeaderMetadata(t *testing.T) {
 	if conv.ConversationID != "session-1" {
 		t.Errorf("ConversationID = %q, want session-1", conv.ConversationID)
 	}
-	if conv.Workspace != "/work/openusage" {
-		t.Errorf("Workspace = %q, want /work/openusage", conv.Workspace)
+	if conv.Workspace != "/work/agentusage" {
+		t.Errorf("Workspace = %q, want /work/agentusage", conv.Workspace)
 	}
 	if conv.Model != "claude-sonnet-4-5" {
 		t.Errorf("Model = %q, want claude-sonnet-4-5", conv.Model)

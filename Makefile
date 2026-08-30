@@ -1,11 +1,11 @@
-APP_NAME    := openusage
-MODULE      := github.com/janekbaraniewski/openusage
+APP_NAME    := agentusage
+MODULE      := github.com/nurulislamz/agentusage
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE  := $(shell date +%Y-%m-%dT%H:%M:%S%z)
 
 BIN_DIR     := bin
-CMD_DIR     := ./cmd/openusage
+CMD_DIR     := ./cmd/agentusage
 
 # Append .exe to built binaries on Windows so they are runnable. GNU Make sets
 # OS=Windows_NT on Windows (incl. Git Bash, where these recipes are run).
@@ -76,9 +76,9 @@ build: deps ## Build the binary
 install: build ## Install binary to ~/.local/bin and restart daemon if running
 	install -d $(HOME)/.local/bin
 	install -m 755 $(BIN_DIR)/$(APP_NAME)$(EXE) $(HOME)/.local/bin/$(APP_NAME)$(EXE)
-	@if command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet openusage-telemetry.service 2>/dev/null; then \
-		echo "Restarting openusage-telemetry.service..."; \
-		systemctl --user restart openusage-telemetry.service; \
+	@if command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet agentusage-telemetry.service 2>/dev/null; then \
+		echo "Restarting agentusage-telemetry.service..."; \
+		systemctl --user restart agentusage-telemetry.service; \
 	fi
 
 

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/daemon"
+	"github.com/nurulislamz/agentusage/internal/daemon"
 )
 
 // DoctorOptions configures the Run helper. All fields are optional; the
@@ -39,7 +39,7 @@ func Run(out io.Writer, opts DoctorOptions) error {
 	if opts.Now.IsZero() {
 		opts.Now = time.Now()
 	}
-	fmt.Fprintln(out, "openusage tmux doctor")
+	fmt.Fprintln(out, "agentusage tmux doctor")
 	fmt.Fprintln(out, strings.Repeat("-", 32))
 
 	checkTmuxBinary(out, opts)
@@ -182,8 +182,8 @@ func checkSnippet(out io.Writer, opts DoctorOptions) {
 		return
 	}
 	if !present {
-		fmt.Fprintf(out, "[INFO] tmux.conf: %s has no openusage block (run `openusage tmux install --write` to add it)\n", path)
+		fmt.Fprintf(out, "[INFO] tmux.conf: %s has no agentusage block (run `agentusage tmux install --write` to add it)\n", path)
 		return
 	}
-	fmt.Fprintf(out, "[ OK ] tmux.conf: openusage block present at %s\n", path)
+	fmt.Fprintf(out, "[ OK ] tmux.conf: agentusage block present at %s\n", path)
 }

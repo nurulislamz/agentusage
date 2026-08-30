@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func loadMaterializedUsageAgg(ctx context.Context, db *sql.DB, filter usageFilter, agg *telemetryUsageAgg) error {

@@ -14,16 +14,16 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/tui"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/daemon"
+	"github.com/nurulislamz/agentusage/internal/tui"
 	"github.com/spf13/cobra"
 )
 
 // envHubToken is shared with the hub server + exporter: if --token is not
 // provided, this env var is used as a Bearer token fallback.
-const envHubToken = "OPENUSAGE_HUB_TOKEN"
+const envHubToken = "AGENTUSAGE_HUB_TOKEN"
 
 // maxFetchBodyBytes caps /v1/snapshots responses from a remote hub so a
 // misbehaving endpoint cannot force the viewer to decode an unbounded body.
@@ -37,15 +37,15 @@ func newHubViewCommand() *cobra.Command {
 		Use:   "hub-view <url>",
 		Short: "View a remote hub's aggregated usage data in the TUI",
 		Long: strings.Join([]string{
-			"Connect to a remote OpenUsage hub and display its aggregated snapshot data in a read-only TUI.",
+			"Connect to a remote agentUsage hub and display its aggregated snapshot data in a read-only TUI.",
 			"No local providers or daemon required.",
 			"",
-			"If the target hub requires auth, pass --token or export OPENUSAGE_HUB_TOKEN to authenticate.",
+			"If the target hub requires auth, pass --token or export AGENTUSAGE_HUB_TOKEN to authenticate.",
 		}, "\n"),
 		Example: strings.Join([]string{
-			"  openusage hub-view https://openusage.gameapp.club",
-			"  openusage hub-view http://192.168.1.10:9190 --interval 10s",
-			"  OPENUSAGE_HUB_TOKEN=s3cret openusage hub-view http://hub:9190",
+			"  agentusage hub-view https://agentusage.gameapp.club",
+			"  agentusage hub-view http://192.168.1.10:9190 --interval 10s",
+			"  AGENTUSAGE_HUB_TOKEN=s3cret agentusage hub-view http://hub:9190",
 		}, "\n"),
 		Args: cobra.ExactArgs(1),
 		Run: func(_ *cobra.Command, args []string) {
@@ -67,12 +67,12 @@ func newHubViewCommand() *cobra.Command {
 	}
 
 	cmd.Flags().DurationVar(&interval, "interval", 0, "polling interval for fetching snapshots (0 uses config or 30s)")
-	cmd.Flags().StringVar(&token, "token", "", "Bearer token for hubs requiring auth (falls back to OPENUSAGE_HUB_TOKEN env var)")
+	cmd.Flags().StringVar(&token, "token", "", "Bearer token for hubs requiring auth (falls back to AGENTUSAGE_HUB_TOKEN env var)")
 	return cmd
 }
 
 func runHubView(cfg config.Config, hubURL, token string) {
-	verbose := os.Getenv("OPENUSAGE_DEBUG") != ""
+	verbose := os.Getenv("AGENTUSAGE_DEBUG") != ""
 
 	if err := tui.LoadThemes(config.ConfigDir()); err != nil && verbose {
 		log.Printf("theme load: %v", err)
@@ -183,7 +183,7 @@ func fetchHubSnapshots(ctx context.Context, client *http.Client, url, token stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, fmt.Errorf("HTTP 401: hub requires Bearer token (--token or OPENUSAGE_HUB_TOKEN)")
+		return nil, fmt.Errorf("HTTP 401: hub requires Bearer token (--token or AGENTUSAGE_HUB_TOKEN)")
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)

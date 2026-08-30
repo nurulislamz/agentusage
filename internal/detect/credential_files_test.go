@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // withCleanCredentialEnv resets HOME / APPDATA / known env vars to safe
@@ -17,7 +17,7 @@ func withCleanCredentialEnv(t *testing.T) string {
 	setHome(t, home)
 	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
 	t.Setenv("PATH", "")
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
 	for _, m := range envKeyMapping {
 		t.Setenv(m.EnvVar, "")
 	}

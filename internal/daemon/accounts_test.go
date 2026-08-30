@@ -3,8 +3,8 @@ package daemon
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestFilterAccountsByDashboard_DefaultEnabled(t *testing.T) {

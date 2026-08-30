@@ -8,12 +8,12 @@ import (
 )
 
 func TestSystemdUnit_UsesDaemonRunSubcommand(t *testing.T) {
-	unit := systemdUnit("/usr/local/bin/openusage", "/tmp/openusage.sock", "/tmp/openusage.env")
+	unit := systemdUnit("/usr/local/bin/agentusage", "/tmp/agentusage.sock", "/tmp/agentusage.env")
 
-	if !strings.Contains(unit, "ExecStart=/usr/local/bin/openusage telemetry daemon run --socket-path /tmp/openusage.sock") {
+	if !strings.Contains(unit, "ExecStart=/usr/local/bin/agentusage telemetry daemon run --socket-path /tmp/agentusage.sock") {
 		t.Fatalf("systemd unit does not include daemon run subcommand:\n%s", unit)
 	}
-	if !strings.Contains(unit, "EnvironmentFile=-/tmp/openusage.env") {
+	if !strings.Contains(unit, "EnvironmentFile=-/tmp/agentusage.env") {
 		t.Fatalf("systemd unit does not include env file:\n%s", unit)
 	}
 }

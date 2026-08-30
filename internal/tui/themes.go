@@ -14,9 +14,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// OPENUSAGE_THEME_DIR can point to one or more additional theme directories
+// AGENTUSAGE_THEME_DIR can point to one or more additional theme directories
 // (path-list separated, e.g. ":" on unix, ";" on Windows).
-const themeDirEnvVar = "OPENUSAGE_THEME_DIR"
+const themeDirEnvVar = "AGENTUSAGE_THEME_DIR"
 
 //go:embed bundled_themes/*.json
 var bundledThemesFS embed.FS
@@ -340,7 +340,7 @@ func setActiveThemeByNameLocked(name string) bool {
 //
 // External files are loaded from:
 //  1. <configDir>/themes
-//  2. each path in OPENUSAGE_THEME_DIR (path-list separated)
+//  2. each path in AGENTUSAGE_THEME_DIR (path-list separated)
 //
 // Invalid theme files are skipped. The function returns an aggregated error when
 // one or more files fail to load, while still keeping valid themes available.

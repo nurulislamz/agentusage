@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 func recordToolCall(toolCalls map[string]int, callTool map[string]string, callID, tool string) {
@@ -217,7 +217,7 @@ func classifyClient(source, originator string) string {
 	org := strings.ToLower(strings.TrimSpace(originator))
 
 	switch {
-	case src == "openusage" || src == "codex":
+	case src == "agentusage" || src == "codex":
 		return "CLI"
 	case strings.Contains(org, "desktop"):
 		return "Desktop App"
