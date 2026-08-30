@@ -55,7 +55,6 @@ func main() {
 	root.AddCommand(newHubViewCommand())
 	root.AddCommand(newServeCommand())
 	root.AddCommand(newCursorCommand())
-	root.AddCommand(newAntigravityCommand())
 	root.AddCommand(newStatuslineCommand())
 	root.AddCommand(newTmuxCommand())
 	for _, c := range newReportCommands() {

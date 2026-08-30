@@ -14,7 +14,6 @@ import (
 
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/export"
-	"github.com/nurulislamz/agentusage/internal/providers/antigravity"
 	"github.com/nurulislamz/agentusage/internal/providers/claude_code"
 	"github.com/nurulislamz/agentusage/internal/providers/cursor"
 	"github.com/nurulislamz/agentusage/internal/report"
@@ -86,7 +85,7 @@ func (o statuslineOptions) segmentEnabled(key string) bool {
 // Claude Code.
 const settingsSnippet = `To wire it in automatically (creates a .bak backup, preserves other keys):
 
-  agentusage statusline install
+  openusage statusline install
 
 Or add this to ~/.claude/settings.json by hand:
 
@@ -126,9 +125,9 @@ It runs offline by default (embedded pricing) so it responds instantly; pass
 
 ` + settingsSnippet,
 		Example: strings.Join([]string{
-			`  echo '{"session_id":"abc","model":{"display_name":"Opus 4.8"}}' | agentusage statusline`,
-			"  agentusage statusline install",
-			"  agentusage statusline --offline=false",
+			`  echo '{"session_id":"abc","model":{"display_name":"Opus 4.8"}}' | openusage statusline`,
+			"  openusage statusline install",
+			"  openusage statusline --offline=false",
 		}, "\n"),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return runStatusline(opts, os.Stdin, os.Stdout)
@@ -159,9 +158,9 @@ toggle which segments show, flip color and pricing, then apply. Passing any
 flag (or a non-TTY) keeps it scriptable and bakes the choices into the installed
 command. A .bak backup of settings.json is created.`,
 		Example: strings.Join([]string{
-			"  agentusage statusline install",
-			"  agentusage statusline install --segments today,context",
-			"  agentusage statusline install --color=false --offline=false",
+			"  openusage statusline install",
+			"  openusage statusline install --segments today,context",
+			"  openusage statusline install --color=false --offline=false",
 		}, "\n"),
 		RunE: func(c *cobra.Command, _ []string) error {
 			customized := c.Flags().Changed("segments") || c.Flags().Changed("mode") ||
@@ -204,7 +203,7 @@ func claudeSettingsPath() string {
 }
 
 // statuslineCommandString returns the command Claude Code should invoke: the
-// resolved agentusage binary, the statusline subcommand, and any non-default
+// resolved openusage binary, the statusline subcommand, and any non-default
 // options baked in as flags so the customization survives in settings.json.
 func statuslineCommandString(opts statuslineOptions) string {
 	bin, err := os.Executable()
@@ -271,7 +270,7 @@ func installStatuslineInteractive(out io.Writer) error {
 	return installStatusline(out, ch.options())
 }
 
-// uninstallStatusline removes our statusLine block when it points at agentusage.
+// uninstallStatusline removes our statusLine block when it points at openusage.
 func uninstallStatusline(out io.Writer) error {
 	path := claudeSettingsPath()
 	cfg, err := readJSONObject(path)
@@ -287,7 +286,7 @@ func uninstallStatusline(out io.Writer) error {
 			fmt.Fprintf(out, "removed statusline from %s\n", path)
 			return nil
 		}
-		fmt.Fprintf(out, "statusLine in %s is not managed by agentusage; left unchanged\n", path)
+		fmt.Fprintf(out, "statusLine in %s is not managed by openusage; left unchanged\n", path)
 		return nil
 	}
 	fmt.Fprintf(out, "no statusLine configured in %s\n", path)
@@ -350,17 +349,7 @@ func runStatusline(opts statuslineOptions, stdin io.Reader, stdout io.Writer) er
 		var raw map[string]any
 		if json.Unmarshal(rawData, &raw) == nil {
 			if _, hasCW := raw["context_window"]; hasCW {
-				if prod, _ := raw["product"].(string); prod == "antigravity" || raw["conversation_id"] != nil {
-					line, captureErr := antigravity.CaptureStatusLine(rawData, "")
-					fmt.Fprintln(stdout, line)
-					return captureErr
-				}
 				line, captureErr := cursor.CaptureStatusLine(rawData, "")
-				fmt.Fprintln(stdout, line)
-				return captureErr
-			}
-			if prod, _ := raw["product"].(string); prod == "antigravity" || raw["conversation_id"] != nil {
-				line, captureErr := antigravity.CaptureStatusLine(rawData, "")
 				fmt.Fprintln(stdout, line)
 				return captureErr
 			}

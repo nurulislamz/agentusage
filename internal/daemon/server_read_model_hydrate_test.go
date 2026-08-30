@@ -2,54 +2,54 @@ package daemon
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/nurulislamz/agentusage/internal/core"
-	"github.com/nurulislamz/agentusage/internal/providers/antigravity"
 )
 
-func TestEnrichReadModelSnapshots_HydratesUnknownFromStatusFile(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "antigravity-mohammed-status.json")
-	payload := `{
-		"agent_state": "idle",
-		"email": "mohammed@example.com",
-		"model": {"id": "gemini-2.5-pro", "display_name": "Gemini 2.5 Pro"},
-		"product": "antigravity",
-		"quota": {
-			"gemini": {"remaining_fraction": 0.96, "reset_in_seconds": 3600}
-		},
-		"received_at": "` + time.Now().UTC().Format(time.RFC3339Nano) + `"
-	}`
-	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
-		t.Fatalf("write status file: %v", err)
-	}
+type mockHydrateProvider struct{}
 
+func (m mockHydrateProvider) ID() string                            { return "mock" }
+func (m mockHydrateProvider) Describe() core.ProviderInfo           { return core.ProviderInfo{Name: "mock"} }
+func (m mockHydrateProvider) Spec() core.ProviderSpec               { return core.ProviderSpec{} }
+func (m mockHydrateProvider) DashboardWidget() core.DashboardWidget { return core.DashboardWidget{} }
+func (m mockHydrateProvider) DetailWidget() core.DetailWidget       { return core.DetailWidget{} }
+func (m mockHydrateProvider) HasChanged(acct core.AccountConfig, since time.Time) (bool, error) {
+	return true, nil
+}
+func (m mockHydrateProvider) Fetch(ctx context.Context, acct core.AccountConfig) (core.UsageSnapshot, error) {
+	rem := 96.0
+	return core.UsageSnapshot{
+		ProviderID: acct.Provider,
+		AccountID:  acct.ID,
+		Status:     core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"quota_gemini": {Remaining: &rem},
+		},
+	}, nil
+}
+
+func TestEnrichReadModelSnapshots_HydratesUnknownFromStatusFile(t *testing.T) {
 	svc := &Service{
 		providerByID: map[string]core.UsageProvider{
-			"antigravity": antigravity.New(),
+			"mock": mockHydrateProvider{},
 		},
 	}
 	accounts := []core.AccountConfig{{
-		ID:       "antigravity-mohammed",
-		Provider: "antigravity",
-		RuntimeHints: map[string]string{
-			"status_file": path,
-		},
+		ID:       "mock-acct",
+		Provider: "mock",
 	}}
 	snaps := map[string]core.UsageSnapshot{
-		"antigravity-mohammed": {
-			ProviderID: "antigravity",
-			AccountID:  "antigravity-mohammed",
+		"mock-acct": {
+			ProviderID: "mock",
+			AccountID:  "mock-acct",
 			Status:     core.StatusUnknown,
 		},
 	}
 
 	got := svc.enrichReadModelSnapshots(context.Background(), accounts, core.DefaultModelNormalizationConfig(), snaps)
-	snap := got["antigravity-mohammed"]
+	snap := got["mock-acct"]
 	if snap.Status != core.StatusOK {
 		t.Fatalf("status = %q, want OK", snap.Status)
 	}
