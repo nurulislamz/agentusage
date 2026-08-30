@@ -33,8 +33,8 @@ func PulseChar(bright, dim string, frame int) string {
 
 func ASCIIBanner(frame int) string {
 	lines := []string{
-		` █▀█ █▀█ █▀▀ █▄░█   █░█ █▀ ▄▀█ █▀▀ █▀▀`,
-		` █▄█ █▀▀ ██▄ █░▀█   █▄█ ▄█ █▀█ █▄█ ██▄`,
+		` ▄▀█ █▀▀ █▀▀ █▄░█ ▀█▀   █░█ █▀ ▄▀█ █▀▀ █▀▀`,
+		` █▀█ █▄█ ██▄ █░▀█ ░█░   █▄█ ▄█ █▀█ █▄█ ██▄`,
 	}
 	if len(BrandGradient) == 0 {
 		return strings.Join(lines, "\n")
