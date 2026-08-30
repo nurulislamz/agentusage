@@ -38,4 +38,7 @@ func TestSnapshotsIncludeProjectedViews(t *testing.T) {
 	if view.IconHTML == "" {
 		t.Fatal("expected icon_html")
 	}
+	if view.LastRefreshed == "" {
+		t.Fatal("expected last_refreshed on demo views")
+	}
 }

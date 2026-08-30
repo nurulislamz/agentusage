@@ -29,6 +29,11 @@ func (s *Service) handlePoll(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	if r.URL.Query().Get("wait") == "1" {
+		s.pollProviders(r.Context())
+		writeJSON(w, http.StatusOK, map[string]any{"status": "polled"})
+		return
+	}
 	s.RequestPoll()
 	writeJSON(w, http.StatusOK, map[string]any{"status": "kicked"})
 }
@@ -130,28 +135,36 @@ func (s *Service) handleReadModel(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, ReadModelResponse{Snapshots: map[string]core.UsageSnapshot{}})
 			return
 		}
+		refresh := req.Refresh
 		req = configReq
+		req.Refresh = refresh
 	}
 
 	cacheKey := ReadModelRequestKey(req)
-	if cached, cachedAt, ok := s.rmCache.get(cacheKey); ok {
-		core.Tracef("[read_model] cache hit key=%s age=%s providers=%d", cacheKey, time.Since(cachedAt).Round(time.Millisecond), len(cached))
-		for id, snap := range cached {
-			core.Tracef("[read_model]   %s: %d metrics", id, len(snap.Metrics))
+	if !req.Refresh {
+		if cached, cachedAt, ok := s.rmCache.get(cacheKey); ok {
+			core.Tracef("[read_model] cache hit key=%s age=%s providers=%d", cacheKey, time.Since(cachedAt).Round(time.Millisecond), len(cached))
+			for id, snap := range cached {
+				core.Tracef("[read_model]   %s: %d metrics", id, len(snap.Metrics))
+			}
+			writeJSON(w, http.StatusOK, ReadModelResponse{Snapshots: cached})
+			// Refresh opportunistically only when new data has actually been
+			// ingested since this entry was built. Without the data gate, every
+			// connected client's poll (~5s) forced a full recompute purely because
+			// the entry aged past the staleness floor — pinning daemon CPU even
+			// when nothing changed. The staleness floor still debounces bursts.
+			if time.Since(cachedAt) > 2*time.Second && s.ingestedSince(cachedAt) {
+				s.refreshReadModelCacheAsync(s.serviceContext(r.Context()), cacheKey, req, 60*time.Second)
+			}
+			return
 		}
-		writeJSON(w, http.StatusOK, ReadModelResponse{Snapshots: cached})
-		// Refresh opportunistically only when new data has actually been
-		// ingested since this entry was built. Without the data gate, every
-		// connected client's poll (~5s) forced a full recompute purely because
-		// the entry aged past the staleness floor — pinning daemon CPU even
-		// when nothing changed. The staleness floor still debounces bursts.
-		if time.Since(cachedAt) > 2*time.Second && s.ingestedSince(cachedAt) {
-			s.refreshReadModelCacheAsync(s.serviceContext(r.Context()), cacheKey, req, 60*time.Second)
-		}
-		return
 	}
 
-	computeCtx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	computeTimeout := 5 * time.Second
+	if req.Refresh {
+		computeTimeout = 15 * time.Second
+	}
+	computeCtx, cancel := context.WithTimeout(r.Context(), computeTimeout)
 	snapshots, err := s.computeReadModel(computeCtx, req)
 	cancel()
 	if err == nil && len(snapshots) > 0 {

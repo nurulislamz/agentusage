@@ -1,7 +1,6 @@
 package webserve
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -53,10 +52,6 @@ func buildViews(opts Options, meta collectorMeta, snaps []core.UsageSnapshot) ([
 	out := make([]AccountView, len(views))
 	for i, v := range views {
 		out[i] = enrichAccountView(opts, cfg, orderedMatch(ordered, v.AccountID), accountViewFromTUI(v))
-		frame := renderTUIFrame(cfg, ordered, i, defaultFrameWidth, defaultFrameHeight)
-		if frame != "" {
-			out[i].FrameHTML = ANSIToHTML(frame)
-		}
 	}
 	tokens := tui.WebThemeTokensFromTheme(tui.ActiveTheme())
 	return out, themeTokensFromTUI(tokens)
@@ -131,12 +126,8 @@ func enrichAccountView(opts Options, cfg config.Config, snap core.UsageSnapshot,
 		)
 	}
 
-	if len(view.Resets) > 0 {
-		r := view.Resets[0]
-		view.ResetHint = fmt.Sprintf("Resets in %s", r.Duration)
-		if r.Label != "" {
-			view.ResetHint = fmt.Sprintf("%s resets in %s", r.Label, r.Duration)
-		}
+	if hint := tui.SidebarResetHint(snap, now); hint != "" {
+		view.ResetHint = hint
 	}
 
 	return view
@@ -250,6 +241,17 @@ func accountViewFromTUI(v tui.WebAccountView) AccountView {
 	for i, r := range v.Resets {
 		resets[i] = ResetPill{Label: r.Label, Duration: r.Duration, Urgent: r.Urgent}
 	}
+	cards := make([]DetailCard, len(v.DetailCards))
+	for i, c := range v.DetailCards {
+		rows := make([]DetailRow, len(c.Rows))
+		for j, r := range c.Rows {
+			rows[j] = DetailRow{
+				Kind: r.Kind, Label: r.Label, Value: r.Value,
+				Hint: r.Hint, Percent: r.Percent, Tone: r.Tone,
+			}
+		}
+		cards[i] = DetailCard{ID: c.ID, Title: c.Title, Icon: c.Icon, Color: c.Color, Rows: rows}
+	}
 	return AccountView{
 		Key:            v.Key,
 		ProviderID:     v.ProviderID,
@@ -268,8 +270,13 @@ func accountViewFromTUI(v tui.WebAccountView) AccountView {
 		Timestamp:      v.Timestamp,
 		TileLines:      v.TileLines,
 		DetailSections: sections,
+		DetailCards:    cards,
 		Resets:         resets,
 		DailyCost:      v.DailyCost,
+		CycleSchedule:  v.CycleSchedule,
+		LastRefreshed:  v.LastRefreshed,
+		HasGauge:       v.HasGauge,
+		HeaderTone:     v.HeaderTone,
 	}
 }
 

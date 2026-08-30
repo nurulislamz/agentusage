@@ -12,7 +12,24 @@
 </head>
 <body>
   <div id="app" class="shell" hidden>
-    <pre id="frame" class="tui-frame" aria-live="polite"></pre>
+    <header class="header">
+      <div id="header" class="header-main"></div>
+      <span id="fetching-header" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> Fetching...</span>
+    </header>
+    <div class="hairline" aria-hidden="true"></div>
+    <div class="body">
+      <nav id="nav" class="nav" aria-label="Providers"></nav>
+      <div class="vsep" aria-hidden="true"></div>
+      <main class="panel" aria-label="Detail">
+        <div id="fetching-detail" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> Fetching...</div>
+        <div id="panel"></div>
+      </main>
+    </div>
+    <div class="hairline" aria-hidden="true"></div>
+    <footer class="footer">
+      <span id="fetching-footer" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> Fetching...</span>
+      <div id="footer" class="footer-main"></div>
+    </footer>
   </div>
 
   <div id="splash" class="splash">

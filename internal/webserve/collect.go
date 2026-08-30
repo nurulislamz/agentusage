@@ -6,7 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/export"
+	"github.com/nurulislamz/agentusage/internal/tui"
 	"github.com/nurulislamz/agentusage/internal/version"
 )
 
@@ -72,6 +75,10 @@ func newCollector(opts Options) *collector {
 }
 
 func (c *collector) envelope() (Envelope, error) {
+	return c.envelopeRefresh(false)
+}
+
+func (c *collector) envelopeRefresh(refresh bool) (Envelope, error) {
 	if c.collect != nil {
 		env, err := c.collect()
 		if err != nil {
@@ -84,11 +91,11 @@ func (c *collector) envelope() (Envelope, error) {
 	defer c.mu.Unlock()
 
 	now := c.now()
-	if !c.cachedAt.IsZero() && c.ttl > 0 && now.Sub(c.cachedAt) < c.ttl {
+	if !refresh && !c.cachedAt.IsZero() && c.ttl > 0 && now.Sub(c.cachedAt) < c.ttl {
 		return c.cached, nil
 	}
 
-	env, err := c.fetch()
+	env, err := c.fetch(refresh)
 	if err != nil {
 		return Envelope{}, err
 	}
@@ -98,11 +105,11 @@ func (c *collector) envelope() (Envelope, error) {
 	return env, nil
 }
 
-func (c *collector) fetch() (Envelope, error) {
+func (c *collector) fetch(refresh bool) (Envelope, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	snaps, source, err := c.fetchSnapshots(ctx)
+	snaps, source, err := c.fetchSnapshots(ctx, refresh)
 	if err != nil {
 		return Envelope{}, err
 	}
@@ -110,6 +117,28 @@ func (c *collector) fetch() (Envelope, error) {
 		Source:    source,
 		Snapshots: snaps,
 	}, nil
+}
+
+func (c *collector) setUsageMode(mode string) {
+	mode = normalizeUsageMode(mode)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.opts.UsageMode = mode
+	if c.opts.Config != nil {
+		cfg := *c.opts.Config
+		cfg.Dashboard.UsageMode = mode
+		c.opts.Config = &cfg
+	}
+	if c.collect == nil && !c.cachedAt.IsZero() {
+		c.cached = c.decorate(Envelope{Source: c.cached.Source, Snapshots: c.cached.Snapshots})
+	}
+}
+
+func normalizeUsageMode(mode string) string {
+	if strings.EqualFold(strings.TrimSpace(mode), config.UsageModeUsed) {
+		return config.UsageModeUsed
+	}
+	return config.UsageModeRemaining
 }
 
 func (c *collector) decorate(env Envelope) Envelope {
@@ -137,5 +166,24 @@ func (c *collector) decorate(env Envelope) Envelope {
 	views, tokens := buildViews(c.opts, c.meta, out.Snapshots)
 	out.Views = views
 	out.ThemeTokens = tokens
+	out.TimeWindowLabel = core.ParseTimeWindow(out.TimeWindow).Label()
+	if out.UsageMode == "" {
+		out.UsageMode = "remaining"
+	}
+	out.OkCount = 0
+	out.WarnCount = 0
+	out.ErrCount = 0
+	for _, v := range views {
+		switch strings.ToUpper(v.Status) {
+		case string(core.StatusOK):
+			out.OkCount++
+		case string(core.StatusNearLimit):
+			out.WarnCount++
+		case string(core.StatusLimited), string(core.StatusError):
+			out.ErrCount++
+		}
+	}
+	out.ProviderCount = len(views)
+	out.UnmappedCount, out.UnmappedPhrase = tui.WebUnmappedSummary(out.Snapshots)
 	return out
 }

@@ -60,6 +60,10 @@ lint: ## Run linter (golangci-lint)
 test: ## Run unit tests with coverage
 	$(GO) test $(GOFLAGS) -race -coverprofile=coverage.out -covermode=atomic ./...
 
+.PHONY: verify-web-tui
+verify-web-tui: ## Compare TUI detail information to the web snapshot payload
+	$(GO) test $(GOFLAGS) -count=1 -run TestTUIWebInformationParity ./internal/webserve/
+
 .PHONY: test-verbose
 test-verbose: ## Run unit tests with verbose output
 	$(GO) test $(GOFLAGS) -v -race ./...
@@ -67,6 +71,10 @@ test-verbose: ## Run unit tests with verbose output
 .PHONY: run
 run: ## Run the application locally
 	$(GO) run $(CMD_DIR)
+
+.PHONY: serve
+serve: ## Run the local web dashboard (agentusage serve)
+	$(GO) run $(CMD_DIR) serve $(ARGS)
 
 .PHONY: build
 build: deps ## Build the binary

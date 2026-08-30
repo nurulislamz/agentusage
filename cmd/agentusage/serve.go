@@ -31,6 +31,7 @@ func newServeCommand() *cobra.Command {
 		openBrowser bool
 		noOpen      bool
 		allowPublic bool
+		verify      bool
 	)
 
 	cmd := &cobra.Command{
@@ -44,6 +45,9 @@ func newServeCommand() *cobra.Command {
 			"Collection prefers the telemetry daemon and falls back to a direct provider poll",
 			"(same as `agentusage export --source auto`).",
 			"",
+			"Pass --verify to collect the same payload the web port serves and compare it to",
+			"TUI-rendered detail (accounts, badges, percents, timers). Exits 1 on mismatch.",
+			"",
 			"Security: without AGENTUSAGE_SERVE_TOKEN the server refuses to bind a non-loopback",
 			"interface unless you pass --allow-public.",
 		}, "\n"),
@@ -51,6 +55,8 @@ func newServeCommand() *cobra.Command {
 			"  agentusage serve",
 			"  agentusage serve --demo",
 			"  agentusage serve --listen 127.0.0.1:9090 --no-open",
+			"  agentusage serve --verify",
+			"  agentusage serve --verify --demo",
 			"  AGENTUSAGE_SERVE_TOKEN=s3cret agentusage serve --listen :8080",
 		}, "\n"),
 		SilenceUsage: true,
@@ -75,6 +81,9 @@ func newServeCommand() *cobra.Command {
 				AllowPublic:    allowPublic,
 				Config:         &cfg,
 			}
+			if verify {
+				return runVerify(opts)
+			}
 			shouldOpen := openBrowser
 			if noOpen {
 				shouldOpen = false
@@ -92,7 +101,30 @@ func newServeCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&openBrowser, "open", false, "Open the dashboard in the default browser")
 	cmd.Flags().BoolVar(&noOpen, "no-open", false, "Do not open a browser")
 	cmd.Flags().BoolVar(&allowPublic, "allow-public", false, "Allow binding a non-loopback interface without AGENTUSAGE_SERVE_TOKEN")
+	cmd.Flags().BoolVar(&verify, "verify", false, "Compare TUI detail to the web snapshot payload and exit")
 	return cmd
+}
+
+func runVerify(opts webserve.Options) error {
+	if opts.Config != nil {
+		if err := tui.LoadThemes(config.ConfigDir()); err != nil && core.DebugEnabled() {
+			log.Printf("serve: theme load: %v", err)
+		}
+		tui.SetThemeByName(opts.Config.Theme)
+	}
+	env, issues, err := webserve.VerifyServeParity(opts)
+	if err != nil {
+		return err
+	}
+	if len(issues) > 0 {
+		fmt.Fprintf(os.Stderr, "tui/web information parity: %d mismatch(es)\n", len(issues))
+		for _, issue := range issues {
+			fmt.Fprintf(os.Stderr, "  %s\n", issue)
+		}
+		return fmt.Errorf("tui and web dashboard information do not match")
+	}
+	fmt.Printf("tui/web information parity: OK (%d accounts)\n", len(env.Views))
+	return nil
 }
 
 func runServe(opts webserve.Options, openBrowser bool) error {

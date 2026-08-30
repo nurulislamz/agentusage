@@ -150,6 +150,29 @@ func (r *ViewRuntime) ReadWithFallback(ctx context.Context) SnapshotFrame {
 }
 
 func (r *ViewRuntime) ReadWithFallbackForWindow(ctx context.Context, timeWindow core.TimeWindow) SnapshotFrame {
+	return r.readFrame(ctx, timeWindow, false)
+}
+
+// RefreshForWindow kicks a blocking daemon poll, then reads the read-model
+// with the cache bypassed so the caller sees freshly fetched snapshots.
+func (r *ViewRuntime) RefreshForWindow(ctx context.Context, timeWindow core.TimeWindow) SnapshotFrame {
+	frame := SnapshotFrame{TimeWindow: normalizeReadModelTimeWindow(timeWindow)}
+	if r == nil {
+		return frame
+	}
+	client := r.CurrentClient()
+	if client == nil {
+		client = r.EnsureClient(ctx)
+	}
+	if client != nil {
+		if err := client.RequestPollWait(ctx); err != nil {
+			r.throttledLogError(err)
+		}
+	}
+	return r.readFrame(ctx, timeWindow, true)
+}
+
+func (r *ViewRuntime) readFrame(ctx context.Context, timeWindow core.TimeWindow, refresh bool) SnapshotFrame {
 	frame := SnapshotFrame{TimeWindow: normalizeReadModelTimeWindow(timeWindow)}
 	if r == nil {
 		return frame
@@ -160,7 +183,7 @@ func (r *ViewRuntime) ReadWithFallbackForWindow(ctx context.Context, timeWindow 
 		client = r.EnsureClient(ctx)
 	}
 
-	snaps, err := r.fetchReadModel(ctx, client, ReadModelRequest{TimeWindow: frame.TimeWindow})
+	snaps, err := r.fetchReadModel(ctx, client, ReadModelRequest{TimeWindow: frame.TimeWindow, Refresh: refresh})
 	if err != nil {
 		r.throttledLogError(err)
 		return frame
@@ -178,7 +201,11 @@ func (r *ViewRuntime) fetchReadModel(
 		return nil, errDaemonUnavailable
 	}
 
-	readCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	readTimeout := 5 * time.Second
+	if request.Refresh {
+		readTimeout = 15 * time.Second
+	}
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
 	snaps, err := client.ReadModel(readCtx, request)
 	cancel()
 
@@ -193,7 +220,7 @@ func (r *ViewRuntime) fetchReadModel(
 		return nil, err
 	}
 
-	retryCtx, retryCancel := context.WithTimeout(ctx, 5*time.Second)
+	retryCtx, retryCancel := context.WithTimeout(ctx, readTimeout)
 	snaps, err = recovered.ReadModel(retryCtx, request)
 	retryCancel()
 	return snaps, err

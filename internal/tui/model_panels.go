@@ -325,7 +325,7 @@ const sidebarSummaryMinWidth = 7 // room for e.g. "93.00%"
 
 func (m Model) renderListSummaryRow(snap core.UsageSnapshot, di providerDisplayInfo, w int) string {
 	now := m.viewNow()
-	entries := collectCycleResetEntries(snap)
+	at, hasReset := sidebarCycleResetAt(snap)
 
 	stripW := 0
 	if di.gaugePercent >= 0 {
@@ -343,14 +343,14 @@ func (m Model) renderListSummaryRow(snap core.UsageSnapshot, di providerDisplayI
 
 	left := m.renderListSummary(summary, di.gaugePercent, snap)
 	leftPart := "   " + left
-	if len(entries) == 0 {
+	if !hasReset {
 		return leftPart
 	}
 
-	d := entries[0].at.Sub(now)
+	d := at.Sub(now)
 	dur := formatCycleResetDuration(d)
 	for _, candidate := range []string{
-		formatCycleResetIn(entries[0].at, now),
+		formatCycleResetIn(at, now),
 		"Resets in " + dur,
 		"in " + dur,
 		dur,

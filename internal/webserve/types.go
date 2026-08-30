@@ -25,6 +25,13 @@ type Envelope struct {
 	Theme                  string               `json:"theme"`
 	RefreshIntervalSeconds int                  `json:"refresh_interval_seconds"`
 	UsageMode              string               `json:"usage_mode"`
+	TimeWindowLabel        string               `json:"time_window_label,omitempty"`
+	OkCount                int                  `json:"ok_count"`
+	WarnCount              int                  `json:"warn_count"`
+	ErrCount               int                  `json:"err_count"`
+	ProviderCount          int                  `json:"provider_count"`
+	UnmappedCount          int                  `json:"unmapped_count,omitempty"`
+	UnmappedPhrase         string               `json:"unmapped_phrase,omitempty"`
 	Catalog                []CatalogEntry       `json:"catalog"`
 	ThemeTokens            ThemeTokens          `json:"theme_tokens"`
 	Views                  []AccountView        `json:"views"`
@@ -74,8 +81,13 @@ type AccountView struct {
 	Timestamp      time.Time        `json:"timestamp"`
 	TileLines      []string         `json:"tile_lines"`
 	DetailSections []DetailSection  `json:"detail_sections"`
+	DetailCards    []DetailCard     `json:"detail_cards,omitempty"`
 	Resets         []ResetPill      `json:"resets,omitempty"`
 	DailyCost      []core.TimePoint `json:"daily_cost,omitempty"`
+	CycleSchedule  string           `json:"cycle_schedule,omitempty"`
+	LastRefreshed  string           `json:"last_refreshed,omitempty"`
+	HasGauge       bool             `json:"has_gauge,omitempty"`
+	HeaderTone     string           `json:"header_tone,omitempty"`
 
 	// HTML fragments rendered from the same TUI functions the terminal uses.
 	DetailHTML  string `json:"detail_html,omitempty"`
@@ -86,6 +98,23 @@ type AccountView struct {
 	ResetHint   string `json:"reset_hint,omitempty"`
 	// FrameHTML is a full TUI dashboard frame with this account selected.
 	FrameHTML string `json:"frame_html,omitempty"`
+}
+
+type DetailCard struct {
+	ID    string      `json:"id"`
+	Title string      `json:"title"`
+	Icon  string      `json:"icon,omitempty"`
+	Color string      `json:"color,omitempty"`
+	Rows  []DetailRow `json:"rows"`
+}
+
+type DetailRow struct {
+	Kind    string   `json:"kind"`
+	Label   string   `json:"label,omitempty"`
+	Value   string   `json:"value,omitempty"`
+	Hint    string   `json:"hint,omitempty"`
+	Percent *float64 `json:"percent,omitempty"`
+	Tone    string   `json:"tone,omitempty"`
 }
 
 type DetailSection struct {

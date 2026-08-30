@@ -9,6 +9,8 @@
     token: sessionStorage.getItem("au-serve-token") || "",
     themeOverride: localStorage.getItem("au-serve-theme-override") || "",
     loading: true,
+    refreshing: false,
+    animFrame: 0,
     error: null,
     filterOpen: false,
   };
@@ -19,10 +21,13 @@
     const root = document.documentElement;
     if (override === "light") {
       root.style.cssText = [
-        "--base:#f4f1ea", "--mantle:#fffdf8", "--surface0:#ebe6dc",
-        "--surface1:#ddd6c8", "--surface2:#cfc7b8", "--text:#2c2823",
-        "--subtext:#6d6760", "--dim:#9c958d", "--accent:#7c5cbf",
-        "--lavender:#6b5cae", "--teal:#2f8f86", "--crit:#c65746",
+        "--bg:#f4f1ea", "--base:#f4f1ea", "--mantle:#fffdf8", "--surface-warm:#fffdf8",
+        "--surface:#ebe6dc", "--surface0:#ebe6dc", "--surface1:#ddd6c8", "--surface2:#cfc7b8",
+        "--fg:#2c2823", "--text:#2c2823", "--fg-2:#6d6760", "--subtext:#6d6760",
+        "--muted:#9c958d", "--dim:#9c958d", "--accent:#7c5cbf", "--accent-on:#fffdf8",
+        "--lavender:#6b5cae", "--teal:#2f8f86", "--sapphire:#2f8f86",
+        "--success:#2f8f86", "--warn:#b8860b", "--danger:#c65746", "--crit:#c65746",
+        "--peach:#c65746", "--border:#ddd6c8", "--border-soft:#cfc7b8",
       ].join(";");
       return;
     }
@@ -31,18 +36,32 @@
       return;
     }
     const map = {
+      "--bg": tokens.base,
       "--base": tokens.base,
       "--mantle": tokens.mantle,
+      "--surface-warm": tokens.mantle,
+      "--surface": tokens.surface0,
       "--surface0": tokens.surface0,
       "--surface1": tokens.surface1,
       "--surface2": tokens.surface2,
+      "--fg": tokens.text,
       "--text": tokens.text,
+      "--fg-2": tokens.subtext,
       "--subtext": tokens.subtext,
+      "--muted": tokens.dim,
       "--dim": tokens.dim,
       "--accent": tokens.accent,
+      "--accent-on": tokens.mantle || "#080a11",
       "--lavender": tokens.lavender,
       "--teal": tokens.teal,
+      "--sapphire": tokens.sapphire,
+      "--success": tokens.green,
+      "--warn": tokens.yellow,
+      "--danger": tokens.red,
       "--crit": tokens.red,
+      "--peach": tokens.peach,
+      "--border": tokens.surface1,
+      "--border-soft": tokens.surface2,
     };
     root.style.cssText = Object.entries(map)
       .filter(([, v]) => v)
@@ -75,11 +94,106 @@
     return h;
   }
 
-  async function load() {
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+  }
+
+  function pillClass(badge) {
+    const b = (badge || "").toUpperCase();
+    if (b.includes("LIMIT") || b.includes("ERROR")) return "crit";
+    if (b.includes("LOW") || b.includes("NEAR")) return "warn";
+    if (b.includes("AUTH")) return "auth";
+    if (b === "OK") return "ok";
+    return "ok";
+  }
+
+  function toneClass(tone) {
+    if (tone === "crit" || tone === "warn" || tone === "peach" || tone === "ok" || tone === "dim" || tone === "auth") {
+      return "tone-" + tone;
+    }
+    return "tone-ok";
+  }
+
+  function gaugeColor(tone) {
+    if (tone === "crit") return "var(--danger)";
+    if (tone === "warn") return "var(--warn)";
+    if (tone === "peach") return "var(--peach)";
+    if (tone === "dim") return "var(--muted)";
+    return "var(--success)";
+  }
+
+  const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  let spinnerTimer = 0;
+  let loadInFlight = false;
+
+  function setRefreshing(on) {
+    state.refreshing = !!on;
     const appShell = $("app");
-    if (appShell) appShell.classList.add("refreshing");
+    if (appShell) appShell.classList.toggle("refreshing", state.refreshing);
+    ["fetching-header", "fetching-detail", "fetching-footer"].forEach((id) => {
+      const el = $(id);
+      if (el) el.hidden = !state.refreshing;
+    });
+    if (state.refreshing) {
+      state.animFrame = 0;
+      const frame = SPINNER[0];
+      document.querySelectorAll(".fetching .spin").forEach((el) => {
+        el.textContent = frame;
+      });
+      startSpinner();
+    } else {
+      stopSpinner();
+    }
+  }
+
+  function applyEnvelope(env) {
+    state.envelope = env;
+    state.views = env.views || [];
+    state.error = null;
+    applyThemeTokens(state.envelope.theme_tokens, state.themeOverride);
+    const visible = filteredViews();
+    if (state.selected >= visible.length) {
+      state.selected = Math.max(0, visible.length - 1);
+    }
+    showDashboard(state.views.length > 0);
+    if ($("status-bar")) $("status-bar").hidden = true;
+  }
+
+  function usageMode() {
+    return (state.envelope?.usage_mode || "remaining").toLowerCase() === "used" ? "used" : "remaining";
+  }
+
+  function usageModeLabel() {
+    return usageMode() === "used" ? "Used" : "Remaining";
+  }
+
+  function startSpinner() {
+    stopSpinner();
+    spinnerTimer = setInterval(() => {
+      if (!state.refreshing) return;
+      state.animFrame = (state.animFrame + 1) % SPINNER.length;
+      document.querySelectorAll(".fetching .spin").forEach((el) => {
+        el.textContent = SPINNER[state.animFrame];
+      });
+    }, 150);
+  }
+
+  function stopSpinner() {
+    clearInterval(spinnerTimer);
+    spinnerTimer = 0;
+  }
+
+  async function load(opts) {
+    const manual = !!(opts && opts.manual);
+    if (loadInFlight) return;
+    loadInFlight = true;
+    const showFetching = manual && state.views.length > 0;
+    if (showFetching) setRefreshing(true);
     try {
-      const res = await fetch("/api/v1/snapshots", { headers: headers() });
+      const qs = manual ? "?refresh=1" : "";
+      const res = await fetch("/api/v1/snapshots" + qs, { headers: headers() });
       if (res.status === 401) {
         $("token-modal").hidden = false;
         $("token-error").hidden = false;
@@ -88,17 +202,7 @@
       }
       if (!res.ok) throw new Error(`snapshots ${res.status}`);
       $("token-modal").hidden = true;
-      state.envelope = await res.json();
-      state.views = state.envelope.views || [];
-      state.error = null;
-      applyThemeTokens(state.envelope.theme_tokens, state.themeOverride);
-      const visible = filteredViews();
-      if (state.selected >= visible.length) {
-        state.selected = Math.max(0, visible.length - 1);
-      }
-      showDashboard(state.views.length > 0);
-      render();
-      if ($("status-bar")) $("status-bar").hidden = true;
+      applyEnvelope(await res.json());
     } catch (err) {
       state.error = String(err);
       if ($("status-bar")) {
@@ -112,11 +216,29 @@
         $("app").hidden = true;
       }
     } finally {
+      loadInFlight = false;
       state.loading = false;
-      if (appShell) {
-        setTimeout(() => appShell.classList.remove("refreshing"), 300);
+      if (state.views.length > 0 && $("token-modal").hidden) {
+        render();
       }
+      setRefreshing(false);
     }
+  }
+
+  async function cycleUsageMode() {
+    const next = usageMode() === "used" ? "remaining" : "used";
+    const res = await fetch("/api/v1/usage-mode", {
+      method: "POST",
+      headers: { ...headers(), "Content-Type": "application/json" },
+      body: JSON.stringify({ usage_mode: next }),
+    });
+    if (res.status === 401) {
+      $("token-modal").hidden = false;
+      return;
+    }
+    if (!res.ok) throw new Error(`usage-mode ${res.status}`);
+    applyEnvelope(await res.json());
+    render();
   }
 
   function showDashboard(hasData) {
@@ -125,24 +247,212 @@
     $("app").hidden = !hasData;
   }
 
-
-  function render() {
+  function renderHeader() {
+    const env = state.envelope || {};
     const views = filteredViews();
-    const frame = $("frame");
+    const ok = env.ok_count || 0;
+    const warn = env.warn_count || 0;
+    const err = env.err_count || 0;
+    const unmapped = env.unmapped_count || 0;
+    const n = views.length;
+    const filteredNote = state.filter ? " (filtered)" : "";
+    let counts = "";
+    if (ok) counts += `<span class="ok">${ok}●</span> `;
+    if (warn) counts += `<span class="warn">${warn}◐</span> `;
+    if (err) counts += `<span class="err">${err}✗</span>`;
+    if (unmapped) counts += ` <span class="unmapped">⚠ ${unmapped} unmapped</span>`;
+    const switcher = views.length
+      ? `<select id="switcher" class="switcher" aria-label="Account">${views.map((v, i) =>
+          `<option value="${i}"${i === state.selected ? " selected" : ""}>${esc(v.account_id)}</option>`
+        ).join("")}</select>`
+      : "";
+    $("header").innerHTML = `
+      <span class="bolt">⚡</span>
+      <span class="brand">agentUsage</span>
+      <span class="counts">${counts}</span>
+      ${switcher}
+      <span class="spacer"></span>
+      <span class="header-meta">⊞ ${n} providers${filteredNote}</span>
+    `;
+    const sel = $("switcher");
+    if (sel) {
+      sel.addEventListener("change", () => {
+        state.selected = Number(sel.value);
+        render();
+      });
+    }
+  }
+
+  function renderNav() {
+    const views = filteredViews();
     if (!views.length) {
-      frame.textContent = state.filter ? "No matches." : "No providers.";
+      $("nav").innerHTML = `<div class="group">${state.filter ? "No matches." : "Loading providers…"}</div>`;
       return;
     }
-    const view = views[state.selected];
-    if (view.frame_html) {
-      frame.innerHTML = view.frame_html;
-    } else if (view.detail_html) {
-      // Fallback if frame projection unavailable.
-      frame.innerHTML = view.detail_html;
-    } else {
-      frame.textContent = view.summary || view.account_id;
+    const selected = views[state.selected] || {};
+    const counts = {};
+    views.forEach((v) => { counts[v.provider_id] = (counts[v.provider_id] || 0) + 1; });
+    let html = "";
+    let last = "";
+    views.forEach((v, i) => {
+      if (v.provider_id !== last) {
+        const active = v.provider_id === selected.provider_id;
+        html += `<div class="group${active ? " active" : ""}" style="--p:${esc(v.accent_color || "var(--accent)")}">${esc((v.provider_id || "").toUpperCase())} (${counts[v.provider_id]})</div>`;
+        last = v.provider_id;
+      }
+      const sel = i === state.selected;
+      const pct = v.has_gauge ? Math.max(0, Math.min(100, v.gauge_percent || 0)) : null;
+      const reset = v.reset_hint || "";
+      const summary = v.has_gauge ? (v.summary || `${pct.toFixed(2)}%`) : (v.summary || v.message || "");
+      const inGroup = v.provider_id === selected.provider_id && counts[v.provider_id] > 1;
+      html += `<button type="button" class="item${sel ? " selected" : ""}${inGroup ? " in-group" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")}">
+        <span class="rail"></span>
+        <span class="name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
+        <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
+        <span class="sum">${pct !== null ? `<span class="mini"><i style="width:${pct}%;background:${gaugeColor(toneFromPercent(pct, v))}"></i></span>` : ""}
+          ${esc(summary)}${reset ? `<span class="reset">${esc(reset)}</span>` : ""}</span>
+      </button>`;
+    });
+    $("nav").innerHTML = html;
+    $("nav").querySelectorAll(".item").forEach((el) => {
+      el.addEventListener("click", () => {
+        state.selected = Number(el.dataset.idx);
+        render();
+      });
+    });
+    const selectedEl = $("nav").querySelector(".item.selected");
+    if (selectedEl) selectedEl.scrollIntoView({ block: "nearest" });
+  }
+
+  function toneFromPercent(pct, view) {
+    const used = (state.envelope?.usage_mode || "").toLowerCase() === "used";
+    if (used) {
+      if (pct >= 90) return "crit";
+      if (pct >= 75) return "warn";
+      if (pct >= 50) return "peach";
+      return "ok";
     }
-    frame.tabIndex = 0;
+    if (pct <= 10) return "crit";
+    if (pct <= 25) return "warn";
+    if (pct <= 50) return "peach";
+    return "ok";
+  }
+
+  function renderCards(cards) {
+    if (!cards || !cards.length) return "";
+    return cards.map((card) => {
+      const color = card.color || "var(--fg-2)";
+      const rows = (card.rows || []).map((row) => {
+        if (row.kind === "heading") {
+          return `<div class="heading">${esc(row.value || row.label || "")}</div>`;
+        }
+        if (row.kind === "gauge") {
+          const pct = row.percent == null ? 0 : Number(row.percent);
+          const tone = row.tone || "ok";
+          const modeWord = (state.envelope?.usage_mode || "remaining").toLowerCase() === "used" ? "used" : "remaining";
+          return `<div class="gauge-block ${toneClass(tone)}">
+            <div class="label">${esc(row.label || "")}</div>
+            <div class="gauge" style="color:${gaugeColor(tone)}"><i style="width:${Math.max(0, Math.min(100, pct))}%;background:currentColor"></i></div>
+            <div class="caption"><b>${pct.toFixed(2)}%</b> ${modeWord}${row.hint ? " · " + esc(row.hint) : ""}</div>
+          </div>`;
+        }
+        if (row.kind === "timer") {
+          return `<div class="timer ${toneClass(row.tone || "ok")}">
+            <span class="dot"></span>
+            <span>${esc(row.label || "")}</span>
+            <span class="when">${esc(row.value || "")}</span>
+            <span class="hint">${esc(row.hint || "")}</span>
+          </div>`;
+        }
+        if (row.kind === "kv") {
+          return `<div class="kv"><span class="dim">${esc(row.label || "")}</span> ${esc(row.value || "")}</div>`;
+        }
+        return `<div class="text-row">${esc(row.value || row.label || "")}</div>`;
+      }).join("");
+      return `<section class="card" style="--card:${esc(color)}"><h2>${esc(card.icon || "")} ${esc((card.title || "").toUpperCase())}</h2>${rows}</section>`;
+    }).join("");
+  }
+
+  function formatAge(ms) {
+    if (ms < 0) ms = 0;
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return s + "s";
+    const m = Math.floor(s / 60);
+    if (s < 3600) return m + "m" + (s % 60) + "s";
+    const h = Math.floor(s / 3600);
+    if (s < 86400) return h + "h" + (m % 60) + "m";
+    return Math.floor(h / 24) + "d" + (h % 24) + "h";
+  }
+
+  function parseTimestamp(iso) {
+    if (!iso) return NaN;
+    const ts = Date.parse(iso);
+    if (!Number.isFinite(ts) || ts < Date.parse("2000-01-01T00:00:00Z")) return NaN;
+    return ts;
+  }
+
+  function formatLastRefreshed(iso, fallback) {
+    const ts = parseTimestamp(iso);
+    if (!Number.isFinite(ts)) return fallback || "";
+    const age = Date.now() - ts;
+    if (age < 5000) return "Last refreshed just now";
+    return "Last refreshed " + formatAge(age) + " ago";
+  }
+
+  function lastRefreshedText(view) {
+    if (!view) return "";
+    return formatLastRefreshed(view.timestamp, view.last_refreshed || "");
+  }
+
+  function renderDetail() {
+    const views = filteredViews();
+    const panel = $("panel");
+    if (!views.length) {
+      panel.innerHTML = `<p class="dim">${state.filter ? "No matches." : "No providers."}</p>`;
+      return;
+    }
+    const v = views[state.selected];
+    const meta = [v.provider_id, v.detail].filter(Boolean).join(" · ");
+    const schedule = v.cycle_schedule || "";
+    const summary = v.summary || "";
+    const refreshed = lastRefreshedText(v);
+    const cards = v.detail_cards && v.detail_cards.length
+      ? renderCards(v.detail_cards)
+      : (v.detail_html ? `<section class="card">${v.detail_html}</section>` : "");
+    panel.innerHTML = `
+      <div class="hero">
+        <h1>${esc(v.status_icon || "●")} ${esc(v.account_id)}</h1>
+        <div class="hero-right">${esc(meta)} <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || "")}</span></div>
+      </div>
+      <div class="subhero">
+        <div>${summary ? `<strong>${esc(summary)}</strong>` : ""}${schedule ? ` · ${esc(schedule)}` : ""}</div>
+        ${refreshed ? `<div id="last-refreshed" class="last-refreshed">${esc(refreshed)}</div>` : ""}
+      </div>
+      <div class="accent-line ${esc(v.header_tone || "ok")}"></div>
+      ${cards}
+    `;
+  }
+
+  function renderFooter() {
+    const sec = Math.max(5, state.envelope?.refresh_interval_seconds || 30);
+    const theme = state.envelope?.theme_tokens?.name || state.envelope?.theme || "";
+    $("footer").innerHTML = `
+      <span>auto-refresh ⟳ ${sec}s</span>
+      <span><kbd>j</kbd>/<kbd>k</kbd> move</span>
+      <span><kbd>/</kbd> filter</span>
+      <span><kbd>u</kbd> ${esc(usageModeLabel())}</span>
+      <span><kbd>r</kbd> refresh</span>
+      <span><kbd>t</kbd> theme</span>
+      <span class="grow"></span>
+      <span>${esc(theme)}</span>
+    `;
+  }
+
+  function render() {
+    renderHeader();
+    renderNav();
+    renderDetail();
+    renderFooter();
   }
 
   function moveSelection(delta) {
@@ -173,20 +483,6 @@
     bar.hidden = true;
     render();
   }
-
-  // Approximate TUI mouse hit-test: clicks in the left third pick a provider.
-  $("frame").addEventListener("click", (ev) => {
-    const views = filteredViews();
-    if (!views.length) return;
-    const rect = ev.currentTarget.getBoundingClientRect();
-    const xRatio = (ev.clientX - rect.left) / rect.width;
-    if (xRatio > 0.36) return;
-    const yRatio = (ev.clientY - rect.top) / Math.max(1, rect.height);
-    // Skip header (~2 lines) and footer (~2 lines) roughly.
-    const usable = Math.max(0, Math.min(1, (yRatio - 0.08) / 0.84));
-    state.selected = Math.max(0, Math.min(views.length - 1, Math.floor(usable * views.length)));
-    render();
-  });
 
   $("token-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -227,7 +523,12 @@
       case "r":
       case "R":
         ev.preventDefault();
-        load().catch(console.error);
+        load({ manual: true }).catch(console.error);
+        break;
+      case "u":
+      case "U":
+        ev.preventDefault();
+        cycleUsageMode().catch(console.error);
         break;
       case "t":
       case "T":
@@ -254,4 +555,12 @@
     $("splash").hidden = true;
     $("empty-state").hidden = false;
   });
+
+  setInterval(() => {
+    const el = $("last-refreshed");
+    if (!el) return;
+    const views = filteredViews();
+    const text = lastRefreshedText(views[state.selected]);
+    if (text && el.textContent !== text) el.textContent = text;
+  }, 1000);
 })();

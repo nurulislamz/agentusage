@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>agentUsage — proposed web dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --base: #0c0e16;
+      --mantle: #080a11;
+      --surface0: #161928;
+      --surface1: #1e2235;
+      --surface2: #2a2f47;
+      --text: #e4e6f0;
+      --subtext: #b0b4c8;
+      --dim: #727899;
+      --accent: #7eb8f7;
+      --blue: #5da4e8;
+      --sapphire: #4ec5c1;
+      --green: #59d4a0;
+      --yellow: #f0c75e;
+      --red: #f06a7a;
+      --peach: #f09860;
+      --teal: #4ec5c1;
+      --lavender: #a899f0;
+      --nav-w: 280px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--base); color: var(--text); }
+    body {
+      font-family: "JetBrains Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
+      font-size: 12.5px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+      font-variant-ligatures: none;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+      background:
+        radial-gradient(1200px 480px at 12% -10%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 55%),
+        radial-gradient(900px 420px at 88% 110%, color-mix(in srgb, var(--lavender) 7%, transparent), transparent 50%),
+        var(--base);
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px 8px;
+      min-height: 42px;
+    }
+    .bolt {
+      color: var(--accent);
+      font-size: 15px;
+      filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 55%, transparent));
+    }
+    .brand {
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+      background: linear-gradient(90deg, var(--accent), var(--lavender), var(--teal));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .tab {
+      font-weight: 700;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      background: var(--accent);
+      color: var(--mantle);
+    }
+    .tab.idle { background: transparent; color: var(--dim); font-weight: 500; }
+    .status-counts { color: var(--green); font-weight: 600; margin-left: 4px; }
+    .status-counts .warn { color: var(--yellow); margin-left: 8px; }
+    header .spacer { flex: 1; }
+    .meta { color: var(--dim); font-size: 11.5px; }
+    .hairline {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--surface2) 8%, var(--accent) 38%, var(--lavender) 62%, var(--surface2) 92%, transparent);
+      opacity: 0.55;
+    }
+
+    /* ── Body ── */
+    .body { display: grid; grid-template-columns: var(--nav-w) 1px 1fr; min-height: 0; }
+    .vsep { background: var(--surface1); }
+
+    nav {
+      overflow: auto;
+      padding: 8px 0 12px;
+      background: color-mix(in srgb, var(--mantle) 70%, transparent);
+    }
+    .group {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 10px 14px 4px;
+      color: var(--dim);
+    }
+    .group.active { color: var(--p, var(--lavender)); }
+    .group.active::before { content: "✦ "; }
+    .group:not(.active)::before { content: "◈ "; }
+
+    .item {
+      display: grid;
+      grid-template-columns: 10px 1fr auto;
+      grid-template-rows: auto auto auto;
+      column-gap: 6px;
+      padding: 7px 12px 8px 8px;
+      cursor: pointer;
+      border-left: 2px solid transparent;
+    }
+    .item:hover { background: color-mix(in srgb, var(--surface0) 80%, transparent); }
+    .item.selected {
+      background: var(--surface1);
+      border-left-color: var(--p, var(--lavender));
+    }
+    .item .rail { grid-row: 1 / span 3; width: 2px; border-radius: 2px; align-self: stretch; }
+    .item.selected .rail { background: var(--p, var(--lavender)); box-shadow: 0 0 8px var(--p, var(--lavender)); }
+    .item .name { font-weight: 500; color: var(--text); }
+    .item.selected .name { font-weight: 700; color: var(--p, var(--lavender)); }
+    .item .badge { font-size: 10px; font-weight: 700; }
+    .item .sum { grid-column: 2 / span 2; color: var(--subtext); font-size: 11px; display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+    .item .sum .dim { color: var(--dim); margin-left: auto; }
+    .mini {
+      width: 52px; height: 5px; border-radius: 99px;
+      background: var(--surface2); overflow: hidden; flex-shrink: 0;
+    }
+    .mini > i { display: block; height: 100%; border-radius: inherit; }
+
+    .pill {
+      display: inline-block;
+      padding: 0 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .pill.ok { color: var(--green); background: color-mix(in srgb, var(--green) 16%, transparent); }
+    .pill.warn { color: var(--yellow); background: color-mix(in srgb, var(--yellow) 16%, transparent); }
+    .pill.crit { color: var(--red); background: color-mix(in srgb, var(--red) 16%, transparent); }
+
+    /* ── Detail ── */
+    main { overflow: auto; padding: 12px 18px 24px; }
+    .hero {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    }
+    .hero h1 {
+      margin: 0; font-size: 16px; font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .hero-right { color: var(--dim); display: flex; align-items: center; gap: 10px; font-size: 11.5px; }
+    .subhero {
+      margin-top: 4px;
+      display: flex; justify-content: space-between; gap: 12px;
+      color: var(--subtext);
+    }
+    .subhero strong { color: var(--text); }
+    .reset { color: var(--teal); }
+    .accent-line {
+      height: 2px; margin: 10px 0 14px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--green), color-mix(in srgb, var(--green) 20%, transparent));
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .card {
+      background: var(--surface0);
+      border: 1px solid var(--surface1);
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--subtext);
+    }
+    .big {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .big.ok { color: var(--green); }
+    .big.warn { color: var(--yellow); }
+    .card .caption { margin-top: 6px; color: var(--dim); font-size: 11px; }
+    .card .caption b { color: var(--text); font-weight: 600; }
+
+    .gauge {
+      margin-top: 10px;
+      height: 9px;
+      background: var(--surface2);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .gauge > i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    .stack {
+      display: flex;
+      height: 10px;
+      border-radius: 99px;
+      overflow: hidden;
+      background: var(--surface2);
+      margin: 8px 0 10px;
+    }
+    .stack > i { display: block; height: 100%; }
+
+    .rows { display: grid; gap: 5px; }
+    .row {
+      display: grid;
+      grid-template-columns: 12px 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      color: var(--subtext);
+      font-size: 12px;
+    }
+    .swatch { width: 8px; height: 8px; border-radius: 2px; }
+    .row .pct { color: var(--text); font-weight: 600; width: 42px; text-align: right; }
+    .row .cost { color: var(--dim); width: 56px; text-align: right; }
+
+    .spark {
+      margin-top: 10px;
+      height: 48px;
+      color: var(--accent);
+    }
+    .spark svg { width: 100%; height: 100%; display: block; }
+    .hint { margin-top: 8px; color: var(--dim); font-size: 11px; }
+
+    .pair { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      font-size: 11px;
+      color: var(--subtext);
+      background: var(--surface1);
+      border-radius: 3px;
+      padding: 3px 7px;
+    }
+    .chip b { color: var(--text); font-weight: 600; }
+    .add { color: var(--green); }
+    .del { color: var(--red); }
+
+    footer {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 7px 16px 9px;
+      color: var(--dim);
+      font-size: 11px;
+    }
+    footer kbd {
+      font: inherit;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    footer .grow { flex: 1; }
+
+    .note {
+      position: fixed;
+      top: 10px;
+      right: 14px;
+      z-index: 5;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--mantle);
+      background: color-mix(in srgb, var(--lavender) 85%, white);
+      padding: 3px 8px;
+      border-radius: 3px;
+    }
+
+    @media (max-width: 900px) {
+      .body { grid-template-columns: 1fr; }
+      nav { display: none; }
+      .vsep { display: none; }
+      .stats, .pair { grid-template-columns: 1fr; }
+      .note { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="note">MOCKUP</div>
+  <div class="shell">
+    <header>
+      <span class="bolt">⚡</span>
+      <span class="brand">agentUsage</span>
+      <span class="tab">1:dashboard</span>
+      <span class="tab idle">2:analytics</span>
+      <span class="status-counts">6● <span class="warn">1◐</span></span>
+      <span class="spacer"></span>
+      <span class="meta">⊞ 7 providers · remaining · 30d</span>
+    </header>
+    <div class="hairline"></div>
+
+    <div class="body">
+      <nav>
+        <div class="group active" style="--p:var(--lavender)">CURSOR (1)</div>
+        <div class="item selected" style="--p:var(--lavender)" data-id="cursor">
+          <span class="rail"></span>
+          <span class="name">cursor-ide</span>
+          <span class="pill ok">OK</span>
+          <span class="sum">
+            <span class="mini"><i style="width:83%;background:var(--green)"></i></span>
+            $3.45 / $20.00
+            <span class="dim">in 11d</span>
+          </span>
+        </div>
+
+        <div class="group">CLAUDE_CODE (1)</div>
+        <div class="item" style="--p:var(--peach)" data-id="claude">
+          <span class="rail"></span>
+          <span class="name">claude-code</span>
+          <span class="pill ok">OK</span>
+          <span class="sum">
+            <span class="mini"><i style="width:62%;background:var(--yellow)"></i></span>
+            5h 62% left
+            <span class="dim">resets 2h</span>
+          </span>
+        </div>
+
+        <div class="group">COPILOT (1)</div>
+        <div class="item" style="--p:var(--green)" data-id="copilot">
+          <span class="rail"></span>
+          <span class="name">copilot</span>
+          <span class="pill warn">NEAR</span>
+          <span class="sum">
+            <span class="mini"><i style="width:18%;background:var(--peach)"></i></span>
+            chat 18% left
+            <span class="dim">in 4d</span>
+          </span>
+        </div>
+
+        <div class="group">GEMINI_CLI (1)</div>
+        <div class="item" style="--p:var(--sapphire)" data-id="gemini">
+          <span class="rail"></span>
+          <span class="name">gemini-cli</span>
+          <span class="pill ok">OK</span>
+          <span class="sum">
+            <span class="mini"><i style="width:91%;background:var(--green)"></i></span>
+            quota 91%
+            <span class="dim">oauth</span>
+          </span>
+        </div>
+
+        <div class="group">OPENROUTER (1)</div>
+        <div class="item" style="--p:var(--accent)" data-id="openrouter">
+          <span class="rail"></span>
+          <span class="name">openrouter</span>
+          <span class="pill ok">OK</span>
+          <span class="sum">
+            <span class="mini"><i style="width:74%;background:var(--green)"></i></span>
+            $12.40 credits
+            <span class="dim">zen</span>
+          </span>
+        </div>
+
+        <div class="group">OLLAMA (1)</div>
+        <div class="item" style="--p:var(--teal)" data-id="ollama">
+          <span class="rail"></span>
+          <span class="name">ollama</span>
+          <span class="pill ok">OK</span>
+          <span class="sum">
+            <span class="mini"><i style="width:100%;background:var(--teal)"></i></span>
+            local · 4 models
+            <span class="dim">idle</span>
+          </span>
+        </div>
+      </nav>
+
+      <div class="vsep"></div>
+
+      <main>
+        <div class="hero">
+          <h1><span class="dot"></span> cursor-ide</h1>
+          <div class="hero-right">
+            cursor · Pro · demo.user@acme-corp.dev
+            <span class="pill ok">OK</span>
+          </div>
+        </div>
+        <div class="subhero">
+          <div><strong>$3.45 / $20.00 remaining</strong> <span class="reset">· Billing 11d 17h</span></div>
+          <div>refreshed 12s ago</div>
+        </div>
+        <div class="accent-line"></div>
+
+        <div class="stats">
+          <section class="card">
+            <h2>TEAM BUDGET</h2>
+            <div class="big ok">43.7%</div>
+            <div class="gauge" style="color:var(--green)"><i style="width:43.7%;background:var(--green)"></i></div>
+            <div class="caption"><b>$1,572</b> / $3,600 spent · $2,028 remaining</div>
+          </section>
+          <section class="card">
+            <h2>BILLING CYCLE</h2>
+            <div class="big warn">48.7%</div>
+            <div class="gauge" style="color:var(--yellow)"><i style="width:48.7%;background:var(--yellow)"></i></div>
+            <div class="caption">Feb 11 → Mar 12 · individual $217 · team $1,355</div>
+          </section>
+        </div>
+
+        <section class="card" style="margin-bottom:12px">
+          <h2>▸ MODEL BURN</h2>
+          <div class="stack">
+            <i style="width:34%;background:var(--lavender)"></i>
+            <i style="width:22%;background:var(--peach)"></i>
+            <i style="width:18%;background:var(--teal)"></i>
+            <i style="width:14%;background:var(--blue)"></i>
+            <i style="width:12%;background:var(--yellow)"></i>
+          </div>
+          <div class="rows">
+            <div class="row"><span class="swatch" style="background:var(--lavender)"></span>claude-4.5-opus<span class="pct">34%</span><span class="cost">$1.18</span></div>
+            <div class="row"><span class="swatch" style="background:var(--peach)"></span>composer-1.5<span class="pct">22%</span><span class="cost">$0.76</span></div>
+            <div class="row"><span class="swatch" style="background:var(--teal)"></span>gemini-3-flash<span class="pct">18%</span><span class="cost">$0.41</span></div>
+            <div class="row"><span class="swatch" style="background:var(--blue)"></span>gpt-5.2<span class="pct">14%</span><span class="cost">$0.32</span></div>
+            <div class="row"><span class="swatch" style="background:var(--yellow)"></span>grok-4<span class="pct">12%</span><span class="cost">$0.28</span></div>
+          </div>
+          <div class="spark" aria-hidden="true">
+            <svg viewBox="0 0 320 48" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#7eb8f7" stop-opacity="0.35"/>
+                  <stop offset="100%" stop-color="#7eb8f7" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,36 L20,32 L40,34 L60,28 L80,22 L100,24 L120,18 L140,20 L160,14 L180,16 L200,12 L220,18 L240,10 L260,14 L280,8 L300,11 L320,6 L320,48 L0,48 Z" fill="url(#fill)"/>
+              <path d="M0,36 L20,32 L40,34 L60,28 L80,22 L100,24 L120,18 L140,20 L160,14 L180,16 L200,12 L220,18 L240,10 L260,14 L280,8 L300,11 L320,6" fill="none" stroke="#7eb8f7" stroke-width="1.6"/>
+            </svg>
+          </div>
+          <div class="hint">trend · daily by model · +3 more (Ctrl+0)</div>
+        </section>
+
+        <div class="pair">
+          <section class="card">
+            <h2>CLIENTS</h2>
+            <div class="stack">
+              <i style="width:53%;background:var(--lavender)"></i>
+              <i style="width:41%;background:var(--accent)"></i>
+              <i style="width:5%;background:var(--teal)"></i>
+              <i style="width:1%;background:var(--dim)"></i>
+            </div>
+            <div class="chips">
+              <span class="chip"><b>Composer</b> 53%</span>
+              <span class="chip"><b>Human</b> 41%</span>
+              <span class="chip"><b>Tab</b> 5%</span>
+              <span class="chip"><b>CLI</b> 1%</span>
+            </div>
+          </section>
+          <section class="card">
+            <h2>CODE</h2>
+            <div style="font-size:15px;margin:6px 0 10px">
+              <span class="add">+139 added</span>
+              <span class="del" style="margin-left:12px">−335 removed</span>
+            </div>
+            <div class="caption">2.2k files · 3.6k commits · 65% AI-generated</div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="hairline"></div>
+    <footer>
+      <span>auto-refresh ⟳ 30s</span>
+      <span><kbd>j</kbd>/<kbd>k</kbd> move</span>
+      <span><kbd>/</kbd> filter</span>
+      <span><kbd>r</kbd> refresh</span>
+      <span><kbd>t</kbd> theme</span>
+      <span><kbd>?</kbd> help</span>
+      <span class="grow"></span>
+      <span>Deep Space · loopback :8080</span>
+    </footer>
+  </div>
+  <script>
+    const items = [...document.querySelectorAll(".item")];
+    function select(el) {
+      items.forEach((i) => i.classList.remove("selected"));
+      el.classList.add("selected");
+      document.querySelectorAll(".group").forEach((g) => g.classList.remove("active"));
+      el.previousElementSibling?.classList.add("active");
+      el.previousElementSibling?.style.setProperty("--p", el.style.getPropertyValue("--p"));
+    }
+    items.forEach((el) => el.addEventListener("click", () => select(el)));
+    document.addEventListener("keydown", (ev) => {
+      if (ev.target.matches("input, textarea")) return;
+      const idx = items.findIndex((i) => i.classList.contains("selected"));
+      if (ev.key === "j" || ev.key === "ArrowDown") {
+        ev.preventDefault();
+        select(items[Math.min(items.length - 1, idx + 1)]);
+      }
+      if (ev.key === "k" || ev.key === "ArrowUp") {
+        ev.preventDefault();
+        select(items[Math.max(0, idx - 1)]);
+      }
+    });
+  </script>
+</body>
+</html>

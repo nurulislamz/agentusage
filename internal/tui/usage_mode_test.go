@@ -94,9 +94,6 @@ func TestUsageModeToggle_KeybindingAndPersistence(t *testing.T) {
 	if m.isUsageModeUsed() {
 		t.Fatal("expected default usage mode to be remaining (not used)")
 	}
-	if !strings.Contains(m.View(), "Remaining") {
-		t.Errorf("expected view header to contain 'Remaining', got: %s", m.View())
-	}
 	if !strings.Contains(m.View(), "Weekly Limit Remaining") {
 		t.Errorf("expected 'Weekly Limit Remaining' in remaining mode")
 	}
@@ -127,9 +124,6 @@ func TestUsageModeToggle_KeybindingAndPersistence(t *testing.T) {
 
 	// Verify view now shows Used labels
 	usedView := m.View()
-	if !strings.Contains(usedView, "Used") {
-		t.Errorf("expected view header to contain 'Used', got: %s", usedView)
-	}
 	if !strings.Contains(usedView, "Weekly Limit Used") {
 		t.Errorf("expected 'Weekly Limit Used' in used mode, got view: %s", usedView)
 	}
