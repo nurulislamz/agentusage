@@ -1,4 +1,4 @@
-# Local Web Dashboard (`openusage serve`) Design
+# Local Web Dashboard (`agentusage serve`) Design
 
 Date: 2026-08-30
 Status: Implemented (TUI parity rewrite)
@@ -6,16 +6,16 @@ Author: cursor-agent
 
 ## 1. Problem Statement
 
-OpenUsage's live usage view is terminal-first. The browser dashboard must show
+agentUsage's live usage view is terminal-first. The browser dashboard must show
 **the same data and the same visual language** as the Bubble Tea TUI so operators
 can open a tab without learning a second UI.
 
 ## 2. Goals
 
-1. `openusage serve` starts a local HTTP server with a self-contained dashboard.
+1. `agentusage serve` starts a local HTTP server with a self-contained dashboard.
 2. Collection reuses the same path the TUI uses: prefer `daemon.ViewRuntime`
    (daemon socket / read-model), fall back to `export.Collect` (same as
-   `openusage export --source auto`).
+   `agentusage export --source auto`).
 3. The browser UI is a **faithful port of the TUI split view** (header, navigator,
    detail pane, footer) using the active theme tokens.
 4. Detail content is produced by the same Go renderer as the TUI
@@ -34,7 +34,7 @@ can open a tab without learning a second UI.
 ## 4. Architecture
 
 ```
-openusage serve
+agentusage serve
   → webserve.Server
       GET /api/v1/snapshots  → collector
            → daemon.ViewRuntime.ReadWithFallbackForWindow  (preferred)
@@ -48,7 +48,7 @@ openusage serve
 
 ```go
 type Envelope struct {
-    SchemaVersion, GeneratedAt, OpenUsageVersion, Source, TimeWindow, Theme string
+    SchemaVersion, GeneratedAt, agentUsageVersion, Source, TimeWindow, Theme string
     RefreshIntervalSeconds int
     UsageMode string
     Catalog []CatalogEntry
@@ -83,14 +83,14 @@ debugging and fallbacks.
 ## 5. Security
 
 - Default loopback bind.
-- Non-loopback requires `OPENUSAGE_SERVE_TOKEN` or `--allow-public`.
+- Non-loopback requires `AGENTUSAGE_SERVE_TOKEN` or `--allow-public`.
 - Bearer auth on `/api/v1/*` when token set; `/healthz` stays open.
 - Snapshot `Raw` maps stripped before JSON.
 
 ## 6. CLI
 
 ```
-openusage serve [--listen ADDR] [--source auto|direct|daemon] [--demo] [--open|--no-open] [--allow-public]
+agentusage serve [--listen ADDR] [--source auto|direct|daemon] [--demo] [--open|--no-open] [--allow-public]
 ```
 
 ## 7. Compatibility

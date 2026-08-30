@@ -90,6 +90,7 @@ code { font: inherit; color: var(--accent); }
   min-width: max-content;
   cursor: default;
   user-select: text;
+  transition: opacity 0.15s ease-in-out;
 }
 
 .tui-frame:focus {
@@ -107,13 +108,67 @@ code { font: inherit; color: var(--accent); }
   gap: 10px;
   padding: 8px 12px;
   background: var(--mantle);
-  border: 1px solid var(--surface2);
+  border: 1px solid var(--accent);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
   z-index: 40;
+  transition: box-shadow 0.2s;
+}
+
+.filter-bar:focus-within {
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .filter-bar label {
   color: var(--accent);
   font-weight: 700;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface2);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--dim);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--subtext);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--dim) var(--surface2);
+}
+
+/* Refresh animation */
+@keyframes top-pulse {
+  0% { box-shadow: inset 0 2px 0 0 transparent; }
+  50% { box-shadow: inset 0 2px 0 0 var(--accent); }
+  100% { box-shadow: inset 0 2px 0 0 transparent; }
+}
+.shell.refreshing {
+  animation: top-pulse 1s ease-out;
+}
+
+/* Status bar */
+.status-bar {
+  position: fixed;
+  bottom: 8px;
+  left: 8px;
+  padding: 4px 8px;
+  background: var(--surface0);
+  border: 1px solid var(--crit);
+  color: var(--crit);
+  font-size: 11px;
+  border-radius: 4px;
+  z-index: 100;
+  pointer-events: none;
+}
+.status-bar[hidden] {
+  display: none !important;
 }
 
 .filter-bar input {
@@ -171,5 +226,12 @@ code { font: inherit; color: var(--accent); }
   .tui-frame {
     font-size: 10px;
     white-space: pre;
+  }
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
   }
 }

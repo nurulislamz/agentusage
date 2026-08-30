@@ -76,6 +76,8 @@
   }
 
   async function load() {
+    const appShell = $("app");
+    if (appShell) appShell.classList.add("refreshing");
     try {
       const res = await fetch("/api/v1/snapshots", { headers: headers() });
       if (res.status === 401) {
@@ -96,14 +98,24 @@
       }
       showDashboard(state.views.length > 0);
       render();
+      if ($("status-bar")) $("status-bar").hidden = true;
     } catch (err) {
       state.error = String(err);
-      showDashboard(false);
-      $("empty-state").hidden = false;
-      $("splash").hidden = true;
-      $("app").hidden = true;
+      if ($("status-bar")) {
+        $("status-bar").hidden = false;
+        $("status-bar").textContent = "offline - reconnecting…";
+      }
+      if (state.views.length === 0) {
+        showDashboard(false);
+        $("empty-state").hidden = false;
+        $("splash").hidden = true;
+        $("app").hidden = true;
+      }
     } finally {
       state.loading = false;
+      if (appShell) {
+        setTimeout(() => appShell.classList.remove("refreshing"), 300);
+      }
     }
   }
 
@@ -113,87 +125,7 @@
     $("app").hidden = !hasData;
   }
 
-<<<<<<< HEAD
-  function countStatuses(views) {
-    let ok = 0;
-    let warn = 0;
-    let err = 0;
-    for (const v of views) {
-      switch (v.status) {
-        case "OK": ok++; break;
-        case "NEAR_LIMIT": warn++; break;
-        case "LIMITED":
-        case "ERROR": err++; break;
-        default: break;
-      }
-    }
-    return { ok, warn, err };
-  }
 
-  function renderHeader() {
-    const env = state.envelope;
-    const views = state.views;
-    const counts = countStatuses(views);
-    const root = $("header");
-    root.replaceChildren();
-
-    const spinner = state.refreshing
-      ? el("span", { class: "spinner", text: SPINNER[state.spinnerFrame % SPINNER.length] })
-      : null;
-
-    const countParts = [];
-    if (counts.ok) countParts.push(el("span", { class: "ok", text: `${counts.ok}●` }));
-    if (counts.warn) countParts.push(el("span", { class: "warn", text: `${counts.warn}◐` }));
-    if (counts.err) countParts.push(el("span", { class: "crit", text: `${counts.err}✗` }));
-
-    const filterLabel = state.filter ? " (filtered)" : "";
-    const usageMode = env?.usage_mode || "remaining";
-    const modeLabel = usageMode === "used" ? "Used" : "Remaining";
-
-    const line = el("div", { class: "header-line" }, [
-      el("span", { class: "brand-bolt", text: "⚡" }),
-      el("span", { class: "brand-name", text: "agentUsage" }),
-      el("span", { class: "screen-tab active", text: "1:Dashboard" }),
-      el("span", { class: "header-counts" }, countParts),
-      spinner,
-      el("span", {
-        class: "header-meta",
-        text: env
-          ? `⊞ ${views.length} provider${views.length === 1 ? "" : "s"}${filterLabel} · ${modeLabel} · ${env.time_window || ""}`
-          : "connecting…",
-      }),
-    ]);
-
-    root.append(line, el("div", { class: "header-sep", text: SEP }));
-  }
-
-  function renderFooter() {
-    const env = state.envelope;
-    const root = $("footer");
-    root.replaceChildren();
-
-    const line = el("div", { class: "footer-line" }, [
-      el("span", {}, [
-        el("kbd", { text: "↑" }), document.createTextNode(" "),
-        el("kbd", { text: "↓" }), document.createTextNode(" navigate"),
-      ]),
-      el("span", { text: "·" }),
-      el("span", {}, [el("kbd", { text: "/" }), document.createTextNode(" filter")]),
-      el("span", { text: "·" }),
-      el("span", {}, [el("kbd", { text: "r" }), document.createTextNode(" refresh")]),
-      el("span", { text: "·" }),
-      el("span", {}, [el("kbd", { text: "t" }), document.createTextNode(" theme")]),
-      el("span", { style: "flex:1" }),
-      el("span", {
-        class: "dim",
-        text: env
-          ? `${env.theme || ""} · ${env.source || ""} · refresh ${env.refresh_interval_seconds || 30}s · ${new Date(env.generated_at).toLocaleTimeString()}`
-          : state.error || "offline",
-      }),
-    ]);
-
-    root.append(el("div", { class: "footer-sep", text: SEP }), line);
-  }
   function render() {
     const views = filteredViews();
     const frame = $("frame");
