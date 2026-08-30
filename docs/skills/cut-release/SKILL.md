@@ -65,7 +65,7 @@ Use this exact format. No version header, no tagline — start directly with `##
 ### Maintenance
 * Description of chore/refactor (#PR)
 
-**Full Changelog**: https://github.com/janekbaraniewski/openusage/compare/v<prev>...v<version>
+**Full Changelog**: https://github.com/nurulislamz/agentusage/compare/v<prev>...v<version>
 ```
 
 ### Format rules

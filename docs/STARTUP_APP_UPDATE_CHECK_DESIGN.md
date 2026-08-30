@@ -48,7 +48,7 @@ Add `internal/appupdate/checker.go` with:
 - `Check(ctx, CheckOptions) (Result, error)`
 - `detectInstallMethod(executablePath) InstallMethod`
 - `fetchLatestReleaseVersion(...)` against GitHub Releases API:
-  - `https://api.github.com/repos/janekbaraniewski/openusage/releases/latest`
+  - `https://api.github.com/repos/nurulislamz/agentusage/releases/latest`
 
 `Result` includes:
 
@@ -89,9 +89,9 @@ Install method inferred from executable path heuristics:
 
 ### 5.5 Upgrade hint mapping
 
-- Homebrew: `brew upgrade janekbaraniewski/tap/openusage`
-- Go install: `go install github.com/janekbaraniewski/openusage/cmd/openusage@latest`
-- Install script: `curl -fsSL https://github.com/janekbaraniewski/openusage/releases/latest/download/install.sh | bash`
+- Homebrew: `brew upgrade nurulislamz/tap/agentusage`
+- Go install: `go install github.com/nurulislamz/agentusage/cmd/openusage@latest`
+- Install script: `curl -fsSL https://github.com/nurulislamz/agentusage/releases/latest/download/install.sh | bash`
 - Scoop: `scoop update openusage`
 - Chocolatey: `choco upgrade openusage -y`
 - Unknown: same actionable install script command (`curl ... | bash`) across platforms.

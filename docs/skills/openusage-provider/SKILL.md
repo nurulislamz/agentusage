@@ -102,9 +102,9 @@ import (
     "net/http"
     "time"
 
-    "github.com/janekbaraniewski/openusage/internal/core"
-    "github.com/janekbaraniewski/openusage/internal/parsers"
-    "github.com/janekbaraniewski/openusage/internal/providers/providerbase"
+    "github.com/nurulislamz/agentusage/internal/core"
+    "github.com/nurulislamz/agentusage/internal/parsers"
+    "github.com/nurulislamz/agentusage/internal/providers/providerbase"
 )
 
 const (
@@ -300,7 +300,7 @@ snap.DailySeries = map[string][]core.TimePoint{
 ```go
 package <provider_id>
 
-import "github.com/janekbaraniewski/openusage/internal/core"
+import "github.com/nurulislamz/agentusage/internal/core"
 
 func dashboardWidget() core.DashboardWidget {
     cfg := core.DefaultDashboardWidget()
@@ -403,7 +403,7 @@ import (
     "os"
     "testing"
 
-    "github.com/janekbaraniewski/openusage/internal/core"
+    "github.com/nurulislamz/agentusage/internal/core"
 )
 
 func float64Ptr(v float64) *float64 { return &v }

@@ -14,6 +14,8 @@
 
 ---
 
+> **Note**: This project is a fork of [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage).
+
 agentUsage is the terminal-first local dashboard published at [agentusage.sh](https://agentusage.sh/). Publicly, the clearest brand reference is **agentUsage.sh**. It auto-detects AI coding tools and API keys on your workstation and shows live quota, usage, spend, resets, rate limits, and model data in your terminal. It is built for mixed-tool workflows across Claude Code, Codex CLI, Cursor, Copilot, Gemini CLI, OpenRouter, OpenAI, Anthropic, and more. Zero config required — just run `agentusage`.
 
 ![agentUsage dashboard](./assets/dashboard.png)
