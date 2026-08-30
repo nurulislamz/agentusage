@@ -1,10 +1,6 @@
 (() => {
   "use strict";
 
-  const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-  const SEP = "━".repeat(160);
-  const VSEP = Array.from({ length: 80 }, () => "┃").join("\n");
-
   const state = {
     envelope: null,
     views: [],
@@ -13,62 +9,27 @@
     token: sessionStorage.getItem("au-serve-token") || "",
     themeOverride: localStorage.getItem("au-serve-theme-override") || "",
     loading: true,
-    refreshing: false,
-    spinnerFrame: 0,
     error: null,
     filterOpen: false,
   };
 
   const $ = (id) => document.getElementById(id);
 
-  const el = (tag, attrs = {}, children = []) => {
-    const node = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (k === "class") node.className = v;
-      else if (k === "text") node.textContent = v;
-      else if (k === "html") node.innerHTML = v;
-      else if (k.startsWith("on") && typeof v === "function") {
-        node.addEventListener(k.slice(2).toLowerCase(), v);
-      } else if (v != null) node.setAttribute(k, v);
-    }
-    for (const child of children) {
-      if (child != null) node.append(child);
-    }
-    return node;
-  };
-
-  function statusClass(status) {
-    switch (status) {
-      case "OK": return "ok";
-      case "NEAR_LIMIT": return "warn";
-      case "LIMITED":
-      case "ERROR": return "crit";
-      case "AUTH_REQUIRED": return "auth";
-      default: return "dim";
-    }
-  }
-
   function applyThemeTokens(tokens, override) {
     const root = document.documentElement;
     if (override === "light") {
-      root.dataset.theme = "light";
       root.style.cssText = [
         "--base:#f4f1ea", "--mantle:#fffdf8", "--surface0:#ebe6dc",
         "--surface1:#ddd6c8", "--surface2:#cfc7b8", "--text:#2c2823",
         "--subtext:#6d6760", "--dim:#9c958d", "--accent:#7c5cbf",
-        "--blue:#3d6fb8", "--sapphire:#2f8f86", "--green:#2f9e6d",
-        "--yellow:#b5811a", "--red:#c65746", "--peach:#c67a3a",
-        "--teal:#2f8f86", "--lavender:#6b5cae", "--mauve:#6b5cae",
-        "--ok:#2f9e6d", "--warn:#b5811a", "--crit:#c65746", "--auth:#c67a3a",
+        "--lavender:#6b5cae", "--teal:#2f8f86", "--crit:#c65746",
       ].join(";");
       return;
     }
     if (!tokens || !tokens.base) {
-      root.dataset.theme = "deep-space";
       root.style.cssText = "";
       return;
     }
-    root.dataset.theme = "dynamic";
     const map = {
       "--base": tokens.base,
       "--mantle": tokens.mantle,
@@ -79,19 +40,9 @@
       "--subtext": tokens.subtext,
       "--dim": tokens.dim,
       "--accent": tokens.accent,
-      "--blue": tokens.blue,
-      "--sapphire": tokens.sapphire,
-      "--green": tokens.green,
-      "--yellow": tokens.yellow,
-      "--red": tokens.red,
-      "--peach": tokens.peach,
-      "--teal": tokens.teal,
       "--lavender": tokens.lavender,
-      "--mauve": tokens.mauve,
-      "--ok": tokens.green,
-      "--warn": tokens.yellow,
+      "--teal": tokens.teal,
       "--crit": tokens.red,
-      "--auth": tokens.peach,
     };
     root.style.cssText = Object.entries(map)
       .filter(([, v]) => v)
@@ -125,15 +76,12 @@
   }
 
   async function load() {
-    state.refreshing = true;
-    renderHeader();
     try {
       const res = await fetch("/api/v1/snapshots", { headers: headers() });
       if (res.status === 401) {
         $("token-modal").hidden = false;
         $("token-error").hidden = false;
         $("token-error").textContent = state.token ? "Invalid token" : "Token required";
-        state.refreshing = false;
         return;
       }
       if (!res.ok) throw new Error(`snapshots ${res.status}`);
@@ -156,9 +104,6 @@
       $("app").hidden = true;
     } finally {
       state.loading = false;
-      state.refreshing = false;
-      renderHeader();
-      renderFooter();
     }
   }
 
@@ -168,6 +113,7 @@
     $("app").hidden = !hasData;
   }
 
+<<<<<<< HEAD
   function countStatuses(views) {
     let ok = 0;
     let warn = 0;
@@ -248,127 +194,23 @@
 
     root.append(el("div", { class: "footer-sep", text: SEP }), line);
   }
-
-  function renderNav() {
-    const views = filteredViews();
-    const root = $("nav");
-    root.replaceChildren();
-    if (!views.length) {
-      root.append(el("p", { class: "dim", style: "padding:12px", text: state.filter ? "No matches." : "No providers." }));
-      return;
-    }
-
-    const selectedView = views[state.selected];
-    const selectedProvider = selectedView?.provider_id;
-    let lastProvider = "";
-
-    views.forEach((view, index) => {
-      const pID = view.provider_id;
-      const isFirst = pID !== lastProvider;
-      lastProvider = pID;
-
-      if (isFirst) {
-        const groupCount = views.filter((v) => v.provider_id === pID).length;
-        const active = pID === selectedProvider;
-        const prefix = active ? "✦ " : "◈ ";
-        root.append(el("div", {
-          class: `nav-group${active ? " active" : ""}`,
-          style: active ? `--item-accent:${view.accent_color};color:${view.accent_color}` : "",
-          text: `${prefix}${pID.toUpperCase()} (${groupCount})`,
-        }));
-      }
-
-      const inGroup = pID === selectedProvider;
-      const selected = index === state.selected;
-      const railChar = selected ? "┃" : (inGroup ? "│" : " ");
-
-      const summaryNode = view.summary_html
-        ? el("span", { class: "nav-summary", html: view.summary_html })
-        : el("span", { class: "nav-summary", text: view.summary || "—" });
-
-      const stripNode = view.strip_html
-        ? el("span", { class: "nav-strip", html: view.strip_html })
-        : null;
-
-      const badgeNode = view.badge_html
-        ? el("span", { class: "nav-badge", html: view.badge_html })
-        : el("span", { class: `nav-badge ${statusClass(view.status)}`, text: view.status_badge || "" });
-
-      const iconNode = view.icon_html
-        ? el("span", { html: view.icon_html })
-        : el("span", { class: statusClass(view.status), text: view.status_icon || "·" });
-
-      const resetNode = view.reset_hint
-        ? el("span", {
-          class: `nav-reset${view.resets?.[0]?.urgent ? " urgent" : ""}`,
-          text: ` · ${view.reset_hint}`,
-        })
-        : null;
-
-      root.append(el("button", {
-        class: `nav-item${selected ? " selected" : ""}${inGroup && !selected ? " in-group" : ""}`,
-        type: "button",
-        style: `--item-accent:${view.accent_color}`,
-        onclick: () => { state.selected = index; render(); },
-      }, [
-        el("span", { class: "rail", text: railChar }),
-        el("div", { class: "nav-rows" }, [
-          el("div", { class: "nav-row1" }, [
-            iconNode,
-            el("span", { class: "nav-name", text: view.account_id }),
-            badgeNode,
-          ]),
-          el("div", { class: "nav-row2" }, [
-            stripNode,
-            summaryNode,
-            resetNode,
-          ]),
-          el("hr", { class: "nav-sep" }),
-        ]),
-      ]));
-    });
-
-    root.querySelector(".nav-item.selected")?.scrollIntoView({ block: "nearest" });
-  }
-
-  function renderPanel() {
-    const views = filteredViews();
-    const root = $("panel");
-    root.replaceChildren();
-    if (!views.length) {
-      root.append(el("div", { class: "detail-empty", text: "No provider selected." }));
-      return;
-    }
-
-    const view = views[state.selected];
-    if (view.detail_html) {
-      root.append(el("pre", { class: "detail-term", html: view.detail_html }));
-      return;
-    }
-
-    // Fallback if detail_html missing (should not happen in current API).
-    const lines = [];
-    for (const sec of view.detail_sections || []) {
-      const title = [sec.icon, sec.title].filter(Boolean).join(" ");
-      if (title) lines.push(title);
-      lines.push(...(sec.lines || []));
-      lines.push("");
-    }
-    root.append(el("pre", { class: "detail-term", text: lines.join("\n") || view.summary || "—" }));
-  }
-
-  function renderVSep() {
-    const sep = document.querySelector(".term-vsep");
-    if (sep) sep.textContent = VSEP;
-  }
-
   function render() {
-    if (!state.envelope) return;
-    renderHeader();
-    renderNav();
-    renderPanel();
-    renderFooter();
-    renderVSep();
+    const views = filteredViews();
+    const frame = $("frame");
+    if (!views.length) {
+      frame.textContent = state.filter ? "No matches." : "No providers.";
+      return;
+    }
+    const view = views[state.selected];
+    if (view.frame_html) {
+      frame.innerHTML = view.frame_html;
+    } else if (view.detail_html) {
+      // Fallback if frame projection unavailable.
+      frame.innerHTML = view.detail_html;
+    } else {
+      frame.textContent = view.summary || view.account_id;
+    }
+    frame.tabIndex = 0;
   }
 
   function moveSelection(delta) {
@@ -399,6 +241,20 @@
     bar.hidden = true;
     render();
   }
+
+  // Approximate TUI mouse hit-test: clicks in the left third pick a provider.
+  $("frame").addEventListener("click", (ev) => {
+    const views = filteredViews();
+    if (!views.length) return;
+    const rect = ev.currentTarget.getBoundingClientRect();
+    const xRatio = (ev.clientX - rect.left) / rect.width;
+    if (xRatio > 0.36) return;
+    const yRatio = (ev.clientY - rect.top) / Math.max(1, rect.height);
+    // Skip header (~2 lines) and footer (~2 lines) roughly.
+    const usable = Math.max(0, Math.min(1, (yRatio - 0.08) / 0.84));
+    state.selected = Math.max(0, Math.min(views.length - 1, Math.floor(usable * views.length)));
+    render();
+  });
 
   $("token-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -450,13 +306,6 @@
         break;
     }
   });
-
-  setInterval(() => {
-    if (!state.refreshing) return;
-    state.spinnerFrame += 1;
-    const spin = document.querySelector(".spinner");
-    if (spin) spin.textContent = SPINNER[state.spinnerFrame % SPINNER.length];
-  }, 80);
 
   let refreshTimer = 0;
   const scheduleRefresh = () => {

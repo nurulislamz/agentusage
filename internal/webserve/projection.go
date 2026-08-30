@@ -54,6 +54,10 @@ func buildViews(opts Options, meta collectorMeta, snaps []core.UsageSnapshot) ([
 	out := make([]AccountView, len(views))
 	for i, v := range views {
 		out[i] = enrichAccountView(opts, cfg, orderedMatch(ordered, v.AccountID), accountViewFromTUI(v))
+		frame := renderTUIFrame(cfg, ordered, i, defaultFrameWidth, defaultFrameHeight)
+		if frame != "" {
+			out[i].FrameHTML = ANSIToHTML(frame)
+		}
 	}
 	tokens := tui.WebThemeTokensFromTheme(tui.ActiveTheme())
 	return out, themeTokensFromTUI(tokens)

@@ -84,6 +84,8 @@ type AccountView struct {
 	StripHTML   string `json:"strip_html,omitempty"`
 	SummaryHTML string `json:"summary_html,omitempty"`
 	ResetHint   string `json:"reset_hint,omitempty"`
+	// FrameHTML is a full TUI dashboard frame with this account selected.
+	FrameHTML string `json:"frame_html,omitempty"`
 }
 
 type DetailSection struct {

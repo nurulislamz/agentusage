@@ -64,19 +64,21 @@ type Envelope struct {
 - `badge_html`, `icon_html`, `strip_html`, `summary_html` — navigator chrome
 - `reset_hint` — cycle reset countdown text
 
-### UI
+## 5. UI approach (TUI byte-parity)
 
-Vanilla SPA embedded with `go:embed`. Layout mirrors TUI:
+The browser paints **full TUI frames** produced by:
 
-| Region | TUI | Web |
-|--------|-----|-----|
-| Header | brand + tabs + status counts + meta | same |
-| Left (~⅓) | provider navigator with group headers, compact block strips | same |
-| Right | `RenderDetailContent` cards | `detail_html` in monospace `<pre>` |
-| Footer | key hints + theme/source | same shortcuts (↑↓ / r t) |
+1. `tui.NewModel(...)`
+2. `Update(WindowSizeMsg)` + `Update(SnapshotsMsg)`
+3. `KeyDown` to the selected account
+4. `View()` → ANSI → HTML (`ANSIToHTML`)
 
-Theme CSS variables are injected from `theme_tokens` so the browser matches the
-configured TUI theme (Deep Space default).
+Each `AccountView.frame_html` is that frame with the account selected. The SPA
+swaps frames on `j/k` / click in the left third. Detail content therefore matches
+the terminal renderer exactly (gauges, cards, charts, footer).
+
+Structured fields (`summary`, `strip_html`, `detail_html`, …) remain for
+debugging and fallbacks.
 
 ## 5. Security
 
