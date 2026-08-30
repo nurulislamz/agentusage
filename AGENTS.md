@@ -61,13 +61,12 @@ internal/
   detect/               local tool + env key auto-detection
   integrations/         Codex/OpenCode/Claude hook/plugin install + version checks
   parsers/              shared HTTP header parsing helpers
-  providers/            provider implementations + registry (16 providers)
+  providers/            provider implementations + registry (37 providers)
   telemetry/            SQLite store, ingest pipeline, dedup, read model
   tui/                  Bubble Tea views/components/settings UX
   version/              build metadata injected by ldflags
 plugins/                integration install scripts/templates
 configs/                example settings
-docs/skills/            feature and provider implementation workflows
 ```
 
 ## Provider Model
@@ -79,9 +78,12 @@ All providers implement `core.UsageProvider` from `internal/core/provider.go`:
 - `Fetch(ctx, acct) (core.UsageSnapshot, error)`
 
 Providers are registered in `internal/providers/registry.go` via `AllProviders()`.
-Current provider set: `openai`, `anthropic`, `alibaba_cloud`, `openrouter`, `groq`,
-`mistral`, `deepseek`, `xai`, `opencode`, `gemini_api`, `gemini_cli`,
-`ollama`, `copilot`, `cursor`, `claude_code`, `codex`.
+Current provider set (37 providers): `openai`, `anthropic`, `azure_openai`,
+`alibaba_cloud`, `openrouter`, `perplexity`, `groq`, `mistral`, `moonshot`,
+`deepseek`, `xai`, `zai`, `opencode`, `gemini_api`, `gemini_cli`, `antigravity`,
+`ollama`, `copilot`, `cursor`, `claude_code`, `codex`, `amp`, `goose`,
+`hermes`, `mux`, `droid`, `crush`, `roocode`, `kilocode`, `kiro`, `zed`,
+`codebuff`, `kimi_cli`, `openclaw`, `pi`, `qwen_cli`, `command_code`.
 
 ## Code Style
 
@@ -129,9 +131,6 @@ Current provider set: `openai`, `anthropic`, `alibaba_cloud`, `openrouter`, `gro
 
 ## Adding a Provider
 
-For complete workflow and checklists, follow:
-[`docs/skills/add-new-provider.md`](docs/skills/add-new-provider.md)
-
 Minimum sequence:
 
 1. Quiz requirements and auth/data model.
@@ -140,19 +139,6 @@ Minimum sequence:
 4. Add widget/detail config (`Spec`, optional `widget.go`).
 5. Register in `registry.go`, detection in `internal/detect/`, and example config.
 6. Verify with `go build`, `go test`, `make vet`.
-
-## Repo Skills
-
-For larger changes, use these workflow docs in `docs/skills/`:
-
-- `develop-feature`
-- `design-feature`
-- `review-design`
-- `implement-feature`
-- `validate-feature`
-- `iterate-feature`
-- `finalize-feature`
-- `agentusage-provider` (provider-specific guidance)
 
 ## Commit Style
 
