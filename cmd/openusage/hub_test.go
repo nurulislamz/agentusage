@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/config"
 )
 
 // TestResolveHubRuntime covers the defaulting and auth-token resolution paths

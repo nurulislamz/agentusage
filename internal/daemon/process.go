@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/mod/semver"
 
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/openusage/internal/version"
 )
 
 func ClassifyEnsureError(err error) DaemonState {

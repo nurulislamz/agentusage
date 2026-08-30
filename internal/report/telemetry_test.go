@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 func i64(v int64) *int64      { return &v }

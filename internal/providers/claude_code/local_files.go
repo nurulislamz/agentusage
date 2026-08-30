@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func floorToHour(t time.Time) time.Time {

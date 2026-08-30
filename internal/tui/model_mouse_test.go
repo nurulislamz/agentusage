@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func testSnapshots(ids ...string) map[string]core.UsageSnapshot {

@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/report"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/report"
 )
 
 // JSONOutput is the structured payload emitted by `openusage tmux --json`.

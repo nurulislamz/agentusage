@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // Render evaluates a template against ctx and returns the rendered string.

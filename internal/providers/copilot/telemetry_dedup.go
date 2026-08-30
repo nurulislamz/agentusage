@@ -3,7 +3,7 @@ package copilot
 import (
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 // OTel-style record priorities for tool-call dedup. When the same operation

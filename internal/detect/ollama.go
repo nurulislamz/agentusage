@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func detectOllama(result *Result) {

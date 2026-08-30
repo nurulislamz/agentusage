@@ -1,8 +1,8 @@
 package telemetry
 
 import (
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 func mapProviderEvent(sourceSystem string, ev shared.TelemetryEvent, accountOverride string) IngestRequest {

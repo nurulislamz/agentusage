@@ -12,7 +12,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 type fixedClock struct{ t time.Time }
@@ -128,7 +128,7 @@ func TestProvider_Fetch_HappyPath_JSON(t *testing.T) {
 
 	insertThreadRow(t, dbPath,
 		"thread-aaaa", "2026-05-19T08:00:00Z", "2026-05-19T08:00:00Z",
-		"/Users/janek/code/project\n/Users/janek/code/other", "0",
+		"/Users/test/code/project\n/Users/test/code/other", "0",
 		"json", body,
 	)
 

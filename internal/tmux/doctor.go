@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/daemon"
+	"github.com/nurulislamz/openusage/internal/daemon"
 )
 
 // DoctorOptions configures the Run helper. All fields are optional; the

@@ -5,9 +5,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/integrations"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/integrations"
 	"github.com/samber/lo"
 )
 

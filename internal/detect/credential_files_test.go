@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // withCleanCredentialEnv resets HOME / APPDATA / known env vars to safe

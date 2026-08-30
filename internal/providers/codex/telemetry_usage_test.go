@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 func TestParseTelemetrySessionFile_CollectsTokenDeltas(t *testing.T) {
@@ -143,7 +143,7 @@ func TestParseTelemetrySessionFile_ParsesToolUsageAndPatchStats(t *testing.T) {
 	}
 
 	path := filepath.Join(sessionsDir, "rollout-tools.jsonl")
-	content := `{"timestamp":"2026-03-05T19:00:00Z","type":"session_meta","payload":{"id":"sess-tools","cwd":"/Users/janekbaraniewski/Workspace/priv/openusage","source":"vscode","originator":"Codex Desktop","model_provider":"openai"}}
+	content := `{"timestamp":"2026-03-05T19:00:00Z","type":"session_meta","payload":{"id":"sess-tools","cwd":"/Users/test/Workspace/priv/openusage","source":"vscode","originator":"Codex Desktop","model_provider":"openai"}}
 {"timestamp":"2026-03-05T19:00:01Z","type":"turn_context","payload":{"model":"gpt-5-codex","turn_id":"turn-abc"}}
 {"timestamp":"2026-03-05T19:00:02Z","type":"response_item","payload":{"type":"function_call","name":"mcp__gopls__go_workspace","arguments":"{}","call_id":"call-mcp-1"}}
 {"timestamp":"2026-03-05T19:00:03Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-mcp-1","output":"failed to list namespaces: exit code 255"}}

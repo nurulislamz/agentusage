@@ -3,7 +3,7 @@ package kiro
 import (
 	"context"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // ItemizedUsage returns one event per Kiro conversation, reusing the same DB

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/providers"
+	"github.com/nurulislamz/openusage/internal/providers"
 )
 
 func shortSocketPath(t *testing.T, suffix string) string {

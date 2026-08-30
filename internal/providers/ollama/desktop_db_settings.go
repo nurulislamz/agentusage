@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func queryCount(ctx context.Context, db *sql.DB, query string) (int64, error) {

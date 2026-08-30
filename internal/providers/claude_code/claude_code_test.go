@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/pricing"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/pricing"
 )
 
 func TestSanitizeModelName(t *testing.T) {

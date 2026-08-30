@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/telemetry"
 )
 
 func (s *Service) computeReadModel(

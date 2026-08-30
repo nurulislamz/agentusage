@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 func TestParseTelemetryConversationFile_DedupesByRequestIDAndExtractsToolEvents(t *testing.T) {

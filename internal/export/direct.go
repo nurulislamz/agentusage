@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/providers"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/daemon"
+	"github.com/nurulislamz/openusage/internal/providers"
 )
 
 // fetchTimeout caps a single provider Fetch() call. Matches the daemon's

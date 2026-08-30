@@ -84,9 +84,9 @@ jobs:
           GOARCH: amd64
         run: |
           go build -ldflags="-s -w \
-            -X 'github.com/janekbaraniewski/openusage/internal/version.Version=${{ steps.version.outputs.version }}' \
-            -X 'github.com/janekbaraniewski/openusage/internal/version.CommitHash=$(git rev-parse --short HEAD)' \
-            -X 'github.com/janekbaraniewski/openusage/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
+            -X 'github.com/nurulislamz/openusage/internal/version.Version=${{ steps.version.outputs.version }}' \
+            -X 'github.com/nurulislamz/openusage/internal/version.CommitHash=$(git rev-parse --short HEAD)' \
+            -X 'github.com/nurulislamz/openusage/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
             -o dist/openusage_darwin_amd64 ./cmd/openusage
 
       - name: Build macOS arm64
@@ -96,9 +96,9 @@ jobs:
           GOARCH: arm64
         run: |
           go build -ldflags="-s -w \
-            -X 'github.com/janekbaraniewski/openusage/internal/version.Version=${{ steps.version.outputs.version }}' \
-            -X 'github.com/janekbaraniewski/openusage/internal/version.CommitHash=$(git rev-parse --short HEAD)' \
-            -X 'github.com/janekbaraniewski/openusage/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
+            -X 'github.com/nurulislamz/openusage/internal/version.Version=${{ steps.version.outputs.version }}' \
+            -X 'github.com/nurulislamz/openusage/internal/version.CommitHash=$(git rev-parse --short HEAD)' \
+            -X 'github.com/nurulislamz/openusage/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
             -o dist/openusage_darwin_arm64 ./cmd/openusage
 
       - name: Install cosign
@@ -202,7 +202,7 @@ jobs:
       - name: Generate Homebrew formula
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          REPO="janekbaraniewski/openusage"
+          REPO="nurulislamz/openusage"
           BASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}"
 
           mkdir -p /tmp/homebrew-formula
@@ -250,7 +250,7 @@ jobs:
 
                 Trust the whole tap once to keep openusage linked across upgrades:
 
-                  brew trust janekbaraniewski/tap
+                  brew trust nurulislamz/tap
 
                 See https://docs.brew.sh/Tap-Trust for details.
               EOS
@@ -268,7 +268,7 @@ jobs:
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          git clone --branch master "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/janekbaraniewski/homebrew-tap.git" /tmp/homebrew-tap
+          git clone --branch master "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/nurulislamz/homebrew-tap.git" /tmp/homebrew-tap
           mkdir -p /tmp/homebrew-tap/Formula
           cp /tmp/homebrew-formula/openusage.rb /tmp/homebrew-tap/Formula/openusage.rb
 

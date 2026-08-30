@@ -12,12 +12,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/export"
-	"github.com/janekbaraniewski/openusage/internal/providers/antigravity"
-	"github.com/janekbaraniewski/openusage/internal/providers/claude_code"
-	"github.com/janekbaraniewski/openusage/internal/providers/cursor"
-	"github.com/janekbaraniewski/openusage/internal/report"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/export"
+	"github.com/nurulislamz/openusage/internal/providers/antigravity"
+	"github.com/nurulislamz/openusage/internal/providers/claude_code"
+	"github.com/nurulislamz/openusage/internal/providers/cursor"
+	"github.com/nurulislamz/openusage/internal/report"
 )
 
 // statuslineInput is the JSON Claude Code pipes to a statusLine command on

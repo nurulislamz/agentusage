@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // makeUsageMetric returns a Metric with the given used+limit+window suitable

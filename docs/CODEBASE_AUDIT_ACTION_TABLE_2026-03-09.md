@@ -1,7 +1,7 @@
 # Codebase Audit Action Table
 
 Date: 2026-03-09
-Repository: `/Users/janekbaraniewski/Workspace/priv/openusage`
+Repository: `openusage`
 Branch: `feat/dashboard-race-parser-cleanups`
 
 ## Fixed in This Branch

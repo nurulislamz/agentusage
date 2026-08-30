@@ -219,7 +219,7 @@ func TestSplashProgressShowsAppUpdateNotice(t *testing.T) {
 			status:           DaemonConnecting,
 			appUpdateCurrent: "v0.4.0",
 			appUpdateLatest:  "v0.5.0",
-			appUpdateHint:    "brew upgrade janekbaraniewski/tap/openusage",
+			appUpdateHint:    "brew upgrade nurulislamz/tap/openusage",
 		},
 		providerOrder: []string{"openai"},
 		animFrame:     0,
@@ -230,7 +230,7 @@ func TestSplashProgressShowsAppUpdateNotice(t *testing.T) {
 	if !strings.Contains(combined, "OpenUsage update available: v0.4.0 -> v0.5.0") {
 		t.Error("expected app update headline in splash output")
 	}
-	if !strings.Contains(combined, "Run: brew upgrade janekbaraniewski/tap/openusage") {
+	if !strings.Contains(combined, "Run: brew upgrade nurulislamz/tap/openusage") {
 		t.Error("expected install-specific update action in splash output")
 	}
 }

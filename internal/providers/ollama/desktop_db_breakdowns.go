@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func populateModelUsageFromDB(ctx context.Context, db *sql.DB, snap *core.UsageSnapshot) error {

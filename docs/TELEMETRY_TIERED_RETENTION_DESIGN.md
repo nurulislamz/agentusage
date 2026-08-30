@@ -2,7 +2,7 @@
 
 Date: 2026-06-11
 Status: Proposed
-Author: janekbaraniewski
+Author: OpenUsage
 
 ## 1. Problem Statement
 

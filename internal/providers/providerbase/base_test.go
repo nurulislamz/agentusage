@@ -3,7 +3,7 @@ package providerbase
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func TestNew_AppliesAPIKeyAuthDefaults(t *testing.T) {

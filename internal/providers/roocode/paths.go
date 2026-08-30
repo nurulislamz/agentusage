@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // PathHintTasksDirKey is the AccountConfig hint key used to override the

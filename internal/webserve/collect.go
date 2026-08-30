@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/export"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/openusage/internal/export"
+	"github.com/nurulislamz/openusage/internal/version"
 )
 
 type collector struct {

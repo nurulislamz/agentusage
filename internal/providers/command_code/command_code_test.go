@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func TestCommandCode_Fetch_Success(t *testing.T) {

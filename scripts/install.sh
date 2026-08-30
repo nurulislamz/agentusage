@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REPO="janekbaraniewski/openusage"
+REPO="nurulislamz/openusage"
 BINARY_NAME="openusage"
 INSTALL_DIR="${OPENUSAGE_INSTALL_DIR:-}"
 VERSION="${OPENUSAGE_VERSION:-}"

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // metricsCtx builds a minimal Context for one provider with the given numeric

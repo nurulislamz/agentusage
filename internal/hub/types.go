@@ -3,7 +3,7 @@ package hub
 import (
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 type machineEntry struct {

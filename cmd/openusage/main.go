@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/version"
 	"github.com/spf13/cobra"
 )
 

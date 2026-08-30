@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/openusage/internal/telemetry"
 )
 
 func ingestParsedHookLocally(

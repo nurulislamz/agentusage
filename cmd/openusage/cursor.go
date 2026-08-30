@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/cursor"
+	"github.com/nurulislamz/openusage/internal/providers/cursor"
 	"github.com/spf13/cobra"
 )
 

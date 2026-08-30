@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 // TestParseCopilotTelemetrySessionFile_OTelToolDedup verifies that when the
@@ -23,7 +23,7 @@ func TestParseCopilotTelemetrySessionFile_OTelToolDedup(t *testing.T) {
 				"sessionId": sessionID,
 				"context": map[string]any{
 					"cwd":        "/Users/test/openusage",
-					"repository": "janekbaraniewski/openusage",
+					"repository": "nurulislamz/openusage",
 				},
 			},
 		},

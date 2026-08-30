@@ -14,11 +14,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/export"
-	"github.com/janekbaraniewski/openusage/internal/tmux"
-	"github.com/janekbaraniewski/openusage/internal/tui"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/export"
+	"github.com/nurulislamz/openusage/internal/tmux"
+	"github.com/nurulislamz/openusage/internal/tui"
+	"github.com/nurulislamz/openusage/internal/version"
 )
 
 // tmuxFlags carries the shared render-time flags. Subcommands instantiate

@@ -10,6 +10,7 @@
     filter: "",
     token: sessionStorage.getItem("ou-serve-token") || "",
     themeOverride: localStorage.getItem("ou-serve-theme-override") || "",
+    viewMode: localStorage.getItem("ou-serve-view-mode") || "structured",
     loading: true,
     refreshing: false,
     spinnerFrame: 0,
@@ -44,24 +45,35 @@
     }
   }
 
-  function renderMiniGauge(percent, width = 8) {
+  function gaugeColor(pct) {
+    if (pct < 50) return "var(--ok, #a6e3a1)";
+    if (pct < 80) return "var(--warn, #f9e2af)";
+    return "var(--crit, #f38ba8)";
+  }
+
+  function renderMiniGauge(percent) {
     if (percent < 0 || !Number.isFinite(percent)) return "";
     const pct = Math.min(100, Math.max(0, percent));
-    const filled = Math.round((pct / 100) * width);
-    return "█".repeat(filled) + "░".repeat(Math.max(0, width - filled));
+    return el("div", { class: "mini-gauge-track" }, [
+      el("div", { class: "mini-gauge-fill", style: `width: ${pct}%; background: ${gaugeColor(pct)}` })
+    ]).outerHTML;
   }
 
   function applyThemeTokens(tokens, override) {
     const root = document.documentElement;
-    if (override === "light") {
-      root.dataset.theme = "light";
-      return;
+    if (override) {
+      root.dataset.theme = override;
+    } else {
+      if (!tokens || !tokens.base) {
+        root.dataset.theme = "deep-space";
+        return;
+      }
+      root.dataset.theme = "dynamic";
     }
-    if (!tokens || !tokens.base) {
-      root.dataset.theme = "deep-space";
-      return;
-    }
-    root.dataset.theme = "dynamic";
+    
+    if (override === "light" || override === "deep-space" || override === "tokyo-night") return;
+
+    if (!tokens) return;
     const map = {
       "--base": tokens.base,
       "--mantle": tokens.mantle,
@@ -92,11 +104,18 @@
   }
 
   function cycleThemeOverride() {
-    const order = ["", "light"];
+    const order = ["", "deep-space", "tokyo-night", "light"];
     const idx = order.indexOf(state.themeOverride);
     state.themeOverride = order[(idx + 1) % order.length];
     localStorage.setItem("ou-serve-theme-override", state.themeOverride);
     applyThemeTokens(state.envelope?.theme_tokens, state.themeOverride);
+    renderHeader(); // Re-render to update the theme button state if needed
+  }
+
+  function toggleViewMode() {
+    state.viewMode = state.viewMode === "structured" ? "raw" : "structured";
+    localStorage.setItem("ou-serve-view-mode", state.viewMode);
+    renderPanel();
   }
 
   function filteredViews() {
@@ -177,9 +196,9 @@
   function renderHeader() {
     const env = state.envelope;
     const views = state.views;
+    const filtered = filteredViews();
     const counts = countStatuses(views);
     const root = $("header");
-    root.replaceChildren();
 
     const spinner = state.refreshing
       ? el("span", { class: "spinner", text: SPINNER[state.spinnerFrame % SPINNER.length] })
@@ -190,27 +209,63 @@
     if (counts.warn) countParts.push(el("span", { class: "warn", text: `${counts.warn}◐` }));
     if (counts.err) countParts.push(el("span", { class: "crit", text: `${counts.err}✗` }));
 
-    const filterLabel = state.filter ? " (filtered)" : "";
+    const searchInput = el("input", {
+      type: "text",
+      id: "filter-input",
+      placeholder: "Filter providers (/ or Ctrl+K)",
+      value: state.filter,
+      oninput: (e) => {
+        state.filter = e.target.value;
+        state.selected = 0;
+        renderNav();
+        renderPanel();
+        const meta = document.getElementById("header-meta");
+        if (meta) {
+          const visible = filteredViews();
+          meta.textContent = env ? `⊞ ${visible.length} of ${views.length} provider${views.length === 1 ? "" : "s"} · ${env.time_window || ""} · ${env.source}` : "connecting…";
+        }
+      }
+    });
+
+    const themeBtn = el("button", {
+      class: "theme-toggle-btn",
+      text: "Theme: " + (state.themeOverride || "dynamic"),
+      onclick: cycleThemeOverride
+    });
+
     const line = el("div", { class: "dash-header-line" }, [
       el("span", { class: "brand-bolt", text: "⚡" }),
       el("span", { class: "brand-name", text: "OpenUsage" }),
       el("span", { class: "header-counts" }, countParts),
       spinner,
+      el("div", { class: "header-search" }, [searchInput]),
+      themeBtn,
       el("span", {
+        id: "header-meta",
         class: "header-meta",
         text: env
-          ? `⊞ ${views.length} provider${views.length === 1 ? "" : "s"}${filterLabel} · ${env.time_window || ""} · ${env.source}`
+          ? `⊞ ${filtered.length} of ${views.length} provider${views.length === 1 ? "" : "s"} · ${env.time_window || ""} · ${env.source}`
           : "connecting…",
       }),
     ]);
-
-    root.append(line, el("div", { class: "header-sep", text: "━".repeat(120) }));
+    
+    // Check if input had focus
+    const inputFocused = document.activeElement && document.activeElement.id === "filter-input";
+    
+    root.replaceChildren();
+    root.append(line);
+    
+    if (inputFocused) {
+      document.getElementById("filter-input").focus();
+    }
   }
 
   function renderFooter() {
     const env = state.envelope;
     const root = $("footer");
     root.replaceChildren();
+
+    const pulseDot = el("span", { class: "pulse-dot" });
 
     const line = el("div", { class: "footer-line" }, [
       el("span", {}, [el("kbd", { text: "↑" }), document.createTextNode(" "), el("kbd", { text: "↓" }), document.createTextNode(" navigate")]),
@@ -220,16 +275,19 @@
       el("span", {}, [el("kbd", { text: "r" }), document.createTextNode(" refresh")]),
       el("span", { text: "·" }),
       el("span", {}, [el("kbd", { text: "t" }), document.createTextNode(" theme")]),
+      el("span", { text: "·" }),
+      el("span", {}, [el("kbd", { text: "v" }), document.createTextNode(" view mode")]),
       el("span", { style: "flex:1" }),
       el("span", {
-        class: "dim",
+        class: "dim flex-row align-center",
         text: env
           ? `${env.theme || ""} · ${env.usage_mode || "remaining"} · refresh ${env.refresh_interval_seconds || 30}s · ${new Date(env.generated_at).toLocaleTimeString()}`
           : state.error || "offline",
       }),
+      env && !state.error ? pulseDot : null
     ]);
 
-    root.append(el("div", { class: "footer-sep", text: "━".repeat(120) }), line);
+    root.append(line);
   }
 
   function renderNav() {
@@ -262,7 +320,7 @@
 
       const inGroup = pID === selectedProvider;
       const selected = index === state.selected;
-      const mini = view.gauge_percent >= 0 ? renderMiniGauge(view.gauge_percent) : "";
+      const miniHtml = view.gauge_percent >= 0 ? renderMiniGauge(view.gauge_percent) : "";
 
       root.append(el("button", {
         class: `nav-item${selected ? " selected" : ""}${inGroup && !selected ? " in-group" : ""}`,
@@ -277,7 +335,7 @@
         ]),
         el("div", { class: "nav-row2" }, [
           el("span", { class: "nav-summary", text: view.summary || "—" }),
-          mini ? el("span", { class: "nav-mini-gauge dim", text: mini }) : null,
+          miniHtml ? el("span", { class: "nav-mini-gauge", html: miniHtml }) : null,
         ]),
         el("hr", { class: "nav-sep" }),
       ]));
@@ -292,30 +350,184 @@
     const max = Math.max(...series.map((p) => p.value || 0), 0.01);
     const row = el("div", { class: "spark-row" });
     for (const pt of series) {
-      const bar = el("span", { class: "spark-bar", title: `${pt.date}: $${(pt.value || 0).toFixed(2)}` });
-      bar.style.height = `${Math.max(4, ((pt.value || 0) / max) * 100)}%`;
+      const bar = el("div", { class: "spark-bar", title: `${pt.date}: $${(pt.value || 0).toFixed(2)}` }, [
+        el("div", { class: "spark-bar-fill", style: `height: ${Math.max(4, ((pt.value || 0) / max) * 100)}%` })
+      ]);
       row.append(bar);
     }
-    return el("div", { class: "spark-wrap" }, [
+    const dates = el("div", { class: "spark-dates" });
+    for (const pt of series) {
+      dates.append(el("span", { class: "spark-date-label", text: pt.date.slice(5) }));
+    }
+    return el("div", { class: "spark-wrap card" }, [
       el("div", { class: "tile-section-title", text: "Daily spend" }),
       row,
+      dates
     ]);
   }
 
-  function renderPanel() {
-    const views = filteredViews();
-    const root = $("panel");
-    root.replaceChildren();
-    if (!views.length) return;
+  function renderParsedDetailSections(sections) {
+    const els = [];
+    for (const sec of sections || []) {
+      if (!sec.lines?.length) continue;
+      const title = [sec.icon, sec.title].filter(Boolean).join(" ");
+      
+      const card = el("div", { class: "card section-card" });
+      if (title.trim()) card.append(el("div", { class: "tile-section-title", text: title }));
+      
+      let isBraille = false;
+      const parsedLines = [];
+      
+      for (const line of sec.lines) {
+        if (line.match(/[⠒⠤⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⣿⣶⣤⣀]/)) {
+          isBraille = true;
+          break;
+        }
+      }
+      
+      if (isBraille) {
+        card.append(el("pre", { class: "chart-pre", text: sec.lines.join("\n") }));
+      } else {
+        const rows = el("div", { class: "structured-rows" });
+        for (const line of sec.lines) {
+          const dotMatch = line.match(/^([a-zA-Z0-9\s]+)\s+([·\.]+)\s+(.+)$/);
+          if (dotMatch) {
+            rows.append(el("div", { class: "dot-row" }, [
+              el("span", { class: "dot-label", text: dotMatch[1].trim() }),
+              el("span", { class: "dot-leader" }),
+              el("span", { class: "dot-value", text: dotMatch[3].trim() })
+            ]));
+          } else {
+            const attrMatch = line.match(/^\s+([a-zA-Z0-9\s]+)\s{2,}(.+)$/);
+            if (attrMatch) {
+              rows.append(el("div", { class: "attr-row" }, [
+                el("span", { class: "attr-key", text: attrMatch[1].trim() }),
+                el("span", { class: "attr-value", text: attrMatch[2].trim() })
+              ]));
+            } else {
+              rows.append(el("div", { class: "raw-row", text: line }));
+            }
+          }
+        }
+        card.append(rows);
+      }
+      els.push(card);
+    }
+    return els;
+  }
 
-    const view = views[state.selected];
-    const tile = el("article", { class: "tile", style: `--tile-accent:${view.accent_color}` });
+  function renderStructuredPanel(view, snapshot) {
+    const tile = el("article", { class: "tile structured-mode", style: `--tile-accent:${view.accent_color}` });
+    
+    // Header Hero
+    const header = el("div", { class: "tile-header-hero" }, [
+      el("div", { class: "hero-top" }, [
+        el("span", { class: `hero-status ${statusClass(view.status)}`, text: view.status_icon }),
+        el("span", { class: "hero-title", text: view.account_id }),
+        el("span", { class: `hero-badge ${statusClass(view.status)}`, text: view.status_badge }),
+        el("span", { class: "hero-provider", text: view.provider_name }),
+        el("div", { class: "flex-spacer" }),
+        el("button", { 
+          class: "view-mode-toggle", 
+          text: "[ ▤ Raw TUI ]",
+          onclick: toggleViewMode
+        })
+      ])
+    ]);
+    
+    if (view.timestamp) {
+      const ts = new Date(view.timestamp);
+      const diff = Date.now() - ts.getTime();
+      const age = diff > 60000 ? `${Math.floor(diff / 60000)}m ago` : ts.toLocaleTimeString();
+      header.append(el("div", { class: "hero-meta" }, [
+        el("span", { class: "hero-time", text: `⏱ ${age}` })
+      ]));
+    }
+    tile.append(header);
+    tile.append(el("hr", { class: "tile-accent-sep" }));
 
+    // Primary Gauge
+    if (view.gauge_percent >= 0 || view.summary) {
+      const gaugeCard = el("div", { class: "card gauge-card" });
+      if (view.summary || view.message) {
+        gaugeCard.append(el("div", { class: "hero-message", text: view.message || view.summary }));
+      }
+      if (view.gauge_percent >= 0) {
+        const pct = Math.min(100, Math.max(0, view.gauge_percent));
+        gaugeCard.append(el("div", { class: "gauge-bar-wrap" }, [
+          el("div", { class: "gauge-bar-fill", style: `width: ${pct}%; background: ${gaugeColor(pct)}` })
+        ]));
+      }
+      if (view.resets?.length) {
+        gaugeCard.append(el("div", { class: "reset-pills" }, view.resets.map((p) =>
+          el("span", { class: `reset-pill${p.urgent ? " urgent" : ""}`, html: `◷ ${p.label} <strong>${p.duration}</strong>` }),
+        )));
+      }
+      tile.append(gaugeCard);
+    }
+    
+    // Model Breakdown
+    if (snapshot?.model_usage?.length) {
+      const modelCard = el("div", { class: "card model-card" }, [
+        el("div", { class: "tile-section-title", text: "Model Breakdown" })
+      ]);
+      const getVal = (m) => (m.cost_usd != null && m.cost_usd > 0 ? m.cost_usd : (m.total_tokens || ((m.input_tokens || 0) + (m.output_tokens || 0))));
+      const formatVal = (m) => {
+        if (m.cost_usd != null && m.cost_usd > 0) return `$${m.cost_usd.toFixed(2)}`;
+        const tok = m.total_tokens || ((m.input_tokens || 0) + (m.output_tokens || 0));
+        if (tok >= 1e6) return `${(tok / 1e6).toFixed(1)}M tok`;
+        if (tok >= 1e3) return `${(tok / 1e3).toFixed(1)}k tok`;
+        return `${tok} tok`;
+      };
+      const getModelName = (m) => m.canonical || m.raw_model_id || m.canonical_lineage_id || "unknown";
+
+      const total = snapshot.model_usage.reduce((sum, m) => sum + getVal(m), 0);
+      const bar = el("div", { class: "stacked-bar" });
+      const legend = el("div", { class: "model-legend" });
+
+      const colors = ["#89b4fa", "#f38ba8", "#a6e3a1", "#f9e2af", "#cba6f7", "#94e2d5", "#fab387", "#89dceb"];
+
+      snapshot.model_usage.forEach((m, i) => {
+        const val = getVal(m);
+        const pct = total > 0 ? (val / total) * 100 : 0;
+        const color = colors[i % colors.length];
+
+        bar.append(el("div", { class: "stacked-segment", style: `width: ${pct}%; background-color: ${color}`, title: `${getModelName(m)}: ${formatVal(m)} (${pct.toFixed(1)}%)` }));
+
+        legend.append(el("div", { class: "legend-item" }, [
+          el("span", { class: "legend-dot", style: `background-color: ${color}` }),
+          el("span", { class: "legend-name", text: getModelName(m) }),
+          el("span", { class: "legend-val dim", text: formatVal(m) }),
+          el("span", { class: "legend-pct", text: `${pct.toFixed(1)}%` })
+        ]));
+      });
+      modelCard.append(bar, legend);
+      tile.append(modelCard);
+    }
+
+    const spark = renderSparkline(view.daily_cost);
+    if (spark) tile.append(spark);
+
+    const parsedSections = renderParsedDetailSections(view.detail_sections);
+    parsedSections.forEach(s => tile.append(s));
+
+    return tile;
+  }
+
+  function renderRawPanel(view) {
+    const tile = el("article", { class: "tile raw-mode", style: `--tile-accent:${view.accent_color}` });
+    
     tile.append(el("div", { class: "tile-header" }, [
       el("span", { class: statusClass(view.status), text: view.status_icon }),
       el("span", { class: "tile-title", text: view.account_id }),
       el("span", { class: `nav-badge ${statusClass(view.status)}`, text: view.status_badge }),
       el("span", { class: "dim", text: view.provider_name }),
+      el("div", { class: "flex-spacer" }),
+      el("button", { 
+        class: "view-mode-toggle", 
+        text: "[ ✦ Dashboard ]",
+        onclick: toggleViewMode
+      })
     ]));
     tile.append(el("hr", { class: "tile-accent-sep" }));
 
@@ -363,7 +575,23 @@
       tile.append(el("div", { class: "tile-footer", text: `⏱ ${age}` }));
     }
 
-    root.append(tile);
+    return tile;
+  }
+
+  function renderPanel() {
+    const views = filteredViews();
+    const root = $("panel");
+    root.replaceChildren();
+    if (!views.length) return;
+
+    const view = views[state.selected];
+    const snap = state.envelope.snapshots?.find(s => s.provider_id === view.provider_id && s.account_id === view.account_id);
+    
+    if (state.viewMode === "raw") {
+      root.append(renderRawPanel(view));
+    } else {
+      root.append(renderStructuredPanel(view, snap));
+    }
   }
 
   function render() {
@@ -381,14 +609,6 @@
     render();
   }
 
-  function startFilter() {
-    const q = window.prompt("Filter providers", state.filter);
-    if (q == null) return;
-    state.filter = q;
-    state.selected = 0;
-    render();
-  }
-
   $("token-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
     state.token = $("token-input").value.trim();
@@ -398,7 +618,26 @@
 
   document.addEventListener("keydown", (ev) => {
     if ($("token-modal").hidden === false) return;
-    if (ev.target.matches("input, textarea")) return;
+    
+    // Focus search input on / or Ctrl+K
+    if (ev.key === "/" || (ev.key === "k" && (ev.ctrlKey || ev.metaKey))) {
+      ev.preventDefault();
+      const input = $("filter-input");
+      if (input) input.focus();
+      return;
+    }
+
+    if (ev.target.matches("input, textarea")) {
+      if (ev.key === "Escape") {
+        ev.target.value = "";
+        state.filter = "";
+        ev.target.blur();
+        state.selected = 0;
+        render();
+      }
+      return;
+    }
+
     switch (ev.key) {
       case "ArrowUp":
       case "k":
@@ -410,10 +649,6 @@
         ev.preventDefault();
         moveSelection(1);
         break;
-      case "/":
-        ev.preventDefault();
-        startFilter();
-        break;
       case "r":
       case "R":
         ev.preventDefault();
@@ -423,6 +658,11 @@
       case "T":
         ev.preventDefault();
         cycleThemeOverride();
+        break;
+      case "v":
+      case "V":
+        ev.preventDefault();
+        toggleViewMode();
         break;
       default:
         break;

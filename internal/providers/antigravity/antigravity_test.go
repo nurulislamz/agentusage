@@ -3,6 +3,7 @@ package antigravity
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -11,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 func TestCaptureStatusLineAndFetch(t *testing.T) {
@@ -292,7 +293,7 @@ func TestFetchGemini5hExhaustedWeeklyAvailable(t *testing.T) {
 }
 
 func TestFetchChaosUsageShowsAllModels(t *testing.T) {
-	const jsonPayload = `{
+	jsonPayload := fmt.Sprintf(`{
 		"agent_state": "working",
 		"artifact_count": 1,
 		"context_window": {
@@ -307,12 +308,17 @@ func TestFetchChaosUsageShowsAllModels(t *testing.T) {
 		"plan_tier": "Google AI Pro",
 		"product": "antigravity",
 		"quota": {
-			"3p-5h": {"remaining_fraction": 1, "reset_time": "2026-08-29T21:33:37Z", "reset_in_seconds": 17722},
-			"3p-weekly": {"remaining_fraction": 1, "reset_time": "2026-09-05T16:33:37Z", "reset_in_seconds": 604522},
-			"gemini-5h": {"remaining_fraction": 0.7652325, "reset_time": "2026-08-29T20:25:53Z", "reset_in_seconds": 13658},
-			"gemini-weekly": {"remaining_fraction": 0.96087205, "reset_time": "2026-09-05T15:25:53Z", "reset_in_seconds": 600458}
+			"3p-5h": {"remaining_fraction": 1, "reset_time": "%s", "reset_in_seconds": 17722},
+			"3p-weekly": {"remaining_fraction": 1, "reset_time": "%s", "reset_in_seconds": 604522},
+			"gemini-5h": {"remaining_fraction": 0.7652325, "reset_time": "%s", "reset_in_seconds": 13658},
+			"gemini-weekly": {"remaining_fraction": 0.96087205, "reset_time": "%s", "reset_in_seconds": 600458}
 		}
-	}`
+	}`,
+		time.Now().UTC().Add(4*time.Hour).Format(time.RFC3339),
+		time.Now().UTC().Add(7*24*time.Hour).Format(time.RFC3339),
+		time.Now().UTC().Add(3*time.Hour).Format(time.RFC3339),
+		time.Now().UTC().Add(6*24*time.Hour).Format(time.RFC3339),
+	)
 
 	path := filepath.Join(t.TempDir(), "antigravity-chaos-status.json")
 	if err := os.WriteFile(path, []byte(jsonPayload), 0o600); err != nil {

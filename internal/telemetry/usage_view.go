@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 
 	_ "github.com/mattn/go-sqlite3"
 )

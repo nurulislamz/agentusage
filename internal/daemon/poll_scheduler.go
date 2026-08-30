@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // PollScheduler manages per-provider adaptive backoff to reduce CPU usage when data

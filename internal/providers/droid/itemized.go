@@ -3,7 +3,7 @@ package droid
 import (
 	"context"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // ItemizedUsage returns one event per Droid session, reusing the same parsing

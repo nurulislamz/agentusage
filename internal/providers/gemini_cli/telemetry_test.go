@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 func TestParseGeminiTelemetrySessionFile_NormalizesMCPToolsAndDiffStats(t *testing.T) {

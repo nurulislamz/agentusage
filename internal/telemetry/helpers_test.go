@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func int64Ptr(v int64) *int64 {

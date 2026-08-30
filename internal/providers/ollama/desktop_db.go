@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func (p *Provider) fetchDesktopDB(ctx context.Context, acct core.AccountConfig, snap *core.UsageSnapshot) (bool, error) {

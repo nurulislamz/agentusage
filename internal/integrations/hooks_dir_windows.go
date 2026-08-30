@@ -5,7 +5,7 @@ package integrations
 import (
 	"path/filepath"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/config"
 )
 
 // platformHooksDir places OpenUsage's hook scripts beside settings.json under

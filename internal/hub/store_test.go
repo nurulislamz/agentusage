@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func makeSnap(providerID, accountID string) core.UsageSnapshot {

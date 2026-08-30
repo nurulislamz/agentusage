@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // shimSecurityCLI replaces the system `security` binary with a stub that

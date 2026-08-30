@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/browsercookies"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/integrations"
-	"github.com/janekbaraniewski/openusage/internal/providers"
+	"github.com/nurulislamz/openusage/internal/browsercookies"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/integrations"
+	"github.com/nurulislamz/openusage/internal/providers"
 )
 
 type Service struct {

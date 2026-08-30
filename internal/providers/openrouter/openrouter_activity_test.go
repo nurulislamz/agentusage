@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func TestFetch_ActivityEndpointNewSchema(t *testing.T) {

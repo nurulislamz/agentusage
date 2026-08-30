@@ -1,7 +1,7 @@
 package amp
 
 import (
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // ItemizedUsage returns one event per reconciled assistant message, reusing the

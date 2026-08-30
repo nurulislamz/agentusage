@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 func recordToolCall(toolCalls map[string]int, callTool map[string]string, callID, tool string) {

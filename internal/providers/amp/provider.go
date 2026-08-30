@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/providers/providerbase"
 )
 
 // Provider implements core.UsageProvider for Amp. Amp is a local-file

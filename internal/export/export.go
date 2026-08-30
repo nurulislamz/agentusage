@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/daemon"
+	"github.com/nurulislamz/openusage/internal/version"
 )
 
 // runner bundles the orchestration dependencies so tests can swap them out.

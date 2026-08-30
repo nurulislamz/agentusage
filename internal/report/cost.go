@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/pricing"
+	"github.com/nurulislamz/openusage/internal/pricing"
 )
 
 // CostFunc resolves a USD cost for a single usage record. It is injected so the

@@ -2,7 +2,7 @@
 
 Date: 2026-04-30
 Status: Proposed
-Author: Jan Baraniewski
+Author: OpenUsage Contributors
 
 Driven by GitHub issue #80: a user installed openusage with the OpenCode plugin and saw five "Unmapped" providers (`github-copilot`, `google`, `moonshot`, `openai`, `openrouter`) with no in-product way to fix them. The fix instructions told them to hand-edit `settings.json`. The Dashboard appeared empty (only `claude-code` was visible) even though their settings showed providers were "detected".
 

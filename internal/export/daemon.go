@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/daemon"
 )
 
 // daemonHealthTimeout caps the probe used to decide whether the daemon is

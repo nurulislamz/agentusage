@@ -3,7 +3,7 @@ package codebuff
 import (
 	"context"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // ItemizedUsage returns one event per recorded assistant turn, reusing the

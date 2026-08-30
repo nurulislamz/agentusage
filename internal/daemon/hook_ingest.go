@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/providers"
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/openusage/internal/providers"
+	"github.com/nurulislamz/openusage/internal/telemetry"
 )
 
 type HookParseResult struct {

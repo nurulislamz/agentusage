@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/openusage/internal/version"
 )
 
 var IntegrationVersion = version.Version

@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/pricing"
+	"github.com/nurulislamz/openusage/internal/pricing"
 )
 
 func TestEstimateUsageCost_UsesResolver(t *testing.T) {

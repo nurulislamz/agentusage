@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/detect"
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/detect"
+	"github.com/nurulislamz/openusage/internal/telemetry"
 )
 
 func ResolveAccounts(cfg *config.Config) []core.AccountConfig {

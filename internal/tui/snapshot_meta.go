@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/janekbaraniewski/openusage/internal/core"
+import "github.com/nurulislamz/openusage/internal/core"
 
 func snapshotMeta(snap core.UsageSnapshot, key string) string {
 	if v, ok := snap.MetaValue(key); ok {

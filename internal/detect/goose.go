@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // detectGoose registers a local Goose account when either the CLI binary is

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func TestComputeDisplayInfo_MapsActivityFallbackToUsage(t *testing.T) {
@@ -389,7 +389,7 @@ func TestUpdate_AppUpdateMsgStoresNotice(t *testing.T) {
 	updated, _ := m.Update(AppUpdateMsg{
 		CurrentVersion: "v0.4.0",
 		LatestVersion:  "v0.5.0",
-		UpgradeHint:    "brew upgrade janekbaraniewski/tap/openusage",
+		UpgradeHint:    "brew upgrade nurulislamz/tap/openusage",
 	})
 	got, ok := updated.(Model)
 	if !ok {
@@ -401,7 +401,7 @@ func TestUpdate_AppUpdateMsgStoresNotice(t *testing.T) {
 	if got.daemon.appUpdateLatest != "v0.5.0" {
 		t.Fatalf("appUpdateLatest = %q, want v0.5.0", got.daemon.appUpdateLatest)
 	}
-	if got.daemon.appUpdateHint != "brew upgrade janekbaraniewski/tap/openusage" {
+	if got.daemon.appUpdateHint != "brew upgrade nurulislamz/tap/openusage" {
 		t.Fatalf("appUpdateHint = %q", got.daemon.appUpdateHint)
 	}
 }
@@ -410,14 +410,14 @@ func TestRenderFooterStatusLine_ShowsAppUpdateWhenIdle(t *testing.T) {
 	m := NewModel(0.2, 0.1, false, config.DashboardConfig{}, nil, core.TimeWindow30d)
 	m.daemon.appUpdateCurrent = "v0.4.0"
 	m.daemon.appUpdateLatest = "v0.5.0"
-	m.daemon.appUpdateHint = "go install github.com/janekbaraniewski/openusage/cmd/openusage@latest"
+	m.daemon.appUpdateHint = "go install github.com/nurulislamz/openusage/cmd/openusage@latest"
 
 	line := m.renderFooterStatusLine(180)
 
 	if !strings.Contains(line, "Update available: v0.4.0 -> v0.5.0") {
 		t.Fatalf("footer line missing update versions, got: %q", line)
 	}
-	if !strings.Contains(line, "Run: go install github.com/janekbaraniewski/openusage/cmd/openusage@latest") {
+	if !strings.Contains(line, "Run: go install github.com/nurulislamz/openusage/cmd/openusage@latest") {
 		t.Fatalf("footer line missing update command, got: %q", line)
 	}
 }

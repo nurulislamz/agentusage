@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/detect"
-	"github.com/janekbaraniewski/openusage/internal/integrations"
-	"github.com/janekbaraniewski/openusage/internal/providers"
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/daemon"
+	"github.com/nurulislamz/openusage/internal/detect"
+	"github.com/nurulislamz/openusage/internal/integrations"
+	"github.com/nurulislamz/openusage/internal/providers"
+	"github.com/nurulislamz/openusage/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 

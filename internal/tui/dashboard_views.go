@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/janekbaraniewski/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/config"
 )
 
 type dashboardViewMode string

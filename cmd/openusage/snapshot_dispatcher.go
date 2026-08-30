@@ -5,9 +5,9 @@ import (
 	"sync/atomic"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/tui"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/daemon"
+	"github.com/nurulislamz/openusage/internal/tui"
 )
 
 type snapshotDispatcher struct {

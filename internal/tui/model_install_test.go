@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func TestDaemonInstallResultSuccess(t *testing.T) {

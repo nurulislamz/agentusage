@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // PathHintDBsKey is the AccountConfig path hint used to inject an

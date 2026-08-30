@@ -10,8 +10,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 func parseCopilotTelemetrySessionStore(ctx context.Context, dbPath string, skipSessions map[string]bool) ([]shared.TelemetryEvent, error) {

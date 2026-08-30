@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func TestRenderTile_ShowsInternalScrollIndicatorsWhenContentHidden(t *testing.T) {

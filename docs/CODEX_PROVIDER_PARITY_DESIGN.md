@@ -2,7 +2,7 @@
 
 Date: 2026-02-26
 Status: Implemented (runtime) / Demo parity in progress
-Author: janekbaraniewski + Codex
+Author: OpenUsage + Codex
 
 ## 1. Problem Statement
 

@@ -3,8 +3,8 @@ package tmux
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/claude_code"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/providers/claude_code"
 )
 
 func ptr(v float64) *float64 { return &v }

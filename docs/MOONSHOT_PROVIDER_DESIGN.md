@@ -2,7 +2,7 @@
 
 Date: 2026-04-30
 Status: Proposed
-Author: Jan Baraniewski
+Author: OpenUsage Contributors
 
 Driven by GitHub issue #79 — add full openusage support for Moonshot AI (Kimi). Targeting "max tier" parity with the richer existing providers (OpenRouter / Cursor level), constrained by what Moonshot's API actually exposes.
 

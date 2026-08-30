@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func extractUsageSamples(raw json.RawMessage, kind string) []usageSample {

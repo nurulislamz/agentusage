@@ -1,5 +1,5 @@
 APP_NAME    := openusage
-MODULE      := github.com/janekbaraniewski/openusage
+MODULE      := github.com/nurulislamz/openusage
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE  := $(shell date +%Y-%m-%dT%H:%M:%S%z)
@@ -67,6 +67,10 @@ test-verbose: ## Run unit tests with verbose output
 .PHONY: run
 run: ## Run the application locally
 	$(GO) run $(CMD_DIR)
+
+.PHONY: serve
+serve: ## Serve the local web dashboard
+	$(GO) run $(CMD_DIR) serve
 
 .PHONY: build
 build: deps ## Build the binary

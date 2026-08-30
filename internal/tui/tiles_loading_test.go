@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func TestTileShouldRenderLoading_MetadataOnlySnapshot(t *testing.T) {

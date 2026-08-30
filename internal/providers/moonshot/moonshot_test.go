@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // userInfoBody returns a realistic /v1/users/me response. Mirrors the live

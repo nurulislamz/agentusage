@@ -5,7 +5,7 @@ package telemetry
 import (
 	"path/filepath"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/config"
 )
 
 // platformStateDir keeps telemetry state beside settings.json under

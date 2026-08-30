@@ -8,11 +8,11 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/janekbaraniewski/openusage/internal/ccevents"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/export"
-	"github.com/janekbaraniewski/openusage/internal/providers/claude_code"
-	"github.com/janekbaraniewski/openusage/internal/report"
+	"github.com/nurulislamz/openusage/internal/ccevents"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/export"
+	"github.com/nurulislamz/openusage/internal/providers/claude_code"
+	"github.com/nurulislamz/openusage/internal/report"
 )
 
 // Context is the rendering input handed to the formatter. It bundles a

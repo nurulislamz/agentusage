@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func populateEstimatedTokenUsageFromDB(ctx context.Context, db *sql.DB, snap *core.UsageSnapshot, now time.Time) error {

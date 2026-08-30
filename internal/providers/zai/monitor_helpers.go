@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func resolveAPIBases(acct core.AccountConfig) (codingBase, monitorBase, region string) {

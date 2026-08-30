@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/pricing"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/pricing"
 )
 
 // priceLookupTimeout bounds the dynamic pricing query so a slow upstream

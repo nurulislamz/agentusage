@@ -10,14 +10,14 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/appupdate"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/daemon"
-	"github.com/janekbaraniewski/openusage/internal/dashboardapp"
-	"github.com/janekbaraniewski/openusage/internal/exporter"
-	"github.com/janekbaraniewski/openusage/internal/tui"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/openusage/internal/appupdate"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/daemon"
+	"github.com/nurulislamz/openusage/internal/dashboardapp"
+	"github.com/nurulislamz/openusage/internal/exporter"
+	"github.com/nurulislamz/openusage/internal/tui"
+	"github.com/nurulislamz/openusage/internal/version"
 )
 
 func runDashboard(cfg config.Config) {

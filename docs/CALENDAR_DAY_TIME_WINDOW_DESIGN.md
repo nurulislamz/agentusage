@@ -2,7 +2,7 @@
 
 Date: 2026-04-08
 Status: Implemented
-Author: janekbaraniewski
+Author: OpenUsage
 
 ## 1. Problem Statement
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 const providerSnapshotSchemaVersion = "provider_snapshot_v1"

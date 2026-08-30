@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func newTestServer(t *testing.T) (*Server, *Store) {

@@ -1,8 +1,8 @@
 package copilot
 
 import (
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/providers/providerbase"
 )
 
 func dashboardWidget() core.DashboardWidget {

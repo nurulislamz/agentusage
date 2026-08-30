@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func buildClaudeCodeDemoSnapshot(now time.Time) core.UsageSnapshot {

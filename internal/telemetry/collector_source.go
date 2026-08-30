@@ -3,7 +3,7 @@ package telemetry
 import (
 	"context"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
 )
 
 type SourceCollector struct {

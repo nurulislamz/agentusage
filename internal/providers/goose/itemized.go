@@ -3,7 +3,7 @@ package goose
 import (
 	"context"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // ItemizedUsage returns one event per Goose session, reusing the same SQLite

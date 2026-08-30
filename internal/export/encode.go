@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // encode writes the envelope to w in the requested format.

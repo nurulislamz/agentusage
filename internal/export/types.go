@@ -13,7 +13,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // SchemaVersion is the version of the export envelope format. Bumped on

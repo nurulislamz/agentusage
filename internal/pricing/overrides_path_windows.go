@@ -5,7 +5,7 @@ package pricing
 import (
 	"path/filepath"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/config"
 )
 
 // platformCustomOverridesPath places custom-pricing.json beside settings.json

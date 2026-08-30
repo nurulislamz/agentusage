@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/pricing"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/pricing"
 )
 
 // TestMain installs a stub priceLookup so the existing codex tests remain

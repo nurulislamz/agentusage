@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	defaultLatestReleaseURL = "https://api.github.com/repos/janekbaraniewski/openusage/releases/latest"
-	defaultInstallScriptURL = "https://github.com/janekbaraniewski/openusage/releases/latest/download/install.sh"
+	defaultLatestReleaseURL = "https://api.github.com/repos/nurulislamz/openusage/releases/latest"
+	defaultInstallScriptURL = "https://github.com/nurulislamz/openusage/releases/latest/download/install.sh"
 	defaultRequestTimeout   = 1500 * time.Millisecond
 )
 
@@ -225,9 +225,9 @@ func looksLikeInstallScriptPath(path string) bool {
 func upgradeHint(method InstallMethod) string {
 	switch method {
 	case InstallMethodHomebrew:
-		return "brew upgrade janekbaraniewski/tap/openusage"
+		return "brew upgrade nurulislamz/tap/openusage"
 	case InstallMethodGoInstall:
-		return "go install github.com/janekbaraniewski/openusage/cmd/openusage@latest"
+		return "go install github.com/nurulislamz/openusage/cmd/openusage@latest"
 	case InstallMethodInstallScript:
 		return "curl -fsSL " + defaultInstallScriptURL + " | bash"
 	case InstallMethodScoop:

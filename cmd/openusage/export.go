@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/janekbaraniewski/openusage/internal/export"
+	"github.com/nurulislamz/openusage/internal/export"
 )
 
 // newExportCommand wires the `openusage export` subcommand. It collects the

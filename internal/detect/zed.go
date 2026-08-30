@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // detectZed registers a local Zed account when threads.db is present at the

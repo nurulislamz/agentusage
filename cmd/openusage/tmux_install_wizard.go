@@ -10,9 +10,9 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/tmux"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/tmux"
 )
 
 // templateComponent is one toggleable piece of the custom segment builder. The

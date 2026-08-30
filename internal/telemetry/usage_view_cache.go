@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // usageViewCache caches the fully aggregated telemetryUsageAgg for a given

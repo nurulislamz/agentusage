@@ -99,7 +99,7 @@ func TestCheckUpdateAvailable(t *testing.T) {
 	if result.LatestVersion != "v1.3.0" {
 		t.Fatalf("LatestVersion = %q, want v1.3.0", result.LatestVersion)
 	}
-	if result.UpgradeHint != "brew upgrade janekbaraniewski/tap/openusage" {
+	if result.UpgradeHint != "brew upgrade nurulislamz/tap/openusage" {
 		t.Fatalf("UpgradeHint = %q", result.UpgradeHint)
 	}
 }
@@ -205,7 +205,7 @@ func TestCheckForwardsGitHubTokenHeaderForGitHubHTTPS(t *testing.T) {
 	result, err := Check(context.Background(), CheckOptions{
 		CurrentVersion:   "v1.2.0",
 		ExecutablePath:   "/tmp/openusage-old",
-		LatestReleaseURL: "https://api.github.com/repos/janekbaraniewski/openusage/releases/latest",
+		LatestReleaseURL: "https://api.github.com/repos/nurulislamz/openusage/releases/latest",
 		HTTPClient:       client,
 	})
 	if err != nil {

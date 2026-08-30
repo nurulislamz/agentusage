@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/browsercookies"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/browsercookies"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // isolateConfigDir redirects config.ConfigDir() (which holds the credentials
@@ -129,8 +129,8 @@ func TestFetch_CookieConfigured_PopulatesAllFields(t *testing.T) {
 	if got := snap.Attributes["usage_tier"]; got != "0" {
 		t.Errorf("usage_tier = %q, want 0", got)
 	}
-	if got := snap.Attributes["account_email"]; got != "jan@baraniewski.com" {
-		t.Errorf("account_email = %q", got)
+	if got := snap.Attributes["account_email"]; got != "user@example.com" {
+		t.Fatalf("account_email = %q, want user@example.com", got)
 	}
 
 	if bal, ok := snap.Metrics["available_balance"]; !ok || bal.Remaining == nil {

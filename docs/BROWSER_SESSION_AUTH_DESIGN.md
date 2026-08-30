@@ -2,7 +2,7 @@
 
 Date: 2026-04-30
 Status: Proposed
-Author: Jan Baraniewski
+Author: OpenUsage Contributors
 
 Originally driven by issues #79 (Perplexity) and #80 (OpenCode / OpenAI-via-OpenCode-OAuth fallout). Live probing (2026-04-30) confirmed this isn't just an OpenCode/Perplexity quirk — **every modern AI-platform console hides usage / billing / account data behind session-cookie auth, and rejects OAuth tokens explicitly**. OpenAI's billing endpoint literally says so:
 

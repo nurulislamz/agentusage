@@ -9,13 +9,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/janekbaraniewski/openusage/internal/ccevents"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/export"
-	"github.com/janekbaraniewski/openusage/internal/providers"
-	"github.com/janekbaraniewski/openusage/internal/providers/claude_code"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
-	"github.com/janekbaraniewski/openusage/internal/report"
+	"github.com/nurulislamz/openusage/internal/ccevents"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/export"
+	"github.com/nurulislamz/openusage/internal/providers"
+	"github.com/nurulislamz/openusage/internal/providers/claude_code"
+	"github.com/nurulislamz/openusage/internal/providers/shared"
+	"github.com/nurulislamz/openusage/internal/report"
 )
 
 // telemetryCollectTimeout bounds a single provider's local-log collection.

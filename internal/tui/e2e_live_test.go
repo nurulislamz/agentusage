@@ -7,11 +7,11 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/antigravity"
-	"github.com/janekbaraniewski/openusage/internal/providers/command_code"
-	"github.com/janekbaraniewski/openusage/internal/providers/opencode"
+	"github.com/nurulislamz/openusage/internal/config"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/providers/antigravity"
+	"github.com/nurulislamz/openusage/internal/providers/command_code"
+	"github.com/nurulislamz/openusage/internal/providers/opencode"
 )
 
 func TestE2E_LiveProvidersRender(t *testing.T) {

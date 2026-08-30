@@ -17,10 +17,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/exporter"
-	"github.com/janekbaraniewski/openusage/internal/providers"
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/exporter"
+	"github.com/nurulislamz/openusage/internal/providers"
+	"github.com/nurulislamz/openusage/internal/telemetry"
 )
 
 type Service struct {

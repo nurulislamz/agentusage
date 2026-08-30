@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/janekbaraniewski/openusage/internal/browsercookies"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/browsercookies"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func (m Model) renderSettingsThemeBody(w, h int) string {

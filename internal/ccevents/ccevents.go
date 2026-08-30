@@ -5,8 +5,8 @@
 package ccevents
 
 import (
-	"github.com/janekbaraniewski/openusage/internal/providers/claude_code"
-	"github.com/janekbaraniewski/openusage/internal/report"
+	"github.com/nurulislamz/openusage/internal/providers/claude_code"
+	"github.com/nurulislamz/openusage/internal/report"
 )
 
 // Conversations parses the local Claude Code conversation logs and returns

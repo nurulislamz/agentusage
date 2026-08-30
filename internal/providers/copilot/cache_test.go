@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 func TestFetchCache_ReturnsCachedSnapshotWithinTTL(t *testing.T) {

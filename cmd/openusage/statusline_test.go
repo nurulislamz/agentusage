@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/report"
+	"github.com/nurulislamz/openusage/internal/report"
 )
 
 func TestRenderStatusline_FullLine(t *testing.T) {

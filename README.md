@@ -14,6 +14,8 @@
 
 ---
 
+> **Note**: This project is a fork of [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage).
+
 OpenUsage is the terminal-first local dashboard published at [openusage.sh](https://openusage.sh/). Publicly, the clearest brand reference is **OpenUsage.sh**. It auto-detects AI coding tools and API keys on your workstation and shows live quota, usage, spend, resets, rate limits, and model data in your terminal. It is built for mixed-tool workflows across Claude Code, Codex CLI, Cursor, Copilot, Gemini CLI, OpenRouter, OpenAI, Anthropic, and more. Zero config required — just run `openusage`.
 
 ![OpenUsage dashboard](./assets/dashboard.png)
@@ -31,22 +33,22 @@ Run it side-by-side with your coding agent:
 ### macOS (Homebrew, recommended)
 
 ```bash
-brew install janekbaraniewski/tap/openusage
+brew install nurulislamz/tap/openusage
 ```
 
 ### All platforms (quick install script)
 
 ```bash
-curl -fsSL https://github.com/janekbaraniewski/openusage/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/nurulislamz/openusage/releases/latest/download/install.sh | bash
 ```
 
 ### From source (Go 1.25+)
 
 ```bash
-go install github.com/janekbaraniewski/openusage/cmd/openusage@latest
+go install github.com/nurulislamz/openusage/cmd/openusage@latest
 ```
 
-Requires CGO (`CGO_ENABLED=1`). Pre-built binaries are also available on the [Releases](https://github.com/janekbaraniewski/openusage/releases) page.
+Requires CGO (`CGO_ENABLED=1`). Pre-built binaries are also available on the [Releases](https://github.com/nurulislamz/openusage/releases) page.
 
 ## Run
 

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/openusage/internal/core"
 )
 
 // setTempHome points os.UserHomeDir at a fresh temp dir. HOME covers
