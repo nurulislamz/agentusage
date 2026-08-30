@@ -163,7 +163,7 @@ npx skills add mattpocock/skills --skill tdd,code-review,implement
 | Stars | Repo | Use for |
 |------:|------|---------|
 | ~31k | [lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager) | Dashboard + API proxy + auto-rotation (skip if using `agy-box` only) |
-| Native | `agy-box <name>` | Isolated account containers |
+| Native | `agy-box add <name>` | Isolated account containers |
 
 ### Skip
 
