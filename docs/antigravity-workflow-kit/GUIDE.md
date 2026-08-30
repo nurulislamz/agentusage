@@ -91,6 +91,17 @@ Pair with `/plan` or `/grill-me` for non-trivial work so the file list is agreed
 
 ---
 
+## Antigravity pitfalls this kit avoids
+
+| Pitfall | Fix in template |
+|---------|-----------------|
+| Wrong `tools:` names hang subagents | Only blog-documented names; see `.agents/TOOLS.md` |
+| Matt Pocock skills demand `/setup-matt-pocock-skills` | Adapted `code-review`, `implement`, `to-spec` |
+| `implement` auto-commits / self-reviews | Hand off to `verifier`; no commit unless asked |
+| `code-review` needs branch fixed-point | Defaults to working-tree `git diff` |
+| Implementer claims done | `implementer-handoff` rule + verifier PASS required |
+| `list_dir` / SDK-only tool ids | Removed from frontmatter |
+
 ## Matt Pocock skills (bundled)
 
 The template **vendors** these skills from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT) under `.agents/skills/`:
