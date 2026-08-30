@@ -31,14 +31,6 @@ func (t ampThread) effectiveCreatedAt() string {
 	return strings.TrimSpace(t.CreatedRFC)
 }
 
-// effectiveLedgerPath returns whichever ledger-path field was populated.
-func (t ampThread) effectiveLedgerPath() string {
-	if v := strings.TrimSpace(t.LedgerPath); v != "" {
-		return v
-	}
-	return strings.TrimSpace(t.LedgerCC)
-}
-
 // ampMessage is one entry in the thread's message log. We only care about
 // assistant-role messages that carry token-usage data, but we tolerate any
 // role/shape on read.

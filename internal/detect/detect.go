@@ -96,33 +96,6 @@ func homeDir() string {
 	return h
 }
 
-func cursorAppSupportDir() string {
-	home := homeDir()
-	if home == "" {
-		return ""
-	}
-	switch runtime.GOOS {
-	case "darwin":
-		return filepath.Join(home, "Library", "Application Support", "Cursor")
-	case "linux":
-		dir := filepath.Join(home, ".config", "Cursor")
-		if fileExists(filepath.Join(dir, "User", "globalStorage", "state.vscdb")) {
-			return dir
-		}
-		if matches, err := filepath.Glob("/mnt/c/Users/*/AppData/Roaming/Cursor/User/globalStorage/state.vscdb"); err == nil && len(matches) > 0 {
-			return filepath.Dir(filepath.Dir(filepath.Dir(matches[0])))
-		}
-		return dir
-	case "windows":
-		appData := os.Getenv("APPDATA")
-		if appData != "" {
-			return filepath.Join(appData, "Cursor")
-		}
-		return filepath.Join(home, "AppData", "Roaming", "Cursor")
-	}
-	return ""
-}
-
 func findBinary(name string) string {
 	path, err := exec.LookPath(name)
 	if err != nil {

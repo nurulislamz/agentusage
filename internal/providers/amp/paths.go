@@ -42,26 +42,6 @@ func defaultDataDir() string {
 	}
 }
 
-// defaultThreadsDir returns the conventional threads directory under the data
-// dir. Returns "" when the data dir cannot be resolved.
-func defaultThreadsDir() string {
-	dir := defaultDataDir()
-	if dir == "" {
-		return ""
-	}
-	return filepath.Join(dir, "threads")
-}
-
-// defaultLedgerPath returns the conventional ledger file path under the data
-// dir. Returns "" when the data dir cannot be resolved.
-func defaultLedgerPath() string {
-	dir := defaultDataDir()
-	if dir == "" {
-		return ""
-	}
-	return filepath.Join(dir, "ledger.jsonl")
-}
-
 // resolveDataDir picks the effective data directory for a fetch / detect
 // call. Callers should pass an override (from AccountConfig.Path / Hint or
 // AccountConfig.Binary) when present; otherwise the platform default is used.

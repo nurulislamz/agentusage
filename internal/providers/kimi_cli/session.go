@@ -81,14 +81,6 @@ func readKimiConfigModel(path string) string {
 	return cfg.Model
 }
 
-// readKimiWireFile parses one wire.jsonl file and returns flattened per-record
-// entries. Returns nil (no error) when the file is missing or empty so
-// directory walks can keep going. Per-line malformed JSON is skipped
-// silently; only I/O failures surface as errors.
-func readKimiWireFile(path string) ([]kimiModelEntry, error) {
-	return readKimiWireFileWithModel(path, defaultModel)
-}
-
 // readKimiWireFileWithModel is the variant used by the provider; it allows
 // the caller to inject the model name resolved from config.json.
 func readKimiWireFileWithModel(path, fallbackModel string) ([]kimiModelEntry, error) {

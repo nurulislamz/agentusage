@@ -52,11 +52,6 @@ type UsageStat struct {
 	Cost        float64
 }
 
-// TotalTokens returns the sum of every token bucket on the turn.
-func (s UsageStat) TotalTokens() int {
-	return s.Input + s.Output + s.CacheRead + s.CacheCreate + s.Reasoning
-}
-
 // AggregateOptions configures AggregateConversations.
 type AggregateOptions struct {
 	// ProjectsDir / AltProjectsDir override the conversation roots. When both

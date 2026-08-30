@@ -177,27 +177,6 @@ func FindTaskDirs(extensionSubdir string) []string {
 	return tasks
 }
 
-// FirstExistingTasksRoot returns the absolute path to the first
-// `<root>/<extensionSubdir>/tasks` directory we find on disk. This is the
-// stable hint a detector should publish; callers should still use
-// FindTaskDirs at fetch time to enumerate per-task subdirs (the user may
-// have multiple VS Code variants installed simultaneously).
-//
-// Returns "" when no globalStorage root contains the extension subdir.
-func FirstExistingTasksRoot(extensionSubdir string) string {
-	extensionSubdir = strings.TrimSpace(extensionSubdir)
-	if extensionSubdir == "" {
-		return ""
-	}
-	for _, root := range VSCodeGlobalStorageRoots() {
-		tasksRoot := filepath.Join(root, extensionSubdir, "tasks")
-		if dirExists(tasksRoot) {
-			return tasksRoot
-		}
-	}
-	return ""
-}
-
 // AnyExtensionInstalled reports whether at least one VS Code variant
 // contains the extension's globalStorage subdir (regardless of whether
 // it has any tasks yet). Detectors call this to decide whether to register

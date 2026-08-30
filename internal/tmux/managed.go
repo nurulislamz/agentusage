@@ -13,12 +13,6 @@ import "bytes"
 // The `block` passed to replaceOrAppendBlock already includes its own sentinel
 // lines; the markers are used only to locate an existing block.
 
-// blockPresent reports whether data contains the managed block (its start
-// marker).
-func blockPresent(data []byte, startMarker string) bool {
-	return bytes.Contains(data, []byte(startMarker))
-}
-
 // replaceOrAppendBlock returns existing with the managed block replaced in
 // place when present, or appended (separated by a blank line) when absent.
 func replaceOrAppendBlock(existing []byte, startMarker, endMarker, block string) []byte {

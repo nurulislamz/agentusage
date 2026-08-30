@@ -57,17 +57,6 @@ func resolveDBPath(acct core.AccountConfig) string {
 	return ""
 }
 
-// firstCandidatePath returns the first candidate path regardless of whether
-// it exists. Used by detectors when surfacing "expected location" hints.
-func firstCandidatePath() string {
-	for _, candidate := range defaultStateDBPaths() {
-		if candidate != "" {
-			return candidate
-		}
-	}
-	return ""
-}
-
 func fileExists(path string) bool {
 	if path == "" {
 		return false
