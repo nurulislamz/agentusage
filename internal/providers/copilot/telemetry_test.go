@@ -439,8 +439,8 @@ func TestParseCopilotTelemetrySessionStore_Fallback(t *testing.T) {
 			first_seen_at TEXT
 		)`,
 		`INSERT INTO sessions (id, cwd, repository) VALUES
-			('sess-missing-jsonl', '/Users/test/agentusage', 'janek/agentusage'),
-			('sess-has-jsonl', '/Users/test/other', 'janek/other')`,
+			('sess-missing-jsonl', '/Users/test/agentusage', 'testuser/agentusage'),
+			('sess-has-jsonl', '/Users/test/other', 'testuser/other')`,
 		`INSERT INTO turns (session_id, turn_index, user_message, assistant_response, timestamp) VALUES
 			('sess-missing-jsonl', 0, 'hello', 'world', '2026-03-01T10:00:00Z'),
 			('sess-has-jsonl', 1, 'skip', 'skip', '2026-03-01T10:01:00Z')`,

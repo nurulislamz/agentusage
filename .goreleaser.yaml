@@ -20,9 +20,9 @@ builds:
       - CC=gcc
     ldflags:
       - -s -w
-      - -X 'github.com/janekbaraniewski/openusage/internal/version.Version={{.Version}}'
-      - -X 'github.com/janekbaraniewski/openusage/internal/version.CommitHash={{.ShortCommit}}'
-      - -X 'github.com/janekbaraniewski/openusage/internal/version.BuildDate={{.Date}}'
+      - -X 'github.com/nurulislamz/agentusage/internal/version.Version={{.Version}}'
+      - -X 'github.com/nurulislamz/agentusage/internal/version.CommitHash={{.ShortCommit}}'
+      - -X 'github.com/nurulislamz/agentusage/internal/version.BuildDate={{.Date}}'
 
   # --- Linux arm64 ---
   - id: linux-arm64
@@ -37,9 +37,9 @@ builds:
       - CC=aarch64-linux-gnu-gcc
     ldflags:
       - -s -w
-      - -X 'github.com/janekbaraniewski/openusage/internal/version.Version={{.Version}}'
-      - -X 'github.com/janekbaraniewski/openusage/internal/version.CommitHash={{.ShortCommit}}'
-      - -X 'github.com/janekbaraniewski/openusage/internal/version.BuildDate={{.Date}}'
+      - -X 'github.com/nurulislamz/agentusage/internal/version.Version={{.Version}}'
+      - -X 'github.com/nurulislamz/agentusage/internal/version.CommitHash={{.ShortCommit}}'
+      - -X 'github.com/nurulislamz/agentusage/internal/version.BuildDate={{.Date}}'
 
   # --- Windows amd64 ---
   - id: windows-amd64
@@ -54,9 +54,9 @@ builds:
       - CC=x86_64-w64-mingw32-gcc
     ldflags:
       - -s -w
-      - -X 'github.com/janekbaraniewski/openusage/internal/version.Version={{.Version}}'
-      - -X 'github.com/janekbaraniewski/openusage/internal/version.CommitHash={{.ShortCommit}}'
-      - -X 'github.com/janekbaraniewski/openusage/internal/version.BuildDate={{.Date}}'
+      - -X 'github.com/nurulislamz/agentusage/internal/version.Version={{.Version}}'
+      - -X 'github.com/nurulislamz/agentusage/internal/version.CommitHash={{.ShortCommit}}'
+      - -X 'github.com/nurulislamz/agentusage/internal/version.BuildDate={{.Date}}'
 
   # --- macOS (built natively on macOS runner for both archs) ---
   # Note: macOS builds are handled separately in the release-macos job
@@ -90,7 +90,7 @@ checksum:
 #
 #   cosign verify-blob \
 #     --bundle openusage_X.Y.Z_linux_amd64.tar.gz.sigstore.json \
-#     --certificate-identity-regexp 'https://github\.com/janekbaraniewski/openusage/\.github/workflows/' \
+#     --certificate-identity-regexp 'https://github\.com/nurulislamz/agentusage/\.github/workflows/' \
 #     --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
 #     openusage_X.Y.Z_linux_amd64.tar.gz
 #
@@ -136,8 +136,8 @@ changelog:
 
 release:
   github:
-    owner: janekbaraniewski
-    name: openusage
+    owner: nurulislamz
+    name: agentusage
   draft: false
   prerelease: auto
   name_template: "v{{.Version}}"
@@ -146,4 +146,4 @@ release:
   header: |
     ## Changelog
   footer: |
-    **Full Changelog**: https://github.com/janekbaraniewski/openusage/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/nurulislamz/agentusage/compare/{{ .PreviousTag }}...{{ .Tag }}

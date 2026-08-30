@@ -1,7 +1,7 @@
 # System Review: Post-Cleanup State
 
 Date: 2026-03-09
-Repository: `/Users/janekbaraniewski/Workspace/priv/openusage`
+Repository: `openusage`
 Branch: `feat/dashboard-race-parser-cleanups`
 
 ## Scope
@@ -56,15 +56,15 @@ The earlier follow-up list is now closed for the purposes of this review. What r
 
 ## References
 
-- [CODEBASE_AUDIT_ACTION_TABLE_2026-03-09.md](/Users/janekbaraniewski/Workspace/priv/openusage/docs/CODEBASE_AUDIT_ACTION_TABLE_2026-03-09.md)
-- [internal/tui/render_cache.go](/Users/janekbaraniewski/Workspace/priv/openusage/internal/tui/render_cache.go)
-- [internal/tui/detail_metrics.go](/Users/janekbaraniewski/Workspace/priv/openusage/internal/tui/detail_metrics.go)
-- [internal/tui/settings_modal_input.go](/Users/janekbaraniewski/Workspace/priv/openusage/internal/tui/settings_modal_input.go)
-- [internal/providers/ollama/desktop_db.go](/Users/janekbaraniewski/Workspace/priv/openusage/internal/providers/ollama/desktop_db.go)
-- [internal/providers/ollama/desktop_db_tokens.go](/Users/janekbaraniewski/Workspace/priv/openusage/internal/providers/ollama/desktop_db_tokens.go)
-- [internal/providers/gemini_cli/api_usage.go](/Users/janekbaraniewski/Workspace/priv/openusage/internal/providers/gemini_cli/api_usage.go)
-- [internal/core/provider.go](/Users/janekbaraniewski/Workspace/priv/openusage/internal/core/provider.go)
-- [internal/telemetry/test_helpers_test.go](/Users/janekbaraniewski/Workspace/priv/openusage/internal/telemetry/test_helpers_test.go)
+- [CODEBASE_AUDIT_ACTION_TABLE_2026-03-09.md](docs/CODEBASE_AUDIT_ACTION_TABLE_2026-03-09.md)
+- [internal/tui/render_cache.go](internal/tui/render_cache.go)
+- [internal/tui/detail_metrics.go](internal/tui/detail_metrics.go)
+- [internal/tui/settings_modal_input.go](internal/tui/settings_modal_input.go)
+- [internal/providers/ollama/desktop_db.go](internal/providers/ollama/desktop_db.go)
+- [internal/providers/ollama/desktop_db_tokens.go](internal/providers/ollama/desktop_db_tokens.go)
+- [internal/providers/gemini_cli/api_usage.go](internal/providers/gemini_cli/api_usage.go)
+- [internal/core/provider.go](internal/core/provider.go)
+- [internal/telemetry/test_helpers_test.go](internal/telemetry/test_helpers_test.go)
 
 ## Bottom Line
 

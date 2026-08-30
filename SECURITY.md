@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-OpenUsage follows semantic versioning. Security fixes land on the latest minor release line. Patch releases are cut as needed and published to the [GitHub releases page](https://github.com/janekbaraniewski/openusage/releases).
+agentUsage follows semantic versioning. Security fixes land on the latest minor release line. Patch releases are cut as needed and published to the [GitHub releases page](https://github.com/nurulislamz/agentusage/releases).
 
 | Version line | Supported |
 |---|---|
@@ -15,13 +15,13 @@ We aim to keep CVE windows short. If a high-severity issue is reported against a
 
 **Please do not file public GitHub issues for security problems.**
 
-Use [GitHub's private vulnerability reporting](https://github.com/janekbaraniewski/openusage/security/advisories/new) instead. It opens a private advisory channel between you and the maintainers.
+Use [GitHub's private vulnerability reporting](https://github.com/nurulislamz/agentusage/security/advisories/new) instead. It opens a private advisory channel between you and the maintainers.
 
-If you can't use that channel, email `security@baraniewski.com` with:
+If you can't use that channel, open a private advisory or contact the maintainers with:
 
 - A clear description of the issue and its impact
 - Steps to reproduce, or a proof-of-concept
-- The version of OpenUsage where you observed it (`openusage version`)
+- The version of agentUsage where you observed it (`agentusage version`)
 - The platform and Go version (`go version`)
 - Any suggested mitigation, if you have one
 
@@ -42,7 +42,7 @@ Researchers acting in good faith are welcome and credited in the advisory unless
 
 In scope:
 
-- The `openusage` binary, including the dashboard TUI, the daemon, and the integrations command
+- The `agentusage` binary, including the dashboard TUI, the daemon, and the integrations command
 - Provider auth flows and any code that handles credentials, cookies, or session data
 - The telemetry pipeline, SQLite store, and Unix-socket protocol
 - The published Homebrew tap and release artifacts
@@ -63,4 +63,4 @@ This project participates in:
 - [OpenSSF Scorecard](https://scorecard.dev/) for supply-chain hygiene
 - [Sigstore cosign](https://www.sigstore.dev/) keyless signing of release binaries (GitHub OIDC identity)
 
-Release checksums are published alongside binaries on the [releases page](https://github.com/janekbaraniewski/openusage/releases).
+Release checksums are published alongside binaries on the [releases page](https://github.com/nurulislamz/agentusage/releases).

@@ -2,7 +2,7 @@
 
 Date: 2026-04-08
 Status: Implemented
-Author: janekbaraniewski
+Author: AgentUsage Contributors
 
 ## 1. Problem Statement
 

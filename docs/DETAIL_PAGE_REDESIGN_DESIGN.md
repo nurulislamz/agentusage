@@ -2,7 +2,7 @@
 
 Date: 2026-02-24
 Status: Proposed
-Author: janekbaraniewski
+Author: AgentUsage Contributors
 
 ## 1. Problem Statement
 

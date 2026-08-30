@@ -30,9 +30,9 @@ ARG BUILD_DATE=unknown
 
 RUN CGO_ENABLED=1 GOOS=linux go build \
     -ldflags "-s -w \
-      -X 'github.com/janekbaraniewski/openusage/internal/version.Version=${VERSION}' \
-      -X 'github.com/janekbaraniewski/openusage/internal/version.CommitHash=${COMMIT_HASH}' \
-      -X 'github.com/janekbaraniewski/openusage/internal/version.BuildDate=${BUILD_DATE}'" \
+      -X 'github.com/nurulislamz/agentusage/internal/version.Version=${VERSION}' \
+      -X 'github.com/nurulislamz/agentusage/internal/version.CommitHash=${COMMIT_HASH}' \
+      -X 'github.com/nurulislamz/agentusage/internal/version.BuildDate=${BUILD_DATE}'" \
     -o /openusage ./cmd/openusage
 
 # ── runtime ───────────────────────────────────────────────────────────────────
@@ -50,9 +50,9 @@ ARG COMMIT_HASH=unknown
 ARG BUILD_DATE=unknown
 LABEL org.opencontainers.image.title="openusage-hub" \
       org.opencontainers.image.description="OpenUsage hub server for multi-machine usage aggregation." \
-      org.opencontainers.image.source="https://github.com/janekbaraniewski/openusage" \
-      org.opencontainers.image.url="https://github.com/janekbaraniewski/openusage" \
-      org.opencontainers.image.documentation="https://janekbaraniewski.github.io/openusage/guides/multi-machine" \
+      org.opencontainers.image.source="https://github.com/nurulislamz/agentusage" \
+      org.opencontainers.image.url="https://github.com/nurulislamz/agentusage" \
+      org.opencontainers.image.documentation="https://agentusage.sh/guides/multi-machine" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${COMMIT_HASH}" \
