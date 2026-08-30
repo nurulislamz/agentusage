@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func float64Ptr(v float64) *float64 { return &v }

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 const (
@@ -22,8 +22,8 @@ const (
 	tokenExpirySkew = 60 * time.Second
 	// Optional OAuth client for token refresh. When unset, expired tokens are
 	// renewed by pinging the box (`agy-box <name> -p ping`) instead.
-	oauthClientIDEnv     = "OPENUSAGE_ANTIGRAVITY_CLIENT_ID"
-	oauthClientSecretEnv = "OPENUSAGE_ANTIGRAVITY_CLIENT_SECRET"
+	oauthClientIDEnv     = "AGENTUSAGE_ANTIGRAVITY_CLIENT_ID"
+	oauthClientSecretEnv = "AGENTUSAGE_ANTIGRAVITY_CLIENT_SECRET"
 )
 
 type oauthTokenFilePayload struct {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // TestProvider_Fetch_DBPathsRawKeys verifies that multi-path discovery

@@ -14,11 +14,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/export"
-	"github.com/janekbaraniewski/openusage/internal/tmux"
-	"github.com/janekbaraniewski/openusage/internal/tui"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/export"
+	"github.com/nurulislamz/agentusage/internal/tmux"
+	"github.com/nurulislamz/agentusage/internal/tui"
+	"github.com/nurulislamz/agentusage/internal/version"
 )
 
 // tmuxFlags carries the shared render-time flags. Subcommands instantiate
@@ -41,7 +41,7 @@ type tmuxFlags struct {
 	noCache    bool
 }
 
-// newTmuxCommand returns the full `openusage tmux` command tree. The default
+// newTmuxCommand returns the full `agentusage tmux` command tree. The default
 // run renders the status line; subcommands cover install/uninstall, the
 // preset and variable catalogs, doctor diagnostics, the ANSI preview helper,
 // and the watch alerter.
@@ -61,13 +61,13 @@ By default the command picks the most recently-used provider (recency then
 priority order) and renders the "compact" preset. Pass --preset, --format, or
 --segment to customize. Pass --json for structured output.
 
-Run "openusage tmux install" to wire it into your tmux.conf.`,
+Run "agentusage tmux install" to wire it into your tmux.conf.`,
 		Example: strings.Join([]string{
-			"  openusage tmux",
-			"  openusage tmux --preset claude-focused",
-			"  openusage tmux --format '{tool} {today_cost:money}'",
-			"  openusage tmux --segment cost",
-			"  openusage tmux --json",
+			"  agentusage tmux",
+			"  agentusage tmux --preset claude-focused",
+			"  agentusage tmux --format '{tool} {today_cost:money}'",
+			"  agentusage tmux --segment cost",
+			"  agentusage tmux --json",
 		}, "\n"),
 		RunE: func(c *cobra.Command, _ []string) error {
 			return runTmuxRender(c, f)
@@ -75,7 +75,7 @@ Run "openusage tmux install" to wire it into your tmux.conf.`,
 	}
 
 	fl := cmd.Flags()
-	fl.StringVar(&f.preset, "preset", "", "named preset (see `openusage tmux presets`)")
+	fl.StringVar(&f.preset, "preset", "", "named preset (see `agentusage tmux presets`)")
 	fl.StringVar(&f.format, "format", "", "custom template; overrides preset")
 	fl.StringVar(&f.segment, "segment", "", "render a single named segment")
 	fl.StringVar(&f.provider, "provider", "", "pin a provider id (skips auto-detection)")
@@ -107,13 +107,13 @@ Run "openusage tmux install" to wire it into your tmux.conf.`,
 
 // newTmuxFontCommand manages the bundled provider-icon font: installing it into
 // the user font directory, checking install/version state, and removing it.
-// When installed, `openusage tmux` auto-upgrades the default unicode glyphs to
+// When installed, `agentusage tmux` auto-upgrades the default unicode glyphs to
 // the real provider icons.
 func newTmuxFontCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "font",
 		Short: "Install or check the bundled provider-icon font",
-		Long: `Install the OpenUsage provider-icon font so the status bar can render real
+		Long: `Install the agentUsage provider-icon font so the status bar can render real
 provider logos instead of emoji.
 
 The font ships glyphs at Private Use Area codepoints; your terminal falls back
@@ -153,9 +153,9 @@ the unicode emoji, and providers fall back further to ASCII labels with
 		Use:   "patch",
 		Short: "Augment your terminal font with the provider icons (for iTerm2/Terminal.app)",
 		Long: `Copy your terminal font, add the 19 provider-icon glyphs to the copy under a
-new family name (" +OpenUsage"), and install it. Your original font is never
+new family name (" +agentUsage"), and install it. Your original font is never
 modified. Use this for terminals without per-range font fallback (iTerm2,
-Terminal.app); then select the "… +OpenUsage" family in your terminal settings.
+Terminal.app); then select the "… +agentUsage" family in your terminal settings.
 
 Requires a source checkout (the patch script), Python 3 with fonttools, and —
 for auto-detecting your iTerm2 font — fontconfig. Pass --base to patch a
@@ -177,7 +177,7 @@ specific font file.`,
 		Long: `Configure detected terminals to use the bundled icon font for the icon
 codepoints, the preferred way (per-range fallback — your main font is left
 untouched). Works for kitty, Ghostty, and WezTerm. iTerm2 / Terminal.app have
-no per-range fallback; for those, use ` + "`openusage tmux font patch`" + `.`,
+no per-range fallback; for those, use ` + "`agentusage tmux font patch`" + `.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// The fallback only works if the font is installed, so ensure it.
 			if !tmux.FontInstalled() {
@@ -216,11 +216,11 @@ no per-range fallback; for those, use ` + "`openusage tmux font patch`" + `.`,
 			fmt.Fprintf(os.Stdout, "glyphs:    %d providers\n", len(tmux.CustomFontProviders()))
 			switch {
 			case !st.Installed:
-				fmt.Fprintln(os.Stdout, "installed: no   (run: openusage tmux font install)")
+				fmt.Fprintln(os.Stdout, "installed: no   (run: agentusage tmux font install)")
 			case st.UpToDate:
 				fmt.Fprintln(os.Stdout, "installed: yes, up to date")
 			default:
-				fmt.Fprintln(os.Stdout, "installed: yes, but OUTDATED (run: openusage tmux font install to update)")
+				fmt.Fprintln(os.Stdout, "installed: yes, but OUTDATED (run: agentusage tmux font install to update)")
 				fmt.Fprintf(os.Stdout, "  embedded sha256:  %s\n", st.EmbeddedSHA)
 				fmt.Fprintf(os.Stdout, "  installed sha256: %s\n", st.InstalledSHA)
 			}
@@ -230,7 +230,7 @@ no per-range fallback; for those, use ` + "`openusage tmux font patch`" + `.`,
 	return cmd
 }
 
-// runTmuxRender is the default `openusage tmux` entry point. It applies the
+// runTmuxRender is the default `agentusage tmux` entry point. It applies the
 // max-runtime budget so a slow daemon can never freeze tmux: on timeout we
 // emit a `?` placeholder and exit 0 so the status bar keeps ticking.
 func runTmuxRender(c *cobra.Command, f *tmuxFlags) error {
@@ -241,7 +241,7 @@ func runTmuxRender(c *cobra.Command, f *tmuxFlags) error {
 	// override flags were passed, point users at the install command.
 	if !opts.raw && !opts.jsonOut && os.Getenv("TMUX") == "" && isStdoutTerminal() &&
 		!c.Flags().Changed("preset") && !c.Flags().Changed("format") && !c.Flags().Changed("segment") {
-		fmt.Fprintln(os.Stdout, "not running inside tmux. Try `openusage tmux install` to add it to your status bar.")
+		fmt.Fprintln(os.Stdout, "not running inside tmux. Try `agentusage tmux install` to add it to your status bar.")
 		return nil
 	}
 
@@ -295,7 +295,7 @@ func lastStatusPath() string {
 	if err != nil || home == "" {
 		return ""
 	}
-	return filepath.Join(home, ".cache", "openusage", "tmux-laststatus")
+	return filepath.Join(home, ".cache", "agentusage", "tmux-laststatus")
 }
 
 // readLastStatus returns the last good rendered status if it exists and is
@@ -601,9 +601,9 @@ func newTmuxInstallCommand() *cobra.Command {
 	fl.IntVar(&opts.Interval, "interval", opts.Interval, "tmux status-interval")
 	fl.IntVar(&opts.RightLength, "right-length", opts.RightLength, "tmux status-right-length")
 	fl.IntVar(&opts.LeftLength, "left-length", opts.LeftLength, "tmux status-left-length")
-	fl.StringVar(&opts.BindPopup, "bind-popup", "", "bind a key to display-popup -E openusage (tmux 3.2+)")
+	fl.StringVar(&opts.BindPopup, "bind-popup", "", "bind a key to display-popup -E agentusage (tmux 3.2+)")
 	fl.StringVar(&opts.BindRefresh, "bind-refresh", "", "bind a key to refresh the status bar on demand")
-	fl.StringVar(&opts.Binary, "binary", "", "override the openusage binary path in the snippet")
+	fl.StringVar(&opts.Binary, "binary", "", "override the agentusage binary path in the snippet")
 	fl.BoolVar(&withFont, "with-font", false, "install the bundled provider-icon font without prompting")
 	fl.BoolVar(&noFont, "no-font", false, "skip the provider-icon font prompt entirely")
 	return cmd
@@ -627,7 +627,7 @@ func offerFontInstall(force, skip bool) {
 	if !force {
 		if !isStdinTerminal() {
 			fmt.Fprintln(os.Stdout, "Tip: install the provider-icon font for real provider logos in your status bar:")
-			fmt.Fprintln(os.Stdout, "       openusage tmux font install")
+			fmt.Fprintln(os.Stdout, "       agentusage tmux font install")
 			return
 		}
 		verb := "Install"
@@ -635,12 +635,12 @@ func offerFontInstall(force, skip bool) {
 			verb = "Update"
 		}
 		fmt.Fprintln(os.Stdout, "")
-		fmt.Fprintln(os.Stdout, "OpenUsage ships an icon font so your status bar shows real provider logos")
+		fmt.Fprintln(os.Stdout, "agentUsage ships an icon font so your status bar shows real provider logos")
 		fmt.Fprintln(os.Stdout, "(Claude, Cursor, Codex, …) instead of emoji.")
 		install = promptYesNo(fmt.Sprintf("%s the provider-icon font now? [Y/n] ", verb), true)
 	}
 	if !install {
-		fmt.Fprintln(os.Stdout, "Skipped. Install it anytime with: openusage tmux font install")
+		fmt.Fprintln(os.Stdout, "Skipped. Install it anytime with: agentusage tmux font install")
 		return
 	}
 	path, err := tmux.InstallFont()
@@ -681,7 +681,7 @@ func isStdinTerminal() bool {
 func newTmuxUninstallCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "uninstall",
-		Short: "Remove the openusage block from tmux.conf",
+		Short: "Remove the agentusage block from tmux.conf",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := tmux.Uninstall(os.Stdout, ""); err != nil {
 				return err
@@ -756,7 +756,7 @@ func newTmuxVariablesCommand() *cobra.Command {
 
 // collectKnownVariables merges the semantic alias names, built-in segment
 // names, and a small set of always-available bare names. The result is what
-// `openusage tmux variables` exposes to users.
+// `agentusage tmux variables` exposes to users.
 func collectKnownVariables() []string {
 	seen := map[string]bool{}
 	add := func(s string) {
@@ -899,7 +899,7 @@ func parseDurationOr(s string, fallback time.Duration) time.Duration {
 }
 
 // isStdoutTerminal reports whether stdout is a real interactive terminal. Used
-// by the smart-hint behavior so users running `openusage tmux` interactively
+// by the smart-hint behavior so users running `agentusage tmux` interactively
 // (no flags, not inside tmux) get a friendly install pointer instead of a
 // tmux-format string. Uses term.IsTerminal (a real TTY ioctl) for consistency
 // with isStdinTerminal — an os.ModeCharDevice check would wrongly treat

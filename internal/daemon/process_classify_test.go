@@ -20,10 +20,10 @@ func TestClassifyEnsureError(t *testing.T) {
 		},
 		{
 			name:        "not installed returns friendly message",
-			err:         fmt.Errorf("telemetry daemon service is not installed; run `openusage telemetry daemon install`"),
+			err:         fmt.Errorf("telemetry daemon service is not installed; run `agentusage telemetry daemon install`"),
 			wantStatus:  DaemonStatusNotInstalled,
 			wantMessage: "Background helper is not set up.",
-			wantHint:    "openusage telemetry daemon install",
+			wantHint:    "agentusage telemetry daemon install",
 		},
 		{
 			name:        "out of date returns error message",

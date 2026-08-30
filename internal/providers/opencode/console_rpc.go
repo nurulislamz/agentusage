@@ -180,13 +180,13 @@ func (c *ConsoleClient) applyHeaders(req *http.Request, fnID string) {
 	req.Header.Set("Accept", "*/*")
 	if fnID != "" {
 		req.Header.Set("x-server-id", fnID)
-		req.Header.Set("x-server-instance", "openusage")
+		req.Header.Set("x-server-instance", "agentusage")
 	}
 	// Cookie header — single cookie, not a full jar. The session cookie
 	// is the only one we need; OpenCode's console doesn't gate on
 	// CSRF/anti-forgery for these GETs.
 	req.AddCookie(&http.Cookie{Name: c.CookieName, Value: c.Cookie})
-	req.Header.Set("User-Agent", "openusage/console-client")
+	req.Header.Set("User-Agent", "agentusage/console-client")
 }
 
 // DiscoverWorkspaceID resolves the user's last-seen workspace by following the

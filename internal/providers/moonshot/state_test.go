@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // On a series of polls where the balance only goes down, the gauge's Limit
@@ -16,7 +16,7 @@ import (
 func TestPeak_PinsLimitAcrossSpend(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "moonshot-state.json")
 	t.Setenv("TEST_MOONSHOT_KEY", "sk-test")
-	t.Setenv("OPENUSAGE_MOONSHOT_STATE_PATH", statePath)
+	t.Setenv("AGENTUSAGE_MOONSHOT_STATE_PATH", statePath)
 
 	// Ramp the server's "current balance" down across polls.
 	balances := []float64{15.0, 14.5, 12.0, 10.0}
@@ -60,7 +60,7 @@ func TestPeak_PinsLimitAcrossSpend(t *testing.T) {
 func TestPeak_TopUpRaisesLimit(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "moonshot-state.json")
 	t.Setenv("TEST_MOONSHOT_KEY", "sk-test")
-	t.Setenv("OPENUSAGE_MOONSHOT_STATE_PATH", statePath)
+	t.Setenv("AGENTUSAGE_MOONSHOT_STATE_PATH", statePath)
 
 	currentBalance := 15.0
 	server := httptest.NewServer(handlerStub(t, func() string {
@@ -113,7 +113,7 @@ func TestPeak_TopUpRaisesLimit(t *testing.T) {
 func TestPeak_PerAccountIsolation(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "moonshot-state.json")
 	t.Setenv("TEST_MOONSHOT_KEY", "sk-test")
-	t.Setenv("OPENUSAGE_MOONSHOT_STATE_PATH", statePath)
+	t.Setenv("AGENTUSAGE_MOONSHOT_STATE_PATH", statePath)
 
 	balances := map[string]float64{
 		"moonshot-ai": 100,

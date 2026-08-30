@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // TestVSCodeGlobalStorageRoots_ContainsKnownVariants asserts that the

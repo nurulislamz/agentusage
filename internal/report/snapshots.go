@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // FromSnapshots converts provider usage snapshots into day-level synthetic

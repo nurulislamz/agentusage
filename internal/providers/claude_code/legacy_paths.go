@@ -3,7 +3,7 @@ package claude_code
 import (
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func normalizeLegacyPaths(acct *core.AccountConfig) {

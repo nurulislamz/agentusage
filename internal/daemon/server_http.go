@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/integrations"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/integrations"
+	"github.com/nurulislamz/agentusage/internal/version"
 )
 
 func (s *Service) handleHealth(w http.ResponseWriter, _ *http.Request) {

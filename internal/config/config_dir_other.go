@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 )
 
-// osConfigDir returns the OpenUsage config directory on Unix: ~/.config/openusage.
+// osConfigDir returns the agentUsage config directory on Unix: ~/.config/agentusage.
 // XDG_CONFIG_HOME is intentionally not honored (see docs/reference/paths.md).
 func osConfigDir() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "openusage")
+	return filepath.Join(home, ".config", "agentusage")
 }

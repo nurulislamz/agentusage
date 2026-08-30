@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestCollectorCache(t *testing.T) {
@@ -54,8 +54,8 @@ func TestCollectorDemoDecorates(t *testing.T) {
 	if env.SchemaVersion != "1" {
 		t.Errorf("schema = %q", env.SchemaVersion)
 	}
-	if env.OpenUsageVersion != "v-test" {
-		t.Errorf("version = %q", env.OpenUsageVersion)
+	if env.AgentUsageVersion != "v-test" {
+		t.Errorf("version = %q", env.AgentUsageVersion)
 	}
 	if env.TimeWindow != "7d" || env.Theme != "Tokyo Night" {
 		t.Errorf("meta window/theme = %q / %q", env.TimeWindow, env.Theme)

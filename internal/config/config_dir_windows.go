@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-// osConfigDir returns the OpenUsage config directory on Windows: %APPDATA%\openusage.
+// osConfigDir returns the agentUsage config directory on Windows: %APPDATA%\agentusage.
 func osConfigDir() string {
-	return filepath.Join(os.Getenv("APPDATA"), "openusage")
+	return filepath.Join(os.Getenv("APPDATA"), "agentusage")
 }

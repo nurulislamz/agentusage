@@ -9,12 +9,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/detect"
-	"github.com/janekbaraniewski/openusage/internal/providers"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/detect"
+	"github.com/nurulislamz/agentusage/internal/providers"
 )
 
-// newDetectCommand returns the `openusage detect` cobra subcommand. It runs
+// newDetectCommand returns the `agentusage detect` cobra subcommand. It runs
 // the full credential auto-detection pipeline (without persisting anything)
 // and prints a human-readable report of:
 //
@@ -22,14 +22,14 @@ import (
 //   - accounts and where each credential was sourced from,
 //   - providers we know how to handle but have no credential for yet.
 //
-// Tokens are masked. Use this command to debug "why doesn't openusage see
+// Tokens are masked. Use this command to debug "why doesn't agentusage see
 // my key?" before opening an issue.
 func newDetectCommand() *cobra.Command {
 	var showAll bool
 	cmd := &cobra.Command{
 		Use:   "detect",
 		Short: "Run the credential auto-detection pipeline and print a report",
-		Long: `Runs the same auto-detection logic openusage uses on startup and prints
+		Long: `Runs the same auto-detection logic agentusage uses on startup and prints
 what it found, including which file, env var, or keychain entry each
 credential came from. Tokens are masked. Nothing is written to disk.`,
 		RunE: func(_ *cobra.Command, _ []string) error {

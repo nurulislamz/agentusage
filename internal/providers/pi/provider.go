@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 const ID = "pi"
@@ -44,7 +44,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Install Pi and run at least one session.",
-					"openusage auto-detects ~/.pi/agent/sessions and ~/.omp/agent/sessions; no configuration required.",
+					"agentusage auto-detects ~/.pi/agent/sessions and ~/.omp/agent/sessions; no configuration required.",
 				},
 			},
 			Dashboard: dashboardWidget(),

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/detect"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/detect"
 )
 
 // MaskKey behaviour is covered in internal/detect/mask_test.go. The test

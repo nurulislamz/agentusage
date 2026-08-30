@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestDecodeStoredLimitSnapshot_RejectsEmptyPayload(t *testing.T) {

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
 )
 
 // Provider implements core.UsageProvider for Amp. Amp is a local-file
@@ -38,7 +38,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Install the Amp client and run at least one thread.",
-					"OpenUsage reads thread JSON and the credit ledger from the per-user data directory; no API key is required.",
+					"agentUsage reads thread JSON and the credit ledger from the per-user data directory; no API key is required.",
 				},
 			},
 			Dashboard: dashboardWidget(),

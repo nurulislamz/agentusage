@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // End-to-end: seed a cumulative balance series, run the read model for a 7d and

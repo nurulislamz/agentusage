@@ -21,9 +21,9 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 // ID is the canonical provider identifier registered in
@@ -65,8 +65,8 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Install Crush and run it at least once in a project directory to create `.crush/crush.db`.",
-					"openusage walks your home directory and common code roots to find project DBs.",
-					"Override the search roots with $OPENUSAGE_CRUSH_ROOTS (colon-separated paths).",
+					"agentusage walks your home directory and common code roots to find project DBs.",
+					"Override the search roots with $AGENTUSAGE_CRUSH_ROOTS (colon-separated paths).",
 				},
 			},
 			Dashboard: dashboardWidget(),

@@ -1,8 +1,8 @@
 package report
 
 import (
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 // FromTelemetry maps a provider's per-turn telemetry events into report events.

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/browsercookies"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/browsercookies"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // isolateConfigDir redirects config.ConfigDir() (which holds the credentials
@@ -108,7 +108,7 @@ func TestFetch_CookieConfigured_PopulatesAllFields(t *testing.T) {
 	// Override the console base URL via a back-door so we can hit the
 	// fake httptest server. The constant is unexported; we use a small
 	// test seam via os.Setenv-driven override.
-	t.Setenv("OPENUSAGE_PERPLEXITY_CONSOLE_BASE_URL", server.URL)
+	t.Setenv("AGENTUSAGE_PERPLEXITY_CONSOLE_BASE_URL", server.URL)
 
 	snap, err := p.Fetch(context.Background(), core.AccountConfig{
 		ID:       "perplexity",
@@ -172,7 +172,7 @@ func TestFetch_CookieRejected_SurfacesAuth(t *testing.T) {
 
 	isolateConfigDir(t)
 	pinSessionForTest(t, "perplexity", "expired-cookie")
-	t.Setenv("OPENUSAGE_PERPLEXITY_CONSOLE_BASE_URL", server.URL)
+	t.Setenv("AGENTUSAGE_PERPLEXITY_CONSOLE_BASE_URL", server.URL)
 
 	snap, err := New().Fetch(context.Background(), core.AccountConfig{
 		ID:       "perplexity",

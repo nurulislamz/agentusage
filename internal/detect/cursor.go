@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func detectCursor(result *Result) {
@@ -35,7 +35,7 @@ func detectCursor(result *Result) {
 			}
 			boxName := entry.Name()
 			boxConfigDir := filepath.Join(containersDir, boxName, ".cursor")
-			boxStatusFile := filepath.Join(home, ".local", "state", "openusage", fmt.Sprintf("cursor-%s-status.json", boxName))
+			boxStatusFile := filepath.Join(home, ".local", "state", "agentusage", fmt.Sprintf("cursor-%s-status.json", boxName))
 
 			acct := core.AccountConfig{
 				ID:           fmt.Sprintf("cursor-%s", boxName),
@@ -57,7 +57,7 @@ func detectCursor(result *Result) {
 	if configDir == "" {
 		configDir = filepath.Join(home, ".cursor")
 	}
-	defaultStatusFile := filepath.Join(home, ".local", "state", "openusage", "cursor-status.json")
+	defaultStatusFile := filepath.Join(home, ".local", "state", "agentusage", "cursor-status.json")
 
 	if !dirExists(configDir) && bin == "" && !fileExists(defaultStatusFile) {
 		return

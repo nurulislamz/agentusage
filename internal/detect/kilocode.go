@@ -3,8 +3,8 @@ package detect
 import (
 	"log"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/roocode"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/roocode"
 )
 
 // detectKiloCode registers a local Kilo Code account when the extension's

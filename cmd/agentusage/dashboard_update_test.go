@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/appupdate"
-	"github.com/janekbaraniewski/openusage/internal/tui"
+	"github.com/nurulislamz/agentusage/internal/appupdate"
+	"github.com/nurulislamz/agentusage/internal/tui"
 )
 
 func TestRunStartupUpdateCheckSendsMessageOnUpdate(t *testing.T) {
@@ -34,7 +34,7 @@ func TestRunStartupUpdateCheckSendsMessageOnUpdate(t *testing.T) {
 				UpdateAvailable: true,
 				CurrentVersion:  "v1.2.0",
 				LatestVersion:   "v1.3.0",
-				UpgradeHint:     "brew upgrade janekbaraniewski/tap/openusage",
+				UpgradeHint:     "brew upgrade nurulislamz/tap/agentusage",
 			}, nil
 		},
 		func(msg tui.AppUpdateMsg) {

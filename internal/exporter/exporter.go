@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 	// envAuthToken is the environment variable fallback for the hub auth token,
 	// used when ExportConfig.AuthToken is empty. Applies symmetrically on the
 	// hub side to simplify deployments where the same value is shared.
-	envAuthToken = "OPENUSAGE_HUB_TOKEN"
+	envAuthToken = "AGENTUSAGE_HUB_TOKEN"
 )
 
 // Exporter periodically pushes usage snapshots to a remote hub.
@@ -39,7 +39,7 @@ type Exporter struct {
 // New creates a new Exporter from the given ExportConfig.
 // Returns an error if cfg.Target is empty.
 //
-// If cfg.AuthToken is empty and the OPENUSAGE_HUB_TOKEN env var is set, the
+// If cfg.AuthToken is empty and the AGENTUSAGE_HUB_TOKEN env var is set, the
 // env var is used as the Bearer token. This matches the hub-side convention.
 func New(cfg config.ExportConfig) (*Exporter, error) {
 	target := strings.TrimRight(strings.TrimSpace(cfg.Target), "/")

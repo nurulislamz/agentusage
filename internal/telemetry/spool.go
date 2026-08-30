@@ -50,7 +50,7 @@ func NewSpool(dir string) *Spool {
 func DefaultSpoolDir() (string, error) {
 	// Delegate to DefaultStateDir so the spool can never diverge from the rest
 	// of the state directory (notably on Windows, where state lives under
-	// %APPDATA%\openusage\state rather than ~/.local/state).
+	// %APPDATA%\agentusage\state rather than ~/.local/state).
 	stateDir, err := DefaultStateDir()
 	if err != nil {
 		return "", err

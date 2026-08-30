@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/pricing"
+	"github.com/nurulislamz/agentusage/internal/pricing"
 )
 
 // TestEstimateCost_AppliesTierAbove200k locks in the cost-accuracy fix: the

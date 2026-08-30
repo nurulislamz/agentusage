@@ -10,7 +10,7 @@ import (
 
 // Preset is one named, pre-baked status template. Each preset bundles a
 // display-ready format string with the glyph tier it was designed for, plus a
-// canned sample for the `openusage tmux presets` listing.
+// canned sample for the `agentusage tmux presets` listing.
 type Preset struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`

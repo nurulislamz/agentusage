@@ -5,7 +5,7 @@ import (
 )
 
 func TestParseGlyphTierCustomFont(t *testing.T) {
-	for _, s := range []string{"customfont", "custom", "openusage", "CustomFont"} {
+	for _, s := range []string{"customfont", "custom", "agentusage", "CustomFont"} {
 		if got := ParseGlyphTier(s); got != GlyphTierCustomFont {
 			t.Errorf("ParseGlyphTier(%q) = %q, want customfont", s, got)
 		}

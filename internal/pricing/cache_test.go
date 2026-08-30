@@ -123,19 +123,19 @@ func TestDiskCache_AtomicWriteUnderConcurrentAccess(t *testing.T) {
 }
 
 func TestResolveTTL(t *testing.T) {
-	t.Setenv("OPENUSAGE_PRICING_TTL", "")
+	t.Setenv("AGENTUSAGE_PRICING_TTL", "")
 	if got := ResolveTTL(); got != DefaultTTL {
 		t.Errorf("unset = %v, want %v", got, DefaultTTL)
 	}
-	t.Setenv("OPENUSAGE_PRICING_TTL", "30m")
+	t.Setenv("AGENTUSAGE_PRICING_TTL", "30m")
 	if got := ResolveTTL(); got != 30*time.Minute {
 		t.Errorf("30m = %v", got)
 	}
-	t.Setenv("OPENUSAGE_PRICING_TTL", "garbage")
+	t.Setenv("AGENTUSAGE_PRICING_TTL", "garbage")
 	if got := ResolveTTL(); got != DefaultTTL {
 		t.Errorf("garbage = %v, want default", got)
 	}
-	t.Setenv("OPENUSAGE_PRICING_TTL", "3600")
+	t.Setenv("AGENTUSAGE_PRICING_TTL", "3600")
 	if got := ResolveTTL(); got != time.Hour {
 		t.Errorf("plain-seconds = %v, want 1h", got)
 	}

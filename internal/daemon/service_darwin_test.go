@@ -9,10 +9,10 @@ import (
 
 func TestLaunchdPlist_UsesDaemonRunSubcommand(t *testing.T) {
 	plist := launchdPlist(
-		"/tmp/openusage",
-		"/tmp/openusage.sock",
-		"/tmp/openusage.stdout.log",
-		"/tmp/openusage.stderr.log",
+		"/tmp/agentusage",
+		"/tmp/agentusage.sock",
+		"/tmp/agentusage.stdout.log",
+		"/tmp/agentusage.stderr.log",
 		map[string]string{"OPENAI_API_KEY": "sk-test"},
 	)
 

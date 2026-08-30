@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // detectMacOSKeychainCredentials probes well-known macOS keychain entries
@@ -22,7 +22,7 @@ import (
 //  1. Auto-detect picks up the account even if file-based detection missed
 //     it — for example when the CLI's binary isn't on $PATH but its
 //     keychain entry is present (SSH/devcontainer scenarios).
-//  2. The `openusage detect` debug command can show the user which keychain
+//  2. The `agentusage detect` debug command can show the user which keychain
 //     entries are populated and where each credential comes from.
 //
 // The probe uses /usr/bin/security with a short timeout. The user gets a

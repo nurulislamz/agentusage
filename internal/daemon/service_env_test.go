@@ -10,7 +10,7 @@ import (
 func TestCurrentServiceEnvSnapshot_IncludesKnownConfiguredVars(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "sk-openai")
 	t.Setenv("ZEN_API_KEY", "sk-zen")
-	t.Setenv("OPENUSAGE_HUB_TOKEN", "hub-secret")
+	t.Setenv("AGENTUSAGE_HUB_TOKEN", "hub-secret")
 	t.Setenv("UNRELATED_ENV", "ignore-me")
 
 	env := currentServiceEnvSnapshot()
@@ -21,8 +21,8 @@ func TestCurrentServiceEnvSnapshot_IncludesKnownConfiguredVars(t *testing.T) {
 	if env["ZEN_API_KEY"] != "sk-zen" {
 		t.Fatalf("ZEN_API_KEY = %q, want sk-zen", env["ZEN_API_KEY"])
 	}
-	if env["OPENUSAGE_HUB_TOKEN"] != "hub-secret" {
-		t.Fatalf("OPENUSAGE_HUB_TOKEN = %q, want hub-secret", env["OPENUSAGE_HUB_TOKEN"])
+	if env["AGENTUSAGE_HUB_TOKEN"] != "hub-secret" {
+		t.Fatalf("AGENTUSAGE_HUB_TOKEN = %q, want hub-secret", env["AGENTUSAGE_HUB_TOKEN"])
 	}
 	if _, ok := env["UNRELATED_ENV"]; ok {
 		t.Fatal("unexpected unrelated env var in snapshot")

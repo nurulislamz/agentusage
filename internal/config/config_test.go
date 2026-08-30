@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -185,7 +185,7 @@ func TestLoad_RepairsConfigWithStaleBytesInPlace(t *testing.T) {
 	}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	path := filepath.Join(home, ".config", "openusage", "settings.json")
+	path := filepath.Join(home, ".config", "agentusage", "settings.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("mkdir config dir: %v", err)
 	}

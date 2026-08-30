@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func (m Model) View() string {
@@ -48,7 +48,7 @@ func (m Model) renderHeader(w int) string {
 		lipgloss.NewStyle().Foreground(colorDim).Bold(true).Render("⚡"),
 		m.animFrame,
 	)
-	brandText := RenderGradientText("OpenUsage", m.animFrame)
+	brandText := RenderGradientText("agentUsage", m.animFrame)
 
 	tabs := m.renderScreenTabs()
 
@@ -225,10 +225,10 @@ func (m Model) renderFooterStatusLine(w int) string {
 		if m.analyticsFilter.text != "" {
 			return " " + dimStyle.Render("filter: ") + searchStyle.Render(m.analyticsFilter.text)
 		}
-		return " " + dimStyle.Render("j/k scroll · PgUp/PgDn page · Home/End jump · s sort · / filter · " + refreshFooterHint())
+		return " " + dimStyle.Render("j/k scroll · PgUp/PgDn page · Home/End jump · s sort · / filter · "+refreshFooterHint())
 	default:
 		if m.mode == modeDetail && m.screen == screenDashboard {
-			return " " + dimStyle.Render("Tab/Shift+Tab sections · ←/→ sections · j/k scroll · PgUp/PgDn page · " + refreshFooterHint() + " · Esc back")
+			return " " + dimStyle.Render("Tab/Shift+Tab sections · ←/→ sections · j/k scroll · PgUp/PgDn page · "+refreshFooterHint()+" · Esc back")
 		}
 		if m.filter.active {
 			cursor := PulseChar("█", "▌", m.animFrame)
@@ -261,7 +261,7 @@ func (m Model) appUpdateHeadline() string {
 	if !m.hasAppUpdateNotice() {
 		return ""
 	}
-	return "OpenUsage update available: " + m.daemon.appUpdateCurrent + " -> " + m.daemon.appUpdateLatest
+	return "agentUsage update available: " + m.daemon.appUpdateCurrent + " -> " + m.daemon.appUpdateLatest
 }
 
 func (m Model) appUpdateAction() string {

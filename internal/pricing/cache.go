@@ -9,12 +9,12 @@ import (
 	"time"
 )
 
-// DefaultTTL is the cache freshness window used when OPENUSAGE_PRICING_TTL
+// DefaultTTL is the cache freshness window used when AGENTUSAGE_PRICING_TTL
 // is unset or unparseable.
 const DefaultTTL = 24 * time.Hour
 
 // DiskCache stores upstream pricing payloads under
-// $UserCacheDir/openusage/pricing/<name>.json, keyed by source name.
+// $UserCacheDir/agentusage/pricing/<name>.json, keyed by source name.
 // Writes are atomic (write to tmp + rename) so a concurrent reader never
 // sees a partially-written file.
 type DiskCache struct {
@@ -31,7 +31,7 @@ func NewDiskCache() (*DiskCache, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pricing: resolving user cache dir: %w", err)
 	}
-	dir := filepath.Join(base, "openusage", "pricing")
+	dir := filepath.Join(base, "agentusage", "pricing")
 	return &DiskCache{dir: dir, ttl: ResolveTTL()}, nil
 }
 
@@ -115,10 +115,10 @@ func (c *DiskCache) Store(name string, data []byte) error {
 }
 
 // ResolveTTL returns the cache freshness window honouring the
-// OPENUSAGE_PRICING_TTL env var (Go duration syntax, e.g. "12h", "30m").
+// AGENTUSAGE_PRICING_TTL env var (Go duration syntax, e.g. "12h", "30m").
 // On parse failure or unset, DefaultTTL is returned.
 func ResolveTTL() time.Duration {
-	v := os.Getenv("OPENUSAGE_PRICING_TTL")
+	v := os.Getenv("AGENTUSAGE_PRICING_TTL")
 	if v == "" {
 		return DefaultTTL
 	}

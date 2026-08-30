@@ -1,6 +1,6 @@
 package copilot
 
-import "github.com/janekbaraniewski/openusage/internal/core"
+import "github.com/nurulislamz/agentusage/internal/core"
 
 func testCopilotAccount(binary, configDir, copilotBinary string) core.AccountConfig {
 	acct := core.AccountConfig{

@@ -24,7 +24,7 @@ func withFakeCodexAuth(t *testing.T, authBody string) (home string) {
 	writeFakeBinary(t, binDir, "codex")
 	setHome(t, home)
 	t.Setenv("PATH", binDir)
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", binDir)
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", binDir)
 	t.Setenv("OPENAI_API_KEY", "")
 	return home
 }

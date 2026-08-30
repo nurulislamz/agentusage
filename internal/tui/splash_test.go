@@ -219,7 +219,7 @@ func TestSplashProgressShowsAppUpdateNotice(t *testing.T) {
 			status:           DaemonConnecting,
 			appUpdateCurrent: "v0.4.0",
 			appUpdateLatest:  "v0.5.0",
-			appUpdateHint:    "brew upgrade janekbaraniewski/tap/openusage",
+			appUpdateHint:    "brew upgrade nurulislamz/tap/agentusage",
 		},
 		providerOrder: []string{"openai"},
 		animFrame:     0,
@@ -227,10 +227,10 @@ func TestSplashProgressShowsAppUpdateNotice(t *testing.T) {
 	lines := m.splashProgressLines()
 	combined := joinLines(lines)
 
-	if !strings.Contains(combined, "OpenUsage update available: v0.4.0 -> v0.5.0") {
+	if !strings.Contains(combined, "agentUsage update available: v0.4.0 -> v0.5.0") {
 		t.Error("expected app update headline in splash output")
 	}
-	if !strings.Contains(combined, "Run: brew upgrade janekbaraniewski/tap/openusage") {
+	if !strings.Contains(combined, "Run: brew upgrade nurulislamz/tap/agentusage") {
 		t.Error("expected install-specific update action in splash output")
 	}
 }
@@ -275,7 +275,7 @@ func TestSplashProgressRunningAfterInstall(t *testing.T) {
 
 func TestSplashProgressErrorMultilineMessage(t *testing.T) {
 	m := Model{
-		daemon:        daemonState{status: DaemonError, message: "context deadline exceeded\nsocket_path=/Users/test/.openusage/socket\nstatus_cmd=launchctl print"},
+		daemon:        daemonState{status: DaemonError, message: "context deadline exceeded\nsocket_path=/Users/test/.agentusage/socket\nstatus_cmd=launchctl print"},
 		providerOrder: []string{"openai"},
 		animFrame:     0,
 	}

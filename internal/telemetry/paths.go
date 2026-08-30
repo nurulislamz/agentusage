@@ -6,13 +6,13 @@ import (
 	"strings"
 )
 
-// DefaultStateDir resolves the OpenUsage telemetry state directory (db, socket,
+// DefaultStateDir resolves the agentUsage telemetry state directory (db, socket,
 // spools, logs). XDG_STATE_HOME wins on every platform when set; otherwise the
 // base is provided by platformStateDir() in the platform-specific
 // state_dir_*.go files.
 func DefaultStateDir() (string, error) {
 	if base := strings.TrimSpace(os.Getenv("XDG_STATE_HOME")); base != "" {
-		return filepath.Join(base, "openusage"), nil
+		return filepath.Join(base, "agentusage"), nil
 	}
 	return platformStateDir()
 }

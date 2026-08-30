@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/browsercookies"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/integrations"
-	"github.com/janekbaraniewski/openusage/internal/providers"
+	"github.com/nurulislamz/agentusage/internal/browsercookies"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/integrations"
+	"github.com/nurulislamz/agentusage/internal/providers"
 )
 
 type Service struct {
@@ -220,7 +220,7 @@ func (s *Service) ConnectBrowserSession(accountID, domain, cookieName, browser s
 }
 
 // DisconnectBrowserSession removes the stored cookie for an account. Used
-// by the "x" key on a connected row to revoke openusage's stored credential
+// by the "x" key on a connected row to revoke agentusage's stored credential
 // (the browser session itself is unaffected).
 func (s *Service) DisconnectBrowserSession(accountID string) error {
 	if strings.TrimSpace(accountID) == "" {

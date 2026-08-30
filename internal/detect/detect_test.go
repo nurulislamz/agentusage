@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestAutoDetect_Runs(t *testing.T) {
@@ -33,7 +33,7 @@ func TestAutoDetect_Runs(t *testing.T) {
 
 // TestAutoDetect_PrecedenceShellRCWinsWhenEnvUnset verifies the boot scenario
 // the user cares about: a key exported only in ~/.zshrc still surfaces when
-// the running process didn't inherit a set OPENAI_API_KEY (e.g. openusage
+// the running process didn't inherit a set OPENAI_API_KEY (e.g. agentusage
 // launched from Spotlight/Dock).
 func TestAutoDetect_PrecedenceShellRCWinsWhenEnvUnset(t *testing.T) {
 	home := t.TempDir()
@@ -43,7 +43,7 @@ func TestAutoDetect_PrecedenceShellRCWinsWhenEnvUnset(t *testing.T) {
 	}
 	setHome(t, home)
 	t.Setenv("PATH", "")
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
 	for _, m := range envKeyMapping {
 		t.Setenv(m.EnvVar, "")
 	}
@@ -75,7 +75,7 @@ func TestAutoDetect_PrecedenceEnvVarBeatsAllFiles(t *testing.T) {
 	}
 	setHome(t, home)
 	t.Setenv("PATH", "")
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
 	t.Setenv("OPENAI_API_KEY", "sk-from-process-env-12345")
 
 	result := AutoDetect()
@@ -257,7 +257,7 @@ api_key: test-zai-token
 
 	setHome(t, home)
 	t.Setenv("PATH", "")
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
 
 	var result Result
 	detectZAICodingHelper(&result)
@@ -330,11 +330,11 @@ func TestResultSummary_Empty(t *testing.T) {
 
 func TestFindBinary_UsesExtraDetectBinDirs(t *testing.T) {
 	tmp := t.TempDir()
-	name := "openusage-testbin"
+	name := "agentusage-testbin"
 	path := writeFakeBinary(t, tmp, name)
 
 	t.Setenv("PATH", "")
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", tmp)
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", tmp)
 
 	got := findBinary(name)
 	if got != path {
@@ -348,14 +348,14 @@ func TestFindBinary_SkipsNonExecutableFiles(t *testing.T) {
 	}
 
 	tmp := t.TempDir()
-	name := "openusage-testbin-noexec"
+	name := "agentusage-testbin-noexec"
 	path := filepath.Join(tmp, name)
 	if err := os.WriteFile(path, []byte("data"), 0o644); err != nil {
 		t.Fatalf("write temp file: %v", err)
 	}
 
 	t.Setenv("PATH", "")
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", tmp)
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", tmp)
 
 	if got := findBinary(name); got != "" {
 		t.Fatalf("findBinary() = %q, want empty for non-executable", got)
@@ -421,7 +421,7 @@ func TestDetectGHCopilot_StandaloneBinaryDetected(t *testing.T) {
 	// standalone copilot path ends up in RuntimeHints regardless.
 	t.Setenv("PATH", tmp)
 	t.Setenv("HOME", home)
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
 
 	var result Result
 	detectGHCopilot(&result)
@@ -482,7 +482,7 @@ func TestDetectGHCopilot_StandaloneBinaryNoGH(t *testing.T) {
 
 	t.Setenv("PATH", tmp)
 	t.Setenv("HOME", home)
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
 
 	var result Result
 	detectGHCopilot(&result)
@@ -520,7 +520,7 @@ func TestDetectGHCopilot_GHCopilotTakesPrecedence(t *testing.T) {
 
 	t.Setenv("PATH", tmp)
 	t.Setenv("HOME", home)
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
 
 	var result Result
 	detectGHCopilot(&result)
@@ -569,7 +569,7 @@ func TestDetectGHCopilot_StandaloneBinaryWithGH(t *testing.T) {
 
 	t.Setenv("PATH", tmp)
 	t.Setenv("HOME", home)
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
 
 	var result Result
 	detectGHCopilot(&result)
@@ -602,7 +602,7 @@ func TestDetectGHCopilot_SkipsWithoutCopilotDir(t *testing.T) {
 
 	t.Setenv("PATH", tmp)
 	t.Setenv("HOME", home)
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
 
 	var result Result
 	detectGHCopilot(&result)
@@ -626,7 +626,7 @@ func TestDetectGHCopilot_SkipsWhenNoBinaries(t *testing.T) {
 	// Empty PATH, no binaries at all.
 	t.Setenv("PATH", tmp)
 	t.Setenv("HOME", home)
-	t.Setenv("OPENUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
 
 	var result Result
 	detectGHCopilot(&result)

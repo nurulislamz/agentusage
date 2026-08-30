@@ -86,11 +86,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            bin: openusage
+            bin: agentusage
           - os: macos-latest
-            bin: openusage
+            bin: agentusage
           - os: windows-latest
-            bin: openusage.exe
+            bin: agentusage.exe
     env:
       CGO_ENABLED: "1" # mattn/go-sqlite3 (cursor provider + telemetry store)
     steps:
@@ -108,7 +108,7 @@ jobs:
 
       - name: Build binary
         shell: bash
-        run: go build -ldflags="-s -w" -o ${{ matrix.bin }} ./cmd/openusage
+        run: go build -ldflags="-s -w" -o ${{ matrix.bin }} ./cmd/agentusage
 
       - name: Verify binary
         shell: bash

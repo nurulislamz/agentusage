@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 // loadBrowserSession is a seam so tests can supply a session instead of reading
@@ -64,7 +64,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Log into https://console.perplexity.ai in your browser.",
-					"In openusage: Settings → 5 KEYS → perplexity → press Enter to import the session cookie.",
+					"In agentusage: Settings → 5 KEYS → perplexity → press Enter to import the session cookie.",
 					"Tile shows your tier, balance, monthly usage, and per-model spend once connected.",
 				},
 			},
@@ -264,7 +264,7 @@ func newConsoleClient(cookieValue, cookieName string) *consoleClient {
 	base := consoleBaseURL
 	// Test seam: tests override the base URL by setting this env var.
 	// Production never sets it, so the constant wins.
-	if override := strings.TrimSpace(os.Getenv("OPENUSAGE_PERPLEXITY_CONSOLE_BASE_URL")); override != "" {
+	if override := strings.TrimSpace(os.Getenv("AGENTUSAGE_PERPLEXITY_CONSOLE_BASE_URL")); override != "" {
 		base = override
 	}
 	return &consoleClient{
@@ -289,7 +289,7 @@ func (c *consoleClient) get(ctx context.Context, path string, query map[string]s
 	req.Header.Set("x-app-apiclient", "default")
 	req.Header.Set("x-app-apiversion", "2.18")
 	req.Header.Set("x-app-domain", "api-console")
-	req.Header.Set("User-Agent", "openusage/perplexity-console")
+	req.Header.Set("User-Agent", "agentusage/perplexity-console")
 	req.AddCookie(&http.Cookie{Name: c.cookieName, Value: c.cookieValue})
 
 	resp, err := c.httpClient.Do(req)

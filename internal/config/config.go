@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/samber/lo"
 )
 
@@ -142,7 +142,7 @@ type ExportConfig struct {
 	IntervalSeconds int    `json:"interval_seconds"` // push interval; default 60
 	MachineName     string `json:"machine_name"`     // override hostname; empty uses os.Hostname()
 	// AuthToken is the optional Bearer token sent with each push. It must NOT
-	// be persisted to settings.json — supply it via OPENUSAGE_HUB_TOKEN env var
+	// be persisted to settings.json — supply it via AGENTUSAGE_HUB_TOKEN env var
 	// at runtime. Mirrors AccountConfig.Token's `json:"-"` posture.
 	AuthToken string `json:"-"`
 }
@@ -152,18 +152,18 @@ type HubConfig struct {
 	StaleTimeoutSeconds int    `json:"stale_timeout_seconds"` // seconds before a machine entry is pruned; default 300
 	// AuthToken is the optional Bearer token required on /v1/push and
 	// /v1/snapshots. It must NOT be persisted to settings.json — supply it via
-	// OPENUSAGE_HUB_TOKEN env var at runtime. Empty disables auth.
+	// AGENTUSAGE_HUB_TOKEN env var at runtime. Empty disables auth.
 	AuthToken string `json:"-"`
 }
 
-// ServeConfig configures the local web dashboard started by `openusage serve`.
+// ServeConfig configures the local web dashboard started by `agentusage serve`.
 type ServeConfig struct {
 	// ListenAddr is the TCP address to bind. Empty means 127.0.0.1:8080 at
 	// runtime. Overridden by --listen.
 	ListenAddr string `json:"listen_addr"`
 	// AuthToken is the optional Bearer token required on /api/v1/* endpoints.
 	// It must NOT be persisted to settings.json — supply it via
-	// OPENUSAGE_SERVE_TOKEN at runtime. Empty disables auth.
+	// AGENTUSAGE_SERVE_TOKEN at runtime. Empty disables auth.
 	AuthToken string `json:"-"`
 }
 
@@ -174,7 +174,7 @@ type IntegrationState struct {
 	Declined    bool   `json:"declined,omitempty"`
 }
 
-// TmuxConfig holds user-tunable settings for the `openusage tmux` subcommand.
+// TmuxConfig holds user-tunable settings for the `agentusage tmux` subcommand.
 // All fields are optional; unset values fall through to preset defaults and
 // then to hardcoded defaults inside internal/tmux.
 type TmuxConfig struct {
@@ -207,7 +207,7 @@ type ColorRule struct {
 	HighColor   string  `json:"high_color,omitempty"`
 }
 
-// TmuxAlerts configures push-alert thresholds for `openusage tmux watch`.
+// TmuxAlerts configures push-alert thresholds for `agentusage tmux watch`.
 type TmuxAlerts struct {
 	BurnRatePerHour       float64 `json:"burn_rate_per_hour,omitempty"`
 	BlockMinutesRemaining int     `json:"block_minutes_remaining,omitempty"`
@@ -236,7 +236,7 @@ type Config struct {
 // DefaultProviderLinks returns built-in telemetry provider-id to dashboard provider-id mappings.
 //
 // Telemetry sources (e.g. the OpenCode plugin) tag events with whatever provider id the
-// source tool uses internally. Those names don't always match openusage's internal provider
+// source tool uses internally. Those names don't always match agentusage's internal provider
 // ids — e.g. OpenCode says "google" for the Gemini API, "github-copilot" for Copilot,
 // and "azure" for Azure OpenAI.
 // These defaults paper over the rename mismatches so users don't see "Unmapped" for
@@ -270,7 +270,7 @@ func DefaultConfig() Config {
 	}
 }
 
-// ConfigDir returns the directory that holds settings.json and other OpenUsage
+// ConfigDir returns the directory that holds settings.json and other agentUsage
 // config. The per-OS base is provided by osConfigDir() in the platform-specific
 // config_dir_*.go files.
 func ConfigDir() string {

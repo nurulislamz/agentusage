@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/parsers"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/parsers"
 )
 
 func (p *Provider) fetchLocalAPI(ctx context.Context, baseURL string, snap *core.UsageSnapshot) (bool, error) {

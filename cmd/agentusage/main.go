@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/version"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +20,8 @@ func main() {
 	}
 
 	root := cobra.Command{
-		Use:     "openusage",
-		Short:   "OpenUsage is a terminal dashboard for monitoring AI coding tool usage and spend.",
+		Use:     "agentusage",
+		Short:   "agentUsage is a terminal dashboard for monitoring AI coding tool usage and spend.",
 		Version: version.Version,
 		Run: func(_ *cobra.Command, _ []string) {
 			// Loaded here rather than in main so an unreadable config only fails
@@ -55,6 +55,7 @@ func main() {
 	root.AddCommand(newHubViewCommand())
 	root.AddCommand(newServeCommand())
 	root.AddCommand(newCursorCommand())
+	root.AddCommand(newAntigravityCommand())
 	root.AddCommand(newStatuslineCommand())
 	root.AddCommand(newTmuxCommand())
 	for _, c := range newReportCommands() {

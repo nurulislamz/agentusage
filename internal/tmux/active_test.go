@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // stubProvider implements core.UsageProvider + LocalSourceProvider for tests.

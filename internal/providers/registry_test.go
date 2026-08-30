@@ -3,7 +3,7 @@ package providers
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestAllProviders_ContainsOpenCode(t *testing.T) {

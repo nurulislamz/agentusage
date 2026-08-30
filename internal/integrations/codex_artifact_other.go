@@ -34,7 +34,7 @@ func codexNotifyTOML(targetFile string) string {
 }
 
 // codexConfigured reports whether the Codex config content registers the
-// openusage notify hook. On Unix this is the presence of the script reference.
+// agentusage notify hook. On Unix this is the presence of the script reference.
 func codexConfigured(content string) bool {
 	return strings.Contains(content, "notify") && strings.Contains(content, "codex-notify.sh")
 }

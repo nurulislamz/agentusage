@@ -25,7 +25,7 @@ type LocalAuthInfo struct {
 // DefaultStateDBPath returns the platform path to Cursor's state.vscdb,
 // including the WSL glob for a Windows Cursor install.
 func DefaultStateDBPath() string {
-	if envPath := strings.TrimSpace(os.Getenv("OPENUSAGE_CURSOR_STATE_DB")); envPath != "" {
+	if envPath := strings.TrimSpace(os.Getenv("AGENTUSAGE_CURSOR_STATE_DB")); envPath != "" {
 		return envPath
 	}
 	if envPath := strings.TrimSpace(os.Getenv("CURSOR_STATE_DB")); envPath != "" {

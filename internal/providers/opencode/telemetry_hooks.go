@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 // ParseTelemetryHookPayload parses OpenCode plugin hook payloads.
@@ -283,7 +283,7 @@ func sanitizeUpstreamProviderCandidate(value string) string {
 	}
 	clean := strings.ToLower(name)
 	switch clean {
-	case "openrouter", "openusage", "opencode", "unknown":
+	case "openrouter", "agentusage", "opencode", "unknown":
 		return ""
 	default:
 		return clean

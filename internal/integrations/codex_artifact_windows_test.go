@@ -8,7 +8,7 @@ import (
 )
 
 func TestCodexNotifyTOMLWindowsUsesLiteralStrings(t *testing.T) {
-	exe := `C:\Users\someone\AppData\Local\openusage\openusage.exe`
+	exe := `C:\Users\someone\AppData\Local\agentusage\agentusage.exe`
 	got := codexNotifyTOML(exe)
 
 	// Must register the binary directly with the telemetry hook subcommand.
@@ -36,12 +36,12 @@ func TestCodexArtifactWindowsWritesNoFile(t *testing.T) {
 	if art.Template != "" || art.Basename != "" {
 		t.Fatalf("expected no artifact on Windows, got template=%q basename=%q", art.Template, art.Basename)
 	}
-	dirs := Dirs{OpenusageBin: `C:\bin\openusage.exe`}
+	dirs := Dirs{AgentusageBin: `C:\bin\agentusage.exe`}
 	path, writes := codexTargetFile(dirs)
 	if writes {
 		t.Fatal("codexTargetFile should report writesArtifact=false on Windows")
 	}
-	if path != dirs.OpenusageBin {
-		t.Fatalf("codexTargetFile path = %q, want the binary path %q", path, dirs.OpenusageBin)
+	if path != dirs.AgentusageBin {
+		t.Fatalf("codexTargetFile path = %q, want the binary path %q", path, dirs.AgentusageBin)
 	}
 }

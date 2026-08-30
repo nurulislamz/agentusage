@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 const (
@@ -53,7 +53,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Set AZURE_OPENAI_API_KEY (or AZURE_API_KEY) to a valid Azure OpenAI key.",
-					"Set AZURE_RESOURCE_NAME to your resource name (e.g. my-resource) — OpenUsage builds https://my-resource.openai.azure.com from it.",
+					"Set AZURE_RESOURCE_NAME to your resource name (e.g. my-resource) — agentUsage builds https://my-resource.openai.azure.com from it.",
 					"For non-standard endpoints (sovereign clouds, custom domains), set AZURE_OPENAI_ENDPOINT or base_url to the full URL instead.",
 				},
 			},

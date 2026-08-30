@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/claude_code"
+	"github.com/nurulislamz/agentusage/internal/providers/claude_code"
 )
 
 // statuslineChoices is the result of the interactive statusline configurator.

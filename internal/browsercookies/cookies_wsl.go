@@ -20,7 +20,7 @@ func (r *kookyReader) readCookieWSL(ctx context.Context, domain, name, browser s
 	var err error
 
 	if home != "" {
-		keyFile := filepath.Join(home, ".config", "openusage", "chrome_key")
+		keyFile := filepath.Join(home, ".config", "agentusage", "chrome_key")
 		keyData, err = os.ReadFile(keyFile)
 	}
 
@@ -29,7 +29,7 @@ func (r *kookyReader) readCookieWSL(ctx context.Context, domain, name, browser s
 		if entries, err2 := os.ReadDir(usersDir); err2 == nil {
 			for _, entry := range entries {
 				if entry.IsDir() {
-					uKeyPath := filepath.Join(usersDir, entry.Name(), ".openusage_chrome_key")
+					uKeyPath := filepath.Join(usersDir, entry.Name(), ".agentusage_chrome_key")
 					if kd, kErr := os.ReadFile(uKeyPath); kErr == nil && len(kd) > 0 {
 						keyData = kd
 						break
@@ -69,7 +69,7 @@ func (r *kookyReader) readCookieWSL(ctx context.Context, domain, name, browser s
 			if _, err := os.Stat(dbPath); err != nil {
 				continue
 			}
-			tmpFile, err := os.CreateTemp("", "openusage_cookie_*.db")
+			tmpFile, err := os.CreateTemp("", "agentusage_cookie_*.db")
 			if err != nil {
 				continue
 			}

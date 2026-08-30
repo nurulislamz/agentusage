@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // setHome redirects the home directory for the test. defaultProjectsDir()

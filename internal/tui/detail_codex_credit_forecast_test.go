@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestBuildDetailCodexCreditForecastSection(t *testing.T) {

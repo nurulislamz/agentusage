@@ -1,7 +1,7 @@
 package roocode
 
 import (
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // ItemizedExtension returns one event per recorded API call across every task

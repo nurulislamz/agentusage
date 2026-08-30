@@ -104,13 +104,13 @@ func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) bool {
 	header := r.Header.Get("Authorization")
 	const prefix = "Bearer "
 	if !strings.HasPrefix(header, prefix) {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="openusage-serve"`)
+		w.Header().Set("WWW-Authenticate", `Bearer realm="agentusage-serve"`)
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing bearer token"})
 		return false
 	}
 	got := strings.TrimSpace(strings.TrimPrefix(header, prefix))
 	if subtle.ConstantTimeCompare([]byte(got), []byte(s.authToken)) != 1 {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="openusage-serve", error="invalid_token"`)
+		w.Header().Set("WWW-Authenticate", `Bearer realm="agentusage-serve", error="invalid_token"`)
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid bearer token"})
 		return false
 	}
@@ -162,7 +162,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"openusage_version":        env.OpenUsageVersion,
+		"agentusage_version":       env.AgentUsageVersion,
 		"source":                   env.Source,
 		"time_window":              env.TimeWindow,
 		"theme":                    env.Theme,

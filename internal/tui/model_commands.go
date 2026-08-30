@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/integrations"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/integrations"
 )
 
 func (m Model) persistThemeCmd(themeName string) tea.Cmd {
@@ -225,7 +225,7 @@ func (m Model) loadAvailableBrowsersCmd(accountID string) tea.Cmd {
 	}
 }
 
-// disconnectBrowserSessionCmd removes openusage's stored cookie for the
+// disconnectBrowserSessionCmd removes agentusage's stored cookie for the
 // account. Doesn't touch the user's browser session.
 func (m Model) disconnectBrowserSessionCmd(accountID string) tea.Cmd {
 	return func() tea.Msg {

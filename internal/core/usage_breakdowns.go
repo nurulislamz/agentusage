@@ -279,7 +279,7 @@ func parseClientMetricKey(key string) (name, field string, ok bool) {
 func canonicalizeClientBucket(name string) string {
 	bucket := sourceAsClientBucket(name)
 	switch bucket {
-	case "codex", "openusage":
+	case "codex", "agentusage", "openusage":
 		return "cli_agents"
 	}
 	return bucket

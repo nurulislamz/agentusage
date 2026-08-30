@@ -12,7 +12,7 @@ func TestLastErrorLine_ReturnsMostRecentError(t *testing.T) {
 	logPath := filepath.Join(tmp, "daemon.stderr.log")
 	content := strings.Join([]string{
 		"hint: missing integration",
-		"Error: telemetry daemon already running on socket /tmp/openusage.sock",
+		"Error: telemetry daemon already running on socket /tmp/agentusage.sock",
 		"Usage:",
 		"Error: open daemon telemetry store: telemetry: opening DB: permission denied",
 		"tail line",

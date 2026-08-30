@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // withFakeOpenCodeAuth writes an auth.json under a temp HOME and rewires
@@ -129,7 +129,7 @@ func TestDetectOpenCodeAuth_MalformedJSONLogsAndContinues(t *testing.T) {
 // TestDetectOpenCodeAuth_AdoptsOpenCodeGoKey covers the github issue #90 case:
 // an `opencode auth login` run that lands the credential under the
 // "opencode-go" provider id (the Go subscription, not Zen) must still
-// produce an openusage tile. Both opencode/opencode-go map to the same
+// produce an agentusage tile. Both opencode/opencode-go map to the same
 // account id because they share OPENCODE_API_KEY upstream.
 func TestDetectOpenCodeAuth_AdoptsOpenCodeGoKey(t *testing.T) {
 	withFakeOpenCodeAuth(t, `{

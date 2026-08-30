@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestNew_EmptyTarget(t *testing.T) {
@@ -264,7 +264,7 @@ func TestStart_ImmediateFirstPush(t *testing.T) {
 }
 
 func TestPush_SendsAuthorizationHeader(t *testing.T) {
-	t.Setenv("OPENUSAGE_HUB_TOKEN", "")
+	t.Setenv("AGENTUSAGE_HUB_TOKEN", "")
 	var mu sync.Mutex
 	var gotAuth string
 
@@ -296,7 +296,7 @@ func TestPush_SendsAuthorizationHeader(t *testing.T) {
 }
 
 func TestNew_AuthTokenEnvFallback(t *testing.T) {
-	t.Setenv("OPENUSAGE_HUB_TOKEN", "env-tok")
+	t.Setenv("AGENTUSAGE_HUB_TOKEN", "env-tok")
 	e, err := New(config.ExportConfig{Target: "http://example.com", MachineName: "h"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -307,7 +307,7 @@ func TestNew_AuthTokenEnvFallback(t *testing.T) {
 }
 
 func TestNew_ExplicitTokenOverridesEnv(t *testing.T) {
-	t.Setenv("OPENUSAGE_HUB_TOKEN", "env-tok")
+	t.Setenv("AGENTUSAGE_HUB_TOKEN", "env-tok")
 	e, err := New(config.ExportConfig{Target: "http://example.com", MachineName: "h", AuthToken: "explicit"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

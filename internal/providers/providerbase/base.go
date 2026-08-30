@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 // Base centralizes provider metadata and widget/detail configuration.

@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janekbaraniewski/openusage/internal/config"
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func testSnapshots(ids ...string) map[string]core.UsageSnapshot {
@@ -57,10 +57,10 @@ func TestMouseWheelScrollsDetailPaneInWideSplitView(t *testing.T) {
 
 func TestMouseWheelUpClampsDetailOffsetAtZero(t *testing.T) {
 	m := Model{
-		width:       90,
-		height:      40,
-		sortedIDs:   []string{"a", "b", "c"},
-		snapshots:   testSnapshots("a", "b", "c"),
+		width:        90,
+		height:       40,
+		sortedIDs:    []string{"a", "b", "c"},
+		snapshots:    testSnapshots("a", "b", "c"),
 		detailOffset: 1,
 	}
 

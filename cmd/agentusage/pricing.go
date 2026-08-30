@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/janekbaraniewski/openusage/internal/pricing"
+	"github.com/nurulislamz/agentusage/internal/pricing"
 )
 
 func newPricingCommand() *cobra.Command {
@@ -27,9 +27,9 @@ caches the table on disk under the user cache directory, and prints the
 resolved rates for the supplied model.
 
 Examples:
-  openusage pricing claude-3-5-sonnet
-  openusage pricing gpt-4o --context 250000
-  openusage pricing gemini-1.5-pro --json
+  agentusage pricing claude-3-5-sonnet
+  agentusage pricing gpt-4o --context 250000
+  agentusage pricing gemini-1.5-pro --json
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

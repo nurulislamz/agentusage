@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 func TestMapProviderEvent_AccountFallsBackToSourceSystemBeforeProvider(t *testing.T) {

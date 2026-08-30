@@ -8,8 +8,8 @@
     views: [],
     selected: 0,
     filter: "",
-    token: sessionStorage.getItem("ou-serve-token") || "",
-    themeOverride: localStorage.getItem("ou-serve-theme-override") || "",
+    token: sessionStorage.getItem("au-serve-token") || "",
+    themeOverride: localStorage.getItem("au-serve-theme-override") || "",
     loading: true,
     refreshing: false,
     spinnerFrame: 0,
@@ -95,7 +95,7 @@
     const order = ["", "light"];
     const idx = order.indexOf(state.themeOverride);
     state.themeOverride = order[(idx + 1) % order.length];
-    localStorage.setItem("ou-serve-theme-override", state.themeOverride);
+    localStorage.setItem("au-serve-theme-override", state.themeOverride);
     applyThemeTokens(state.envelope?.theme_tokens, state.themeOverride);
   }
 
@@ -193,7 +193,7 @@
     const filterLabel = state.filter ? " (filtered)" : "";
     const line = el("div", { class: "dash-header-line" }, [
       el("span", { class: "brand-bolt", text: "⚡" }),
-      el("span", { class: "brand-name", text: "OpenUsage" }),
+      el("span", { class: "brand-name", text: "agentUsage" }),
       el("span", { class: "header-counts" }, countParts),
       spinner,
       el("span", {
@@ -392,7 +392,7 @@
   $("token-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
     state.token = $("token-input").value.trim();
-    sessionStorage.setItem("ou-serve-token", state.token);
+    sessionStorage.setItem("au-serve-token", state.token);
     load().catch(console.error);
   });
 

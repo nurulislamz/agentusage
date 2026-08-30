@@ -2,10 +2,10 @@
 
 set -euo pipefail
 
-REPO="janekbaraniewski/openusage"
-BINARY_NAME="openusage"
-INSTALL_DIR="${OPENUSAGE_INSTALL_DIR:-}"
-VERSION="${OPENUSAGE_VERSION:-}"
+REPO="nurulislamz/agentusage"
+BINARY_NAME="agentusage"
+INSTALL_DIR="${AGENTUSAGE_INSTALL_DIR:-}"
+VERSION="${AGENTUSAGE_VERSION:-}"
 
 log() {
   printf '==> %s\n' "$*"
@@ -26,7 +26,7 @@ need_cmd() {
 
 usage() {
   cat <<'EOF'
-Install OpenUsage from GitHub Releases.
+Install agentUsage from GitHub Releases.
 
 Usage:
   install.sh [--version vX.Y.Z] [--install-dir PATH]
@@ -37,19 +37,19 @@ Options:
   -h, --help     Show this help
 
 Environment variables:
-  OPENUSAGE_VERSION      Same as --version
-  OPENUSAGE_INSTALL_DIR  Same as --install-dir
-  OPENUSAGE_GITHUB_TOKEN Optional GitHub token (helps avoid API rate limits)
+  AGENTUSAGE_VERSION      Same as --version
+  AGENTUSAGE_INSTALL_DIR  Same as --install-dir
+  AGENTUSAGE_GITHUB_TOKEN Optional GitHub token (helps avoid API rate limits)
 EOF
 }
 
 api_get() {
   local url="$1"
   if has_cmd curl; then
-    if [ -n "${OPENUSAGE_GITHUB_TOKEN:-}" ]; then
+    if [ -n "${AGENTUSAGE_GITHUB_TOKEN:-}" ]; then
       curl -fsSL \
         -H "Accept: application/vnd.github+json" \
-        -H "Authorization: Bearer ${OPENUSAGE_GITHUB_TOKEN}" \
+        -H "Authorization: Bearer ${AGENTUSAGE_GITHUB_TOKEN}" \
         "$url"
     else
       curl -fsSL -H "Accept: application/vnd.github+json" "$url"
@@ -58,10 +58,10 @@ api_get() {
   fi
 
   if has_cmd wget; then
-    if [ -n "${OPENUSAGE_GITHUB_TOKEN:-}" ]; then
+    if [ -n "${AGENTUSAGE_GITHUB_TOKEN:-}" ]; then
       wget -qO- \
         --header="Accept: application/vnd.github+json" \
-        --header="Authorization: Bearer ${OPENUSAGE_GITHUB_TOKEN}" \
+        --header="Authorization: Bearer ${AGENTUSAGE_GITHUB_TOKEN}" \
         "$url"
     else
       wget -qO- --header="Accept: application/vnd.github+json" "$url"
@@ -187,10 +187,10 @@ EOF
 
 if [ "$OS" = "windows" ]; then
   [ "$ARCH" = "amd64" ] || die "Windows arm64 binaries are not published yet"
-  BINARY_NAME="openusage.exe"
+  BINARY_NAME="agentusage.exe"
   ARCHIVE_EXT="zip"
 else
-  BINARY_NAME="openusage"
+  BINARY_NAME="agentusage"
   ARCHIVE_EXT="tar.gz"
 fi
 
@@ -213,7 +213,7 @@ if [ -z "$VERSION_TAG" ]; then
 fi
 
 VERSION_NO_V="${VERSION_TAG#v}"
-ASSET="openusage_${VERSION_NO_V}_${OS}_${ARCH}.${ARCHIVE_EXT}"
+ASSET="agentusage_${VERSION_NO_V}_${OS}_${ARCH}.${ARCHIVE_EXT}"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION_TAG}/${ASSET}"
 
 TMP_DIR="$(mktemp -d)"

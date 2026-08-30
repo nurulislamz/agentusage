@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 const (
@@ -40,7 +40,7 @@ func NewServer(addr string, store *Store) *Server {
 // NewServerWithAuth creates a Server that requires Bearer token auth on
 // mutating / data endpoints when authToken is non-empty. The caller is
 // expected to have resolved any environment-variable fallback (e.g.
-// OPENUSAGE_HUB_TOKEN) before invoking this — see cmd/openusage/hub.go's
+// AGENTUSAGE_HUB_TOKEN) before invoking this — see cmd/agentusage/hub.go's
 // resolveHubRuntime for the canonical resolution path.
 func NewServerWithAuth(addr string, store *Store, authToken string) *Server {
 	return &Server{addr: addr, store: store, authToken: strings.TrimSpace(authToken)}
@@ -93,7 +93,7 @@ func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) bool {
 	header := r.Header.Get("Authorization")
 	const prefix = "Bearer "
 	if !strings.HasPrefix(header, prefix) {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="openusage-hub"`)
+		w.Header().Set("WWW-Authenticate", `Bearer realm="agentusage-hub"`)
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing bearer token"})
 		return false
 	}
@@ -101,7 +101,7 @@ func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) bool {
 	// Constant-time compare so an attacker can't enumerate the token
 	// byte-by-byte via response-timing differences.
 	if subtle.ConstantTimeCompare([]byte(got), []byte(s.authToken)) != 1 {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="openusage-hub", error="invalid_token"`)
+		w.Header().Set("WWW-Authenticate", `Bearer realm="agentusage-hub", error="invalid_token"`)
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid bearer token"})
 		return false
 	}

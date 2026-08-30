@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // materializedTableName is the fixed temp table name used for materialized

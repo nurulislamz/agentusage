@@ -1,5 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin"
-// openusage-integration-version: __OPENUSAGE_INTEGRATION_VERSION__
+// agentusage-integration-version: __AGENTUSAGE_INTEGRATION_VERSION__
 
 import { createConnection as netCreateConnection } from "node:net"
 import { existsSync, mkdirSync, writeFileSync, renameSync, readdirSync } from "node:fs"
@@ -89,7 +89,7 @@ function sanitizeUpstreamProvider(value: string): string {
     return ""
   }
   const normalized = trimmed.toLowerCase()
-  if (normalized === "openrouter" || normalized === "openusage" || normalized === "opencode" || normalized === "unknown") {
+  if (normalized === "openrouter" || normalized === "agentusage" || normalized === "opencode" || normalized === "unknown") {
     return ""
   }
   return trimmed
@@ -124,11 +124,11 @@ function normalizeModel(value: unknown): { providerID?: string; modelID?: string
 }
 
 function loadConfig(): RuntimeConfig {
-  const accountID = process.env.OPENUSAGE_TELEMETRY_ACCOUNT_ID?.trim()
+  const accountID = process.env.AGENTUSAGE_TELEMETRY_ACCOUNT_ID?.trim()
   return {
-    enabled: parseBool(process.env.OPENUSAGE_TELEMETRY_ENABLED, true),
+    enabled: parseBool(process.env.AGENTUSAGE_TELEMETRY_ENABLED, true),
     accountID: accountID && accountID !== "" ? accountID : undefined,
-    verbose: parseBool(process.env.OPENUSAGE_TELEMETRY_VERBOSE, false),
+    verbose: parseBool(process.env.AGENTUSAGE_TELEMETRY_VERBOSE, false),
   }
 }
 
@@ -290,20 +290,20 @@ function safeJSONStringify(value: unknown): string | undefined {
   }
 }
 
-// On Windows the openusage daemon resolves its state dir to
-// %APPDATA%\openusage\state (see telemetry.DefaultStateDir). XDG_STATE_HOME
+// On Windows the agentusage daemon resolves its state dir to
+// %APPDATA%\agentusage\state (see telemetry.DefaultStateDir). XDG_STATE_HOME
 // still wins when explicitly set, matching the Go side.
 function windowsStateDir(): string {
   const stateHome = (process.env.XDG_STATE_HOME || "").trim()
   if (stateHome !== "") {
-    return `${stateHome}\\openusage`
+    return `${stateHome}\\agentusage`
   }
   const appData = (process.env.APPDATA || "").trim()
-  return `${appData}\\openusage\\state`
+  return `${appData}\\agentusage\\state`
 }
 
 function resolveSocketPath(): string {
-  const explicit = (process.env.OPENUSAGE_SOCKET || "").trim()
+  const explicit = (process.env.AGENTUSAGE_SOCKET || "").trim()
   if (explicit !== "") {
     return explicit
   }
@@ -312,11 +312,11 @@ function resolveSocketPath(): string {
   }
   const stateHome = (process.env.XDG_STATE_HOME || "").trim()
   const base = stateHome !== "" ? stateHome : `${process.env.HOME}/.local/state`
-  return `${base}/openusage/telemetry.sock`
+  return `${base}/agentusage/telemetry.sock`
 }
 
 function resolveHookSpoolDir(): string {
-  const explicit = (process.env.OPENUSAGE_HOOK_SPOOL || "").trim()
+  const explicit = (process.env.AGENTUSAGE_HOOK_SPOOL || "").trim()
   if (explicit !== "") {
     return explicit
   }
@@ -325,7 +325,7 @@ function resolveHookSpoolDir(): string {
   }
   const stateHome = (process.env.XDG_STATE_HOME || "").trim()
   const base = stateHome !== "" ? stateHome : `${process.env.HOME}/.local/state`
-  return `${base}/openusage/hook-spool`
+  return `${base}/agentusage/hook-spool`
 }
 
 async function postToSocket(socketPath: string, path: string, body: string): Promise<boolean> {
@@ -348,7 +348,7 @@ async function spoolToDisk(source: string, accountID: string, payloadJSON: strin
     if (!existsSync(dir)) { mkdirSync(dir, { recursive: true }) }
     const files = readdirSync(dir).filter(f => f.endsWith(".json"))
     if (files.length >= 500) {
-      if (verbose) { console.error("[openusage-telemetry] hook spool full (500 files)") }
+      if (verbose) { console.error("[agentusage-telemetry] hook spool full (500 files)") }
       return
     }
     const ts = Math.floor(Date.now() / 1000)
@@ -360,7 +360,7 @@ async function spoolToDisk(source: string, accountID: string, payloadJSON: strin
     writeFileSync(tmp, record + "\n")
     renameSync(tmp, dst)
   } catch (err) {
-    if (verbose) { console.error(`[openusage-telemetry] spool write failed: ${err}`) }
+    if (verbose) { console.error(`[agentusage-telemetry] spool write failed: ${err}`) }
   }
 }
 
@@ -368,7 +368,7 @@ async function sendPayload(cfg: RuntimeConfig, payload: unknown): Promise<void> 
   const payloadJSON = safeJSONStringify(payload)
   if (!payloadJSON) {
     if (cfg.verbose) {
-      console.error("[openusage-telemetry] payload serialization failed")
+      console.error("[agentusage-telemetry] payload serialization failed")
     }
     return
   }
@@ -391,7 +391,7 @@ async function sendPayload(cfg: RuntimeConfig, payload: unknown): Promise<void> 
   await spoolToDisk("opencode", cfg.accountID || "", payloadJSON, cfg.verbose)
 }
 
-export const OpenUsageTelemetry: Plugin = async () => {
+export const AgentUsageTelemetry: Plugin = async () => {
   const cfg = loadConfig()
   if (!cfg.enabled) {
     return {}
@@ -434,4 +434,4 @@ export const OpenUsageTelemetry: Plugin = async () => {
   }
 }
 
-export default OpenUsageTelemetry
+export default AgentUsageTelemetry

@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // writeRegistry writes a projects.json registry under dir and returns

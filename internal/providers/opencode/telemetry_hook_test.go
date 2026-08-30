@@ -3,7 +3,7 @@ package opencode
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 func TestParseTelemetryHookPayload_EventWrapperMessageUpdated(t *testing.T) {

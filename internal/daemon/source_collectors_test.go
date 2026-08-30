@@ -3,9 +3,9 @@ package daemon
 import (
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers"
-	"github.com/janekbaraniewski/openusage/internal/telemetry"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers"
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 )
 
 func TestBuildCollectors_ScopesConfiguredAccount(t *testing.T) {

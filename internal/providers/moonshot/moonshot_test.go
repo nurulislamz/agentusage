@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // userInfoBody returns a realistic /v1/users/me response. Mirrors the live
@@ -86,7 +86,7 @@ func setKey(t *testing.T, value string) {
 	t.Setenv("TEST_MOONSHOT_KEY", value)
 	// Each test gets an isolated state file so peak-tracking from previous
 	// runs (or from another running daemon on the dev box) can't leak in.
-	t.Setenv("OPENUSAGE_MOONSHOT_STATE_PATH", filepath.Join(t.TempDir(), "moonshot-state.json"))
+	t.Setenv("AGENTUSAGE_MOONSHOT_STATE_PATH", filepath.Join(t.TempDir(), "moonshot-state.json"))
 }
 
 func newAcct(server, accountID string) core.AccountConfig {

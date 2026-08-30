@@ -11,8 +11,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 func TestParseCopilotTelemetrySessionFile_ToolLifecycleAndMCP(t *testing.T) {
@@ -29,8 +29,8 @@ func TestParseCopilotTelemetrySessionFile_ToolLifecycleAndMCP(t *testing.T) {
 				"copilotVersion": "0.0.500",
 				"startTime":      "2026-03-01T10:00:00Z",
 				"context": map[string]any{
-					"cwd":        "/Users/test/openusage",
-					"repository": "janekbaraniewski/openusage",
+					"cwd":        "/Users/test/agentusage",
+					"repository": "nurulislamz/agentusage",
 					"branch":     "main",
 				},
 			},
@@ -121,8 +121,8 @@ func TestParseCopilotTelemetrySessionFile_ToolLifecycleAndMCP(t *testing.T) {
 	if got, _ := mcpEvent.Payload["mcp_function"].(string); got != "pods_list" {
 		t.Fatalf("payload.mcp_function = %q, want pods_list", got)
 	}
-	if got, _ := mcpEvent.Payload["client"].(string); got != "janekbaraniewski/openusage" {
-		t.Fatalf("payload.client = %q, want janekbaraniewski/openusage", got)
+	if got, _ := mcpEvent.Payload["client"].(string); got != "nurulislamz/agentusage" {
+		t.Fatalf("payload.client = %q, want nurulislamz/agentusage", got)
 	}
 	if got, _ := mcpEvent.Payload["file"].(string); got != "internal/providers/copilot/copilot.go" {
 		t.Fatalf("payload.file = %q, want internal/providers/copilot/copilot.go", got)
@@ -169,8 +169,8 @@ func TestParseCopilotTelemetrySessionFile_AssistantUsageFallbackModel(t *testing
 			"data": map[string]any{
 				"sessionId": sessionID,
 				"context": map[string]any{
-					"cwd":        "/Users/test/openusage",
-					"repository": "janekbaraniewski/openusage",
+					"cwd":        "/Users/test/agentusage",
+					"repository": "nurulislamz/agentusage",
 				},
 			},
 		},
@@ -228,8 +228,8 @@ func TestParseCopilotTelemetrySessionFile_AssistantUsageFallbackModel(t *testing
 	if usageEvent.CostUSD == nil || *usageEvent.CostUSD != 1.25 {
 		t.Fatalf("cost_usd = %v, want 1.25", usageEvent.CostUSD)
 	}
-	if got, _ := usageEvent.Payload["client"].(string); got != "janekbaraniewski/openusage" {
-		t.Fatalf("payload.client = %q, want janekbaraniewski/openusage", got)
+	if got, _ := usageEvent.Payload["client"].(string); got != "nurulislamz/agentusage" {
+		t.Fatalf("payload.client = %q, want nurulislamz/agentusage", got)
 	}
 }
 
@@ -245,8 +245,8 @@ func TestParseCopilotTelemetrySessionFile_ShutdownFallbackUsage(t *testing.T) {
 			"data": map[string]any{
 				"sessionId": sessionID,
 				"context": map[string]any{
-					"cwd":        "/Users/test/openusage",
-					"repository": "janekbaraniewski/openusage",
+					"cwd":        "/Users/test/agentusage",
+					"repository": "nurulislamz/agentusage",
 				},
 			},
 		},
@@ -439,7 +439,7 @@ func TestParseCopilotTelemetrySessionStore_Fallback(t *testing.T) {
 			first_seen_at TEXT
 		)`,
 		`INSERT INTO sessions (id, cwd, repository) VALUES
-			('sess-missing-jsonl', '/Users/test/openusage', 'janek/openusage'),
+			('sess-missing-jsonl', '/Users/test/agentusage', 'janek/agentusage'),
 			('sess-has-jsonl', '/Users/test/other', 'janek/other')`,
 		`INSERT INTO turns (session_id, turn_index, user_message, assistant_response, timestamp) VALUES
 			('sess-missing-jsonl', 0, 'hello', 'world', '2026-03-01T10:00:00Z'),

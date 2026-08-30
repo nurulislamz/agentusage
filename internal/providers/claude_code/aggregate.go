@@ -12,7 +12,7 @@ type CostMode string
 
 const (
 	// CostModeCalculate always recomputes cost from tokens at current model
-	// rates. This is OpenUsage's historical behaviour and the default.
+	// rates. This is agentUsage's historical behaviour and the default.
 	CostModeCalculate CostMode = "calculate"
 	// CostModeDisplay trusts the costUSD recorded in the JSONL entry and shows
 	// 0 when it is absent.

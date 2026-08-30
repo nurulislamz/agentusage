@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
-	"github.com/janekbaraniewski/openusage/internal/providers/providerbase"
-	"github.com/janekbaraniewski/openusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
+	"github.com/nurulislamz/agentusage/internal/providers/shared"
 )
 
 const (
@@ -52,7 +52,7 @@ func New() *Provider {
 			Setup: core.ProviderSetupSpec{
 				Quickstart: []string{
 					"Install Qwen CLI and run at least one chat.",
-					"openusage auto-detects ~/.qwen/projects/<project>/chats/*.jsonl; no configuration required.",
+					"agentusage auto-detects ~/.qwen/projects/<project>/chats/*.jsonl; no configuration required.",
 				},
 			},
 			Dashboard: dashboardWidget(),

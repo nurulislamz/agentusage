@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/janekbaraniewski/openusage/internal/report"
+	"github.com/nurulislamz/agentusage/internal/report"
 )
 
 func TestRenderStatusline_FullLine(t *testing.T) {
@@ -194,7 +194,7 @@ func TestStatuslineHasInstallUninstallSubcommands(t *testing.T) {
 		t.Fatalf("statusline missing install/uninstall subcommands; have %v", have)
 	}
 	// The render command itself must take no positional args (Claude Code calls
-	// `openusage statusline` bare) and still expose --segments for the baked command.
+	// `agentusage statusline` bare) and still expose --segments for the baked command.
 	if cmd.Flags().Lookup("segments") == nil {
 		t.Fatal("statusline render command missing --segments flag")
 	}

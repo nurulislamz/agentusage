@@ -4,8 +4,8 @@ package integrations
 
 import "path/filepath"
 
-// platformHooksDir places OpenUsage's hook scripts under <configRoot>/openusage/hooks
+// platformHooksDir places agentUsage's hook scripts under <configRoot>/agentusage/hooks
 // on Unix (configRoot is XDG_CONFIG_HOME or ~/.config).
 func platformHooksDir(configRoot string) string {
-	return filepath.Join(configRoot, "openusage", "hooks")
+	return filepath.Join(configRoot, "agentusage", "hooks")
 }

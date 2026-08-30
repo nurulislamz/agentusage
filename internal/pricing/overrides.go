@@ -14,8 +14,8 @@ import (
 
 const (
 	// CustomOverridesFilename is the basename of the user-editable pricing
-	// override file searched for under $XDG_CONFIG_HOME/openusage/ and
-	// ~/.config/openusage/. The file is optional; absence is not an error.
+	// override file searched for under $XDG_CONFIG_HOME/agentusage/ and
+	// ~/.config/agentusage/. The file is optional; absence is not an error.
 	CustomOverridesFilename = "custom-pricing.json"
 
 	// SourceCustom marks prices that originated in the user's
@@ -146,11 +146,11 @@ func finiteNonNegative(v float64) bool {
 }
 
 func customOverridesPath() (string, error) {
-	if env := strings.TrimSpace(os.Getenv("OPENUSAGE_CUSTOM_PRICING")); env != "" {
+	if env := strings.TrimSpace(os.Getenv("AGENTUSAGE_CUSTOM_PRICING")); env != "" {
 		return env, nil
 	}
 	if xdg := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); xdg != "" {
-		return filepath.Join(xdg, "openusage", CustomOverridesFilename), nil
+		return filepath.Join(xdg, "agentusage", CustomOverridesFilename), nil
 	}
 	// Platform default: tracks settings.json's location (see overrides_path_*.go).
 	return platformCustomOverridesPath()

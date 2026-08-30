@@ -6,9 +6,9 @@ import "strings"
 
 // codexArtifact describes the Codex notify hook artifact on Windows. Codex
 // execs the notify array directly (no shell), so a .sh script has no
-// interpreter. Instead of writing a script, we register the openusage binary
+// interpreter. Instead of writing a script, we register the agentusage binary
 // directly in the notify array; Codex appends the event JSON as the next argv
-// element, yielding `openusage telemetry hook codex <payload>`. An empty
+// element, yielding `agentusage telemetry hook codex <payload>`. An empty
 // Template/Basename signals the installer to write no artifact file.
 func codexArtifact() artifactSpec {
 	return artifactSpec{
@@ -20,14 +20,14 @@ func codexArtifact() artifactSpec {
 }
 
 // codexTargetFile returns the value Codex's notify array points at (the
-// openusage binary) and reports that no artifact file is written on Windows.
+// agentusage binary) and reports that no artifact file is written on Windows.
 func codexTargetFile(dirs Dirs) (path string, writesArtifact bool) {
-	return dirs.OpenusageBin, false
+	return dirs.AgentusageBin, false
 }
 
 // codexNotifyTOML renders the TOML notify assignment on Windows as an array of
 // TOML literal (single-quoted) strings. Literal strings do not process
-// backslash escapes, so a Windows path like C:\Users\...\openusage.exe is
+// backslash escapes, so a Windows path like C:\Users\...\agentusage.exe is
 // preserved verbatim. The trailing elements turn the binary into the full hook
 // command; Codex appends the event JSON as the next argv element.
 func codexNotifyTOML(exePath string) string {
@@ -39,7 +39,7 @@ func codexNotifyTOML(exePath string) string {
 	return "notify = [" + strings.Join(quoted, ", ") + "]"
 }
 
-// codexConfigured reports whether the Codex config registers the openusage
+// codexConfigured reports whether the Codex config registers the agentusage
 // notify hook on Windows: a notify line that invokes the binary with the
 // `telemetry hook codex` subcommand.
 func codexConfigured(content string) bool {

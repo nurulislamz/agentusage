@@ -1,6 +1,6 @@
 package ollama
 
-import "github.com/janekbaraniewski/openusage/internal/core"
+import "github.com/nurulislamz/agentusage/internal/core"
 
 // LocalSourcePaths returns the on-disk locations the provider reads. Mirrors
 // resolveDesktopDBPath/resolveServerConfigPath/resolveServerLogFiles in

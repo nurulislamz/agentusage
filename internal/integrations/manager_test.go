@@ -7,7 +7,7 @@ import (
 )
 
 func TestParseIntegrationVersion(t *testing.T) {
-	data := []byte("# openusage-integration-version: 2026-02-23.1\n")
+	data := []byte("# agentusage-integration-version: 2026-02-23.1\n")
 	got := parseIntegrationVersion(data)
 	if got != "2026-02-23.1" {
 		t.Fatalf("parseIntegrationVersion() = %q, want 2026-02-23.1", got)
@@ -17,14 +17,14 @@ func TestParseIntegrationVersion(t *testing.T) {
 func TestManagerInstallAndListStatuses(t *testing.T) {
 	root := t.TempDir()
 	dirs := Dirs{
-		Home:         root,
-		ConfigRoot:   filepath.Join(root, ".config"),
-		HooksDir:     filepath.Join(root, ".config", "openusage", "hooks"),
-		OpenusageBin: "/tmp/openusage-bin",
+		Home:          root,
+		ConfigRoot:    filepath.Join(root, ".config"),
+		HooksDir:      filepath.Join(root, ".config", "agentusage", "hooks"),
+		AgentusageBin: "/tmp/agentusage-bin",
 	}
 	m := Manager{dirs: dirs}
 
-	for _, id := range []ID{OpenCodeID, CodexID, ClaudeCodeID, CursorID} {
+	for _, id := range []ID{OpenCodeID, CodexID, ClaudeCodeID, AntigravityID, CursorID} {
 		if err := m.Install(id); err != nil {
 			t.Fatalf("Install(%s) error = %v", id, err)
 		}
@@ -48,10 +48,10 @@ func TestManagerInstallAndListStatuses(t *testing.T) {
 func TestManagerInstallUnknownID(t *testing.T) {
 	root := t.TempDir()
 	dirs := Dirs{
-		Home:         root,
-		ConfigRoot:   filepath.Join(root, ".config"),
-		HooksDir:     filepath.Join(root, ".config", "openusage", "hooks"),
-		OpenusageBin: "/tmp/openusage-bin",
+		Home:          root,
+		ConfigRoot:    filepath.Join(root, ".config"),
+		HooksDir:      filepath.Join(root, ".config", "agentusage", "hooks"),
+		AgentusageBin: "/tmp/agentusage-bin",
 	}
 	m := Manager{dirs: dirs}
 
@@ -64,10 +64,10 @@ func TestManagerInstallUnknownID(t *testing.T) {
 func TestManagerListStatusesMissing(t *testing.T) {
 	root := t.TempDir()
 	dirs := Dirs{
-		Home:         root,
-		ConfigRoot:   filepath.Join(root, ".config"),
-		HooksDir:     filepath.Join(root, ".config", "openusage", "hooks"),
-		OpenusageBin: "/tmp/openusage-bin",
+		Home:          root,
+		ConfigRoot:    filepath.Join(root, ".config"),
+		HooksDir:      filepath.Join(root, ".config", "agentusage", "hooks"),
+		AgentusageBin: "/tmp/agentusage-bin",
 	}
 	m := Manager{dirs: dirs}
 
@@ -82,16 +82,16 @@ func TestManagerListStatusesMissing(t *testing.T) {
 func TestManagerDetectOutdated(t *testing.T) {
 	root := t.TempDir()
 	dirs := Dirs{
-		Home:         root,
-		ConfigRoot:   filepath.Join(root, ".config"),
-		HooksDir:     filepath.Join(root, ".config", "openusage", "hooks"),
-		OpenusageBin: "/tmp/openusage-bin",
+		Home:          root,
+		ConfigRoot:    filepath.Join(root, ".config"),
+		HooksDir:      filepath.Join(root, ".config", "agentusage", "hooks"),
+		AgentusageBin: "/tmp/agentusage-bin",
 	}
 
 	// Create an old-version hook file for codex.
 	def, _ := DefinitionByID(CodexID)
 	if def.WritesArtifact != nil && !def.WritesArtifact(dirs) {
-		// On platforms where Codex registers the openusage binary directly
+		// On platforms where Codex registers the agentusage binary directly
 		// (no hook script), there is no on-disk version to mark "outdated".
 		t.Skip("codex writes no artifact file on this platform; outdated detection is file-based")
 	}
@@ -103,7 +103,7 @@ func TestManagerDetectOutdated(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(configFile), 0o755); err != nil {
 		t.Fatalf("mkdir config dir: %v", err)
 	}
-	if err := os.WriteFile(hookFile, []byte("# openusage-integration-version: 2025-01-01\n"), 0o755); err != nil {
+	if err := os.WriteFile(hookFile, []byte("# agentusage-integration-version: 2025-01-01\n"), 0o755); err != nil {
 		t.Fatalf("write hook: %v", err)
 	}
 	if err := os.WriteFile(configFile, []byte("notify = [\""+hookFile+"\"]\n"), 0o600); err != nil {

@@ -4,8 +4,8 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "./tmp/openusage"
-  cmd = "go build -o ./tmp/openusage ./cmd/openusage"
+  bin = "./tmp/agentusage"
+  cmd = "go build -o ./tmp/agentusage ./cmd/agentusage"
   delay = 500
   exclude_dir = ["bin", "tmp", "vendor", ".git", ".venv-font"]
   exclude_file = []

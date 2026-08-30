@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/janekbaraniewski/openusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 // encode writes the envelope to w in the requested format.
@@ -49,14 +49,14 @@ func encodeJSON(w io.Writer, env ExportEnvelope) error {
 //
 // Columns:
 //
-//	schema_version, generated_at, openusage_version, source,
+//	schema_version, generated_at, agentusage_version, source,
 //	provider_id, account_id, snapshot_timestamp, status, message,
 //	metric, used, limit, remaining, unit, window
 func encodeCSV(w io.Writer, env ExportEnvelope) error {
 	buf := bytes.NewBuffer(nil)
 	cw := csv.NewWriter(buf)
 	header := []string{
-		"schema_version", "generated_at", "openusage_version", "source",
+		"schema_version", "generated_at", "agentusage_version", "source",
 		"provider_id", "account_id", "snapshot_timestamp", "status", "message",
 		"metric", "used", "limit", "remaining", "unit", "window",
 	}
@@ -67,7 +67,7 @@ func encodeCSV(w io.Writer, env ExportEnvelope) error {
 	envFields := []string{
 		env.SchemaVersion,
 		env.GeneratedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
-		env.OpenUsageVersion,
+		env.AgentUsageVersion,
 		string(env.Source),
 	}
 

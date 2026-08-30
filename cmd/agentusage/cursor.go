@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/janekbaraniewski/openusage/internal/providers/cursor"
+	"github.com/nurulislamz/agentusage/internal/providers/cursor"
 	"github.com/spf13/cobra"
 )
 
@@ -21,11 +21,11 @@ func newCursorCommand() *cobra.Command {
 		Use:   "statusline",
 		Short: "Capture and render Cursor's status-line JSON",
 		Long: `Read the JSON Cursor sends to a statusLine command, save the latest
-payload for OpenUsage, and print a compact one-line summary. The command does
+payload for agentUsage, and print a compact one-line summary. The command does
 not read or store credentials.`,
 		Example: strings.Join([]string{
-			`  cat statusline.json | openusage cursor statusline`,
-			`  cat statusline.json | openusage cursor statusline --state-file /tmp/cursor.json`,
+			`  cat statusline.json | agentusage cursor statusline`,
+			`  cat statusline.json | agentusage cursor statusline --state-file /tmp/cursor.json`,
 		}, "\n"),
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
@@ -39,7 +39,7 @@ not read or store credentials.`,
 			return captureErr
 		},
 	}
-	statusline.Flags().StringVar(&stateFile, "state-file", "", "override the OpenUsage Cursor state file")
+	statusline.Flags().StringVar(&stateFile, "state-file", "", "override the agentUsage Cursor state file")
 	cmd.AddCommand(statusline)
 	return cmd
 }
