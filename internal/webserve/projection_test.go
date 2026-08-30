@@ -25,7 +25,20 @@ func TestSnapshotsIncludeProjectedViews(t *testing.T) {
 	if env.ThemeTokens.Base == "" {
 		t.Fatal("expected theme tokens")
 	}
-	if env.Views[0].Key == "" || len(env.Views[0].TileLines) == 0 {
-		t.Fatalf("incomplete view: %+v", env.Views[0])
+	view := env.Views[0]
+	if view.Key == "" || len(view.TileLines) == 0 {
+		t.Fatalf("incomplete view: %+v", view)
+	}
+	if view.DetailHTML == "" {
+		t.Fatal("expected detail_html from TUI RenderDetailContent")
+	}
+	if view.BadgeHTML == "" {
+		t.Fatal("expected badge_html")
+	}
+	if view.IconHTML == "" {
+		t.Fatal("expected icon_html")
+	}
+	if view.LastRefreshed == "" {
+		t.Fatal("expected last_refreshed on demo views")
 	}
 }

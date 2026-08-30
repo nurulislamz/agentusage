@@ -199,13 +199,49 @@ func formatCycleResetSchedule(snap core.UsageSnapshot, now time.Time) string {
 	return strings.Join(parts, " · ")
 }
 
-// formatCycleResetScheduleSidebar renders the primary cycle reset for the navigator row.
-func formatCycleResetScheduleSidebar(snap core.UsageSnapshot, now time.Time) string {
+func monthlyQuotaExhausted(snap core.UsageSnapshot) bool {
+	for _, key := range []string{"monthly_usage_pct", "monthly_usage", "monthly_subscription"} {
+		met, ok := snap.Metrics[key]
+		if !ok {
+			continue
+		}
+		if met.Remaining != nil && *met.Remaining <= 0 {
+			return true
+		}
+		if met.Used != nil && *met.Used >= 100 {
+			return true
+		}
+	}
+	return false
+}
+
+func sidebarCycleResetAt(snap core.UsageSnapshot) (time.Time, bool) {
 	entries := collectCycleResetEntries(snap)
 	if len(entries) == 0 {
+		return time.Time{}, false
+	}
+	if monthlyQuotaExhausted(snap) {
+		for _, e := range entries {
+			if e.tier == cycleResetMonthly {
+				return e.at, true
+			}
+		}
+	}
+	return entries[0].at, true
+}
+
+// formatCycleResetScheduleSidebar renders the primary cycle reset for the navigator row.
+func formatCycleResetScheduleSidebar(snap core.UsageSnapshot, now time.Time) string {
+	at, ok := sidebarCycleResetAt(snap)
+	if !ok {
 		return ""
 	}
-	return formatCycleResetIn(entries[0].at, now)
+	return formatCycleResetIn(at, now)
+}
+
+// SidebarResetHint is the navigator reset sentence (TUI list and web nav).
+func SidebarResetHint(snap core.UsageSnapshot, now time.Time) string {
+	return formatCycleResetScheduleSidebar(snap, now)
 }
 
 // formatCycleResetScheduleCompact renders all cycle resets on one line.

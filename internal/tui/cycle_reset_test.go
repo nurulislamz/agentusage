@@ -136,6 +136,44 @@ func TestRenderDetailContent_ShowsCycleResetInHeader(t *testing.T) {
 	}
 }
 
+func TestFormatCycleResetScheduleSidebar_OpenCodeMonthlyExhausted(t *testing.T) {
+	now := time.Date(2026, 8, 30, 18, 15, 0, 0, time.UTC)
+	zero, thirtyTwo, hundred := 0.0, 32.0, 100.0
+	snap := core.UsageSnapshot{
+		ProviderID: "opencode",
+		AccountID:  "opencode-mohammed",
+		Status:     core.StatusLimited,
+		Timestamp:  now,
+		Metrics: map[string]core.Metric{
+			"rolling_usage":     {Remaining: &hundred},
+			"weekly_usage":      {Remaining: &thirtyTwo},
+			"monthly_usage_pct": {Remaining: &zero},
+		},
+		Resets: map[string]time.Time{
+			"rolling_usage":     now.Add(4*time.Hour + 59*time.Minute),
+			"weekly_usage":      now.Add(5*time.Hour + 45*time.Minute),
+			"monthly_usage_pct": now.Add(9*24*time.Hour + 3*time.Hour),
+		},
+	}
+
+	got := formatCycleResetScheduleSidebar(snap, now)
+	if got != "Resets in 9 days" {
+		t.Fatalf("sidebar reset = %q, want monthly Resets in 9 days", got)
+	}
+
+	m := NewModel(0.2, 0.05, false, config.DashboardConfig{}, nil, core.TimeWindow3d)
+	m.referenceTime = now
+	di := computeDisplayInfo(snap, dashboardWidget("opencode"), false, config.UsageModeRemaining)
+	row := m.renderListSummaryRow(snap, di, 48)
+	plain := StripANSI(row)
+	if !strings.Contains(plain, "9 days") {
+		t.Fatalf("list row should show monthly reset, got %q", plain)
+	}
+	if strings.Contains(strings.ToLower(plain), "week") || strings.Contains(plain, "5h") {
+		t.Fatalf("list row should not show weekly/5h reset when monthly is exhausted, got %q", plain)
+	}
+}
+
 func TestFormatLastRefreshedIfStale(t *testing.T) {
 	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
 	if got := formatLastRefreshedIfStale(now.Add(-10*time.Second), now); got != "" {

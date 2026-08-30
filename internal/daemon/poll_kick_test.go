@@ -1,9 +1,30 @@
 package daemon
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestHandlePollWaitReturnsPolled(t *testing.T) {
+	s := &Service{pollKick: make(chan struct{}, 1)}
+	req := httptest.NewRequest(http.MethodPost, "/v1/poll?wait=1", nil)
+	w := httptest.NewRecorder()
+	s.handlePoll(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"polled"`) {
+		t.Fatalf("body = %s, want polled", w.Body.String())
+	}
+	select {
+	case <-s.pollKick:
+		t.Fatal("wait=1 should run poll inline, not enqueue kick")
+	default:
+	}
+}
 
 func TestRequestPoll_Coalesces(t *testing.T) {
 	s := &Service{pollKick: make(chan struct{}, 1)}

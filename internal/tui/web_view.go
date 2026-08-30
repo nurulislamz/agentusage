@@ -53,8 +53,13 @@ type WebAccountView struct {
 	Timestamp      time.Time          `json:"timestamp"`
 	TileLines      []string           `json:"tile_lines"`
 	DetailSections []WebDetailSection `json:"detail_sections"`
+	DetailCards    []WebDetailCard    `json:"detail_cards,omitempty"`
 	Resets         []WebResetPill     `json:"resets,omitempty"`
 	DailyCost      []core.TimePoint   `json:"daily_cost,omitempty"`
+	CycleSchedule  string             `json:"cycle_schedule,omitempty"`
+	LastRefreshed  string             `json:"last_refreshed,omitempty"`
+	HasGauge       bool               `json:"has_gauge,omitempty"`
+	HeaderTone     string             `json:"header_tone,omitempty"`
 }
 
 type WebDetailSection struct {
@@ -149,6 +154,13 @@ func SnapshotsToMap(snaps []core.UsageSnapshot) map[string]core.UsageSnapshot {
 	return out
 }
 
+// WebUnmappedSummary returns the TUI header unmapped count and right-side phrase.
+func WebUnmappedSummary(snaps []core.UsageSnapshot) (count int, phrase string) {
+	m := Model{snapshots: SnapshotsToMap(snaps)}
+	ids := m.telemetryUnmappedProviders()
+	return len(ids), m.unmappedHeaderPhrase()
+}
+
 func (p WebProjector) ProjectSnapshots(snaps []core.UsageSnapshot, names map[string]string) []WebAccountView {
 	out := make([]WebAccountView, 0, len(snaps))
 	for _, snap := range snaps {
@@ -183,6 +195,7 @@ func (p WebProjector) ProjectSnapshot(snap core.UsageSnapshot, providerName stri
 		now = time.Now()
 	}
 	detailSections := projectDetailSections(snap, widget, detailW, m.warnThreshold, m.critThreshold, m.timeWindow, hideCosts, now, m.usageMode)
+	detailCards := projectDetailCards(snap, widget, detailW, m.warnThreshold, m.critThreshold, m.timeWindow, hideCosts, now, m.usageMode)
 
 	view := WebAccountView{
 		Key:            fmt.Sprintf("%s:%s", snap.ProviderID, snap.AccountID),
@@ -191,7 +204,7 @@ func (p WebProjector) ProjectSnapshot(snap core.UsageSnapshot, providerName stri
 		AccountID:      snap.AccountID,
 		Status:         string(snap.Status),
 		StatusBadge:    StripANSI(SnapshotStatusBadge(snap)),
-		StatusIcon:     StatusIcon(snap.Status),
+		StatusIcon:     StatusIcon(core.EffectiveStatus(snap)),
 		AccentColor:    colorHex(ProviderColor(snap.ProviderID)),
 		Summary:        di.summary,
 		Detail:         di.detail,
@@ -201,7 +214,12 @@ func (p WebProjector) ProjectSnapshot(snap core.UsageSnapshot, providerName stri
 		Timestamp:      snap.Timestamp,
 		TileLines:      tileLines,
 		DetailSections: detailSections,
+		DetailCards:    detailCards,
 		Resets:         projectResetPills(snap, widget, now),
+		CycleSchedule:  formatCycleResetSchedule(snap, now),
+		LastRefreshed:  formatLastRefreshed(snap.Timestamp, now),
+		HeaderTone:     headerTone(snap),
+		HasGauge:       di.gaugePercent >= 0,
 	}
 	if di.gaugePercent >= 0 {
 		view.GaugePercent = di.gaugePercent

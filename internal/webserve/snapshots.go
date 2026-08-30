@@ -10,7 +10,7 @@ import (
 	"github.com/nurulislamz/agentusage/internal/tui"
 )
 
-func (c *collector) fetchSnapshots(ctx context.Context) ([]core.UsageSnapshot, string, error) {
+func (c *collector) fetchSnapshots(ctx context.Context, refresh bool) ([]core.UsageSnapshot, string, error) {
 	if c.demo {
 		return demoSnapshots(c.now()), "demo", nil
 	}
@@ -21,7 +21,12 @@ func (c *collector) fetchSnapshots(ctx context.Context) ([]core.UsageSnapshot, s
 
 	rt := daemon.NewViewRuntime(nil, daemon.ResolveSocketPath(), core.DebugEnabled())
 	rt.SetTimeWindow(tw)
-	frame := rt.ReadWithFallbackForWindow(ctx, tw)
+	var frame daemon.SnapshotFrame
+	if refresh {
+		frame = rt.RefreshForWindow(ctx, tw)
+	} else {
+		frame = rt.ReadWithFallbackForWindow(ctx, tw)
+	}
 	if len(frame.Snapshots) > 0 {
 		return projector.OrderSnapshots(frame.Snapshots), "daemon", nil
 	}

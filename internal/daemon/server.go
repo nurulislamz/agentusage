@@ -43,6 +43,7 @@ type Service struct {
 
 	pollStateMu sync.Mutex
 	pollState   map[string]*providerPollState // per-account change detection state
+	pollMu      sync.Mutex                    // serializes pollProviders (ticker vs wait=1)
 
 	// pollKick coalesces on-demand poll requests (status-line notify, fsnotify).
 	// Capacity 1 so bursts of Antigravity updates collapse into one Fetch cycle.

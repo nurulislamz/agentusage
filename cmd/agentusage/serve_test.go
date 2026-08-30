@@ -28,7 +28,7 @@ func TestFirstNonEmpty(t *testing.T) {
 
 func TestNewServeCommandFlags(t *testing.T) {
 	cmd := newServeCommand()
-	for _, name := range []string{"listen", "source", "demo", "open", "no-open", "allow-public"} {
+	for _, name := range []string{"listen", "source", "demo", "open", "no-open", "allow-public", "verify"} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("missing flag --%s", name)
 		}

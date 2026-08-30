@@ -135,11 +135,12 @@ func TestRenderHeader_ShowsGlobalUnmappedWarning_Passive(t *testing.T) {
 	}
 
 	header := m.renderHeader(160)
-	if !strings.Contains(header, "telemetry sources without an account") {
-		t.Fatalf("header missing passive phrasing: %q", header)
+	plain := StripANSI(header)
+	if !strings.Contains(plain, "unmapped") {
+		t.Fatalf("header missing unmapped status badge: %q", plain)
 	}
-	if !strings.Contains(header, "unmapped") {
-		t.Fatalf("header missing unmapped status badge: %q", header)
+	if strings.Contains(plain, "telemetry sources without an account") || strings.Contains(plain, "telemetry sources need mapping") {
+		t.Fatalf("header should not show unmapped mapping phrase: %q", plain)
 	}
 }
 
@@ -158,7 +159,11 @@ func TestRenderHeader_ShowsGlobalUnmappedWarning_Actionable(t *testing.T) {
 	}
 
 	header := m.renderHeader(160)
-	if !strings.Contains(header, "telemetry sources need mapping") {
-		t.Fatalf("header missing actionable phrasing: %q", header)
+	plain := StripANSI(header)
+	if !strings.Contains(plain, "unmapped") {
+		t.Fatalf("header missing unmapped status badge: %q", plain)
+	}
+	if strings.Contains(plain, "telemetry sources need mapping") || strings.Contains(plain, "Remaining") || strings.Contains(plain, "3 Days") {
+		t.Fatalf("header should not show mapping/mode/window chrome: %q", plain)
 	}
 }

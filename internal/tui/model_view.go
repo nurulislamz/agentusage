@@ -92,14 +92,7 @@ func (m Model) renderHeader(w int) string {
 			if m.filter.text != "" {
 				info += " (filtered)"
 			}
-			info += " · " + m.usageModeStatusLabel()
 		}
-	}
-	if !m.settings.show {
-		info += " · " + m.timeWindow.Label()
-	}
-	if !m.settings.show && len(unmappedProviders) > 0 {
-		info += " · " + m.unmappedHeaderPhrase()
 	}
 
 	statusInfo := ""

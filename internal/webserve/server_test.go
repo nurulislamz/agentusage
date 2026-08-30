@@ -133,6 +133,12 @@ func TestIndexServed(t *testing.T) {
 	if !strings.Contains(html, "agentUsage") {
 		t.Error("index.html should mention agentUsage")
 	}
+	if !strings.Contains(html, `id="nav"`) || !strings.Contains(html, `id="panel"`) {
+		t.Error("index.html should use native nav/panel chrome")
+	}
+	if strings.Contains(html, "tui-frame") {
+		t.Error("index.html should not paint a TUI frame")
+	}
 	if !strings.Contains(html, "/app.js") {
 		t.Error("index.html should load app.js")
 	}
@@ -222,6 +228,53 @@ func TestListenAndServeLoopback(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("ListenAndServe did not return after cancel")
+	}
+}
+
+func TestUsageModePOSTReprojectsViews(t *testing.T) {
+	srv := testServer(t, Options{Demo: true, UsageMode: "remaining"})
+	handler := srv.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/snapshots", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	var remaining Envelope
+	if err := json.NewDecoder(w.Body).Decode(&remaining); err != nil {
+		t.Fatal(err)
+	}
+	if remaining.UsageMode != "remaining" {
+		t.Fatalf("usage_mode = %q, want remaining", remaining.UsageMode)
+	}
+	if len(remaining.Views) == 0 {
+		t.Fatal("expected views")
+	}
+	remPct := remaining.Views[0].GaugePercent
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/usage-mode", strings.NewReader(`{"usage_mode":"used"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("usage-mode status = %d body %s", w.Code, w.Body.String())
+	}
+	var used Envelope
+	if err := json.NewDecoder(w.Body).Decode(&used); err != nil {
+		t.Fatal(err)
+	}
+	if used.UsageMode != "used" {
+		t.Fatalf("usage_mode = %q, want used", used.UsageMode)
+	}
+	if len(used.Views) == 0 {
+		t.Fatal("expected views after toggle")
+	}
+	if used.Views[0].AccountID != remaining.Views[0].AccountID {
+		t.Fatalf("account changed %q → %q", remaining.Views[0].AccountID, used.Views[0].AccountID)
+	}
+	if used.Views[0].GaugePercent == remPct {
+		t.Fatalf("gauge_percent stayed %v after switching to used", remPct)
 	}
 }
 

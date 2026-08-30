@@ -11,25 +11,36 @@
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-  <div id="app" class="dash" hidden>
-    <header id="header" class="dash-header" aria-label="Dashboard header"></header>
-    <div class="dash-body">
-      <nav id="nav" class="dash-nav" aria-label="Providers"></nav>
-      <div class="dash-vsep" aria-hidden="true"></div>
-      <main id="panel" class="dash-panel" aria-label="Provider detail"></main>
+  <div id="app" class="shell" hidden>
+    <header class="header">
+      <div id="header" class="header-main"></div>
+      <span id="fetching-header" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> Fetching...</span>
+    </header>
+    <div class="hairline" aria-hidden="true"></div>
+    <div class="body">
+      <nav id="nav" class="nav" aria-label="Providers"></nav>
+      <div class="vsep" aria-hidden="true"></div>
+      <main class="panel" aria-label="Detail">
+        <div id="fetching-detail" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> Fetching...</div>
+        <div id="panel"></div>
+      </main>
     </div>
-    <footer id="footer" class="dash-footer" aria-label="Status bar"></footer>
+    <div class="hairline" aria-hidden="true"></div>
+    <footer class="footer">
+      <span id="fetching-footer" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> Fetching...</span>
+      <div id="footer" class="footer-main"></div>
+    </footer>
   </div>
 
   <div id="splash" class="splash">
-    <pre class="splash-logo" aria-hidden="true"> █▀█ █▀█ █▀▀ █▄░█   █░█ █▀ ▄▀█ █▀▀ █▀▀
- █▄█ █▀▀ ██▄ █░▀█   █▄█ ▄█ █▀█ █▄█ ██▄</pre>
+    <pre class="splash-logo" aria-hidden="true"> ▄▀█ █▀▀ █▀▀ █▄░█ ▀█▀   █░█ █▀ ▄▀█ █▀▀ █▀▀
+ █▀█ █▄█ ██▄ █░▀█ ░█░   █▄█ ▄█ █▀█ █▄█ ██▄</pre>
     <p class="splash-text">Loading usage snapshots…</p>
   </div>
 
   <div id="empty-state" class="empty" hidden>
-    <pre class="splash-logo dim" aria-hidden="true"> █▀█ █▀█ █▀▀ █▄░█   █░█ █▀ ▄▀█ █▀▀ █▀▀
- █▄█ █▀▀ ██▄ █░▀█   █▄█ ▄█ █▀█ █▄█ ██▄</pre>
+    <pre class="splash-logo dim" aria-hidden="true"> ▄▀█ █▀▀ █▀▀ █▄░█ ▀█▀   █░█ █▀ ▄▀█ █▀▀ █▀▀
+ █▀█ █▄█ ██▄ █░▀█ ░█░   █▄█ ▄█ █▀█ █▄█ ██▄</pre>
     <h2>No snapshots yet</h2>
     <p>Start the telemetry daemon, configure providers, or run <code>agentusage serve --demo</code>.</p>
   </div>
@@ -44,6 +55,13 @@
     </form>
   </div>
 
+  <div id="filter-bar" class="filter-bar" hidden>
+    <label for="filter-input">/</label>
+    <input id="filter-input" type="text" spellcheck="false" autocomplete="off" placeholder="filter providers…">
+    <span class="dim">Esc cancel · Enter apply</span>
+  </div>
+
+  <div id="status-bar" class="status-bar" hidden></div>
   <script src="/app.js"></script>
 </body>
 </html>

@@ -33,6 +33,8 @@ func (s *Service) pollProviders(ctx context.Context) {
 	if s == nil || s.quotaIngest == nil {
 		return
 	}
+	s.pollMu.Lock()
+	defer s.pollMu.Unlock()
 	started := time.Now()
 
 	accounts, modelNorm, err := LoadAccountsAndNorm()

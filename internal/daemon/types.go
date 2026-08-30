@@ -32,6 +32,9 @@ type ReadModelRequest struct {
 	Accounts      []ReadModelAccount `json:"accounts"`
 	ProviderLinks map[string]string  `json:"provider_links"`
 	TimeWindow    core.TimeWindow    `json:"time_window,omitempty"`
+	// Refresh skips the read-model cache so callers see data ingested by a
+	// just-completed provider poll.
+	Refresh bool `json:"refresh,omitempty"`
 }
 
 type ReadModelResponse struct {

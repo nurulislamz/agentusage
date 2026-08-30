@@ -1,8 +1,6 @@
 (() => {
   "use strict";
 
-  const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
   const state = {
     envelope: null,
     views: [],
@@ -12,83 +10,63 @@
     themeOverride: localStorage.getItem("au-serve-theme-override") || "",
     loading: true,
     refreshing: false,
-    spinnerFrame: 0,
+    animFrame: 0,
     error: null,
+    filterOpen: false,
   };
 
   const $ = (id) => document.getElementById(id);
 
-  const el = (tag, attrs = {}, children = []) => {
-    const node = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (k === "class") node.className = v;
-      else if (k === "text") node.textContent = v;
-      else if (k === "html") node.innerHTML = v;
-      else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2).toLowerCase(), v);
-      else if (v != null) node.setAttribute(k, v);
-    }
-    for (const child of children) {
-      if (child != null) node.append(child);
-    }
-    return node;
-  };
-
-  function statusClass(status) {
-    switch (status) {
-      case "OK": return "ok";
-      case "NEAR_LIMIT": return "warn";
-      case "LIMITED":
-      case "ERROR": return "crit";
-      case "AUTH_REQUIRED": return "auth";
-      default: return "";
-    }
-  }
-
-  function renderMiniGauge(percent, width = 8) {
-    if (percent < 0 || !Number.isFinite(percent)) return "";
-    const pct = Math.min(100, Math.max(0, percent));
-    const filled = Math.round((pct / 100) * width);
-    return "█".repeat(filled) + "░".repeat(Math.max(0, width - filled));
-  }
-
   function applyThemeTokens(tokens, override) {
     const root = document.documentElement;
     if (override === "light") {
-      root.dataset.theme = "light";
+      root.style.cssText = [
+        "--bg:#f4f1ea", "--base:#f4f1ea", "--mantle:#fffdf8", "--surface-warm:#fffdf8",
+        "--surface:#ebe6dc", "--surface0:#ebe6dc", "--surface1:#ddd6c8", "--surface2:#cfc7b8",
+        "--fg:#2c2823", "--text:#2c2823", "--fg-2:#6d6760", "--subtext:#6d6760",
+        "--muted:#9c958d", "--dim:#9c958d", "--accent:#7c5cbf", "--accent-on:#fffdf8",
+        "--lavender:#6b5cae", "--teal:#2f8f86", "--sapphire:#2f8f86",
+        "--success:#2f8f86", "--warn:#b8860b", "--danger:#c65746", "--crit:#c65746",
+        "--peach:#c65746", "--border:#ddd6c8", "--border-soft:#cfc7b8",
+      ].join(";");
       return;
     }
     if (!tokens || !tokens.base) {
-      root.dataset.theme = "deep-space";
+      root.style.cssText = "";
       return;
     }
-    root.dataset.theme = "dynamic";
     const map = {
+      "--bg": tokens.base,
       "--base": tokens.base,
       "--mantle": tokens.mantle,
+      "--surface-warm": tokens.mantle,
+      "--surface": tokens.surface0,
       "--surface0": tokens.surface0,
       "--surface1": tokens.surface1,
       "--surface2": tokens.surface2,
+      "--fg": tokens.text,
       "--text": tokens.text,
+      "--fg-2": tokens.subtext,
       "--subtext": tokens.subtext,
+      "--muted": tokens.dim,
       "--dim": tokens.dim,
       "--accent": tokens.accent,
-      "--blue": tokens.blue,
-      "--sapphire": tokens.sapphire,
-      "--green": tokens.green,
-      "--yellow": tokens.yellow,
-      "--red": tokens.red,
-      "--peach": tokens.peach,
-      "--teal": tokens.teal,
+      "--accent-on": tokens.mantle || "#080a11",
       "--lavender": tokens.lavender,
-      "--mauve": tokens.mauve,
-      "--ok": tokens.green,
+      "--teal": tokens.teal,
+      "--sapphire": tokens.sapphire,
+      "--success": tokens.green,
       "--warn": tokens.yellow,
+      "--danger": tokens.red,
       "--crit": tokens.red,
-      "--auth": tokens.peach,
+      "--peach": tokens.peach,
+      "--border": tokens.surface1,
+      "--border-soft": tokens.surface2,
     };
-    for (const [key, val] of Object.entries(map)) {
-      if (val) root.style.setProperty(key, val);
-    }
+    root.style.cssText = Object.entries(map)
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}:${v}`)
+      .join(";");
   }
 
   function cycleThemeOverride() {
@@ -116,40 +94,151 @@
     return h;
   }
 
-  async function load() {
-    state.refreshing = true;
-    renderHeader();
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+  }
+
+  function pillClass(badge) {
+    const b = (badge || "").toUpperCase();
+    if (b.includes("LIMIT") || b.includes("ERROR")) return "crit";
+    if (b.includes("LOW") || b.includes("NEAR")) return "warn";
+    if (b.includes("AUTH")) return "auth";
+    if (b === "OK") return "ok";
+    return "ok";
+  }
+
+  function toneClass(tone) {
+    if (tone === "crit" || tone === "warn" || tone === "peach" || tone === "ok" || tone === "dim" || tone === "auth") {
+      return "tone-" + tone;
+    }
+    return "tone-ok";
+  }
+
+  function gaugeColor(tone) {
+    if (tone === "crit") return "var(--danger)";
+    if (tone === "warn") return "var(--warn)";
+    if (tone === "peach") return "var(--peach)";
+    if (tone === "dim") return "var(--muted)";
+    return "var(--success)";
+  }
+
+  const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  let spinnerTimer = 0;
+  let loadInFlight = false;
+
+  function setRefreshing(on) {
+    state.refreshing = !!on;
+    const appShell = $("app");
+    if (appShell) appShell.classList.toggle("refreshing", state.refreshing);
+    ["fetching-header", "fetching-detail", "fetching-footer"].forEach((id) => {
+      const el = $(id);
+      if (el) el.hidden = !state.refreshing;
+    });
+    if (state.refreshing) {
+      state.animFrame = 0;
+      const frame = SPINNER[0];
+      document.querySelectorAll(".fetching .spin").forEach((el) => {
+        el.textContent = frame;
+      });
+      startSpinner();
+    } else {
+      stopSpinner();
+    }
+  }
+
+  function applyEnvelope(env) {
+    state.envelope = env;
+    state.views = env.views || [];
+    state.error = null;
+    applyThemeTokens(state.envelope.theme_tokens, state.themeOverride);
+    const visible = filteredViews();
+    if (state.selected >= visible.length) {
+      state.selected = Math.max(0, visible.length - 1);
+    }
+    showDashboard(state.views.length > 0);
+    if ($("status-bar")) $("status-bar").hidden = true;
+  }
+
+  function usageMode() {
+    return (state.envelope?.usage_mode || "remaining").toLowerCase() === "used" ? "used" : "remaining";
+  }
+
+  function usageModeLabel() {
+    return usageMode() === "used" ? "Used" : "Remaining";
+  }
+
+  function startSpinner() {
+    stopSpinner();
+    spinnerTimer = setInterval(() => {
+      if (!state.refreshing) return;
+      state.animFrame = (state.animFrame + 1) % SPINNER.length;
+      document.querySelectorAll(".fetching .spin").forEach((el) => {
+        el.textContent = SPINNER[state.animFrame];
+      });
+    }, 150);
+  }
+
+  function stopSpinner() {
+    clearInterval(spinnerTimer);
+    spinnerTimer = 0;
+  }
+
+  async function load(opts) {
+    const manual = !!(opts && opts.manual);
+    if (loadInFlight) return;
+    loadInFlight = true;
+    const showFetching = manual && state.views.length > 0;
+    if (showFetching) setRefreshing(true);
     try {
-      const res = await fetch("/api/v1/snapshots", { headers: headers() });
+      const qs = manual ? "?refresh=1" : "";
+      const res = await fetch("/api/v1/snapshots" + qs, { headers: headers() });
       if (res.status === 401) {
         $("token-modal").hidden = false;
         $("token-error").hidden = false;
         $("token-error").textContent = state.token ? "Invalid token" : "Token required";
-        state.refreshing = false;
         return;
       }
       if (!res.ok) throw new Error(`snapshots ${res.status}`);
       $("token-modal").hidden = true;
-      state.envelope = await res.json();
-      state.views = state.envelope.views || [];
-      state.error = null;
-      applyThemeTokens(state.envelope.theme_tokens, state.themeOverride);
-      const visible = filteredViews();
-      if (state.selected >= visible.length) state.selected = Math.max(0, visible.length - 1);
-      showDashboard(state.views.length > 0);
-      render();
+      applyEnvelope(await res.json());
     } catch (err) {
       state.error = String(err);
-      showDashboard(false);
-      $("empty-state").hidden = false;
-      $("splash").hidden = true;
-      $("app").hidden = true;
+      if ($("status-bar")) {
+        $("status-bar").hidden = false;
+        $("status-bar").textContent = "offline - reconnecting…";
+      }
+      if (state.views.length === 0) {
+        showDashboard(false);
+        $("empty-state").hidden = false;
+        $("splash").hidden = true;
+        $("app").hidden = true;
+      }
     } finally {
+      loadInFlight = false;
       state.loading = false;
-      state.refreshing = false;
-      renderHeader();
-      renderFooter();
+      if (state.views.length > 0 && $("token-modal").hidden) {
+        render();
+      }
+      setRefreshing(false);
     }
+  }
+
+  async function cycleUsageMode() {
+    const next = usageMode() === "used" ? "remaining" : "used";
+    const res = await fetch("/api/v1/usage-mode", {
+      method: "POST",
+      headers: { ...headers(), "Content-Type": "application/json" },
+      body: JSON.stringify({ usage_mode: next }),
+    });
+    if (res.status === 401) {
+      $("token-modal").hidden = false;
+      return;
+    }
+    if (!res.ok) throw new Error(`usage-mode ${res.status}`);
+    applyEnvelope(await res.json());
+    render();
   }
 
   function showDashboard(hasData) {
@@ -158,219 +247,211 @@
     $("app").hidden = !hasData;
   }
 
-  function countStatuses(views) {
-    let ok = 0;
-    let warn = 0;
-    let err = 0;
-    for (const v of views) {
-      switch (v.status) {
-        case "OK": ok++; break;
-        case "NEAR_LIMIT": warn++; break;
-        case "LIMITED":
-        case "ERROR": err++; break;
-        default: break;
-      }
-    }
-    return { ok, warn, err };
-  }
-
   function renderHeader() {
-    const env = state.envelope;
-    const views = state.views;
-    const counts = countStatuses(views);
-    const root = $("header");
-    root.replaceChildren();
-
-    const spinner = state.refreshing
-      ? el("span", { class: "spinner", text: SPINNER[state.spinnerFrame % SPINNER.length] })
-      : null;
-
-    const countParts = [];
-    if (counts.ok) countParts.push(el("span", { class: "ok", text: `${counts.ok}●` }));
-    if (counts.warn) countParts.push(el("span", { class: "warn", text: `${counts.warn}◐` }));
-    if (counts.err) countParts.push(el("span", { class: "crit", text: `${counts.err}✗` }));
-
-    const filterLabel = state.filter ? " (filtered)" : "";
-    const line = el("div", { class: "dash-header-line" }, [
-      el("span", { class: "brand-bolt", text: "⚡" }),
-      el("span", { class: "brand-name", text: "agentUsage" }),
-      el("span", { class: "header-counts" }, countParts),
-      spinner,
-      el("span", {
-        class: "header-meta",
-        text: env
-          ? `⊞ ${views.length} provider${views.length === 1 ? "" : "s"}${filterLabel} · ${env.time_window || ""} · ${env.source}`
-          : "connecting…",
-      }),
-    ]);
-
-    root.append(line, el("div", { class: "header-sep", text: "━".repeat(120) }));
-  }
-
-  function renderFooter() {
-    const env = state.envelope;
-    const root = $("footer");
-    root.replaceChildren();
-
-    const line = el("div", { class: "footer-line" }, [
-      el("span", {}, [el("kbd", { text: "↑" }), document.createTextNode(" "), el("kbd", { text: "↓" }), document.createTextNode(" navigate")]),
-      el("span", { text: "·" }),
-      el("span", {}, [el("kbd", { text: "/" }), document.createTextNode(" filter")]),
-      el("span", { text: "·" }),
-      el("span", {}, [el("kbd", { text: "r" }), document.createTextNode(" refresh")]),
-      el("span", { text: "·" }),
-      el("span", {}, [el("kbd", { text: "t" }), document.createTextNode(" theme")]),
-      el("span", { style: "flex:1" }),
-      el("span", {
-        class: "dim",
-        text: env
-          ? `${env.theme || ""} · ${env.usage_mode || "remaining"} · refresh ${env.refresh_interval_seconds || 30}s · ${new Date(env.generated_at).toLocaleTimeString()}`
-          : state.error || "offline",
-      }),
-    ]);
-
-    root.append(el("div", { class: "footer-sep", text: "━".repeat(120) }), line);
+    const env = state.envelope || {};
+    const views = filteredViews();
+    const ok = env.ok_count || 0;
+    const warn = env.warn_count || 0;
+    const err = env.err_count || 0;
+    const unmapped = env.unmapped_count || 0;
+    const n = views.length;
+    const filteredNote = state.filter ? " (filtered)" : "";
+    let counts = "";
+    if (ok) counts += `<span class="ok">${ok}●</span> `;
+    if (warn) counts += `<span class="warn">${warn}◐</span> `;
+    if (err) counts += `<span class="err">${err}✗</span>`;
+    if (unmapped) counts += ` <span class="unmapped">⚠ ${unmapped} unmapped</span>`;
+    const switcher = views.length
+      ? `<select id="switcher" class="switcher" aria-label="Account">${views.map((v, i) =>
+          `<option value="${i}"${i === state.selected ? " selected" : ""}>${esc(v.account_id)}</option>`
+        ).join("")}</select>`
+      : "";
+    $("header").innerHTML = `
+      <span class="bolt">⚡</span>
+      <span class="brand">agentUsage</span>
+      <span class="counts">${counts}</span>
+      ${switcher}
+      <span class="spacer"></span>
+      <span class="header-meta">⊞ ${n} providers${filteredNote}</span>
+    `;
+    const sel = $("switcher");
+    if (sel) {
+      sel.addEventListener("change", () => {
+        state.selected = Number(sel.value);
+        render();
+      });
+    }
   }
 
   function renderNav() {
     const views = filteredViews();
-    const root = $("nav");
-    root.replaceChildren();
     if (!views.length) {
-      root.append(el("p", { class: "dim", style: "padding:12px", text: state.filter ? "No matches." : "No providers." }));
+      $("nav").innerHTML = `<div class="group">${state.filter ? "No matches." : "Loading providers…"}</div>`;
       return;
     }
-
-    const selectedView = views[state.selected];
-    const selectedProvider = selectedView?.provider_id;
-    let lastProvider = "";
-
-    views.forEach((view, index) => {
-      const pID = view.provider_id;
-      const isFirst = pID !== lastProvider;
-      lastProvider = pID;
-
-      if (isFirst) {
-        const groupCount = views.filter((v) => v.provider_id === pID).length;
-        const active = pID === selectedProvider;
-        root.append(el("div", {
-          class: `nav-group-header ${active ? "active" : "inactive"}`,
-          style: active ? `color:${view.accent_color}` : "",
-          text: `${pID.toUpperCase()} (${groupCount})`,
-        }));
+    const selected = views[state.selected] || {};
+    const counts = {};
+    views.forEach((v) => { counts[v.provider_id] = (counts[v.provider_id] || 0) + 1; });
+    let html = "";
+    let last = "";
+    views.forEach((v, i) => {
+      if (v.provider_id !== last) {
+        const active = v.provider_id === selected.provider_id;
+        html += `<div class="group${active ? " active" : ""}" style="--p:${esc(v.accent_color || "var(--accent)")}">${esc((v.provider_id || "").toUpperCase())} (${counts[v.provider_id]})</div>`;
+        last = v.provider_id;
       }
-
-      const inGroup = pID === selectedProvider;
-      const selected = index === state.selected;
-      const mini = view.gauge_percent >= 0 ? renderMiniGauge(view.gauge_percent) : "";
-
-      root.append(el("button", {
-        class: `nav-item${selected ? " selected" : ""}${inGroup && !selected ? " in-group" : ""}`,
-        type: "button",
-        style: `--item-accent:${view.accent_color}`,
-        onclick: () => { state.selected = index; render(); },
-      }, [
-        el("div", { class: "nav-row1" }, [
-          el("span", { class: `nav-status ${statusClass(view.status)}`, text: view.status_icon }),
-          el("span", { class: "nav-name", text: view.account_id }),
-          el("span", { class: `nav-badge ${statusClass(view.status)}`, text: view.status_badge }),
-        ]),
-        el("div", { class: "nav-row2" }, [
-          el("span", { class: "nav-summary", text: view.summary || "—" }),
-          mini ? el("span", { class: "nav-mini-gauge dim", text: mini }) : null,
-        ]),
-        el("hr", { class: "nav-sep" }),
-      ]));
+      const sel = i === state.selected;
+      const pct = v.has_gauge ? Math.max(0, Math.min(100, v.gauge_percent || 0)) : null;
+      const reset = v.reset_hint || "";
+      const summary = v.has_gauge ? (v.summary || `${pct.toFixed(2)}%`) : (v.summary || v.message || "");
+      const inGroup = v.provider_id === selected.provider_id && counts[v.provider_id] > 1;
+      html += `<button type="button" class="item${sel ? " selected" : ""}${inGroup ? " in-group" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")}">
+        <span class="rail"></span>
+        <span class="name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
+        <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
+        <span class="sum">${pct !== null ? `<span class="mini"><i style="width:${pct}%;background:${gaugeColor(toneFromPercent(pct, v))}"></i></span>` : ""}
+          ${esc(summary)}${reset ? `<span class="reset">${esc(reset)}</span>` : ""}</span>
+      </button>`;
     });
-
-    root.querySelector(".nav-item.selected")?.scrollIntoView({ block: "nearest" });
+    $("nav").innerHTML = html;
+    $("nav").querySelectorAll(".item").forEach((el) => {
+      el.addEventListener("click", () => {
+        state.selected = Number(el.dataset.idx);
+        render();
+      });
+    });
+    const selectedEl = $("nav").querySelector(".item.selected");
+    if (selectedEl) selectedEl.scrollIntoView({ block: "nearest" });
   }
 
-  function renderSparkline(points) {
-    if (!points?.length) return null;
-    const series = points.slice(-14);
-    const max = Math.max(...series.map((p) => p.value || 0), 0.01);
-    const row = el("div", { class: "spark-row" });
-    for (const pt of series) {
-      const bar = el("span", { class: "spark-bar", title: `${pt.date}: $${(pt.value || 0).toFixed(2)}` });
-      bar.style.height = `${Math.max(4, ((pt.value || 0) / max) * 100)}%`;
-      row.append(bar);
+  function toneFromPercent(pct, view) {
+    const used = (state.envelope?.usage_mode || "").toLowerCase() === "used";
+    if (used) {
+      if (pct >= 90) return "crit";
+      if (pct >= 75) return "warn";
+      if (pct >= 50) return "peach";
+      return "ok";
     }
-    return el("div", { class: "spark-wrap" }, [
-      el("div", { class: "tile-section-title", text: "Daily spend" }),
-      row,
-    ]);
+    if (pct <= 10) return "crit";
+    if (pct <= 25) return "warn";
+    if (pct <= 50) return "peach";
+    return "ok";
   }
 
-  function renderPanel() {
+  function renderCards(cards) {
+    if (!cards || !cards.length) return "";
+    return cards.map((card) => {
+      const color = card.color || "var(--fg-2)";
+      const rows = (card.rows || []).map((row) => {
+        if (row.kind === "heading") {
+          return `<div class="heading">${esc(row.value || row.label || "")}</div>`;
+        }
+        if (row.kind === "gauge") {
+          const pct = row.percent == null ? 0 : Number(row.percent);
+          const tone = row.tone || "ok";
+          const modeWord = (state.envelope?.usage_mode || "remaining").toLowerCase() === "used" ? "used" : "remaining";
+          return `<div class="gauge-block ${toneClass(tone)}">
+            <div class="label">${esc(row.label || "")}</div>
+            <div class="gauge" style="color:${gaugeColor(tone)}"><i style="width:${Math.max(0, Math.min(100, pct))}%;background:currentColor"></i></div>
+            <div class="caption"><b>${pct.toFixed(2)}%</b> ${modeWord}${row.hint ? " · " + esc(row.hint) : ""}</div>
+          </div>`;
+        }
+        if (row.kind === "timer") {
+          return `<div class="timer ${toneClass(row.tone || "ok")}">
+            <span class="dot"></span>
+            <span>${esc(row.label || "")}</span>
+            <span class="when">${esc(row.value || "")}</span>
+            <span class="hint">${esc(row.hint || "")}</span>
+          </div>`;
+        }
+        if (row.kind === "kv") {
+          return `<div class="kv"><span class="dim">${esc(row.label || "")}</span> ${esc(row.value || "")}</div>`;
+        }
+        return `<div class="text-row">${esc(row.value || row.label || "")}</div>`;
+      }).join("");
+      return `<section class="card" style="--card:${esc(color)}"><h2>${esc(card.icon || "")} ${esc((card.title || "").toUpperCase())}</h2>${rows}</section>`;
+    }).join("");
+  }
+
+  function formatAge(ms) {
+    if (ms < 0) ms = 0;
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return s + "s";
+    const m = Math.floor(s / 60);
+    if (s < 3600) return m + "m" + (s % 60) + "s";
+    const h = Math.floor(s / 3600);
+    if (s < 86400) return h + "h" + (m % 60) + "m";
+    return Math.floor(h / 24) + "d" + (h % 24) + "h";
+  }
+
+  function parseTimestamp(iso) {
+    if (!iso) return NaN;
+    const ts = Date.parse(iso);
+    if (!Number.isFinite(ts) || ts < Date.parse("2000-01-01T00:00:00Z")) return NaN;
+    return ts;
+  }
+
+  function formatLastRefreshed(iso, fallback) {
+    const ts = parseTimestamp(iso);
+    if (!Number.isFinite(ts)) return fallback || "";
+    const age = Date.now() - ts;
+    if (age < 5000) return "Last refreshed just now";
+    return "Last refreshed " + formatAge(age) + " ago";
+  }
+
+  function lastRefreshedText(view) {
+    if (!view) return "";
+    return formatLastRefreshed(view.timestamp, view.last_refreshed || "");
+  }
+
+  function renderDetail() {
     const views = filteredViews();
-    const root = $("panel");
-    root.replaceChildren();
-    if (!views.length) return;
-
-    const view = views[state.selected];
-    const tile = el("article", { class: "tile", style: `--tile-accent:${view.accent_color}` });
-
-    tile.append(el("div", { class: "tile-header" }, [
-      el("span", { class: statusClass(view.status), text: view.status_icon }),
-      el("span", { class: "tile-title", text: view.account_id }),
-      el("span", { class: `nav-badge ${statusClass(view.status)}`, text: view.status_badge }),
-      el("span", { class: "dim", text: view.provider_name }),
-    ]));
-    tile.append(el("hr", { class: "tile-accent-sep" }));
-
-    if (view.tag_label || view.tag_emoji) {
-      tile.append(el("div", { class: "tile-tagline" }, [
-        el("span", { text: `${view.tag_emoji || ""} ${view.tag_label || ""}`.trim() }),
-        view.detail ? el("span", { class: "dim", text: view.detail }) : null,
-      ]));
+    const panel = $("panel");
+    if (!views.length) {
+      panel.innerHTML = `<p class="dim">${state.filter ? "No matches." : "No providers."}</p>`;
+      return;
     }
+    const v = views[state.selected];
+    const meta = [v.provider_id, v.detail].filter(Boolean).join(" · ");
+    const schedule = v.cycle_schedule || "";
+    const summary = v.summary || "";
+    const refreshed = lastRefreshedText(v);
+    const cards = v.detail_cards && v.detail_cards.length
+      ? renderCards(v.detail_cards)
+      : (v.detail_html ? `<section class="card">${v.detail_html}</section>` : "");
+    panel.innerHTML = `
+      <div class="hero">
+        <h1>${esc(v.status_icon || "●")} ${esc(v.account_id)}</h1>
+        <div class="hero-right">${esc(meta)} <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || "")}</span></div>
+      </div>
+      <div class="subhero">
+        <div>${summary ? `<strong>${esc(summary)}</strong>` : ""}${schedule ? ` · ${esc(schedule)}` : ""}</div>
+        ${refreshed ? `<div id="last-refreshed" class="last-refreshed">${esc(refreshed)}</div>` : ""}
+      </div>
+      <div class="accent-line ${esc(v.header_tone || "ok")}"></div>
+      ${cards}
+    `;
+  }
 
-    if (view.message) {
-      tile.append(el("div", { class: "tile-hero", text: view.message }));
-    } else if (view.summary) {
-      tile.append(el("div", { class: "tile-hero", text: view.summary }));
-    }
-
-    if (view.resets?.length) {
-      tile.append(el("div", { class: "reset-pills" }, view.resets.map((p) =>
-        el("span", { class: `reset-pill${p.urgent ? " urgent" : ""}`, html: `◷ ${p.label} <strong>${p.duration}</strong>` }),
-      )));
-    }
-
-    const spark = renderSparkline(view.daily_cost);
-    if (spark) tile.append(spark);
-
-    if (view.tile_lines?.length) {
-      tile.append(el("pre", { class: "tile-pre", text: view.tile_lines.join("\n") }));
-    }
-
-    for (const sec of view.detail_sections || []) {
-      if (!sec.lines?.length) continue;
-      const title = [sec.icon, sec.title].filter(Boolean).join(" ");
-      if (title.trim()) tile.append(el("div", { class: "tile-section-title", text: title }));
-      const block = el("pre", { class: "detail-pre" });
-      block.textContent = sec.lines.join("\n");
-      tile.append(block);
-    }
-
-    if (view.timestamp) {
-      const ts = new Date(view.timestamp);
-      const diff = Date.now() - ts.getTime();
-      const age = diff > 60000
-        ? `${Math.floor(diff / 60000)}m ago`
-        : ts.toLocaleTimeString();
-      tile.append(el("div", { class: "tile-footer", text: `⏱ ${age}` }));
-    }
-
-    root.append(tile);
+  function renderFooter() {
+    const sec = Math.max(5, state.envelope?.refresh_interval_seconds || 30);
+    const theme = state.envelope?.theme_tokens?.name || state.envelope?.theme || "";
+    $("footer").innerHTML = `
+      <span>auto-refresh ⟳ ${sec}s</span>
+      <span><kbd>j</kbd>/<kbd>k</kbd> move</span>
+      <span><kbd>/</kbd> filter</span>
+      <span><kbd>u</kbd> ${esc(usageModeLabel())}</span>
+      <span><kbd>r</kbd> refresh</span>
+      <span><kbd>t</kbd> theme</span>
+      <span class="grow"></span>
+      <span>${esc(theme)}</span>
+    `;
   }
 
   function render() {
-    if (!state.envelope) return;
     renderHeader();
     renderNav();
-    renderPanel();
+    renderDetail();
     renderFooter();
   }
 
@@ -381,11 +462,25 @@
     render();
   }
 
-  function startFilter() {
-    const q = window.prompt("Filter providers", state.filter);
-    if (q == null) return;
-    state.filter = q;
-    state.selected = 0;
+  function openFilter() {
+    state.filterOpen = true;
+    const bar = $("filter-bar");
+    const input = $("filter-input");
+    bar.hidden = false;
+    input.value = state.filter;
+    input.focus();
+    input.select();
+  }
+
+  function closeFilter(apply) {
+    const bar = $("filter-bar");
+    const input = $("filter-input");
+    if (apply) {
+      state.filter = input.value;
+      state.selected = 0;
+    }
+    state.filterOpen = false;
+    bar.hidden = true;
     render();
   }
 
@@ -396,8 +491,19 @@
     load().catch(console.error);
   });
 
+  $("filter-input").addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      closeFilter(true);
+    } else if (ev.key === "Escape") {
+      ev.preventDefault();
+      closeFilter(false);
+    }
+  });
+
   document.addEventListener("keydown", (ev) => {
     if ($("token-modal").hidden === false) return;
+    if (state.filterOpen) return;
     if (ev.target.matches("input, textarea")) return;
     switch (ev.key) {
       case "ArrowUp":
@@ -412,12 +518,17 @@
         break;
       case "/":
         ev.preventDefault();
-        startFilter();
+        openFilter();
         break;
       case "r":
       case "R":
         ev.preventDefault();
-        load().catch(console.error);
+        load({ manual: true }).catch(console.error);
+        break;
+      case "u":
+      case "U":
+        ev.preventDefault();
+        cycleUsageMode().catch(console.error);
         break;
       case "t":
       case "T":
@@ -428,13 +539,6 @@
         break;
     }
   });
-
-  setInterval(() => {
-    if (!state.refreshing) return;
-    state.spinnerFrame += 1;
-    const spin = document.querySelector(".spinner");
-    if (spin) spin.textContent = SPINNER[state.spinnerFrame % SPINNER.length];
-  }, 80);
 
   let refreshTimer = 0;
   const scheduleRefresh = () => {
@@ -451,4 +555,12 @@
     $("splash").hidden = true;
     $("empty-state").hidden = false;
   });
+
+  setInterval(() => {
+    const el = $("last-refreshed");
+    if (!el) return;
+    const views = filteredViews();
+    const text = lastRefreshedText(views[state.selected]);
+    if (text && el.textContent !== text) el.textContent = text;
+  }, 1000);
 })();

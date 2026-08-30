@@ -63,6 +63,15 @@ agentusage
 
 Auto-detection picks up local tools and common API key environment variables immediately without configuration.
 
+Prefer a browser? The same live snapshots open in a TUI-faithful web dashboard:
+
+```bash
+agentusage serve            # http://127.0.0.1:8080
+agentusage serve --demo     # synthetic data preview
+```
+
+`serve` prefers the telemetry daemon (same path as the terminal UI) and falls back to a direct provider poll.
+
 ## Features
 
 - **Cross-provider tracking** — compare coding agents, API platforms, and local runtimes in one local dashboard

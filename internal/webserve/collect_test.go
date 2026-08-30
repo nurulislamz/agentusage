@@ -35,6 +35,59 @@ func TestCollectorCache(t *testing.T) {
 	}
 }
 
+func TestCollectorRefreshBypassesCache(t *testing.T) {
+	now := time.Date(2026, 8, 30, 21, 0, 0, 0, time.UTC)
+	c := newCollector(Options{
+		Demo:           true,
+		RefreshSeconds: 60,
+		Now:            func() time.Time { return now },
+	})
+	first, err := c.envelope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(time.Second)
+	cached, err := c.envelope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cached.GeneratedAt.Equal(first.GeneratedAt) {
+		t.Fatalf("expected cache hit, generated_at moved %v → %v", first.GeneratedAt, cached.GeneratedAt)
+	}
+	fresh, err := c.envelopeRefresh(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fresh.GeneratedAt.Equal(now) {
+		t.Fatalf("refresh generated_at = %v, want %v", fresh.GeneratedAt, now)
+	}
+}
+
+func TestCollectorSetUsageModeReprojectsCache(t *testing.T) {
+	now := time.Date(2026, 8, 30, 21, 0, 0, 0, time.UTC)
+	c := newCollector(Options{
+		Demo:           true,
+		UsageMode:      "remaining",
+		RefreshSeconds: 60,
+		Now:            func() time.Time { return now },
+	})
+	first, err := c.envelope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.UsageMode != "remaining" {
+		t.Fatalf("usage_mode = %q", first.UsageMode)
+	}
+	c.setUsageMode("used")
+	second, err := c.envelope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.UsageMode != "used" {
+		t.Fatalf("after set usage_mode = %q", second.UsageMode)
+	}
+}
+
 func TestCollectorDemoDecorates(t *testing.T) {
 	c := newCollector(Options{
 		Demo:           true,

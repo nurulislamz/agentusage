@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nurulislamz/agentusage/internal/config"
 )
 
 // Server serves the local web dashboard and snapshot JSON API.
@@ -54,6 +56,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.handleHealth)
 	mux.HandleFunc("/api/v1/snapshots", s.handleSnapshots)
+	mux.HandleFunc("/api/v1/usage-mode", s.handleUsageMode)
 	mux.HandleFunc("/api/v1/meta", s.handleMeta)
 
 	sub, err := fs.Sub(uiFS, "ui")
@@ -64,8 +67,17 @@ func (s *Server) Handler() http.Handler {
 		return mux
 	}
 	fileServer := http.FileServer(http.FS(sub))
-	mux.Handle("/", fileServer)
+	mux.Handle("/", noCacheUI(fileServer))
 	return mux
+}
+
+// noCacheUI disables browser caching of the embedded SPA so serve upgrades
+// are visible after a normal reload.
+func noCacheUI(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {
@@ -140,6 +152,49 @@ func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
+	refresh := r.URL.Query().Get("refresh") == "1"
+	env, err := s.collector.envelopeRefresh(refresh)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, env)
+}
+
+func (s *Server) handleUsageMode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	if !s.checkAuth(w, r) {
+		return
+	}
+	var body struct {
+		UsageMode string `json:"usage_mode"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		return
+	}
+	mode := normalizeUsageMode(body.UsageMode)
+	if strings.TrimSpace(body.UsageMode) == "" {
+		current := s.collector.opts.UsageMode
+		if current == "" && s.collector.opts.Config != nil {
+			current = s.collector.opts.Config.Dashboard.UsageMode
+		}
+		if normalizeUsageMode(current) == config.UsageModeUsed {
+			mode = config.UsageModeRemaining
+		} else {
+			mode = config.UsageModeUsed
+		}
+	}
+	if !s.collector.demo {
+		if err := config.SaveDashboardUsageMode(mode); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+	}
+	s.collector.setUsageMode(mode)
 	env, err := s.collector.envelope()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
