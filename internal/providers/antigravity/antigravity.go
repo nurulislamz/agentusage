@@ -338,7 +338,7 @@ func projectQuotaMetrics(snap *core.UsageSnapshot, payload statusLinePayload) {
 		} else if activePool == "claude" {
 			overallRemaining = claudeRem
 		} else {
-			overallRemaining = math.Max(geminiRem, claudeRem)
+			overallRemaining = math.Min(geminiRem, claudeRem)
 		}
 	} else if hasGemini {
 		overallRemaining = geminiRem
@@ -424,10 +424,10 @@ func statusFromQuota(payload statusLinePayload) core.Status {
 	claudeRem, hasClaude := getPoolRemainingFraction(payload, "claude", "3p", "opus", "sonnet")
 
 	if hasGemini && hasClaude {
-		if geminiRem <= 0 && claudeRem <= 0 {
+		if geminiRem <= 0 || claudeRem <= 0 {
 			return core.StatusLimited
 		}
-		if geminiRem < quotaNearLimitRatio && claudeRem < quotaNearLimitRatio {
+		if geminiRem < quotaNearLimitRatio || claudeRem < quotaNearLimitRatio {
 			return core.StatusNearLimit
 		}
 		return core.StatusOK

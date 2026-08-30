@@ -85,7 +85,7 @@ func (m Model) renderHelpOverlay(screenW, screenH int) string {
 		color             lipgloss.Color
 	}{
 		{"●", "OK", "All good — usage/spend healthy", colorOK},
-		{"◐", "WARN", "Approaching limit", colorWarn},
+		{"◐", "LOW", "Approaching limit", colorWarn},
 		{"◌", "LIMIT", "At or over limit", colorCrit},
 		{"◈", "AUTH", "Authentication required", colorAuth},
 		{"✗", "ERR", "Error fetching data", colorCrit},

@@ -460,6 +460,80 @@ func TestSnapshotStatusBadge_SpecificLimits(t *testing.T) {
 	}
 }
 
+func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
+	three := 3.0
+	eight := 8.0
+	fifty := 50.0
+
+	// 5h near limit (3% left) -> 5H LOW
+	fiveLowSnap := core.UsageSnapshot{
+		Status: core.StatusNearLimit,
+		Metrics: map[string]core.Metric{
+			"rolling_usage": {Remaining: &three, Window: "5h"},
+		},
+	}
+	fiveLowBadge := SnapshotStatusBadge(fiveLowSnap)
+	if !strings.Contains(fiveLowBadge, "5H LOW") {
+		t.Errorf("expected 5H LOW in badge, got %q", fiveLowBadge)
+	}
+
+	// Daily near limit -> DAILY LOW
+	dailyLowSnap := core.UsageSnapshot{
+		Status: core.StatusNearLimit,
+		Metrics: map[string]core.Metric{
+			"daily_usage": {Remaining: &eight, Window: "1d"},
+		},
+	}
+	dailyLowBadge := SnapshotStatusBadge(dailyLowSnap)
+	if !strings.Contains(dailyLowBadge, "DAILY LOW") {
+		t.Errorf("expected DAILY LOW in badge, got %q", dailyLowBadge)
+	}
+
+	// Weekly low (3% left) -> ignores weekly for LOW, displays plain LOW
+	weeklyLowSnap := core.UsageSnapshot{
+		Status: core.StatusNearLimit,
+		Metrics: map[string]core.Metric{
+			"weekly_usage": {Remaining: &three, Window: "7d"},
+		},
+	}
+	weeklyLowBadge := SnapshotStatusBadge(weeklyLowSnap)
+	if strings.Contains(weeklyLowBadge, "WEEKLY LOW") {
+		t.Errorf("did NOT expect WEEKLY LOW (weekly should be ignored for LOW), got %q", weeklyLowBadge)
+	}
+	if !strings.Contains(weeklyLowBadge, "LOW") {
+		t.Errorf("expected LOW in badge, got %q", weeklyLowBadge)
+	}
+
+	// Monthly low -> ignores monthly for LOW, displays plain LOW
+	monthlyLowSnap := core.UsageSnapshot{
+		Status: core.StatusNearLimit,
+		Metrics: map[string]core.Metric{
+			"monthly_usage": {Remaining: &three, Window: "30d"},
+		},
+	}
+	monthlyLowBadge := SnapshotStatusBadge(monthlyLowSnap)
+	if strings.Contains(monthlyLowBadge, "MONTHLY LOW") {
+		t.Errorf("did NOT expect MONTHLY LOW, got %q", monthlyLowBadge)
+	}
+	if !strings.Contains(monthlyLowBadge, "LOW") {
+		t.Errorf("expected LOW in badge, got %q", monthlyLowBadge)
+	}
+
+	// Antigravity 3% on 5h window with healthy weekly (50%) -> displays 5H LOW
+	agLowSnap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		Status:     core.StatusOK, // Even if initially marked StatusOK, EffectiveStatus surfaces near limit
+		Metrics: map[string]core.Metric{
+			"quota_gemini_5h":     {Remaining: &three, Window: "5h"},
+			"quota_gemini_weekly": {Remaining: &fifty, Window: "7d"},
+		},
+	}
+	agLowBadge := SnapshotStatusBadge(agLowSnap)
+	if !strings.Contains(agLowBadge, "5H LOW") {
+		t.Errorf("expected 5H LOW in badge for Antigravity with 3%% 5h quota, got %q", agLowBadge)
+	}
+}
+
 func TestUsageGaugeColor_Tiers(t *testing.T) {
 	const warn = 0.20
 	const crit = 0.05
