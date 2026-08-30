@@ -8,19 +8,11 @@ const QuotaNearLimitPercent = 15.0
 // When telemetry has quota metrics but no persisted status, infer health
 // from the tightest quota bucket.
 func EffectiveStatus(snap UsageSnapshot) Status {
-	if snap.Status == StatusAuth || snap.Status == StatusError || snap.Status == StatusLimited {
+	if snap.Status != "" && snap.Status != StatusUnknown {
 		return snap.Status
 	}
 	if status, ok := InferStatusFromQuotaMetrics(snap); ok {
-		if status == StatusLimited || status == StatusNearLimit {
-			return status
-		}
-		if snap.Status == "" || snap.Status == StatusUnknown {
-			return status
-		}
-	}
-	if snap.Status != "" && snap.Status != StatusUnknown {
-		return snap.Status
+		return status
 	}
 	return snap.Status
 }

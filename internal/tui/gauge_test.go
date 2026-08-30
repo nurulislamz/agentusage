@@ -522,7 +522,10 @@ func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
 	// Antigravity 3% on 5h window with healthy weekly (50%) -> displays 5H LOW
 	agLowSnap := core.UsageSnapshot{
 		ProviderID: "antigravity",
-		Status:     core.StatusOK, // Even if initially marked StatusOK, EffectiveStatus surfaces near limit
+		Status:     core.StatusNearLimit,
+		Attributes: map[string]string{
+			"model": "Gemini 3.7 Flash (High)",
+		},
 		Metrics: map[string]core.Metric{
 			"quota_gemini_5h":     {Remaining: &three, Window: "5h"},
 			"quota_gemini_weekly": {Remaining: &fifty, Window: "7d"},
@@ -531,6 +534,53 @@ func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
 	agLowBadge := SnapshotStatusBadge(agLowSnap)
 	if !strings.Contains(agLowBadge, "5H LOW") {
 		t.Errorf("expected 5H LOW in badge for Antigravity with 3%% 5h quota, got %q", agLowBadge)
+	}
+
+	// Antigravity: Claude is at monthly limit (0% remaining), but Gemini is available (80% remaining).
+	// Must NOT show MONTHLY LIMIT!
+	eighty := 80.0
+	zero := 0.0
+	agClaudeLimitedSnap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		Status:     core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"quota_gemini_5h":     {Remaining: &eighty, Window: "5h"},
+			"quota_gemini_weekly": {Remaining: &eighty, Window: "7d"},
+			"quota_claude_weekly": {Remaining: &zero, Window: "7d"},
+			"quota_3p_weekly":     {Remaining: &zero, Window: "7d"},
+			"quota_3p_monthly":    {Remaining: &zero, Window: "30d"},
+		},
+	}
+	agClaudeLimitedBadge := SnapshotStatusBadge(agClaudeLimitedSnap)
+	if strings.Contains(agClaudeLimitedBadge, "MONTHLY LIMIT") {
+		t.Errorf("did NOT expect MONTHLY LIMIT when Gemini has 80%% quota remaining, got %q", agClaudeLimitedBadge)
+	}
+	if strings.Contains(agClaudeLimitedBadge, "LIMIT") {
+		t.Errorf("did NOT expect LIMIT badge when Gemini is healthy, got %q", agClaudeLimitedBadge)
+	}
+	if !strings.Contains(agClaudeLimitedBadge, "OK") {
+		t.Errorf("expected OK badge when Gemini is healthy, got %q", agClaudeLimitedBadge)
+	}
+
+	// Antigravity: Claude is at monthly limit (0%), and Gemini 5h is low (3%).
+	// Must show 5H LOW, NOT MONTHLY LIMIT!
+	agGeminiLowClaudeLimitedSnap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		Status:     core.StatusNearLimit,
+		Metrics: map[string]core.Metric{
+			"quota_gemini_5h":     {Remaining: &three, Window: "5h"},
+			"quota_gemini_weekly": {Remaining: &eighty, Window: "7d"},
+			"quota_claude_weekly": {Remaining: &zero, Window: "7d"},
+			"quota_3p_weekly":     {Remaining: &zero, Window: "7d"},
+			"quota_3p_monthly":    {Remaining: &zero, Window: "30d"},
+		},
+	}
+	agGeminiLowBadge := SnapshotStatusBadge(agGeminiLowClaudeLimitedSnap)
+	if strings.Contains(agGeminiLowBadge, "MONTHLY LIMIT") {
+		t.Errorf("did NOT expect MONTHLY LIMIT when Gemini is active with 3%% 5h quota, got %q", agGeminiLowBadge)
+	}
+	if !strings.Contains(agGeminiLowBadge, "5H LOW") {
+		t.Errorf("expected 5H LOW when Gemini 5h is at 3%%, got %q", agGeminiLowBadge)
 	}
 }
 

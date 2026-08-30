@@ -491,6 +491,12 @@ func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 	if model == "" {
 		model = strings.ToLower(snap.Attributes["model_id"])
 	}
+	if model == "" {
+		model = strings.ToLower(snap.Attributes["active_model"])
+	}
+	if model == "" {
+		model = strings.ToLower(snap.Message)
+	}
 
 	activePool := ""
 	if strings.Contains(model, "gemini") {
@@ -511,6 +517,26 @@ func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 		}
 		if activePool == "claude" && strings.Contains(k, "gemini") {
 			return false
+		}
+		if activePool == "" && snap.ProviderID == "antigravity" {
+			// If Gemini has remaining quota, Claude exhaustion is not relevant to available capacity
+			if strings.Contains(k, "claude") || strings.Contains(k, "3p") || strings.Contains(k, "opus") || strings.Contains(k, "sonnet") {
+				if g5h, ok := snap.Metrics["quota_gemini_5h"]; ok && g5h.Remaining != nil && *g5h.Remaining > 0 {
+					return false
+				}
+				if gwk, ok := snap.Metrics["quota_gemini_weekly"]; ok && gwk.Remaining != nil && *gwk.Remaining > 0 {
+					return false
+				}
+			}
+			// If Claude has remaining quota, Gemini exhaustion is not relevant
+			if strings.Contains(k, "gemini") {
+				if c5h, ok := snap.Metrics["quota_claude_5h"]; ok && c5h.Remaining != nil && *c5h.Remaining > 0 {
+					return false
+				}
+				if cwk, ok := snap.Metrics["quota_claude_weekly"]; ok && cwk.Remaining != nil && *cwk.Remaining > 0 {
+					return false
+				}
+			}
 		}
 		return true
 	}
@@ -546,8 +572,23 @@ func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 		}
 	}
 
-	// Safeguard: If exhausted["WEEKLY"] is set, but there is ANY relevant weekly metric
-	// with Remaining > 0 (e.g. quota_gemini_weekly has 37.87% remaining), do NOT report WEEKLY limit!
+	// Safeguards: If ANY relevant metric for the active pool (or across available pools)
+	// has Remaining > 0, do NOT report MONTHLY or WEEKLY limit!
+	if exhausted["MONTHLY"] {
+		for key, met := range snap.Metrics {
+			if !isRelevantKey(key) {
+				continue
+			}
+			k := strings.ToLower(key)
+			w := strings.ToLower(met.Window)
+			if strings.Contains(k, "month") || strings.Contains(w, "month") || strings.Contains(w, "30d") {
+				if met.Remaining != nil && *met.Remaining > 0 {
+					exhausted["MONTHLY"] = false
+					break
+				}
+			}
+		}
+	}
 	if exhausted["WEEKLY"] {
 		for key, met := range snap.Metrics {
 			if !isRelevantKey(key) {
@@ -640,6 +681,12 @@ func resolveNearLimitType(snap core.UsageSnapshot) string {
 	if model == "" {
 		model = strings.ToLower(snap.Attributes["model_id"])
 	}
+	if model == "" {
+		model = strings.ToLower(snap.Attributes["active_model"])
+	}
+	if model == "" {
+		model = strings.ToLower(snap.Message)
+	}
 
 	activePool := ""
 	if strings.Contains(model, "gemini") {
@@ -660,6 +707,26 @@ func resolveNearLimitType(snap core.UsageSnapshot) string {
 		}
 		if activePool == "claude" && strings.Contains(k, "gemini") {
 			return false
+		}
+		if activePool == "" && snap.ProviderID == "antigravity" {
+			// If Gemini has remaining quota, Claude low metrics are not relevant to available capacity
+			if strings.Contains(k, "claude") || strings.Contains(k, "3p") || strings.Contains(k, "opus") || strings.Contains(k, "sonnet") {
+				if g5h, ok := snap.Metrics["quota_gemini_5h"]; ok && g5h.Remaining != nil && *g5h.Remaining > 0 {
+					return false
+				}
+				if gwk, ok := snap.Metrics["quota_gemini_weekly"]; ok && gwk.Remaining != nil && *gwk.Remaining > 0 {
+					return false
+				}
+			}
+			// If Claude has remaining quota, Gemini low metrics are not relevant
+			if strings.Contains(k, "gemini") {
+				if c5h, ok := snap.Metrics["quota_claude_5h"]; ok && c5h.Remaining != nil && *c5h.Remaining > 0 {
+					return false
+				}
+				if cwk, ok := snap.Metrics["quota_claude_weekly"]; ok && cwk.Remaining != nil && *cwk.Remaining > 0 {
+					return false
+				}
+			}
 		}
 		return true
 	}
