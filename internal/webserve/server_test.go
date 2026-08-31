@@ -348,6 +348,51 @@ func TestUsageModePOSTReprojectsViews(t *testing.T) {
 	}
 }
 
+func TestUsageMode_CSRF_OriginProtection(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	handler := srv.Handler()
+
+	// 1. Cross-site Sec-Fetch-Site should be blocked
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/usage-mode", strings.NewReader(`{"usage_mode":"used"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for Sec-Fetch-Site: cross-site, got %d", w.Code)
+	}
+
+	// 2. Untrusted external Origin should be blocked
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/usage-mode", strings.NewReader(`{"usage_mode":"used"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://evil.com")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for Origin: http://evil.com, got %d", w.Code)
+	}
+
+	// 3. Localhost origin should be allowed
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/usage-mode", strings.NewReader(`{"usage_mode":"used"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://localhost:8080")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for Origin: http://localhost:8080, got %d", w.Code)
+	}
+
+	// 4. 127.0.0.1 origin should be allowed
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/usage-mode", strings.NewReader(`{"usage_mode":"remaining"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://127.0.0.1:8080")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for Origin: http://127.0.0.1:8080, got %d", w.Code)
+	}
+}
+
 func TestSnapshotsWrongMethod(t *testing.T) {
 	srv := testServer(t, Options{Demo: true})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/snapshots", nil)

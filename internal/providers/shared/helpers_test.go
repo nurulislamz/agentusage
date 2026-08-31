@@ -669,3 +669,25 @@ func TestProbeRateLimits_RequestError(t *testing.T) {
 		t.Error("expected error for unreachable server")
 	}
 }
+
+func TestFetchJSON_ResponseSizeLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Write more than maxResponseBytes (8 MiB)
+		buf := make([]byte, 1<<20) // 1 MiB chunk
+		for i := 0; i < 9; i++ {
+			_, _ = w.Write(buf)
+		}
+	}))
+	defer server.Close()
+
+	var out map[string]any
+	status, _, err := FetchJSON(context.Background(), server.URL, "sk-test", &out, server.Client())
+	if status != http.StatusOK {
+		t.Errorf("status = %d, want 200", status)
+	}
+	// Parsing will fail because 8 MiB was truncated from the stream of zeroes, but read itself didn't consume 9+ MiB unbounded
+	if err == nil {
+		t.Error("expected parse error on truncated stream")
+	}
+}

@@ -98,6 +98,8 @@ func ResolveBaseURL(acct core.AccountConfig, defaultURL string) string {
 	return defaultURL
 }
 
+const maxResponseBytes = 8 << 20
+
 // FetchJSON performs an authenticated GET request and decodes the JSON response
 // body into out. Returns the HTTP status code and response headers on success.
 // For non-200 responses, returns an error with the status code.
@@ -122,7 +124,7 @@ func FetchJSON(ctx context.Context, url, apiKey string, out any, client *http.Cl
 		return resp.StatusCode, resp.Header, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return resp.StatusCode, resp.Header, fmt.Errorf("reading body: %w", err)
 	}

@@ -198,3 +198,44 @@ func TestDeleteCredentialFrom_RequiresExactAccountID(t *testing.T) {
 		t.Fatalf("openai-auto key = %q, want preserved", got)
 	}
 }
+
+func TestSaveSession_PermissionsAndAtomic(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "credentials.json")
+
+	session := BrowserSession{
+		Domain:     "claude.ai",
+		CookieName: "sessionKey",
+		Value:      "sk-ant-session-secret",
+	}
+
+	if err := SaveSessionTo(path, "claude_code-personal", session); err != nil {
+		t.Fatalf("SaveSessionTo: %v", err)
+	}
+
+	loaded, found, err := LoadSessionFrom(path, "claude_code-personal")
+	if err != nil {
+		t.Fatalf("LoadSessionFrom: %v", err)
+	}
+	if !found || loaded.Value != session.Value {
+		t.Errorf("loaded session = %+v, want %+v", loaded, session)
+	}
+
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("os.Stat: %v", err)
+		}
+		if perm := info.Mode().Perm(); perm != 0o600 {
+			t.Errorf("credentials.json permissions = %o, want 0600", perm)
+		}
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "credentials.json" {
+		t.Errorf("expected only credentials.json in directory, found: %v", entries)
+	}
+}

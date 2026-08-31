@@ -245,8 +245,32 @@ func writeCredentials(path string, creds Credentials) error {
 	}
 	data = append(data, '\n')
 
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return fmt.Errorf("writing credentials: %w", err)
+	tmpFile, err := os.CreateTemp(dir, filepath.Base(path)+".tmp.*")
+	if err != nil {
+		return fmt.Errorf("creating credentials tmp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath) // no-op if rename succeeded; cleans up on failure
+
+	if err := tmpFile.Chmod(0o600); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("setting credentials tmp file permissions: %w", err)
+	}
+
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("writing credentials tmp file: %w", err)
+	}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("syncing credentials tmp file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("closing credentials tmp file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("renaming credentials tmp file: %w", err)
 	}
 	// Enforce permissions even if the file pre-existed with wrong mode.
 	if err := os.Chmod(path, 0o600); err != nil {

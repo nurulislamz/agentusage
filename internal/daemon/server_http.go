@@ -38,6 +38,11 @@ func (s *Service) handlePoll(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "kicked"})
 }
 
+const (
+	// maxHookBodyBytes caps /v1/hook/ request bodies to guard against excessive memory use.
+	maxHookBodyBytes = 4 << 20
+)
+
 func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
 	if r.Method != http.MethodPost {
@@ -52,8 +57,13 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxHookBodyBytes)
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
+		if strings.Contains(err.Error(), "request body too large") {
+			writeJSONError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
 		writeJSONError(w, http.StatusBadRequest, "read payload failed")
 		return
 	}

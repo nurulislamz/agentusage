@@ -631,14 +631,34 @@ func saveLocked(path string, cfg Config) error {
 	}
 	data = append(data, '\n')
 
-	tmpPath := target + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
+	tmpFile, err := os.CreateTemp(dir, filepath.Base(target)+".tmp.*")
+	if err != nil {
+		return fmt.Errorf("creating config tmp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath) // no-op if rename succeeded; cleans up on rename failure
+
+	if err := tmpFile.Chmod(0o600); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("setting config tmp file permissions: %w", err)
+	}
+
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
 		return fmt.Errorf("writing config tmp file: %w", err)
 	}
-	defer os.Remove(tmpPath) // no-op if rename succeeded; cleans up on rename failure
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("syncing config tmp file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("closing config tmp file: %w", err)
+	}
+
 	if err := os.Rename(tmpPath, target); err != nil {
 		return fmt.Errorf("renaming config tmp file: %w", err)
 	}
+	_ = os.Chmod(target, 0o600)
 	return nil
 }
 

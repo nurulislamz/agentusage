@@ -352,7 +352,7 @@ func (s *Service) startSocketServer(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("listen telemetry daemon socket: %w", err)
 	}
-	_ = os.Chmod(s.cfg.SocketPath, 0o660)
+	_ = os.Chmod(s.cfg.SocketPath, 0o600)
 	s.infof("socket_listening", "path=%s", s.cfg.SocketPath)
 
 	mux := http.NewServeMux()
