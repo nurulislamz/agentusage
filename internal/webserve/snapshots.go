@@ -10,7 +10,7 @@ import (
 	"github.com/nurulislamz/agentusage/internal/tui"
 )
 
-func (c *collector) fetchSnapshots(ctx context.Context, refresh bool) ([]core.UsageSnapshot, string, error) {
+func (c *collector) fetchSnapshots(ctx context.Context, refresh bool, accountID string) ([]core.UsageSnapshot, string, error) {
 	if c.demo {
 		return demoSnapshots(c.now()), "demo", nil
 	}
@@ -19,21 +19,28 @@ func (c *collector) fetchSnapshots(ctx context.Context, refresh bool) ([]core.Us
 	tw := core.ParseTimeWindow(cfg.Data.TimeWindow)
 	projector := tui.NewWebProjectorFromConfig(cfg)
 
-	rt := daemon.NewViewRuntime(nil, daemon.ResolveSocketPath(), core.DebugEnabled())
-	rt.SetTimeWindow(tw)
-	var frame daemon.SnapshotFrame
-	if refresh {
-		frame = rt.RefreshForWindow(ctx, tw)
-	} else {
-		frame = rt.ReadWithFallbackForWindow(ctx, tw)
-	}
-	if len(frame.Snapshots) > 0 {
-		return projector.OrderSnapshots(frame.Snapshots), "daemon", nil
+	if c.source != export.SourceDirect && c.rt != nil {
+		var frame daemon.SnapshotFrame
+		if refresh && accountID == "" {
+			frame = c.rt.RefreshForWindow(ctx, tw)
+		} else {
+			frame = c.rt.ReadWithFallbackForWindow(ctx, tw)
+		}
+		if len(frame.Snapshots) > 0 {
+			if c.enrich != nil {
+				c.enrich(ctx, frame.Snapshots, accountID)
+			}
+			return projector.OrderSnapshots(frame.Snapshots), "daemon", nil
+		}
 	}
 
 	snaps, resolved, err := export.Collect(ctx, c.source)
 	if err != nil {
 		return nil, "", fmt.Errorf("serve: collecting snapshots: %w", err)
 	}
-	return projector.OrderSnapshots(tui.SnapshotsToMap(snaps)), string(resolved), nil
+	snapMap := tui.SnapshotsToMap(snaps)
+	if c.enrich != nil {
+		c.enrich(ctx, snapMap, accountID)
+	}
+	return projector.OrderSnapshots(snapMap), string(resolved), nil
 }
