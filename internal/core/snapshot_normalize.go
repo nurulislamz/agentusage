@@ -34,14 +34,74 @@ func NormalizeUsageSnapshotWithConfig(s UsageSnapshot, modelCfg ModelNormalizati
 }
 
 func isDiagnosticKey(key string) bool {
-	lk := strings.ToLower(strings.TrimSpace(key))
-	if lk == "" {
+	start := 0
+	for start < len(key) && (key[start] == ' ' || key[start] == '\t' || key[start] == '\n' || key[start] == '\r') {
+		start++
+	}
+	end := len(key)
+	for end > start && (key[end-1] == ' ' || key[end-1] == '\t' || key[end-1] == '\n' || key[end-1] == '\r') {
+		end--
+	}
+	if start >= end {
 		return false
 	}
-	return strings.Contains(lk, "error") ||
-		strings.Contains(lk, "warning") ||
-		strings.HasSuffix(lk, "_err") ||
-		strings.HasSuffix(lk, "_warn")
+	s := key[start:end]
+	return containsFoldASCII(s, "error") ||
+		containsFoldASCII(s, "warning") ||
+		hasSuffixFoldASCII(s, "_err") ||
+		hasSuffixFoldASCII(s, "_warn")
+}
+
+func containsFoldASCII(s, substr string) bool {
+	if len(substr) > len(s) {
+		return false
+	}
+	if len(substr) == 0 {
+		return true
+	}
+	limit := len(s) - len(substr)
+	for i := 0; i <= limit; i++ {
+		match := true
+		for j := 0; j < len(substr); j++ {
+			c1 := s[i+j]
+			c2 := substr[j]
+			if c1 >= 'A' && c1 <= 'Z' {
+				c1 += 'a' - 'A'
+			}
+			if c2 >= 'A' && c2 <= 'Z' {
+				c2 += 'a' - 'A'
+			}
+			if c1 != c2 {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSuffixFoldASCII(s, suffix string) bool {
+	if len(suffix) > len(s) {
+		return false
+	}
+	start := len(s) - len(suffix)
+	for i := 0; i < len(suffix); i++ {
+		c1 := s[start+i]
+		c2 := suffix[i]
+		if c1 >= 'A' && c1 <= 'Z' {
+			c1 += 'a' - 'A'
+		}
+		if c2 >= 'A' && c2 <= 'Z' {
+			c2 += 'a' - 'A'
+		}
+		if c1 != c2 {
+			return false
+		}
+	}
+	return true
 }
 
 func normalizeModelUsageRecords(s UsageSnapshot, cfg ModelNormalizationConfig) []ModelUsageRecord {
@@ -58,8 +118,12 @@ func normalizeModelUsageRecords(s UsageSnapshot, cfg ModelNormalizationConfig) [
 		if rec.Window == "" {
 			rec.Window = "unknown"
 		}
-		rec.SetDimension("provider_id", s.ProviderID)
-		rec.SetDimension("account_id", s.AccountID)
+		if s.ProviderID != "" {
+			rec.SetDimension("provider_id", s.ProviderID)
+		}
+		if s.AccountID != "" {
+			rec.SetDimension("account_id", s.AccountID)
+		}
 
 		if rec.TotalTokens == nil {
 			total := float64(0)

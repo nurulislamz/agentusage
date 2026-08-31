@@ -1,6 +1,7 @@
 package core
 
 import (
+	"slices"
 	"strings"
 	"time"
 )
@@ -120,15 +121,54 @@ func synthesizeSelfProviderBreakdown(s *UsageSnapshot) {
 	input := 0.0
 	output := 0.0
 	requests := 0.0
-	for _, rec := range ExtractAnalyticsModelUsage(*s) {
-		input += rec.InputTokens
-		output += rec.OutputTokens
-	}
-	for _, rec := range s.ModelUsage {
-		if rec.Requests != nil {
-			requests += *rec.Requests
+	if len(s.ModelUsage) > 0 {
+		for i := range s.ModelUsage {
+			rec := &s.ModelUsage[i]
+			if rec.InputTokens != nil {
+				input += *rec.InputTokens
+			}
+			if rec.OutputTokens != nil {
+				output += *rec.OutputTokens
+			}
+			if rec.TotalTokens != nil && rec.InputTokens == nil && rec.OutputTokens == nil {
+				input += *rec.TotalTokens
+			}
+			if rec.Requests != nil {
+				requests += *rec.Requests
+			}
+		}
+	} else {
+		for key, metric := range s.Metrics {
+			if metric.Used == nil || *metric.Used <= 0 {
+				continue
+			}
+			switch {
+			case (strings.HasPrefix(key, "model_") && strings.HasSuffix(key, "_input_tokens")) || strings.HasPrefix(key, "input_tokens_"):
+				input += *metric.Used
+			case (strings.HasPrefix(key, "model_") && strings.HasSuffix(key, "_output_tokens")) || strings.HasPrefix(key, "output_tokens_"):
+				output += *metric.Used
+			case strings.HasPrefix(key, "model_") && strings.HasSuffix(key, "_requests"):
+				requests += *metric.Used
+			}
+		}
+		for key, rawVal := range s.Raw {
+			switch {
+			case (strings.HasPrefix(key, "model_") && strings.HasSuffix(key, "_input_tokens")) || strings.HasPrefix(key, "input_tokens_"):
+				if val, ok := parseModelRawValue(rawVal); ok {
+					input += val
+				}
+			case (strings.HasPrefix(key, "model_") && strings.HasSuffix(key, "_output_tokens")) || strings.HasPrefix(key, "output_tokens_"):
+				if val, ok := parseModelRawValue(rawVal); ok {
+					output += val
+				}
+			case strings.HasPrefix(key, "model_") && strings.HasSuffix(key, "_requests"):
+				if val, ok := parseModelRawValue(rawVal); ok {
+					requests += val
+				}
+			}
 		}
 	}
+
 	if requests <= 0 {
 		if metric, ok := s.Metrics["window_requests"]; ok && metric.Used != nil {
 			requests = *metric.Used
@@ -176,9 +216,39 @@ func inferredAnalyticsWindow(s UsageSnapshot) string {
 }
 
 func sumAnalyticsModelTokens(s UsageSnapshot) float64 {
+	if len(s.ModelUsage) > 0 {
+		total := 0.0
+		for i := range s.ModelUsage {
+			rec := &s.ModelUsage[i]
+			if rec.InputTokens != nil {
+				total += *rec.InputTokens
+			}
+			if rec.OutputTokens != nil {
+				total += *rec.OutputTokens
+			}
+			if rec.TotalTokens != nil && rec.InputTokens == nil && rec.OutputTokens == nil {
+				total += *rec.TotalTokens
+			}
+		}
+		return total
+	}
 	total := 0.0
-	for _, model := range ExtractAnalyticsModelUsage(s) {
-		total += model.InputTokens + model.OutputTokens
+	for key, metric := range s.Metrics {
+		if metric.Used == nil || *metric.Used <= 0 {
+			continue
+		}
+		if (strings.HasPrefix(key, "model_") && (strings.HasSuffix(key, "_input_tokens") || strings.HasSuffix(key, "_output_tokens"))) ||
+			strings.HasPrefix(key, "input_tokens_") || strings.HasPrefix(key, "output_tokens_") {
+			total += *metric.Used
+		}
+	}
+	for key, rawVal := range s.Raw {
+		if (strings.HasPrefix(key, "model_") && (strings.HasSuffix(key, "_input_tokens") || strings.HasSuffix(key, "_output_tokens"))) ||
+			strings.HasPrefix(key, "input_tokens_") || strings.HasPrefix(key, "output_tokens_") {
+			if val, ok := parseModelRawValue(rawVal); ok && val > 0 {
+				total += val
+			}
+		}
 	}
 	return total
 }
@@ -194,17 +264,37 @@ func sumAnalyticsModelRequests(s UsageSnapshot) float64 {
 }
 
 func sanitizeAnalyticsMetricID(raw string) string {
-	value := strings.ToLower(strings.TrimSpace(raw))
-	replacer := strings.NewReplacer("/", "_", "-", "_", " ", "_", ".", "_", ":", "_")
-	value = replacer.Replace(value)
-	for strings.Contains(value, "__") {
-		value = strings.ReplaceAll(value, "__", "_")
-	}
-	value = strings.Trim(value, "_")
-	if value == "" {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
 		return ""
 	}
-	return value
+	var b strings.Builder
+	b.Grow(len(raw))
+	lastUnderscore := false
+	for i := 0; i < len(raw); i++ {
+		c := raw[i]
+		switch {
+		case (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'):
+			b.WriteByte(c)
+			lastUnderscore = false
+		case c >= 'A' && c <= 'Z':
+			b.WriteByte(c + ('a' - 'A'))
+			lastUnderscore = false
+		case c == '/' || c == '-' || c == ' ' || c == '.' || c == ':' || c == '_':
+			if !lastUnderscore && b.Len() > 0 {
+				b.WriteByte('_')
+				lastUnderscore = true
+			}
+		default:
+			if !lastUnderscore && b.Len() > 0 {
+				b.WriteByte('_')
+				lastUnderscore = true
+			}
+		}
+	}
+	res := b.String()
+	res = strings.TrimRight(res, "_")
+	return res
 }
 
 func normalizeAnalyticsDailySeries(s *UsageSnapshot) {
@@ -230,17 +320,26 @@ func normalizeExistingSeriesAliases(s *UsageSnapshot) {
 	aliasInto(s, "tokens_total", "analytics_tokens", "tokens")
 	aliasInto(s, "requests", "analytics_requests")
 
+	type seriesMerge struct {
+		target string
+		points []TimePoint
+	}
+	var toMerge []seriesMerge
 	for key, points := range s.DailySeries {
 		switch {
 		case strings.HasPrefix(key, "tokens_model_"):
-			model := strings.TrimPrefix(key, "tokens_model_")
-			mergeSeries(s, "tokens_model_"+model, points)
-			mergeSeries(s, "tokens_"+model, points)
+			model := key[len("tokens_model_"):]
+			toMerge = append(toMerge, seriesMerge{target: "tokens_" + model, points: points})
 		case strings.HasPrefix(key, "usage_model_"):
-			model := strings.TrimPrefix(key, "usage_model_")
-			mergeSeries(s, "tokens_model_"+model, points)
-			mergeSeries(s, "tokens_"+model, points)
+			model := key[len("usage_model_"):]
+			toMerge = append(toMerge,
+				seriesMerge{target: "tokens_model_" + model, points: points},
+				seriesMerge{target: "tokens_" + model, points: points},
+			)
 		}
+	}
+	for _, tm := range toMerge {
+		mergeSeries(s, tm.target, tm.points)
 	}
 }
 
@@ -297,8 +396,9 @@ func synthesizeModelSeriesFromRecords(s *UsageSnapshot) {
 	}
 	date := analyticsReferenceTime(s).Format("2006-01-02")
 
-	perModel := make(map[string]float64)
-	for _, rec := range s.ModelUsage {
+	perModel := make(map[string]float64, len(s.ModelUsage))
+	for i := range s.ModelUsage {
+		rec := &s.ModelUsage[i]
 		model := strings.TrimSpace(rec.RawModelID)
 		if model == "" {
 			model = strings.TrimSpace(rec.CanonicalLineageID)
@@ -346,6 +446,33 @@ func normalizeSeriesPoints(points []TimePoint) []TimePoint {
 	if len(points) == 0 {
 		return nil
 	}
+	if len(points) == 1 {
+		d := strings.TrimSpace(points[0].Date)
+		if d == "" || points[0].Value <= 0 {
+			return nil
+		}
+		if d == points[0].Date {
+			return points
+		}
+		return []TimePoint{{Date: d, Value: points[0].Value}}
+	}
+
+	isCleanSorted := true
+	for i := 0; i < len(points); i++ {
+		d := strings.TrimSpace(points[i].Date)
+		if d == "" || points[i].Value <= 0 || d != points[i].Date {
+			isCleanSorted = false
+			break
+		}
+		if i > 0 && points[i-1].Date >= points[i].Date {
+			isCleanSorted = false
+			break
+		}
+	}
+	if isCleanSorted {
+		return points
+	}
+
 	agg := make(map[string]float64, len(points))
 	for _, p := range points {
 		date := strings.TrimSpace(p.Date)
@@ -354,7 +481,14 @@ func normalizeSeriesPoints(points []TimePoint) []TimePoint {
 		}
 		agg[date] += p.Value
 	}
-	keys := SortedStringKeys(agg)
+	if len(agg) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(agg))
+	for k := range agg {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
 	out := make([]TimePoint, 0, len(keys))
 	for _, k := range keys {
 		out = append(out, TimePoint{Date: k, Value: agg[k]})
@@ -363,20 +497,11 @@ func normalizeSeriesPoints(points []TimePoint) []TimePoint {
 }
 
 func normalizeSeriesModelKey(model string) string {
-	model = strings.ToLower(strings.TrimSpace(model))
-	model = strings.ReplaceAll(model, "/", "_")
-	model = strings.ReplaceAll(model, ":", "_")
-	model = strings.ReplaceAll(model, " ", "_")
-	model = strings.ReplaceAll(model, ".", "_")
-	model = strings.ReplaceAll(model, "-", "_")
-	for strings.Contains(model, "__") {
-		model = strings.ReplaceAll(model, "__", "_")
-	}
-	model = strings.Trim(model, "_")
-	if model == "" {
+	res := sanitizeAnalyticsMetricID(model)
+	if res == "" {
 		return "unknown"
 	}
-	return model
+	return res
 }
 
 func analyticsReferenceTime(s *UsageSnapshot) time.Time {

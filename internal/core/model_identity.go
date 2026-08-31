@@ -1,15 +1,7 @@
 package core
 
 import (
-	"fmt"
-	"regexp"
 	"strings"
-)
-
-var (
-	reDateISO      = regexp.MustCompile(`(20\d{2})[-_](0[1-9]|1[0-2])[-_](0[1-9]|[12]\d|3[01])`)
-	reDateCompact  = regexp.MustCompile(`\b(20\d{2})(0[1-9]|1[0-2])([0-2]\d|3[01])\b`)
-	reVersionToken = regexp.MustCompile(`^\d+(?:\.\d+)?$`)
 )
 
 type canonicalModelIdentity struct {
@@ -61,10 +53,11 @@ func normalizeCanonicalModel(providerID, rawModelID string, cfg ModelNormalizati
 	model = strings.Trim(model, "/")
 
 	explicitVendor := ""
-	if parts := strings.SplitN(model, "/", 2); len(parts) == 2 {
-		if isKnownVendor(parts[0]) {
-			explicitVendor = parts[0]
-			model = parts[1]
+	if slashIdx := strings.IndexByte(model, '/'); slashIdx >= 0 {
+		prefix := model[:slashIdx]
+		if isKnownVendor(prefix) {
+			explicitVendor = prefix
+			model = model[slashIdx+1:]
 		}
 	}
 
@@ -161,7 +154,7 @@ func canonicalizeClaude(tokens []string) canonicalBuild {
 	version := extractVersionNearVariant(tokens, variant)
 	if variant != "" && version != "" {
 		return canonicalBuild{
-			lineage:    fmt.Sprintf("claude-%s-%s", variant, version),
+			lineage:    "claude-" + variant + "-" + version,
 			variant:    variant,
 			confidence: 0.95,
 			reason:     "family_parse",
@@ -169,7 +162,7 @@ func canonicalizeClaude(tokens []string) canonicalBuild {
 	}
 	if variant != "" {
 		return canonicalBuild{
-			lineage:    fmt.Sprintf("claude-%s", variant),
+			lineage:    "claude-" + variant,
 			variant:    variant,
 			confidence: 0.82,
 			reason:     "family_parse_variant_only",
@@ -178,7 +171,7 @@ func canonicalizeClaude(tokens []string) canonicalBuild {
 	version = firstVersionToken(tokens)
 	if version != "" {
 		return canonicalBuild{
-			lineage:    fmt.Sprintf("claude-%s", version),
+			lineage:    "claude-" + version,
 			confidence: 0.78,
 			reason:     "family_parse_version_only",
 		}
@@ -193,12 +186,15 @@ func canonicalizeClaude(tokens []string) canonicalBuild {
 func canonicalizeGPT(tokens []string) canonicalBuild {
 	version := firstVersionToken(tokens)
 	variant := firstMatch(tokens, "codex", "mini", "nano", "turbo", "chat", "pro")
-	lineage := "gpt"
-	if version != "" {
-		lineage += "-" + version
-	}
-	if variant != "" {
-		lineage += "-" + variant
+	var lineage string
+	if version != "" && variant != "" {
+		lineage = "gpt-" + version + "-" + variant
+	} else if version != "" {
+		lineage = "gpt-" + version
+	} else if variant != "" {
+		lineage = "gpt-" + variant
+	} else {
+		lineage = "gpt"
 	}
 	confidence := 0.80
 	if version != "" {
@@ -218,12 +214,15 @@ func canonicalizeGPT(tokens []string) canonicalBuild {
 func canonicalizeGemini(tokens []string) canonicalBuild {
 	version := firstVersionToken(tokens)
 	variant := firstMatch(tokens, "pro", "flash", "ultra", "nano", "lite")
-	lineage := "gemini"
-	if version != "" {
-		lineage += "-" + version
-	}
-	if variant != "" {
-		lineage += "-" + variant
+	var lineage string
+	if version != "" && variant != "" {
+		lineage = "gemini-" + version + "-" + variant
+	} else if version != "" {
+		lineage = "gemini-" + version
+	} else if variant != "" {
+		lineage = "gemini-" + variant
+	} else {
+		lineage = "gemini"
 	}
 	confidence := 0.80
 	if version != "" {
@@ -340,21 +339,127 @@ func detectVariant(tokens []string) string {
 	)
 }
 
-func extractReleaseDate(raw string) string {
-	if m := reDateISO.FindStringSubmatch(raw); len(m) == 4 {
-		return m[1] + m[2] + m[3]
+func isWordByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_'
+}
+
+func matchISODate(s string, i int) bool {
+	if i+10 > len(s) {
+		return false
 	}
-	if m := reDateCompact.FindStringSubmatch(raw); len(m) == 4 {
-		return m[1] + m[2] + m[3]
+	if s[i] != '2' || s[i+1] != '0' || s[i+2] < '0' || s[i+2] > '9' || s[i+3] < '0' || s[i+3] > '9' {
+		return false
+	}
+	sep1 := s[i+4]
+	if sep1 != '-' && sep1 != '_' {
+		return false
+	}
+	m0, m1 := s[i+5], s[i+6]
+	if !((m0 == '0' && m1 >= '1' && m1 <= '9') || (m0 == '1' && m1 >= '0' && m1 <= '2')) {
+		return false
+	}
+	sep2 := s[i+7]
+	if sep2 != '-' && sep2 != '_' {
+		return false
+	}
+	d0, d1 := s[i+8], s[i+9]
+	if !((d0 == '0' && d1 >= '1' && d1 <= '9') ||
+		((d0 == '1' || d0 == '2') && d1 >= '0' && d1 <= '9') ||
+		(d0 == '3' && (d1 == '0' || d1 == '1'))) {
+		return false
+	}
+	return true
+}
+
+func matchCompactDate(s string, i int) bool {
+	if i+8 > len(s) {
+		return false
+	}
+	if i > 0 && isWordByte(s[i-1]) {
+		return false
+	}
+	if i+8 < len(s) && isWordByte(s[i+8]) {
+		return false
+	}
+	if s[i] != '2' || s[i+1] != '0' || s[i+2] < '0' || s[i+2] > '9' || s[i+3] < '0' || s[i+3] > '9' {
+		return false
+	}
+	m0, m1 := s[i+4], s[i+5]
+	if !((m0 == '0' && m1 >= '1' && m1 <= '9') || (m0 == '1' && m1 >= '0' && m1 <= '2')) {
+		return false
+	}
+	d0, d1 := s[i+6], s[i+7]
+	if !((d0 == '0' && d1 >= '1' && d1 <= '9') ||
+		((d0 == '1' || d0 == '2') && d1 >= '0' && d1 <= '9') ||
+		(d0 == '3' && (d1 == '0' || d1 == '1'))) {
+		return false
+	}
+	return true
+}
+
+func extractReleaseDate(raw string) string {
+	for i := 0; i+10 <= len(raw); i++ {
+		if matchISODate(raw, i) {
+			var buf [8]byte
+			buf[0] = raw[i]
+			buf[1] = raw[i+1]
+			buf[2] = raw[i+2]
+			buf[3] = raw[i+3]
+			buf[4] = raw[i+5]
+			buf[5] = raw[i+6]
+			buf[6] = raw[i+8]
+			buf[7] = raw[i+9]
+			return string(buf[:])
+		}
+	}
+	for i := 0; i+8 <= len(raw); i++ {
+		if matchCompactDate(raw, i) {
+			return raw[i : i+8]
+		}
 	}
 	return ""
 }
 
 func stripReleaseDate(raw string) string {
-	out := reDateISO.ReplaceAllString(raw, "")
-	out = reDateCompact.ReplaceAllString(out, "")
-	out = strings.Trim(out, "-_ ")
-	return out
+	if len(raw) < 8 {
+		return strings.Trim(raw, "-_ ")
+	}
+	hasISO := false
+	for i := 0; i+10 <= len(raw); i++ {
+		if matchISODate(raw, i) {
+			hasISO = true
+			break
+		}
+	}
+	hasCompact := false
+	if !hasISO {
+		for i := 0; i+8 <= len(raw); i++ {
+			if matchCompactDate(raw, i) {
+				hasCompact = true
+				break
+			}
+		}
+		if !hasCompact {
+			return strings.Trim(raw, "-_ ")
+		}
+	}
+
+	var b strings.Builder
+	b.Grow(len(raw))
+	i := 0
+	for i < len(raw) {
+		if i+10 <= len(raw) && matchISODate(raw, i) {
+			i += 10
+			continue
+		}
+		if i+8 <= len(raw) && matchCompactDate(raw, i) {
+			i += 8
+			continue
+		}
+		b.WriteByte(raw[i])
+		i++
+	}
+	return strings.Trim(b.String(), "-_ ")
 }
 
 func normalizeModelToken(raw string) string {
@@ -364,19 +469,20 @@ func normalizeModelToken(raw string) string {
 	var b strings.Builder
 	b.Grow(len(raw))
 	lastDash := false
-	for _, r := range raw {
+	for i := 0; i < len(raw); i++ {
+		r := raw[i]
 		switch {
 		case r >= 'a' && r <= 'z':
-			b.WriteRune(r)
+			b.WriteByte(r)
 			lastDash = false
 		case r >= 'A' && r <= 'Z':
-			b.WriteRune(r + ('a' - 'A'))
+			b.WriteByte(r + ('a' - 'A'))
 			lastDash = false
 		case r >= '0' && r <= '9':
-			b.WriteRune(r)
+			b.WriteByte(r)
 			lastDash = false
 		case r == '.':
-			b.WriteRune(r)
+			b.WriteByte(r)
 			lastDash = false
 		default:
 			if !lastDash {
@@ -393,19 +499,65 @@ func normalizeModelToken(raw string) string {
 }
 
 func splitModelTokens(model string) []string {
-	parts := strings.Split(normalizeModelToken(model), "-")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if p != "" {
-			out = append(out, p)
+	norm := normalizeModelToken(model)
+	if norm == "" || norm == "unknown" {
+		return []string{"unknown"}
+	}
+	count := 1
+	for i := 0; i < len(norm); i++ {
+		if norm[i] == '-' {
+			count++
 		}
+	}
+	out := make([]string, 0, count)
+	start := 0
+	for i := 0; i < len(norm); i++ {
+		if norm[i] == '-' {
+			if i > start {
+				out = append(out, norm[start:i])
+			}
+			start = i + 1
+		}
+	}
+	if start < len(norm) {
+		out = append(out, norm[start:])
 	}
 	return out
 }
 
+func isVersionToken(tok string) bool {
+	if len(tok) == 0 {
+		return false
+	}
+	dotSeen := false
+	hasDigitsBefore := false
+	hasDigitsAfter := false
+	for i := 0; i < len(tok); i++ {
+		c := tok[i]
+		if c >= '0' && c <= '9' {
+			if !dotSeen {
+				hasDigitsBefore = true
+			} else {
+				hasDigitsAfter = true
+			}
+		} else if c == '.' {
+			if dotSeen || !hasDigitsBefore {
+				return false
+			}
+			dotSeen = true
+		} else {
+			return false
+		}
+	}
+	if dotSeen {
+		return hasDigitsBefore && hasDigitsAfter
+	}
+	return hasDigitsBefore
+}
+
 func firstVersionToken(tokens []string) string {
 	for i, tok := range tokens {
-		if !reVersionToken.MatchString(tok) {
+		if !isVersionToken(tok) {
 			continue
 		}
 		// join major/minor split across adjacent tokens (e.g. 4,6 -> 4.6)
@@ -433,7 +585,7 @@ func extractVersionNearVariant(tokens []string, variant string) string {
 	}
 	// right side first
 	for i := idx + 1; i < len(tokens); i++ {
-		if reVersionToken.MatchString(tokens[i]) {
+		if isVersionToken(tokens[i]) {
 			if !strings.Contains(tokens[i], ".") && i+1 < len(tokens) && isAllDigits(tokens[i+1]) {
 				return tokens[i] + "." + tokens[i+1]
 			}
@@ -442,7 +594,7 @@ func extractVersionNearVariant(tokens []string, variant string) string {
 	}
 	// then left side
 	for i := idx - 1; i >= 0; i-- {
-		if reVersionToken.MatchString(tokens[i]) {
+		if isVersionToken(tokens[i]) {
 			if !strings.Contains(tokens[i], ".") && i+1 < len(tokens) && isAllDigits(tokens[i+1]) && i+1 == idx-0 {
 				return tokens[i] + "." + tokens[i+1]
 			}
@@ -457,20 +609,31 @@ func parseVendorFamilyFromCanonical(lineage string) (vendor, family string) {
 	if lineage == "" {
 		return "unknown", "unknown"
 	}
-	parts := strings.SplitN(lineage, "/", 2)
-	if len(parts) == 2 {
-		vendor = parts[0]
-		family = strings.SplitN(parts[1], "-", 2)[0]
+	slashIdx := strings.IndexByte(lineage, '/')
+	if slashIdx >= 0 {
+		vendor = lineage[:slashIdx]
+		rest := lineage[slashIdx+1:]
+		dashIdx := strings.IndexByte(rest, '-')
+		if dashIdx >= 0 {
+			family = rest[:dashIdx]
+		} else {
+			family = rest
+		}
 		return vendor, family
 	}
-	return "unknown", strings.SplitN(lineage, "-", 2)[0]
+	dashIdx := strings.IndexByte(lineage, '-')
+	if dashIdx >= 0 {
+		family = lineage[:dashIdx]
+	} else {
+		family = lineage
+	}
+	return "unknown", family
 }
 
 func parseVariantFromCanonical(lineage string) string {
-	parts := strings.SplitN(lineage, "/", 2)
 	model := lineage
-	if len(parts) == 2 {
-		model = parts[1]
+	if slashIdx := strings.IndexByte(lineage, '/'); slashIdx >= 0 {
+		model = lineage[slashIdx+1:]
 	}
 	tokens := splitModelTokens(model)
 	return detectVariant(tokens)

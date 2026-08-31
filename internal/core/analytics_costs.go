@@ -1,5 +1,7 @@
 package core
 
+import "strings"
+
 type AnalyticsCostSummary struct {
 	TotalCostUSD float64
 	TodayCostUSD float64
@@ -50,9 +52,29 @@ func ExtractAnalyticsCostSummary(s UsageSnapshot) AnalyticsCostSummary {
 }
 
 func sumAnalyticsModelCost(s UsageSnapshot) float64 {
+	if len(s.ModelUsage) > 0 {
+		total := 0.0
+		for i := range s.ModelUsage {
+			if s.ModelUsage[i].CostUSD != nil && *s.ModelUsage[i].CostUSD > 0 {
+				total += *s.ModelUsage[i].CostUSD
+			}
+		}
+		return total
+	}
 	total := 0.0
-	for _, model := range ExtractAnalyticsModelUsage(s) {
-		total += model.CostUSD
+	for key, metric := range s.Metrics {
+		if metric.Used != nil && *metric.Used > 0 {
+			if strings.HasPrefix(key, "model_") && (strings.HasSuffix(key, "_cost_usd") || strings.HasSuffix(key, "_cost")) {
+				total += *metric.Used
+			}
+		}
+	}
+	for key, rawVal := range s.Raw {
+		if strings.HasPrefix(key, "model_") && (strings.HasSuffix(key, "_cost_usd") || strings.HasSuffix(key, "_cost")) {
+			if val, ok := parseModelRawValue(rawVal); ok && val > 0 {
+				total += val
+			}
+		}
 	}
 	return total
 }
