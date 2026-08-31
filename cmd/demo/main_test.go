@@ -2,12 +2,18 @@ package main
 
 import (
 	"context"
+	"flag"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/providers"
+	"github.com/nurulislamz/agentusage/internal/tui"
 )
 
 func TestBuildDemoSnapshots_IncludesAllDemoProviders(t *testing.T) {

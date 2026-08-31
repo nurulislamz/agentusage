@@ -333,4 +333,3 @@ func TestBase_Concurrency(t *testing.T) {
 		<-done
 	}
 }
-

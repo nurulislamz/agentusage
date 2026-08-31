@@ -262,4 +262,3 @@ func formatCycleResetScheduleCompact(snap core.UsageSnapshot, now time.Time) str
 	}
 	return "Resets in " + strings.Join(parts, " · ")
 }
-

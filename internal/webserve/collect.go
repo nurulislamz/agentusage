@@ -102,13 +102,13 @@ func newCollector(opts Options) *collector {
 	}
 
 	c := &collector{
-		ttl:     time.Duration(refresh) * time.Second,
-		source:  src,
-		demo:    opts.Demo,
-		now:     now,
-		opts:    opts,
-		rt:      rt,
-		enrich:  enrich,
+		ttl:    time.Duration(refresh) * time.Second,
+		source: src,
+		demo:   opts.Demo,
+		now:    now,
+		opts:   opts,
+		rt:     rt,
+		enrich: enrich,
 		meta: collectorMeta{
 			version:        strings.TrimSpace(opts.Version),
 			timeWindow:     strings.TrimSpace(opts.TimeWindow),

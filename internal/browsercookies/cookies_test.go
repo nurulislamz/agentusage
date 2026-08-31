@@ -465,4 +465,3 @@ func TestReadCookieWSL_KeyValidation(t *testing.T) {
 		t.Logf("readCookieWSL with valid key format returned: %v", err)
 	}
 }
-
