@@ -1,7 +1,7 @@
 package core
 
 import (
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/samber/lo"
@@ -31,6 +31,7 @@ func ExtractAnalyticsModelUsage(s UsageSnapshot) []AnalyticsModelUsageEntry {
 	}
 
 	type agg struct {
+		name       string
 		cost       float64
 		input      float64
 		output     float64
@@ -38,24 +39,21 @@ func ExtractAnalyticsModelUsage(s UsageSnapshot) []AnalyticsModelUsageEntry {
 		window     string
 	}
 
-	byModel := make(map[string]*agg)
-	order := make([]string, 0, len(records))
-	ensure := func(name string) *agg {
-		if entry, ok := byModel[name]; ok {
-			return entry
-		}
-		entry := &agg{}
-		byModel[name] = entry
-		order = append(order, name)
-		return entry
-	}
+	byModel := make(map[string]int, len(records))
+	items := make([]agg, 0, len(records))
 
 	for _, rec := range records {
 		name := analyticsModelDisplayName(rec)
 		if name == "" {
 			continue
 		}
-		entry := ensure(name)
+		idx, ok := byModel[name]
+		if !ok {
+			idx = len(items)
+			byModel[name] = idx
+			items = append(items, agg{name: name, window: rec.Window})
+		}
+		entry := &items[idx]
 		if rec.CostUSD != nil && *rec.CostUSD > 0 {
 			entry.cost += *rec.CostUSD
 		}
@@ -76,31 +74,37 @@ func ExtractAnalyticsModelUsage(s UsageSnapshot) []AnalyticsModelUsageEntry {
 		}
 	}
 
-	out := make([]AnalyticsModelUsageEntry, 0, len(order))
-	for _, name := range order {
-		entry := byModel[name]
-		if entry.cost <= 0 && entry.input <= 0 && entry.output <= 0 {
+	out := make([]AnalyticsModelUsageEntry, 0, len(items))
+	for i := range items {
+		e := &items[i]
+		if e.cost <= 0 && e.input <= 0 && e.output <= 0 {
 			continue
 		}
 		out = append(out, AnalyticsModelUsageEntry{
-			Name:         name,
-			CostUSD:      entry.cost,
-			InputTokens:  entry.input,
-			OutputTokens: entry.output,
-			Confidence:   entry.confidence,
-			Window:       entry.window,
+			Name:         e.name,
+			CostUSD:      e.cost,
+			InputTokens:  e.input,
+			OutputTokens: e.output,
+			Confidence:   e.confidence,
+			Window:       e.window,
 		})
 	}
-	sort.Slice(out, func(i, j int) bool {
-		ti := out[i].InputTokens + out[i].OutputTokens
-		tj := out[j].InputTokens + out[j].OutputTokens
-		if ti != tj {
-			return ti > tj
+	slices.SortFunc(out, func(a, b AnalyticsModelUsageEntry) int {
+		ta := a.InputTokens + a.OutputTokens
+		tb := b.InputTokens + b.OutputTokens
+		if ta != tb {
+			if ta > tb {
+				return -1
+			}
+			return 1
 		}
-		if out[i].CostUSD != out[j].CostUSD {
-			return out[i].CostUSD > out[j].CostUSD
+		if a.CostUSD != b.CostUSD {
+			if a.CostUSD > b.CostUSD {
+				return -1
+			}
+			return 1
 		}
-		return out[i].Name < out[j].Name
+		return strings.Compare(a.Name, b.Name)
 	})
 	return out
 }
