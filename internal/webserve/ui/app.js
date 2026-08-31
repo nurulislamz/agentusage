@@ -532,8 +532,9 @@
   document.addEventListener("keydown", (ev) => {
     if ($("token-modal").hidden === false) return;
     if (state.filterOpen) return;
-    // Don't intercept typing in text input or textarea
-    if (ev.target && ev.target.matches("input, textarea")) return;
+    if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    // Don't intercept typing in text input, textarea, or select
+    if (ev.target && typeof ev.target.matches === "function" && (ev.target.matches("input, textarea, select") || ev.target.isContentEditable)) return;
 
     const key = ev.key;
     if (["ArrowUp", "ArrowDown", "j", "J", "k", "K", "/", "r", "R", "u", "U", "t", "T"].includes(key)) {

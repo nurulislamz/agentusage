@@ -156,6 +156,35 @@ func TestStaticAssets(t *testing.T) {
 	}
 }
 
+func TestAppJSUsageModeKeyHandler(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("/app.js status = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+
+	checks := []struct {
+		desc    string
+		pattern string
+	}{
+		{"modifier key guard", "ev.ctrlKey || ev.metaKey || ev.altKey"},
+		{"form element guard", `matches("input, textarea, select")`},
+		{"keydown 'u' case", `case "u":`},
+		{"keydown 'U' case", `case "U":`},
+		{"usage mode toggle call", "cycleUsageMode()"},
+		{"footer button usage mode", `id="footer-btn-mode"`},
+	}
+
+	for _, tc := range checks {
+		if !strings.Contains(body, tc.pattern) {
+			t.Errorf("/app.js missing %s (expected pattern %q)", tc.desc, tc.pattern)
+		}
+	}
+}
+
 func TestNewServerRejectsPublicBind(t *testing.T) {
 	_, err := NewServer(Options{ListenAddr: ":8080", Demo: true})
 	if err == nil {
