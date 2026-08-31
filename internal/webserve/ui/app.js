@@ -368,8 +368,7 @@
         <span class="rail"></span>
         <span class="name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
         <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
-        <span class="sum">${pct !== null ? `<span class="mini"><i style="width:${pct}%;background:${gaugeColor(toneFromPercent(pct, v))}"></i></span>` : ""}
-          ${esc(summary)}${reset ? `<span class="reset">${esc(reset)}</span>` : ""}</span>
+        <span class="sum">${pct !== null ? `<span class="mini"><i style="width:${pct}%;background:${gaugeColor(toneFromPercent(pct, v))}"></i></span>` : ""}<span class="sum-text">${esc(summary)}</span>${reset ? `<span class="reset">${esc(reset)}</span>` : ""}</span>
       </button>`;
     });
     $("nav").innerHTML = html;
@@ -399,8 +398,14 @@
 
   function renderCards(cards) {
     if (!cards || !cards.length) return "";
-    return cards.map((card) => {
+    const isUsed = (state.envelope?.usage_mode || "remaining").toLowerCase() === "used";
+    const modeWord = isUsed ? "used" : "remaining";
+    const threshPct = isUsed ? 80 : 20;
+
+    const cardsHtml = cards.map((card, idx) => {
       const color = card.color || "var(--fg-2)";
+      const isFeatured = card.id === "hero" || card.id === "overview" || card.id === "quota" || (cards.length === 3 && idx === 0);
+      const heroClass = isFeatured ? " card-hero" : "";
       const rows = (card.rows || []).map((row) => {
         if (row.kind === "heading") {
           return `<div class="heading">${esc(row.value || row.label || "")}</div>`;
@@ -408,11 +413,19 @@
         if (row.kind === "gauge") {
           const pct = row.percent == null ? 0 : Number(row.percent);
           const tone = row.tone || "ok";
-          const modeWord = (state.envelope?.usage_mode || "remaining").toLowerCase() === "used" ? "used" : "remaining";
           return `<div class="gauge-block ${toneClass(tone)}">
-            <div class="label">${esc(row.label || "")}</div>
-            <div class="gauge" style="color:${gaugeColor(tone)}"><i style="width:${Math.max(0, Math.min(100, pct))}%;background:currentColor"></i></div>
-            <div class="caption"><b>${pct.toFixed(2)}%</b> ${modeWord}${row.hint ? " · " + esc(row.hint) : ""}</div>
+            <div class="gauge-header">
+              <span class="gauge-label">${esc(row.label || "")}</span>
+              <span class="gauge-stat">
+                <b class="stat-val">${pct.toFixed(2)}%</b>
+                <span class="pill ${pillClass(tone)}">${esc(modeWord)}</span>
+              </span>
+            </div>
+            <div class="gauge" style="color:${gaugeColor(tone)}">
+              <i style="width:${Math.max(0, Math.min(100, pct))}%;background:currentColor"></i>
+              <span class="gauge-threshold" style="left:${threshPct}%" aria-hidden="true"></span>
+            </div>
+            <div class="caption">${row.hint ? esc(row.hint) : `${pct.toFixed(2)}% ${esc(modeWord)}`}</div>
           </div>`;
         }
         if (row.kind === "timer") {
@@ -428,8 +441,10 @@
         }
         return `<div class="text-row">${esc(row.value || row.label || "")}</div>`;
       }).join("");
-      return `<section class="card" style="--card:${esc(color)}"><h2>${esc(card.icon || "")} ${esc((card.title || "").toUpperCase())}</h2>${rows}</section>`;
+      return `<section class="card${heroClass}" style="--card:${esc(color)}"><div class="card-header"><h2>${esc(card.icon || "")} ${esc((card.title || "").toUpperCase())}</h2></div>${rows}</section>`;
     }).join("");
+
+    return `<div class="panel-cards-grid">${cardsHtml}</div>`;
   }
 
   function formatAge(ms) {
@@ -483,7 +498,7 @@
     const refreshed = lastRefreshedText(v);
     const cards = v.detail_cards && v.detail_cards.length
       ? renderCards(v.detail_cards)
-      : (v.detail_html ? `<section class="card">${v.detail_html}</section>` : "");
+      : (v.detail_html ? `<div class="panel-cards-grid"><section class="card">${v.detail_html}</section></div>` : "");
     panel.innerHTML = `
       <div class="hero">
         <h1>
