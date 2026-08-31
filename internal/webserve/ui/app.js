@@ -192,7 +192,10 @@
     const showFetching = manual && state.views.length > 0;
     if (showFetching) setRefreshing(true);
     try {
-      const qs = manual ? "?refresh=1" : "";
+      let qs = manual ? "?refresh=1" : "";
+      if (opts && opts.accountID) {
+        qs += (qs ? "&" : "?") + `account_id=${encodeURIComponent(opts.accountID)}`;
+      }
       const res = await fetch("/api/v1/snapshots" + qs, { headers: headers() });
       if (res.status === 401) {
         $("token-modal").hidden = false;
@@ -456,7 +459,7 @@
       <span><kbd>j</kbd>/<kbd>k</kbd> move</span>
       <button type="button" class="footer-btn" id="footer-btn-filter" title="Filter providers (/)"><kbd>/</kbd> filter</button>
       <button type="button" class="footer-btn" id="footer-btn-mode" title="Toggle usage mode (u)"><kbd>u</kbd> <span>${esc(usageModeLabel())}</span></button>
-      <button type="button" class="footer-btn" id="footer-btn-refresh" title="Refresh snapshots (r)"><kbd>r</kbd> refresh</button>
+      <button type="button" class="footer-btn" id="footer-btn-refresh" title="Refresh focused account (r) / all (R)"><kbd>r</kbd> refresh</button>
       <button type="button" class="footer-btn" id="footer-btn-theme" title="Cycle theme (t)"><kbd>t</kbd> theme</button>
       <span class="grow"></span>
       <span>${esc(theme)}</span>
@@ -469,7 +472,7 @@
       cycleUsageMode().catch(console.error);
     });
     $("footer-btn-refresh")?.addEventListener("click", () => {
-      load({ manual: true }).catch(console.error);
+      load({ manual: true, accountID: filteredViews()[state.selected]?.account_id }).catch(console.error);
     });
     $("footer-btn-theme")?.addEventListener("click", () => {
       cycleThemeOverride();

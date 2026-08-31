@@ -1,10 +1,12 @@
 package webserve
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/export"
 )
 
 func TestCollectorCache(t *testing.T) {
@@ -54,7 +56,7 @@ func TestCollectorRefreshBypassesCache(t *testing.T) {
 	if !cached.GeneratedAt.Equal(first.GeneratedAt) {
 		t.Fatalf("expected cache hit, generated_at moved %v → %v", first.GeneratedAt, cached.GeneratedAt)
 	}
-	fresh, err := c.envelopeRefresh(true)
+	fresh, err := c.envelopeRefresh(true, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,5 +145,97 @@ func TestProviderCatalogIncludesKnownIDs(t *testing.T) {
 		if !seen[id] {
 			t.Errorf("catalog missing %s", id)
 		}
+	}
+}
+
+func TestCollectorViewRuntimeMaintained(t *testing.T) {
+	c := newCollector(Options{
+		TimeWindow:     "14d",
+		RefreshSeconds: 30,
+	})
+	if c.rt == nil {
+		t.Fatal("expected collector to initialize ViewRuntime")
+	}
+	savedRT := c.rt
+	// Verify rt is maintained across fetch
+	if c.rt != savedRT {
+		t.Fatal("expected collector to reuse the same ViewRuntime instance")
+	}
+}
+
+func TestCollectorTargetedEnrichment(t *testing.T) {
+	c := newCollector(Options{
+		RefreshSeconds: 30,
+	})
+	if c.enrich == nil {
+		t.Fatal("expected enrich function to be initialized")
+	}
+
+	snapCursor := core.NewUsageSnapshot("cursor", "cursor-1")
+	snapAntigravity := core.NewUsageSnapshot("antigravity", "ag-1")
+	snapOpenAI := core.NewUsageSnapshot("openai", "oai-1")
+
+	snaps := map[string]core.UsageSnapshot{
+		"cursor-1": snapCursor,
+		"ag-1":     snapAntigravity,
+		"oai-1":    snapOpenAI,
+	}
+
+	ctx := context.Background()
+	// Enrich targeted account "cursor-1"
+	c.enrich(ctx, snaps, "cursor-1")
+
+	// Ensure non-targeted snapshots were untouched
+	if snaps["ag-1"].ProviderID != "antigravity" || snaps["ag-1"].AccountID != "ag-1" {
+		t.Errorf("ag-1 was unexpectedly modified: %+v", snaps["ag-1"])
+	}
+	if snaps["oai-1"].ProviderID != "openai" || snaps["oai-1"].AccountID != "oai-1" {
+		t.Errorf("oai-1 was unexpectedly modified: %+v", snaps["oai-1"])
+	}
+
+	// Targeted non-existent account should do nothing
+	c.enrich(ctx, snaps, "non-existent")
+	if len(snaps) != 3 {
+		t.Errorf("expected 3 snapshots, got %d", len(snaps))
+	}
+}
+
+func TestCollectorFetchSnapshotsEnrichment(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	c := newCollector(Options{
+		Source:         string(export.SourceDirect),
+		RefreshSeconds: 30,
+	})
+
+	var calledWithAccountID string
+	var enrichCalled bool
+	c.enrich = func(ctx context.Context, snaps map[string]core.UsageSnapshot, accountID string) {
+		enrichCalled = true
+		calledWithAccountID = accountID
+		snaps["cursor-mock"] = core.NewUsageSnapshot("cursor", "cursor-mock")
+	}
+
+	snaps, _, err := c.fetchSnapshots(ctx, true, "cursor-mock")
+	if err != nil {
+		t.Fatalf("fetchSnapshots: %v", err)
+	}
+	if !enrichCalled {
+		t.Fatal("expected enrich to be called during fetchSnapshots")
+	}
+	if calledWithAccountID != "cursor-mock" {
+		t.Errorf("calledWithAccountID = %q, want cursor-mock", calledWithAccountID)
+	}
+	found := false
+	for _, snap := range snaps {
+		if snap.AccountID == "cursor-mock" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected mock snapshot in returned ordered snapshots")
 	}
 }

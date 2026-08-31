@@ -185,6 +185,44 @@ func TestAppJSUsageModeKeyHandler(t *testing.T) {
 	}
 }
 
+func TestAppJSRefreshKeyHandlers(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("/app.js status = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+
+	checks := []struct {
+		desc    string
+		pattern string
+	}{
+		{"load opts.accountID query param", "account_id"},
+		{"keydown 'r' focused account refresh", `accountID: filteredViews()[state.selected]?.account_id`},
+		{"keydown 'R' refresh all", `case "R":`},
+		{"footer button refresh title", `title="Refresh focused account (r) / all (R)"`},
+		{"footer button focused refresh call", `accountID: filteredViews()[state.selected]?.account_id`},
+	}
+
+	for _, tc := range checks {
+		if !strings.Contains(body, tc.pattern) {
+			t.Errorf("/app.js missing %s (expected pattern %q)", tc.desc, tc.pattern)
+		}
+	}
+}
+
+func TestSnapshotsAccountIDParam(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/snapshots?refresh=1&account_id=cursor-main", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+}
+
 func TestNewServerRejectsPublicBind(t *testing.T) {
 	_, err := NewServer(Options{ListenAddr: ":8080", Demo: true})
 	if err == nil {

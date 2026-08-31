@@ -8,7 +8,11 @@ import (
 
 	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/daemon"
 	"github.com/nurulislamz/agentusage/internal/export"
+	"github.com/nurulislamz/agentusage/internal/providers/antigravity"
+	"github.com/nurulislamz/agentusage/internal/providers/cursor"
+	"github.com/nurulislamz/agentusage/internal/providers/opencode"
 	"github.com/nurulislamz/agentusage/internal/tui"
 	"github.com/nurulislamz/agentusage/internal/version"
 )
@@ -24,6 +28,8 @@ type collector struct {
 	opts     Options
 	now      func() time.Time
 	collect  CollectFunc
+	rt       *daemon.ViewRuntime
+	enrich   func(ctx context.Context, snaps map[string]core.UsageSnapshot, accountID string)
 }
 
 type collectorMeta struct {
@@ -47,12 +53,62 @@ func newCollector(opts Options) *collector {
 	if now == nil {
 		now = func() time.Time { return time.Now().UTC() }
 	}
+	cfg := configOrDefault(opts)
+	tw := core.ParseTimeWindow(cfg.Data.TimeWindow)
+	rt := daemon.NewViewRuntime(nil, daemon.ResolveSocketPath(), core.DebugEnabled())
+	rt.SetTimeWindow(tw)
+
+	cachedAccounts := core.MergeAccounts(cfg.Accounts, cfg.AutoDetectedAccounts)
+	cursorProv := cursor.New()
+	antigravityProv := antigravity.New()
+	opencodeProv := opencode.New()
+
+	enrich := func(ctx context.Context, snaps map[string]core.UsageSnapshot, accountID string) {
+		if len(snaps) == 0 {
+			return
+		}
+		targetSnaps := snaps
+		accountID = strings.TrimSpace(accountID)
+		if accountID != "" {
+			targetSnaps = make(map[string]core.UsageSnapshot)
+			if snap, ok := snaps[accountID]; ok {
+				targetSnaps[accountID] = snap
+			} else {
+				return
+			}
+		}
+		enrichCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+		defer cancel()
+		var wg sync.WaitGroup
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			cursorProv.EnrichSnapshots(enrichCtx, cachedAccounts, targetSnaps)
+		}()
+		go func() {
+			defer wg.Done()
+			antigravityProv.EnrichSnapshots(enrichCtx, cachedAccounts, targetSnaps)
+		}()
+		go func() {
+			defer wg.Done()
+			opencodeProv.EnrichSnapshots(enrichCtx, cachedAccounts, targetSnaps)
+		}()
+		wg.Wait()
+		if accountID != "" {
+			if snap, ok := targetSnaps[accountID]; ok {
+				snaps[accountID] = snap
+			}
+		}
+	}
+
 	c := &collector{
-		ttl:    time.Duration(refresh) * time.Second,
-		source: src,
-		demo:   opts.Demo,
-		now:    now,
-		opts:   opts,
+		ttl:     time.Duration(refresh) * time.Second,
+		source:  src,
+		demo:    opts.Demo,
+		now:     now,
+		opts:    opts,
+		rt:      rt,
+		enrich:  enrich,
 		meta: collectorMeta{
 			version:        strings.TrimSpace(opts.Version),
 			timeWindow:     strings.TrimSpace(opts.TimeWindow),
@@ -75,10 +131,10 @@ func newCollector(opts Options) *collector {
 }
 
 func (c *collector) envelope() (Envelope, error) {
-	return c.envelopeRefresh(false)
+	return c.envelopeRefresh(false, "")
 }
 
-func (c *collector) envelopeRefresh(refresh bool) (Envelope, error) {
+func (c *collector) envelopeRefresh(refresh bool, accountID string) (Envelope, error) {
 	if c.collect != nil {
 		env, err := c.collect()
 		if err != nil {
@@ -95,7 +151,7 @@ func (c *collector) envelopeRefresh(refresh bool) (Envelope, error) {
 		return c.cached, nil
 	}
 
-	env, err := c.fetch(refresh)
+	env, err := c.fetch(refresh, accountID)
 	if err != nil {
 		return Envelope{}, err
 	}
@@ -105,11 +161,11 @@ func (c *collector) envelopeRefresh(refresh bool) (Envelope, error) {
 	return env, nil
 }
 
-func (c *collector) fetch(refresh bool) (Envelope, error) {
+func (c *collector) fetch(refresh bool, accountID string) (Envelope, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	snaps, source, err := c.fetchSnapshots(ctx, refresh)
+	snaps, source, err := c.fetchSnapshots(ctx, refresh, accountID)
 	if err != nil {
 		return Envelope{}, err
 	}
