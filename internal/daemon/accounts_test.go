@@ -336,6 +336,39 @@ func TestResolveSocketPath_EnvOverride(t *testing.T) {
 	if got := ResolveSocketPath(); got != "/tmp/custom_override.sock" {
 		t.Errorf("ResolveSocketPath() = %q, want '/tmp/custom_override.sock'", got)
 	}
+
+	path, err := ResolveSocketPathWithError()
+	if err != nil || path != "/tmp/custom_override.sock" {
+		t.Errorf("ResolveSocketPathWithError() = %q, err = %v", path, err)
+	}
+}
+
+func TestResolveSocketPath_Default(t *testing.T) {
+	t.Setenv("AGENTUSAGE_TELEMETRY_SOCKET", "")
+	path := ResolveSocketPath()
+	if path == "" {
+		t.Error("expected non-empty default socket path")
+	}
+}
+
+func TestAccountsConfig_LoadAndBuild(t *testing.T) {
+	// 1. DisabledAccountsFromConfig
+	_ = DisabledAccountsFromConfig()
+
+	// 2. LoadAccountsAndNorm
+	accounts, norm, err := LoadAccountsAndNorm()
+	if err != nil {
+		t.Fatalf("LoadAccountsAndNorm error: %v", err)
+	}
+	_ = accounts
+	_ = norm
+
+	// 3. BuildReadModelRequestFromConfig
+	req, err := BuildReadModelRequestFromConfig()
+	if err != nil {
+		t.Fatalf("BuildReadModelRequestFromConfig error: %v", err)
+	}
+	_ = req
 }
 
 func float64Ptr(v float64) *float64 { return &v }

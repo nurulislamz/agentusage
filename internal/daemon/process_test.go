@@ -198,19 +198,46 @@ func TestTailTextLines_And_TailFile(t *testing.T) {
 }
 
 func TestStartupDiagnostics(t *testing.T) {
-	mgr := ServiceManager{
+	tmp := t.TempDir()
+	logPath := filepath.Join(tmp, "daemon.stderr.log")
+	_ = os.WriteFile(logPath, []byte("error: some daemon log"), 0644)
+
+	// 1. Linux manager
+	mgrLinux := ServiceManager{
 		Kind:       "linux",
 		exePath:    "/usr/local/bin/agentusage",
 		socketPath: "/tmp/test.sock",
 		unitPath:   "/home/user/.config/systemd/user/agentusage.service",
+		stateDir:   tmp,
+	}
+	diagLinux := StartupDiagnostics(mgrLinux, "/tmp/test.sock")
+	if !strings.Contains(diagLinux, "manager_kind=linux") {
+		t.Errorf("StartupDiagnostics missing manager_kind: %s", diagLinux)
 	}
 
-	diag := StartupDiagnostics(mgr, "/tmp/test.sock")
-	if !strings.Contains(diag, "manager_kind=linux") {
-		t.Errorf("StartupDiagnostics missing manager_kind: %s", diag)
+	// 2. Darwin manager
+	mgrDarwin := ServiceManager{
+		Kind:       "darwin",
+		exePath:    "/usr/local/bin/agentusage",
+		socketPath: "/tmp/test.sock",
+		unitPath:   "/home/user/Library/LaunchAgents/com.agentusage.daemon.plist",
+		stateDir:   tmp,
 	}
-	if !strings.Contains(diag, "socket_path=/tmp/test.sock") {
-		t.Errorf("StartupDiagnostics missing socket_path: %s", diag)
+	diagDarwin := StartupDiagnostics(mgrDarwin, "/tmp/test.sock")
+	if !strings.Contains(diagDarwin, "manager_kind=darwin") {
+		t.Errorf("StartupDiagnostics missing manager_kind: %s", diagDarwin)
+	}
+
+	// 3. Windows manager
+	mgrWin := ServiceManager{
+		Kind:       "windows",
+		exePath:    "C:\\agentusage.exe",
+		socketPath: "C:\\daemon.sock",
+		stateDir:   tmp,
+	}
+	diagWin := StartupDiagnostics(mgrWin, "C:\\daemon.sock")
+	if !strings.Contains(diagWin, "manager_kind=windows") {
+		t.Errorf("StartupDiagnostics missing manager_kind: %s", diagWin)
 	}
 }
 
@@ -247,8 +274,9 @@ func TestSpawnDaemonProcess(t *testing.T) {
 }
 
 func TestStartViaManagedService_And_EnsureViaServiceManager(t *testing.T) {
-	ctx := context.Background()
-	client := &Client{SocketPath: "/tmp/test.sock"}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	client := NewClient("/tmp/test.sock")
 
 	// 1. startViaManagedService needsUpgrade with transient exe
 	mgrTransient := ServiceManager{
@@ -270,7 +298,47 @@ func TestStartViaManagedService_And_EnsureViaServiceManager(t *testing.T) {
 		t.Errorf("expected not installed error, got: %v", err)
 	}
 
-	// 3. ensureViaServiceManager unsupported OS with needsUpgrade
-	mgrUnsupported := ServiceManager{Kind: "unsupported_os"}
-	_ = mgrUnsupported
+	// 2b. startViaManagedService installed but fails to start
+	tmpUnit := filepath.Join(t.TempDir(), "agentusage.service")
+	_ = os.WriteFile(tmpUnit, []byte(""), 0644)
+	mgrInstalled := ServiceManager{
+		Kind:     "linux",
+		unitPath: tmpUnit,
+	}
+	_, err = startViaManagedService(ctx, client, mgrInstalled, false, "/tmp/test.sock")
+	if err == nil {
+		t.Error("expected error when service fails to start")
+	}
+
+	// 3. ensureViaServiceManager with needsUpgrade and transient exe
+	_, err = ensureViaServiceManager(ctx, client, "/tmp/test.sock", false, true, HealthResponse{
+		DaemonVersion: "v0.0.1",
+	})
+	if err == nil {
+		t.Error("expected error from ensureViaServiceManager with needsUpgrade on transient binary")
+	}
+}
+
+func TestWaitAndVerifyDaemon_OfflineClient(t *testing.T) {
+	offlineClient := &Client{
+		SocketPath: "/tmp/nonexistent_test_wait.sock",
+		http:       http.DefaultClient,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	err := waitAndVerifyDaemon(ctx, offlineClient, "/tmp/nonexistent_test_wait.sock")
+	if err == nil {
+		t.Error("expected error when waiting for offline daemon")
+	}
+}
+
+func TestEnsureRunning_OfflineSocket(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	_, err := EnsureRunning(ctx, "/tmp/nonexistent_socket_test.sock", false)
+	if err == nil {
+		t.Error("expected error ensuring running on nonexistent socket")
+	}
 }

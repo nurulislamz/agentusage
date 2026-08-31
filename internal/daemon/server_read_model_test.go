@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestReadModelCacheIntervalRespectsPollInterval(t *testing.T) {
@@ -60,4 +62,14 @@ func TestComputeReadModel_Empty(t *testing.T) {
 	if len(res) != 0 {
 		t.Errorf("computeReadModel = %+v, want empty map", res)
 	}
+}
+
+func TestRefreshReadModelCacheFromConfig(t *testing.T) {
+	svc := &Service{
+		rmCache:     newReadModelCache(),
+		logThrottle: core.NewLogThrottle(5, time.Minute),
+	}
+
+	// Should safely run and trigger async refresh without error
+	svc.refreshReadModelCacheFromConfig(context.Background())
 }
