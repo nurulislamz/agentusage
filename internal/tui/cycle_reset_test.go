@@ -131,8 +131,8 @@ func TestRenderDetailContent_ShowsCycleResetInHeader(t *testing.T) {
 	if strings.Contains(header, "Sep") {
 		t.Fatalf("detail header should not show calendar date, got:\n%s", header)
 	}
-	if strings.Contains(header, "Last refreshed") {
-		t.Fatalf("fresh snapshot should not show last refreshed in header, got:\n%s", header)
+	if !strings.Contains(header, "Last refreshed just now") {
+		t.Fatalf("detail header should show last refreshed, got:\n%s", header)
 	}
 }
 
@@ -174,12 +174,3 @@ func TestFormatCycleResetScheduleSidebar_OpenCodeMonthlyExhausted(t *testing.T) 
 	}
 }
 
-func TestFormatLastRefreshedIfStale(t *testing.T) {
-	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
-	if got := formatLastRefreshedIfStale(now.Add(-10*time.Second), now); got != "" {
-		t.Fatalf("fresh timestamp should be hidden, got %q", got)
-	}
-	if got := formatLastRefreshedIfStale(now.Add(-10*time.Minute), now); got == "" {
-		t.Fatal("stale timestamp should be shown")
-	}
-}

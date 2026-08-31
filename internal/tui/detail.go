@@ -97,7 +97,7 @@ func renderDetailCompactHeader(sb *strings.Builder, snap core.UsageSnapshot, now
 	}
 	sb.WriteString(left + strings.Repeat(" ", gap) + right + "\n")
 
-	// Line 2: summary info (left) ... stale refresh timestamp (right)
+	// Line 2: summary info (left) ... refresh timestamp (right)
 	var summaryParts []string
 	if di.summary != "" {
 		summaryParts = append(summaryParts, lipgloss.NewStyle().Bold(true).Foreground(colorText).Render(di.summary))
@@ -112,7 +112,7 @@ func renderDetailCompactHeader(sb *strings.Builder, snap core.UsageSnapshot, now
 	}
 	summaryLeft := "  " + strings.Join(summaryParts, dimStyle.Render("  ·  "))
 
-	summaryRight := dimStyle.Render(formatLastRefreshedIfStale(snap.Timestamp, now))
+	summaryRight := dimStyle.Render(formatLastRefreshed(snap.Timestamp, now))
 	sLeftW := lipgloss.Width(summaryLeft)
 	sRightW := lipgloss.Width(summaryRight)
 	sGap := w - sLeftW - sRightW - 1

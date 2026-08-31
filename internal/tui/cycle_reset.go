@@ -263,12 +263,3 @@ func formatCycleResetScheduleCompact(snap core.UsageSnapshot, now time.Time) str
 	return "Resets in " + strings.Join(parts, " · ")
 }
 
-func formatLastRefreshedIfStale(timestamp time.Time, now time.Time) string {
-	if timestamp.IsZero() {
-		return ""
-	}
-	if now.Sub(timestamp) <= 5*time.Minute {
-		return ""
-	}
-	return formatLastRefreshed(timestamp, now)
-}
