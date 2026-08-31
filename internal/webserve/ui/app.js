@@ -404,7 +404,9 @@
 
     const cardsHtml = cards.map((card, idx) => {
       const color = card.color || "var(--fg-2)";
-      const isFeatured = card.id === "hero" || card.id === "overview" || card.id === "quota" || (cards.length === 3 && idx === 0);
+      const cardId = (card.id || "").toLowerCase();
+      const cardTitle = (card.title || "").toLowerCase();
+      const isFeatured = idx === 0 || ["usage", "hero", "overview", "quota"].includes(cardId) || cardTitle === "usage";
       const heroClass = isFeatured ? " card-hero" : "";
       const rows = (card.rows || []).map((row) => {
         if (row.kind === "heading") {

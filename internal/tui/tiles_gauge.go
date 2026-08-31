@@ -510,11 +510,8 @@ func (m Model) buildOpenCodeTileGaugeLines(snap core.UsageSnapshot, innerW int) 
 	var lines []string
 
 	barW := innerW - 14
-	if barW < 12 {
-		barW = 12
-	}
-	if barW > 50 {
-		barW = 50
+	if barW < 20 {
+		barW = 20
 	}
 
 	now := m.viewNow()
@@ -596,11 +593,8 @@ func (m Model) buildCommandCodeTileGaugeLines(snap core.UsageSnapshot, innerW in
 	var lines []string
 
 	barW := innerW - 14
-	if barW < 12 {
-		barW = 12
-	}
-	if barW > 50 {
-		barW = 50
+	if barW < 20 {
+		barW = 20
 	}
 
 	now := m.viewNow()
@@ -744,9 +738,6 @@ func buildCursorPlanUsageLines(snap core.UsageSnapshot, innerW int, isUsed bool,
 	barW := innerW - 14
 	if barW < 20 {
 		barW = 20
-	}
-	if barW > 50 {
-		barW = 50
 	}
 
 	var lines []string

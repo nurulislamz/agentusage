@@ -190,6 +190,63 @@ func TestWebProjectorOpenCodeDetailCards(t *testing.T) {
 	}
 }
 
+func TestWebProjectorCommandCodeDetailCards(t *testing.T) {
+	now := time.Date(2026, 8, 30, 18, 15, 0, 0, time.UTC)
+	snap := core.UsageSnapshot{
+		AccountID:  "command-code-main",
+		ProviderID: "command_code",
+		Status:     core.StatusOK,
+		Timestamp:  now,
+		Attributes: map[string]string{
+			"plan_name":   "GOAT",
+			"monthly_cap": "$70.00",
+			"weekly_cap":  "$35.00",
+		},
+		Metrics: map[string]core.Metric{
+			"monthly_subscription": {Remaining: func(f float64) *float64 { return &f }(48.8)},
+			"weekly_usage":         {Remaining: func(f float64) *float64 { return &f }(80.0)},
+			"five_hour_usage":      {Remaining: func(f float64) *float64 { return &f }(100.0)},
+		},
+		Resets: map[string]time.Time{
+			"monthly_subscription": now.Add(15 * 24 * time.Hour),
+			"weekly_usage":         now.Add(3 * 24 * time.Hour),
+			"five_hour_usage":      now.Add(4 * time.Hour),
+		},
+	}
+
+	p := WebProjector{
+		TimeWindow:    core.TimeWindow3d,
+		WarnThreshold: 0.25,
+		CritThreshold: 0.1,
+		UsageMode:     config.UsageModeRemaining,
+		TileWidth:     72,
+		DetailWidth:   80,
+		Now:           now,
+	}
+	view := p.ProjectSnapshot(snap, "Command Code")
+	usage := cardByTitle(view.DetailCards, "Usage")
+	if usage.Title == "" {
+		t.Fatalf("missing Usage card, got %#v", view.DetailCards)
+	}
+	gauges := rowsOfKind(usage, "gauge")
+	if len(gauges) < 3 {
+		t.Fatalf("want >=3 usage gauges in command_code, got %d in %#v", len(gauges), usage.Rows)
+	}
+
+	foundMonthly := false
+	for _, g := range gauges {
+		if strings.Contains(g.Label, "Monthly Subscription") {
+			foundMonthly = true
+			if g.Percent == nil || *g.Percent != 48.8 {
+				t.Errorf("monthly subscription percent = %v, want 48.8", g.Percent)
+			}
+		}
+	}
+	if !foundMonthly {
+		t.Errorf("expected monthly subscription gauge with cap info, got %#v", gauges)
+	}
+}
+
 func TestWebProjectorGroupsOpenCodeAccounts(t *testing.T) {
 	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
 	snaps := []core.UsageSnapshot{

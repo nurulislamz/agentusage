@@ -130,7 +130,11 @@ func (m *Model) buildTileBodyLines(
 	}
 
 	topUsageLines := m.buildTileGaugeLines(snap, widget, innerW)
-	if snap.ProviderID != "antigravity" {
+	isCustomQuota := snap.ProviderID == "antigravity" ||
+		snap.ProviderID == "opencode" ||
+		snap.ProviderID == "command_code" ||
+		(snap.ProviderID == "cursor" && len(topUsageLines) > 0)
+	if !isCustomQuota {
 		if di.summary != "" {
 			topUsageLines = append(topUsageLines, tileHeroStyle.Render(truncate(di.summary)))
 		}

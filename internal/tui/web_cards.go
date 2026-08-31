@@ -31,10 +31,11 @@ type WebDetailRow struct {
 }
 
 var (
-	quotaLineRe   = regexp.MustCompile(`(?i)([\d.]+)%\s+(remaining|used)`)
-	trailingPctRe = regexp.MustCompile(`[\d.]+\s*%\s*$`)
-	barePercentRe = regexp.MustCompile(`^[\d.]+%$`)
-	barGlyphsRe   = regexp.MustCompile(`^[█░▒▓▀▄▌▐▏▎▍▋▊▉─━│┃┌┐└┘╭╮╰╯├┤┬┴┼\s]+$`)
+	quotaLineRe       = regexp.MustCompile(`(?i)([\d.]+)%\s+(remaining|used)`)
+	trailingPctRe     = regexp.MustCompile(`[\d.]+\s*%\s*$`)
+	barePercentRe     = regexp.MustCompile(`^[\d.]+%$`)
+	barGlyphsRe       = regexp.MustCompile(`^[█░▒▓▀▄▌▐▏▎▍▋▊▉─━│┃┌┐└┘╭╮╰╯├┤┬┴┼\s]+$`)
+	singleLineGaugeRe = regexp.MustCompile(`^(.+?)\s+([█░▒▓▀▄▌▐▏▎▍▋▊▉─━│┃┌┐└┘╭╮╰╯├┤┬┴┼]+)\s+([\d.]+)%\s*$`)
 )
 
 func projectDetailCards(
@@ -131,6 +132,24 @@ func rowsFromSectionLines(lines []string, isUsedMode bool) []WebDetailRow {
 		if plain == "" || isGaugeBarLine(plain) || isChartArtLine(plain) || (pendingLabel != "" && barePercentRe.MatchString(plain)) {
 			continue
 		}
+		if loc := singleLineGaugeRe.FindStringSubmatch(plain); loc != nil {
+			if pendingLabel != "" {
+				flushText(pendingLabel)
+				pendingLabel = ""
+			}
+			pct, err := strconv.ParseFloat(loc[3], 64)
+			if err == nil {
+				label := strings.TrimSpace(loc[1])
+				p := pct
+				rows = append(rows, WebDetailRow{
+					Kind:    "gauge",
+					Label:   label,
+					Percent: &p,
+					Tone:    quotaTone(pct, isUsedMode),
+				})
+				continue
+			}
+		}
 		if loc := quotaLineRe.FindStringSubmatch(plain); loc != nil {
 			pct, err := strconv.ParseFloat(loc[1], 64)
 			if err != nil {
@@ -153,6 +172,11 @@ func rowsFromSectionLines(lines []string, isUsedMode bool) []WebDetailRow {
 				Percent: &p,
 				Tone:    quotaTone(pct, isUsedMode),
 			})
+			continue
+		}
+		if len(rows) > 0 && rows[len(rows)-1].Kind == "gauge" && rows[len(rows)-1].Hint == "" &&
+			(strings.HasPrefix(strings.ToLower(plain), "resets in") || strings.HasPrefix(strings.ToLower(plain), "reset in") || strings.HasPrefix(strings.ToLower(plain), "projected")) {
+			rows[len(rows)-1].Hint = plain
 			continue
 		}
 		if pendingLabel != "" {
@@ -219,14 +243,19 @@ func isChartArtLine(s string) bool {
 
 func looksLikeGaugeLabel(s string) bool {
 	s = strings.TrimSpace(s)
-	if s == "" {
+	if s == "" || strings.Contains(s, "%") || strings.HasPrefix(s, "◈") || strings.HasPrefix(s, "✦") || strings.HasPrefix(s, "◇") {
 		return false
 	}
 	lower := strings.ToLower(s)
-	return strings.Contains(lower, "limit remaining") ||
-		strings.Contains(lower, "limit used") ||
-		(strings.HasSuffix(lower, " remaining") && !strings.Contains(s, "%")) ||
-		(strings.HasSuffix(lower, " used") && !strings.Contains(s, "%"))
+	return strings.Contains(lower, "remaining") ||
+		strings.Contains(lower, "used") ||
+		strings.Contains(lower, "limit") ||
+		strings.Contains(lower, "quota") ||
+		strings.Contains(lower, "cap") ||
+		strings.Contains(lower, "subscription") ||
+		strings.Contains(lower, "plan") ||
+		strings.Contains(lower, "allowance") ||
+		strings.Contains(lower, "window")
 }
 
 func looksLikeHeading(s string) bool {
