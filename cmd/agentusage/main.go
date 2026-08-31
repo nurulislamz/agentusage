@@ -49,6 +49,7 @@ func main() {
 	root.AddCommand(newTelemetryCommand())
 	root.AddCommand(newIntegrationsCommand())
 	root.AddCommand(newDetectCommand())
+	root.AddCommand(newDoctorCommand())
 	root.AddCommand(newPricingCommand())
 	root.AddCommand(newExportCommand())
 	root.AddCommand(newHubCommand())

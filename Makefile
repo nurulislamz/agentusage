@@ -81,13 +81,18 @@ build: deps ## Build the binary
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/$(APP_NAME)$(EXE) $(CMD_DIR)
 
 .PHONY: install
-install: build ## Install binary to ~/.local/bin and restart daemon if running
+install: build ## Install binary to ~/.local/bin and set up telemetry daemon service
 	install -d $(HOME)/.local/bin
 	install -m 755 $(BIN_DIR)/$(APP_NAME)$(EXE) $(HOME)/.local/bin/$(APP_NAME)$(EXE)
-	@if command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet agentusage-telemetry.service 2>/dev/null; then \
-		echo "Restarting agentusage-telemetry.service..."; \
-		systemctl --user restart agentusage-telemetry.service; \
+	@$(HOME)/.local/bin/$(APP_NAME)$(EXE) telemetry daemon install
+
+.PHONY: uninstall
+uninstall: ## Uninstall binary from ~/.local/bin and remove telemetry daemon service
+	@if [ -x "$(HOME)/.local/bin/$(APP_NAME)$(EXE)" ]; then \
+		"$(HOME)/.local/bin/$(APP_NAME)$(EXE)" telemetry daemon uninstall 2>/dev/null || true; \
 	fi
+	rm -f $(HOME)/.local/bin/$(APP_NAME)$(EXE)
+
 
 
 .PHONY: demo
