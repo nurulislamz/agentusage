@@ -462,8 +462,12 @@ func TestSnapshotStatusBadge_SpecificLimits(t *testing.T) {
 
 func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
 	three := 3.0
+	five := 5.0
 	eight := 8.0
 	fifty := 50.0
+	eighty := 80.0
+	zero := 0.0
+	ninetySix := 96.0
 
 	// 5h near limit (3% left) -> 5H LOW
 	fiveLowSnap := core.UsageSnapshot{
@@ -489,7 +493,7 @@ func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
 		t.Errorf("expected DAILY LOW in badge, got %q", dailyLowBadge)
 	}
 
-	// Weekly low (3% left) -> ignores weekly for LOW, displays plain LOW
+	// Weekly low (< 5% left, e.g. 3%) -> NEAR LIMIT (and NOT NEAR LIMIT LOW)
 	weeklyLowSnap := core.UsageSnapshot{
 		Status: core.StatusNearLimit,
 		Metrics: map[string]core.Metric{
@@ -497,14 +501,14 @@ func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
 		},
 	}
 	weeklyLowBadge := SnapshotStatusBadge(weeklyLowSnap)
-	if strings.Contains(weeklyLowBadge, "WEEKLY LOW") {
-		t.Errorf("did NOT expect WEEKLY LOW (weekly should be ignored for LOW), got %q", weeklyLowBadge)
+	if !strings.Contains(weeklyLowBadge, "NEAR LIMIT") {
+		t.Errorf("expected NEAR LIMIT in badge for < 5%% remaining, got %q", weeklyLowBadge)
 	}
-	if !strings.Contains(weeklyLowBadge, "LOW") {
-		t.Errorf("expected LOW in badge, got %q", weeklyLowBadge)
+	if strings.Contains(weeklyLowBadge, "NEAR LIMIT LOW") {
+		t.Errorf("did NOT expect NEAR LIMIT LOW in badge, got %q", weeklyLowBadge)
 	}
 
-	// Monthly low -> ignores monthly for LOW, displays plain LOW
+	// Monthly low (< 5% left, e.g. 3%) -> NEAR LIMIT (and NOT NEAR LIMIT LOW)
 	monthlyLowSnap := core.UsageSnapshot{
 		Status: core.StatusNearLimit,
 		Metrics: map[string]core.Metric{
@@ -512,11 +516,66 @@ func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
 		},
 	}
 	monthlyLowBadge := SnapshotStatusBadge(monthlyLowSnap)
-	if strings.Contains(monthlyLowBadge, "MONTHLY LOW") {
-		t.Errorf("did NOT expect MONTHLY LOW, got %q", monthlyLowBadge)
+	if !strings.Contains(monthlyLowBadge, "NEAR LIMIT") {
+		t.Errorf("expected NEAR LIMIT in badge for < 5%% remaining, got %q", monthlyLowBadge)
 	}
-	if !strings.Contains(monthlyLowBadge, "LOW") {
-		t.Errorf("expected LOW in badge, got %q", monthlyLowBadge)
+	if strings.Contains(monthlyLowBadge, "NEAR LIMIT LOW") {
+		t.Errorf("did NOT expect NEAR LIMIT LOW in badge, got %q", monthlyLowBadge)
+	}
+
+	// Weekly with >= 5% remaining (e.g. 5%) -> plain LOW (not NEAR LIMIT)
+	weeklyMidSnap := core.UsageSnapshot{
+		Status: core.StatusNearLimit,
+		Metrics: map[string]core.Metric{
+			"weekly_usage": {Remaining: &five, Window: "7d"},
+		},
+	}
+	weeklyMidBadge := SnapshotStatusBadge(weeklyMidSnap)
+	if strings.Contains(weeklyMidBadge, "NEAR LIMIT") {
+		t.Errorf("did NOT expect NEAR LIMIT for >= 5%% remaining, got %q", weeklyMidBadge)
+	}
+	if !strings.Contains(weeklyMidBadge, "LOW") {
+		t.Errorf("expected generic LOW in badge, got %q", weeklyMidBadge)
+	}
+
+	// Monthly with >= 5% remaining (e.g. 8%) -> plain LOW (not NEAR LIMIT)
+	monthlyMidSnap := core.UsageSnapshot{
+		Status: core.StatusNearLimit,
+		Metrics: map[string]core.Metric{
+			"monthly_usage": {Remaining: &eight, Window: "30d"},
+		},
+	}
+	monthlyMidBadge := SnapshotStatusBadge(monthlyMidSnap)
+	if strings.Contains(monthlyMidBadge, "NEAR LIMIT") {
+		t.Errorf("did NOT expect NEAR LIMIT for >= 5%% remaining, got %q", monthlyMidBadge)
+	}
+	if !strings.Contains(monthlyMidBadge, "LOW") {
+		t.Errorf("expected generic LOW in badge, got %q", monthlyMidBadge)
+	}
+
+	// Monthly with >= 95% used -> NEAR LIMIT
+	monthlyUsedSnap := core.UsageSnapshot{
+		Status: core.StatusNearLimit,
+		Metrics: map[string]core.Metric{
+			"monthly_usage": {Used: &ninetySix, Unit: "%", Window: "30d"},
+		},
+	}
+	monthlyUsedBadge := SnapshotStatusBadge(monthlyUsedSnap)
+	if !strings.Contains(monthlyUsedBadge, "NEAR LIMIT") {
+		t.Errorf("expected NEAR LIMIT in badge for >= 95%% used, got %q", monthlyUsedBadge)
+	}
+
+	// Priority: Max cycle (< 5%) over 5H
+	multiPrioritySnap := core.UsageSnapshot{
+		Status: core.StatusNearLimit,
+		Metrics: map[string]core.Metric{
+			"monthly_usage": {Remaining: &three, Window: "30d"},
+			"rolling_usage": {Remaining: &three, Window: "5h"},
+		},
+	}
+	multiPriorityBadge := SnapshotStatusBadge(multiPrioritySnap)
+	if !strings.Contains(multiPriorityBadge, "NEAR LIMIT") {
+		t.Errorf("expected NEAR LIMIT priority over 5h, got %q", multiPriorityBadge)
 	}
 
 	// Antigravity 3% on 5h window with healthy weekly (50%) -> displays 5H LOW
@@ -536,10 +595,8 @@ func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
 		t.Errorf("expected 5H LOW in badge for Antigravity with 3%% 5h quota, got %q", agLowBadge)
 	}
 
-	// Antigravity: Claude is at monthly limit (0% remaining), but Gemini is available (80% remaining).
-	// Must NOT show MONTHLY LIMIT!
-	eighty := 80.0
-	zero := 0.0
+	// Antigravity: Claude is at weekly limit (0% remaining), but Gemini is available (80% remaining).
+	// Must NOT show LIMIT or NEAR LIMIT!
 	agClaudeLimitedSnap := core.UsageSnapshot{
 		ProviderID: "antigravity",
 		Status:     core.StatusOK,
@@ -552,9 +609,6 @@ func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
 		},
 	}
 	agClaudeLimitedBadge := SnapshotStatusBadge(agClaudeLimitedSnap)
-	if strings.Contains(agClaudeLimitedBadge, "MONTHLY LIMIT") {
-		t.Errorf("did NOT expect MONTHLY LIMIT when Gemini has 80%% quota remaining, got %q", agClaudeLimitedBadge)
-	}
 	if strings.Contains(agClaudeLimitedBadge, "LIMIT") {
 		t.Errorf("did NOT expect LIMIT badge when Gemini is healthy, got %q", agClaudeLimitedBadge)
 	}
@@ -562,8 +616,8 @@ func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
 		t.Errorf("expected OK badge when Gemini is healthy, got %q", agClaudeLimitedBadge)
 	}
 
-	// Antigravity: Claude is at monthly limit (0%), and Gemini 5h is low (3%).
-	// Must show 5H LOW, NOT MONTHLY LIMIT!
+	// Antigravity: Claude is at weekly limit (0%), and Gemini 5h is low (3%).
+	// Must show 5H LOW!
 	agGeminiLowClaudeLimitedSnap := core.UsageSnapshot{
 		ProviderID: "antigravity",
 		Status:     core.StatusNearLimit,
@@ -572,15 +626,45 @@ func TestSnapshotStatusBadge_NearLimitLow(t *testing.T) {
 			"quota_gemini_weekly": {Remaining: &eighty, Window: "7d"},
 			"quota_claude_weekly": {Remaining: &zero, Window: "7d"},
 			"quota_3p_weekly":     {Remaining: &zero, Window: "7d"},
-			"quota_3p_monthly":    {Remaining: &zero, Window: "30d"},
 		},
 	}
 	agGeminiLowBadge := SnapshotStatusBadge(agGeminiLowClaudeLimitedSnap)
-	if strings.Contains(agGeminiLowBadge, "MONTHLY LIMIT") {
-		t.Errorf("did NOT expect MONTHLY LIMIT when Gemini is active with 3%% 5h quota, got %q", agGeminiLowBadge)
-	}
 	if !strings.Contains(agGeminiLowBadge, "5H LOW") {
 		t.Errorf("expected 5H LOW when Gemini 5h is at 3%%, got %q", agGeminiLowBadge)
+	}
+
+	// Antigravity user scenario: Gemini weekly has 2.81% remaining (< 5%), Claude weekly is 0%,
+	// and Claude 5h is 100% (idle). Must show NEAR LIMIT (not NEAR LIMIT LOW)!
+	hundred := 100.0
+	twoPointEightOne := 2.8147534
+	ninetySevenPointOneNine := 97.1852466
+	ninetyThreePointNineFive := 93.9485
+	sixPointZeroFive := 6.0515
+	agUserScenarioSnap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		AccountID:  "antigravity-nurulz",
+		Status:     core.StatusNearLimit,
+		Metrics: map[string]core.Metric{
+			"quota":               {Limit: &hundred, Remaining: &twoPointEightOne, Used: &ninetySevenPointOneNine, Unit: "%", Window: "quota"},
+			"quota_3p_5h":         {Limit: &hundred, Remaining: &hundred, Used: &zero, Unit: "%", Window: "5h"},
+			"quota_3p_weekly":     {Limit: &hundred, Remaining: &zero, Used: &hundred, Unit: "%", Window: "7d"},
+			"quota_claude_5h":     {Limit: &hundred, Remaining: &hundred, Used: &zero, Unit: "%", Window: "5h"},
+			"quota_claude_weekly": {Limit: &hundred, Remaining: &zero, Used: &hundred, Unit: "%", Window: "7d"},
+			"quota_gemini_5h":     {Limit: &hundred, Remaining: &ninetyThreePointNineFive, Used: &sixPointZeroFive, Unit: "%", Window: "5h"},
+			"quota_gemini_weekly": {Limit: &hundred, Remaining: &twoPointEightOne, Used: &ninetySevenPointOneNine, Unit: "%", Window: "7d"},
+		},
+		Attributes: map[string]string{
+			"box":     "nurulz",
+			"product": "antigravity",
+		},
+		Message: "Antigravity quota",
+	}
+	agUserBadge := SnapshotStatusBadge(agUserScenarioSnap)
+	if !strings.Contains(agUserBadge, "NEAR LIMIT") {
+		t.Errorf("expected NEAR LIMIT in badge for antigravity-nurulz scenario, got %q", agUserBadge)
+	}
+	if strings.Contains(agUserBadge, "NEAR LIMIT LOW") {
+		t.Errorf("did NOT expect NEAR LIMIT LOW in badge for antigravity-nurulz scenario, got %q", agUserBadge)
 	}
 }
 
