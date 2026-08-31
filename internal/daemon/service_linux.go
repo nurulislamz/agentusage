@@ -45,7 +45,12 @@ func (m ServiceManager) installSystemdUser() error {
 	if _, err := RunCommand("systemctl", "--user", "daemon-reload"); err != nil {
 		return err
 	}
-	if _, err := RunCommand("systemctl", "--user", "enable", "--now", SystemdDaemonUnit); err != nil {
+	if _, err := RunCommand("systemctl", "--user", "enable", SystemdDaemonUnit); err != nil {
+		return err
+	}
+	// enable --now does not restart an already-running unit, so a second
+	// `make install` would leave the old binary in memory.
+	if _, err := RunCommand("systemctl", "--user", "restart", SystemdDaemonUnit); err != nil {
 		return err
 	}
 	return nil
