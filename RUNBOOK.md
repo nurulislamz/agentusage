@@ -125,6 +125,43 @@ Aliases: `agent`/`cursor-box` → `agent-box`; `agy` → `agy-box`; `opencode` �
 Launching a box needs `bwrap` (`sudo apt install bubblewrap`) and the tool CLI
 (`agent`, `agy`, or `opencode`) on `PATH`.
 
+**Ubuntu 24.04+ — `bwrap: setting up uid map: Permission denied`**
+
+AppArmor blocks unprivileged user namespaces unless `/usr/bin/bwrap` has a
+profile. Use the distro package (not Homebrew `bwrap`) and load the profile:
+
+```bash
+sudo apt install bubblewrap apparmor-profiles apparmor-utils
+sudo install -m 0644 \
+  /usr/share/apparmor/extra-profiles/bwrap-userns-restrict \
+  /etc/apparmor.d/bwrap-userns-restrict
+sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+
+# sanity check
+/usr/bin/bwrap --ro-bind / / true
+
+# refresh installed box CLIs (prefer /usr/bin/bwrap)
+cd ~/agentusage && git pull && make box agy-box NAME=nurulz
+agy-box nurulz
+```
+
+If the extra profile is missing, create a minimal one:
+
+```bash
+sudo tee /etc/apparmor.d/bwrap <<'EOF'
+abi <abi/4.0>,
+include <tunables/global>
+
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+  include if exists <local/bwrap>
+}
+EOF
+sudo apparmor_parser -r /etc/apparmor.d/bwrap
+```
+
+Check for conflicting profiles: `sudo aa-status | grep -i bwrap`.
+
 ---
 
 ## 5. tmux & Statusline Setup

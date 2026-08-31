@@ -105,10 +105,21 @@ if [ ! -x "$OPENCODE_BIN" ]; then
     exit 1
 fi
 
-BWRAP_BIN="$(which bwrap 2>/dev/null || echo "/usr/bin/bwrap")"
+# Prefer distro bwrap: on Ubuntu 24.04+ Homebrew bwrap lacks the AppArmor
+# profile and fails with "setting up uid map: Permission denied".
+if [ -x /usr/bin/bwrap ]; then
+  BWRAP_BIN=/usr/bin/bwrap
+elif BWRAP_BIN=$(command -v bwrap 2>/dev/null) && [ -n "$BWRAP_BIN" ]; then
+  :
+elif [ -x /home/linuxbrew/.linuxbrew/bin/bwrap ]; then
+  BWRAP_BIN=/home/linuxbrew/.linuxbrew/bin/bwrap
+else
+  echo "Error: bubblewrap (bwrap) not found." >&2
+  exit 1
+fi
 if [ ! -x "$BWRAP_BIN" ]; then
-    echo "Error: bubblewrap (bwrap) is not installed." >&2
-    exit 1
+  echo "Error: bubblewrap (bwrap) not found." >&2
+  exit 1
 fi
 
 # Execute opencode inside the bubblewrap namespace isolating only OpenCode's dirs
