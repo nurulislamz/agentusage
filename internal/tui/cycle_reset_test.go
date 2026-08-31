@@ -173,4 +173,3 @@ func TestFormatCycleResetScheduleSidebar_OpenCodeMonthlyExhausted(t *testing.T) 
 		t.Fatalf("list row should not show weekly/5h reset when monthly is exhausted, got %q", plain)
 	}
 }
-

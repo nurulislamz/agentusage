@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/nurulislamz/agentusage/internal/core"
 )
@@ -691,3 +693,48 @@ func TestFetchJSON_ResponseSizeLimit(t *testing.T) {
 		t.Error("expected parse error on truncated stream")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// AnyPathModifiedAfter & ApplyStatusFromCode
+// ---------------------------------------------------------------------------
+
+func TestAnyPathModifiedAfter(t *testing.T) {
+	tmpDir := t.TempDir()
+	file1 := filepath.Join(tmpDir, "file1.txt")
+	if err := os.WriteFile(file1, []byte("data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now()
+	past := now.Add(-1 * time.Hour)
+	future := now.Add(1 * time.Hour)
+
+	if !AnyPathModifiedAfter([]string{file1}, past) {
+		t.Errorf("expected true when file modified after past time")
+	}
+	if AnyPathModifiedAfter([]string{file1}, future) {
+		t.Errorf("expected false when file modified before future time")
+	}
+	if AnyPathModifiedAfter([]string{"", filepath.Join(tmpDir, "nonexistent")}, past) {
+		t.Errorf("expected false for empty/nonexistent paths")
+	}
+}
+
+func TestApplyStatusFromCode_CustomKeyHint(t *testing.T) {
+	snap := core.NewUsageSnapshot("provider", "acct-1")
+	ApplyStatusFromCode(http.StatusUnauthorized, &snap, "CUSTOM_ENV_KEY")
+	if snap.Status != core.StatusAuth {
+		t.Errorf("Status = %v, want StatusAuth", snap.Status)
+	}
+	if snap.Message != "HTTP 401 – check CUSTOM_ENV_KEY" {
+		t.Errorf("Message = %q, want 'HTTP 401 – check CUSTOM_ENV_KEY'", snap.Message)
+	}
+
+	// 500 status code should not change snap
+	snap2 := core.NewUsageSnapshot("provider", "acct-2")
+	ApplyStatusFromCode(http.StatusInternalServerError, &snap2, "CUSTOM_ENV_KEY")
+	if snap2.Status != "" {
+		t.Errorf("Status = %v, want empty for 500", snap2.Status)
+	}
+}
+

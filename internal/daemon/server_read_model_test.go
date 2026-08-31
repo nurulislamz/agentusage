@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -22,5 +23,41 @@ func TestReadModelCacheIntervalRespectsPollInterval(t *testing.T) {
 				t.Fatalf("readModelCacheInterval(%s) = %s, want %s", tt.in, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestServiceContext(t *testing.T) {
+	// 1. Nil service with nil fallback
+	var nilSvc *Service
+	if ctx := nilSvc.serviceContext(nil); ctx == nil {
+		t.Error("serviceContext(nil) should return non-nil context")
+	}
+
+	// 2. Nil service with custom fallback
+	customCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if ctx := nilSvc.serviceContext(customCtx); ctx != customCtx {
+		t.Error("serviceContext(custom) should return fallback context")
+	}
+
+	// 3. Service with set ctx
+	svcCtx, cancel2 := context.WithCancel(context.Background())
+	defer cancel2()
+	svc := &Service{ctx: svcCtx}
+	if ctx := svc.serviceContext(customCtx); ctx != svcCtx {
+		t.Error("serviceContext should prefer svc.ctx over fallback")
+	}
+}
+
+func TestComputeReadModel_Empty(t *testing.T) {
+	svc := &Service{}
+	res, err := svc.computeReadModel(context.Background(), ReadModelRequest{
+		Accounts: nil,
+	})
+	if err != nil {
+		t.Fatalf("computeReadModel on empty accounts err: %v", err)
+	}
+	if len(res) != 0 {
+		t.Errorf("computeReadModel = %+v, want empty map", res)
 	}
 }

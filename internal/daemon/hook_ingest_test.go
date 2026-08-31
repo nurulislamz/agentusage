@@ -75,3 +75,23 @@ func TestIngestHookLocally_SpoolOnly(t *testing.T) {
 		t.Fatalf("usage events count = %d, want 0 in spool-only mode", eventCount)
 	}
 }
+
+func TestParseHookRequests_UnknownSource(t *testing.T) {
+	_, err := ParseHookRequests("unknown_nonexistent_tool", "", []byte(`{}`))
+	if err == nil {
+		t.Error("expected error for unknown hook source")
+	}
+}
+
+func TestIngestParsedHookLocally_EmptyRequests(t *testing.T) {
+	resp, err := ingestParsedHookLocally(context.Background(), HookParseResult{
+		SourceName: "opencode",
+		Requests:   nil,
+	}, "", "", false)
+	if err != nil {
+		t.Fatalf("ingestParsedHookLocally with empty requests error: %v", err)
+	}
+	if resp.Source != "opencode" || resp.Enqueued != 0 {
+		t.Errorf("resp = %+v, want empty 0 enqueued", resp)
+	}
+}

@@ -188,6 +188,9 @@ func readFromStores(stores []kooky.CookieStore, domain, name string) (Cookie, bo
 			if err != nil || kc == nil {
 				continue
 			}
+			if kc.Name != name {
+				continue
+			}
 			if !matches(kc.Domain, domain) {
 				continue
 			}

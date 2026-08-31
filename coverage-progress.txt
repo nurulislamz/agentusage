@@ -1,0 +1,59 @@
+# Ralph Autonomous Coverage Campaign Ledger (agentusage)
+
+- **Overall Repository Baseline**: 66.1% statements
+- **Target Global Coverage**: >= 80.0% statements / branches
+- **Validation Protocol**: MAGI Council (Melchior, Balthasar, Casper)
+- **Status**: IN_PROGRESS
+- **Last Updated**: 2026-08-31 20:01
+
+---
+
+## 🎯 Priority Backlog (Ranked by Coverage Deficit)
+
+### Tier 1: Critical Coverage Deficits (< 50%)
+- [x] **Iteration 1**: `internal/providers/providerbase` (18.8% -> **100.0%** [MAGI: UNANIMOUS DONE])
+- [x] **Iteration 2**: `internal/browsercookies` (26.2% -> **80.9%** [MAGI: UNANIMOUS DONE])
+- [ ] **Iteration 3**: `internal/daemon` (26.7% -> Target: >= 80%)
+- [ ] **Iteration 4**: `internal/providers/crush` (34.8% -> Target: >= 80%)
+- [ ] **Iteration 5**: `internal/providers/shared` (41.0% -> Target: >= 80%)
+- [ ] **Iteration 6**: `cmd/demo` (47.5% -> Target: >= 80%)
+
+### Tier 2: Mid-Range Hardening (50% - 70%)
+- [ ] **Iteration 7**: `internal/providers/kilocode` (50.0% -> Target: >= 80%)
+- [ ] **Iteration 8**: `internal/providers/antigravity` (58.1% -> Target: >= 80%)
+- [ ] **Iteration 9**: `internal/tmux` (61.5% -> Target: >= 80%)
+- [ ] **Iteration 10**: `internal/core` (62.2% -> Target: >= 80%)
+- [ ] **Iteration 11**: `internal/providers/kiro` (64.9% -> Target: >= 80%)
+- [ ] **Iteration 12**: `internal/providers/droid` (67.0% -> Target: >= 80%)
+- [ ] **Iteration 13**: `internal/detect` (68.3% -> Target: >= 80%)
+- [ ] **Iteration 14**: `internal/tui` (68.6% -> Target: >= 80%)
+- [ ] **Iteration 15**: `internal/providers/claude_code` (69.9% -> Target: >= 80%)
+
+### Tier 3: High-Value Hardening (70% - 80%)
+- [ ] **Iteration 16**: `internal/providers/cursor` (70.7% -> Target: >= 85%)
+- [ ] **Iteration 17**: `internal/providers/gemini_cli` (71.3% -> Target: >= 85%)
+- [ ] **Iteration 18**: `internal/providers/zed` (71.3% -> Target: >= 85%)
+- [ ] **Iteration 19**: `internal/config` (71.6% -> Target: >= 85%)
+- [ ] **Iteration 20**: `internal/providers/command_code` (72.0% -> Target: >= 85%)
+- [ ] **Iteration 21**: `internal/providers/opencode` (72.4% -> Target: >= 85%)
+- [ ] **Iteration 22**: `internal/providers/copilot` (73.6% -> Target: >= 85%)
+- [ ] **Iteration 23**: `internal/providers/codex` (73.9% -> Target: >= 85%)
+- [ ] **Iteration 24**: `internal/telemetry` (74.7% -> Target: >= 85%)
+- [ ] **Iteration 25**: `internal/providers/ollama` (75.0% -> Target: >= 85%)
+- [ ] **Iteration 26**: `internal/providers/perplexity` (75.2% -> Target: >= 85%)
+- [ ] **Iteration 27**: `internal/providers/hermes` (75.7% -> Target: >= 85%)
+- [ ] **Iteration 28**: `internal/providers/deepseek` (76.2% -> Target: >= 85%)
+- [ ] **Iteration 29**: `internal/providers/amp` (76.8% -> Target: >= 85%)
+- [ ] **Iteration 30**: `internal/webserve` (76.8% -> Target: >= 85%)
+- [ ] **Iteration 31**: `internal/providers/roocode` (78.0% -> Target: >= 85%)
+- [ ] **Iteration 32**: `internal/providers/moonshot` (78.9% -> Target: >= 85%)
+- [ ] **Iteration 33**: `internal/hub` (79.6% -> Target: >= 85%)
+- [ ] **Iteration 34**: `internal/integrations` (79.9% -> Target: >= 85%)
+- [ ] **Iteration 35**: `internal/pricing` (79.9% -> Target: >= 85%)
+
+---
+
+## 📈 Completed Iterations Ledger
+- **Iteration 1**: `internal/providers/providerbase` | Coverage: `18.8% -> 100.0% (+81.2%)` | MAGI: `DONE` (Unanimous) | Tests: 7 passed, 0 flakes, `-race` clean.
+- **Iteration 2**: `internal/browsercookies` | Coverage: `26.2% -> 80.9% (+54.7%)` | MAGI: `DONE` (Unanimous) | Tests: 11 passed, 0 flakes, `-race` clean.
+

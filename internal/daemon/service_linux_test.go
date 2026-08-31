@@ -20,3 +20,18 @@ func TestSystemdUnit_UsesDaemonRunSubcommand(t *testing.T) {
 		t.Fatalf("systemd unit does not prepend user-local bin to PATH:\n%s", unit)
 	}
 }
+
+func TestServiceManager_Install_RejectsTransientExe(t *testing.T) {
+	mgr := ServiceManager{
+		Kind:    "linux",
+		exePath: "/tmp/go-build12345/exe/agentusage",
+	}
+
+	err := mgr.Install()
+	if err == nil {
+		t.Fatal("expected error when installing service from transient executable")
+	}
+	if !strings.Contains(err.Error(), "refusing to install telemetry daemon service from transient executable") {
+		t.Errorf("error = %q, want transient executable refusal message", err)
+	}
+}

@@ -479,6 +479,7 @@ func SnapshotStatusBadge(snap core.UsageSnapshot) string {
 		text := "LOW"
 		if nearType == "NEAR LIMIT" {
 			text = "NEAR LIMIT"
+			return badgeCritStyle.Render(text)
 		} else if nearType != "" {
 			text = nearType + " LOW"
 		}
@@ -741,6 +742,17 @@ func resolveNearLimitType(snap core.UsageSnapshot) string {
 		return true
 	}
 
+	hasSpecificMetrics := false
+	if snap.ProviderID == "antigravity" {
+		for k2 := range snap.Metrics {
+			lk := strings.ToLower(k2)
+			if strings.Contains(lk, "5h") || strings.Contains(lk, "weekly") || strings.Contains(lk, "7d") {
+				hasSpecificMetrics = true
+				break
+			}
+		}
+	}
+
 	// 1. Check metrics for near-limit windows.
 	lowWindows := make(map[string]bool)
 	for key, met := range snap.Metrics {
@@ -754,7 +766,7 @@ func resolveNearLimitType(snap core.UsageSnapshot) string {
 		var windowType string
 		if strings.Contains(k, "month") || strings.Contains(w, "month") || strings.Contains(w, "30d") || isCycleResetMonthlyKey(k) {
 			windowType = "MONTHLY"
-		} else if strings.Contains(k, "weekly") || strings.Contains(k, "week") || strings.Contains(k, "7d") || strings.Contains(w, "weekly") || strings.Contains(w, "7d") || isCycleResetWeeklyKey(k) || (k == "quota" && snap.ProviderID == "antigravity") {
+		} else if strings.Contains(k, "weekly") || strings.Contains(k, "week") || strings.Contains(k, "7d") || strings.Contains(w, "weekly") || strings.Contains(w, "7d") || isCycleResetWeeklyKey(k) || (k == "quota" && snap.ProviderID == "antigravity" && !hasSpecificMetrics) {
 			windowType = "WEEKLY"
 		} else if strings.Contains(k, "5h") || strings.Contains(k, "five_hour") || strings.Contains(k, "rolling") || strings.Contains(w, "5h") {
 			windowType = "5H"
@@ -803,6 +815,72 @@ func resolveNearLimitType(snap core.UsageSnapshot) string {
 			}
 			if isLow {
 				lowWindows[windowType] = true
+			}
+		}
+	}
+
+	// Safeguards: If ANY relevant metric for monthly/weekly has Remaining >= 5.0 (or Used < 95%), do NOT report MONTHLY or WEEKLY near limit!
+	if lowWindows["MONTHLY"] {
+		for key, met := range snap.Metrics {
+			if !isRelevantKey(key) {
+				continue
+			}
+			k := strings.ToLower(key)
+			w := strings.ToLower(met.Window)
+			if strings.Contains(k, "month") || strings.Contains(w, "month") || strings.Contains(w, "30d") || isCycleResetMonthlyKey(k) {
+				isHealthy := false
+				if met.Remaining != nil {
+					remPct := *met.Remaining
+					if met.Limit != nil && *met.Limit > 0 {
+						remPct = (*met.Remaining / *met.Limit) * 100
+					}
+					if remPct >= 5.0 {
+						isHealthy = true
+					}
+				} else if met.Used != nil && *met.Used < 95.0 && met.Unit == "%" {
+					isHealthy = true
+				} else if met.Limit != nil && met.Used != nil && *met.Limit > 0 {
+					pct := (*met.Used / *met.Limit) * 100
+					if pct < 95.0 {
+						isHealthy = true
+					}
+				}
+				if isHealthy {
+					lowWindows["MONTHLY"] = false
+					break
+				}
+			}
+		}
+	}
+	if lowWindows["WEEKLY"] {
+		for key, met := range snap.Metrics {
+			if !isRelevantKey(key) {
+				continue
+			}
+			k := strings.ToLower(key)
+			w := strings.ToLower(met.Window)
+			if strings.Contains(k, "weekly") || strings.Contains(k, "week") || strings.Contains(k, "7d") || strings.Contains(w, "weekly") || strings.Contains(w, "7d") || isCycleResetWeeklyKey(k) {
+				isHealthy := false
+				if met.Remaining != nil {
+					remPct := *met.Remaining
+					if met.Limit != nil && *met.Limit > 0 {
+						remPct = (*met.Remaining / *met.Limit) * 100
+					}
+					if remPct >= 5.0 {
+						isHealthy = true
+					}
+				} else if met.Used != nil && *met.Used < 95.0 && met.Unit == "%" {
+					isHealthy = true
+				} else if met.Limit != nil && met.Used != nil && *met.Limit > 0 {
+					pct := (*met.Used / *met.Limit) * 100
+					if pct < 95.0 {
+						isHealthy = true
+					}
+				}
+				if isHealthy {
+					lowWindows["WEEKLY"] = false
+					break
+				}
 			}
 		}
 	}
