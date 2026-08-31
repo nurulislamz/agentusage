@@ -1,8 +1,12 @@
 package daemon
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -110,5 +114,50 @@ func TestDefaultCollectOptions_GeminiHasSessionsDir(t *testing.T) {
 	}
 	if _, ok := opts.Paths["projects_dir"]; ok {
 		t.Fatalf("unexpected claude projects_dir in gemini opts: %+v", opts.Paths)
+	}
+}
+
+func TestStartSocketServer_Permissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix sockets are not supported in this test")
+	}
+
+	socketPath := shortSocketPath(t, "perms")
+	_ = os.Remove(socketPath)
+	t.Cleanup(func() { _ = os.Remove(socketPath) })
+
+	svc := &Service{
+		cfg: Config{
+			SocketPath: socketPath,
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := svc.startSocketServer(ctx); err != nil {
+		t.Fatalf("startSocketServer: %v", err)
+	}
+
+	info, err := os.Stat(socketPath)
+	if err != nil {
+		t.Fatalf("stat socket: %v", err)
+	}
+
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("socket permissions = %o, want 0600", perm)
+	}
+}
+
+func TestHandleHook_PayloadLimit(t *testing.T) {
+	svc := &Service{}
+	oversized := bytes.Repeat([]byte("a"), 5<<20) // 5 MiB (limit is 4 MiB)
+	req := httptest.NewRequest(http.MethodPost, "/v1/hook/opencode", bytes.NewReader(oversized))
+	w := httptest.NewRecorder()
+
+	svc.handleHook(w, req)
+
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d (RequestEntityTooLarge)", w.Code, http.StatusRequestEntityTooLarge)
 	}
 }

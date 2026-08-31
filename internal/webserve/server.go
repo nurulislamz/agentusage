@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -200,6 +201,10 @@ func (s *Server) handleUsageMode(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
+	if !isAllowedOrigin(r) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "cross-origin request forbidden"})
+		return
+	}
 	var body struct {
 		UsageMode string `json:"usage_mode"`
 	}
@@ -263,4 +268,33 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func isAllowedOrigin(r *http.Request) bool {
+	// Reject explicit cross-site fetch metadata from browsers
+	if strings.EqualFold(r.Header.Get("Sec-Fetch-Site"), "cross-site") {
+		return false
+	}
+
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		// Non-browser or same-origin requests without Origin header
+		return true
+	}
+
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	originHost := u.Hostname()
+	if originHost == "localhost" || originHost == "127.0.0.1" || originHost == "::1" {
+		return true
+	}
+
+	reqHost := r.Host
+	if host, _, err := net.SplitHostPort(reqHost); err == nil {
+		reqHost = host
+	}
+	return strings.EqualFold(originHost, reqHost)
 }

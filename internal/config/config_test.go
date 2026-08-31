@@ -1428,3 +1428,34 @@ func TestSaveDashboardUsageModeTo(t *testing.T) {
 		t.Errorf("usage_mode = %q, want %q", cfg.Dashboard.UsageMode, UsageModeRemaining)
 	}
 }
+
+func TestSaveTo_PermissionsAndAtomic(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+
+	cfg := DefaultConfig()
+	cfg.Theme = "Nord"
+
+	if err := SaveTo(path, cfg); err != nil {
+		t.Fatalf("SaveTo: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("os.Stat: %v", err)
+	}
+
+	if runtime.GOOS != "windows" {
+		if perm := info.Mode().Perm(); perm != 0o600 {
+			t.Errorf("settings.json permissions = %o, want 0600", perm)
+		}
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "settings.json" {
+		t.Errorf("expected only settings.json in directory, found: %v", entries)
+	}
+}
