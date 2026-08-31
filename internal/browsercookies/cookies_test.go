@@ -2,10 +2,64 @@ package browsercookies
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/browserutils/kooky"
 )
+
+type mockBrowserInfo struct {
+	browser  string
+	filePath string
+}
+
+func (m mockBrowserInfo) Browser() string        { return m.browser }
+func (m mockBrowserInfo) Profile() string        { return "Default" }
+func (m mockBrowserInfo) IsDefaultProfile() bool { return true }
+func (m mockBrowserInfo) FilePath() string       { return m.filePath }
+
+type mockCookieStore struct {
+	mockBrowserInfo
+	cookies []*kooky.Cookie
+	closed  bool
+}
+
+func (m *mockCookieStore) SetCookies(_ *url.URL, _ []*http.Cookie) {}
+func (m *mockCookieStore) Cookies(_ *url.URL) []*http.Cookie       { return nil }
+func (m *mockCookieStore) SubJar(_ context.Context, _ ...kooky.Filter) (http.CookieJar, error) {
+	return nil, nil
+}
+func (m *mockCookieStore) TraverseCookies(filters ...kooky.Filter) kooky.CookieSeq {
+	return func(yield func(*kooky.Cookie, error) bool) {
+		for _, c := range m.cookies {
+			if c != nil {
+				passes := true
+				for _, f := range filters {
+					if f != nil && !f.Filter(c) {
+						passes = false
+						break
+					}
+				}
+				if !passes {
+					continue
+				}
+			}
+			if !yield(c, nil) {
+				return
+			}
+		}
+	}
+}
+func (m *mockCookieStore) Close() error {
+	m.closed = true
+	return nil
+}
 
 func TestNormalizeDomain(t *testing.T) {
 	cases := map[string]string{
@@ -77,6 +131,29 @@ func TestCanonicalBrowser(t *testing.T) {
 	}
 }
 
+func TestIsKeychainProtected(t *testing.T) {
+	tests := []struct {
+		browser string
+		want    bool
+	}{
+		{"chrome", true},
+		{"google-chrome", true},
+		{"chromium", true},
+		{"edge", true},
+		{"brave", true},
+		{"vivaldi", true},
+		{"opera", true},
+		{"firefox", false},
+		{"safari", false},
+		{"unknown", false},
+	}
+	for _, tt := range tests {
+		if got := IsKeychainProtected(tt.browser); got != tt.want {
+			t.Errorf("IsKeychainProtected(%q) = %v, want %v", tt.browser, got, tt.want)
+		}
+	}
+}
+
 func TestCookie_IsExpired(t *testing.T) {
 	now := time.Now()
 	cases := []struct {
@@ -94,6 +171,133 @@ func TestCookie_IsExpired(t *testing.T) {
 				t.Errorf("IsExpired = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestPickStoresForBrowser(t *testing.T) {
+	sChrome := &mockCookieStore{mockBrowserInfo: mockBrowserInfo{browser: "chrome"}}
+	sFirefox := &mockCookieStore{mockBrowserInfo: mockBrowserInfo{browser: "firefox"}}
+	sSafari := &mockCookieStore{mockBrowserInfo: mockBrowserInfo{browser: "safari"}}
+	sEdge := &mockCookieStore{mockBrowserInfo: mockBrowserInfo{browser: "edge"}}
+
+	allStores := []kooky.CookieStore{sChrome, nil, sFirefox, sSafari, sEdge}
+
+	// 1. Auto browser (empty string) -> picks only non-keychain stores (firefox, safari)
+	autoStores := pickStoresForBrowser(allStores, "")
+	if len(autoStores) != 2 {
+		t.Fatalf("pickStoresForBrowser(all, \"\") got %d stores, want 2", len(autoStores))
+	}
+	for _, s := range autoStores {
+		bn := canonicalBrowser(s.Browser())
+		if bn != "firefox" && bn != "safari" {
+			t.Errorf("unexpected store in auto list: %q", bn)
+		}
+	}
+
+	// 2. Specific browser ("chrome") -> picks only chrome
+	chromeStores := pickStoresForBrowser(allStores, "chrome")
+	if len(chromeStores) != 1 || canonicalBrowser(chromeStores[0].Browser()) != "chrome" {
+		t.Errorf("pickStoresForBrowser(all, 'chrome') = %v, want 1 chrome store", chromeStores)
+	}
+
+	// 3. Specific browser ("firefox") -> picks only firefox
+	ffStores := pickStoresForBrowser(allStores, "firefox")
+	if len(ffStores) != 1 || canonicalBrowser(ffStores[0].Browser()) != "firefox" {
+		t.Errorf("pickStoresForBrowser(all, 'firefox') = %v, want 1 firefox store", ffStores)
+	}
+
+	// 4. Non-matching browser -> returns empty slice
+	noneStores := pickStoresForBrowser(allStores, "opera")
+	if len(noneStores) != 0 {
+		t.Errorf("pickStoresForBrowser(all, 'opera') = %v, want empty", noneStores)
+	}
+}
+
+func TestReadFromStores(t *testing.T) {
+	now := time.Now()
+	olderExp := now.Add(time.Hour)
+	fresherExp := now.Add(24 * time.Hour)
+
+	bInfo := mockBrowserInfo{browser: "google-chrome", filePath: "/path/to/Cookies"}
+
+	s1 := &mockCookieStore{
+		mockBrowserInfo: bInfo,
+		cookies: []*kooky.Cookie{
+			{
+				Cookie: http.Cookie{
+					Name:     "session",
+					Value:    "older_val",
+					Domain:   ".example.com",
+					Path:     "/",
+					Expires:  olderExp,
+					HttpOnly: true,
+					Secure:   true,
+				},
+				Browser: bInfo,
+			},
+			nil, // Nil cookie in sequence should be handled safely
+			{
+				Cookie: http.Cookie{
+					Name:    "unrelated",
+					Value:   "foo",
+					Domain:  ".example.com",
+					Expires: fresherExp,
+				},
+				Browser: bInfo,
+			},
+		},
+	}
+
+	s2 := &mockCookieStore{
+		mockBrowserInfo: bInfo,
+		cookies: []*kooky.Cookie{
+			{
+				Cookie: http.Cookie{
+					Name:     "session",
+					Value:    "fresher_val",
+					Domain:   ".example.com",
+					Path:     "/",
+					Expires:  fresherExp,
+					HttpOnly: true,
+					Secure:   true,
+				},
+				Browser: bInfo,
+			},
+			{
+				Cookie: http.Cookie{
+					Name:    "session",
+					Value:   "wrong_domain",
+					Domain:  ".different.com",
+					Expires: fresherExp.Add(time.Hour),
+				},
+				Browser: bInfo,
+			},
+		},
+	}
+
+	stores := []kooky.CookieStore{nil, s1, s2}
+
+	cookie, found := readFromStores(stores, "example.com", "session")
+	if !found {
+		t.Fatal("readFromStores failed to find matching cookie")
+	}
+	if cookie.Value != "fresher_val" {
+		t.Errorf("cookie.Value = %q, want fresher 'fresher_val'", cookie.Value)
+	}
+	if cookie.Source != "chrome" {
+		t.Errorf("cookie.Source = %q, want canonical 'chrome'", cookie.Source)
+	}
+	if cookie.StorePath != "/path/to/Cookies" {
+		t.Errorf("cookie.StorePath = %q, want '/path/to/Cookies'", cookie.StorePath)
+	}
+	if !cookie.HTTPOnly || !cookie.Secure {
+		t.Errorf("HTTPOnly=%v Secure=%v, want both true", cookie.HTTPOnly, cookie.Secure)
+	}
+
+	// Non-matching lookup
+	_, foundMissing := readFromStores(stores, "example.com", "nonexistent")
+	if foundMissing {
+		t.Error("expected found=false for missing cookie name")
 	}
 }
 
@@ -185,3 +389,80 @@ func TestNew_ReturnsReader(t *testing.T) {
 		t.Fatal("NewWithTimeout returned nil")
 	}
 }
+
+func TestKookyReader_LiveMethods(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	r := NewWithTimeout(500 * time.Millisecond)
+
+	// AvailableBrowsers on real reader
+	browsers, err := r.AvailableBrowsers(ctx)
+	if err != nil {
+		t.Logf("AvailableBrowsers returned err: %v", err)
+	}
+	t.Logf("AvailableBrowsers: %v", browsers)
+
+	// ReadCookie on real reader with non-existent cookie
+	_, err = r.ReadCookie(ctx, "nonexistent-domain-test.local", "auth_token", "firefox")
+	if !errors.Is(err, ErrNoCookieFound) && err != context.DeadlineExceeded {
+		t.Logf("ReadCookie returned unexpected error: %v", err)
+	}
+
+	// ReadCookie with auto browser ("")
+	_, err = r.ReadCookie(ctx, "nonexistent-domain-test.local", "auth_token", "")
+	if !errors.Is(err, ErrNoCookieFound) && err != context.DeadlineExceeded {
+		t.Logf("ReadCookie (auto) returned unexpected error: %v", err)
+	}
+}
+
+func TestReadCookieWSL_KeyValidation(t *testing.T) {
+	// Create a temp directory to simulate home dir with agentusage config
+	tempDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	t.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", origHome)
+
+	configDir := filepath.Join(tempDir, ".config", "agentusage")
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	r := &kookyReader{}
+	ctx := context.Background()
+
+	// 1. Invalid base64 in key file -> ErrNoCookieFound
+	keyFile := filepath.Join(configDir, "chrome_key")
+	if err := os.WriteFile(keyFile, []byte("invalid-base64!@#$"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := r.readCookieWSL(ctx, "example.com", "token", "chrome")
+	if !errors.Is(err, ErrNoCookieFound) {
+		t.Errorf("readCookieWSL with invalid base64 got %v, want ErrNoCookieFound", err)
+	}
+
+	// 2. Base64 with wrong key length (!= 32 bytes) -> ErrNoCookieFound
+	shortKey := base64.StdEncoding.EncodeToString([]byte("too-short"))
+	if err := os.WriteFile(keyFile, []byte(shortKey), 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = r.readCookieWSL(ctx, "example.com", "token", "chrome")
+	if !errors.Is(err, ErrNoCookieFound) {
+		t.Errorf("readCookieWSL with short key got %v, want ErrNoCookieFound", err)
+	}
+
+	// 3. Valid 32-byte key base64 -> attempts WSL scan and returns ErrNoCookieFound (unless /mnt/c/Users exists with matching cookie)
+	valid32ByteKey := make([]byte, 32)
+	for i := range valid32ByteKey {
+		valid32ByteKey[i] = byte(i + 1)
+	}
+	validKeyB64 := base64.StdEncoding.EncodeToString(valid32ByteKey)
+	if err := os.WriteFile(keyFile, []byte(validKeyB64), 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = r.readCookieWSL(ctx, "nonexistent-domain-test.local", "token", "chrome")
+	if !errors.Is(err, ErrNoCookieFound) {
+		t.Logf("readCookieWSL with valid key format returned: %v", err)
+	}
+}
+
