@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# agy-box: Lightweight Container Runner for Multi-Account Antigravity
+# ==============================================================================
+set -euo pipefail
+
+CONTAINERS_DIR="$HOME/.agy-containers"
+CMD="$(basename "$0")"
+
+# Handle Subcommands: add / new / create
+if [ "${1:-}" = "add" ] || [ "${1:-}" = "new" ] || [ "${1:-}" = "create" ]; then
+  if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+    echo "Usage: $CMD add <box-name>" >&2
+    exit 1
+  fi
+  BOX_NAME="$2"
+  if [[ "$BOX_NAME" =~ ^- ]]; then
+    echo "Error: Invalid box name '$BOX_NAME'" >&2
+    exit 1
+  fi
+  PROFILE_DIR="$CONTAINERS_DIR/$BOX_NAME"
+  if [ -d "$PROFILE_DIR" ]; then
+    echo "Box '$BOX_NAME' already exists ($PROFILE_DIR)."
+    exit 0
+  fi
+
+  mkdir -p "$PROFILE_DIR/.gemini/antigravity-cli" \
+           "$PROFILE_DIR/.gemini/config/workflows" \
+           "$PROFILE_DIR/.gemini/config/global_workflows" \
+           "$PROFILE_DIR/.gemini/config/skills" \
+           "$HOME/.local/state/openusage"
+
+  # Auto-inject OpenUsage statusline telemetry hook into the box's settings
+  SETTINGS_FILE="$PROFILE_DIR/.gemini/antigravity-cli/settings.json"
+  cat << 'JSON' > "$SETTINGS_FILE"
+{
+  "statusLine": {
+    "command": "openusage antigravity statusline"
+  }
+}
+JSON
+
+  # Sync global workflows and skills if available on host
+  if [ -d "$HOME/.gemini/config/workflows" ]; then
+    cp -rn "$HOME/.gemini/config/workflows"/* "$PROFILE_DIR/.gemini/config/workflows/" 2>/dev/null || true
+  fi
+  if [ -d "$HOME/.gemini/config/global_workflows" ]; then
+    cp -rn "$HOME/.gemini/config/global_workflows"/* "$PROFILE_DIR/.gemini/config/global_workflows/" 2>/dev/null || true
+  fi
+  if [ -d "$HOME/.gemini/config/skills" ]; then
+    cp -rn "$HOME/.gemini/config/skills"/* "$PROFILE_DIR/.gemini/config/skills/" 2>/dev/null || true
+  fi
+
+  echo "✨ Created Antigravity box '$BOX_NAME' in $PROFILE_DIR"
+  echo "Launch with: $CMD $BOX_NAME"
+  exit 0
+fi
+
+# Handle Subcommands: list / ls
+if [ "${1:-}" = "list" ] || [ "${1:-}" = "ls" ]; then
+  mkdir -p "$CONTAINERS_DIR"
+  echo "📦 Antigravity Boxes in ~/.agy-containers:"
+  echo ""
+  
+  boxes=("$CONTAINERS_DIR"/*)
+  if [ ! -e "${boxes[0]}" ]; then
+    echo "  (No boxes created yet. Create one with: $CMD add <name>)"
+    exit 0
+  fi
+
+  printf "  %-20s %-18s %s\n" "BOX NAME" "STATUS" "STORAGE LOCATION"
+  printf "  %-20s %-18s %s\n" "────────" "──────" "────────────────"
+  
+  for dir in "$CONTAINERS_DIR"/*; do
+    if [ -d "$dir" ]; then
+      name=$(basename "$dir")
+      status="Ready"
+      if [ -f "$dir/.gemini/oauth_creds.json" ] || [ -f "$dir/.gemini/gemini-credentials.json" ] || [ -f "$dir/.gemini/antigravity-cli/antigravity-oauth-token" ]; then
+        status="Authenticated"
+      elif [ -d "$dir/.gemini/antigravity-cli" ]; then
+        status="Initialized"
+      fi
+      printf "  %-20s %-18s %s\n" "$name" "$status" "$dir"
+    fi
+  done
+  echo ""
+  echo "Usage:"
+  echo "  $CMD add <box-name>     Create a new box"
+  echo "  $CMD <box-name> [args]  Launch an existing box"
+  exit 0
+fi
+
+# Handle Subcommands: rm / delete / remove
+if [ "${1:-}" = "rm" ] || [ "${1:-}" = "delete" ] || [ "${1:-}" = "remove" ]; then
+  if [ $# -lt 2 ]; then
+    echo "Usage: $CMD rm <box-name>" >&2
+    exit 1
+  fi
+  TARGET="$CONTAINERS_DIR/$2"
+  if [ -d "$TARGET" ]; then
+    rm -rf "$TARGET"
+    echo "🗑️  Removed box '$2' ($TARGET)"
+  else
+    echo "Box '$2' does not exist." >&2
+  fi
+  exit 0
+fi
+
+# Handle Help
+if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ "$1" = "help" ]; then
+  cat << HELP
+Usage:
+  $CMD add <box-name>         Create a new box profile
+  $CMD <box-name> [options]   Launch an existing box
+  $CMD list                   List all active boxes
+  $CMD rm <box-name>          Delete a box profile
+
+Examples:
+  $CMD add nurulz
+  $CMD nurulz
+  $CMD nurulz -p ping
+  $CMD list
+
+HELP
+  exit 0
+fi
+
+ACCOUNT="$1"
+shift || true
+
+PROFILE_DIR="$CONTAINERS_DIR/$ACCOUNT"
+if [ ! -d "$PROFILE_DIR" ]; then
+  echo "Error: Box '$ACCOUNT' does not exist." >&2
+  echo "To create this box, run: $CMD add $ACCOUNT" >&2
+  exit 1
+fi
+
+mkdir -p "$PROFILE_DIR/.gemini/antigravity-cli" "$HOME/.local/state/openusage"
+
+# Auto-inject OpenUsage statusline telemetry hook into the box's settings
+SETTINGS_FILE="$PROFILE_DIR/.gemini/antigravity-cli/settings.json"
+if [ ! -f "$SETTINGS_FILE" ]; then
+  cat << 'JSON' > "$SETTINGS_FILE"
+{
+  "statusLine": {
+    "command": "openusage antigravity statusline"
+  }
+}
+JSON
+else
+  python3 -c "
+import json
+try:
+    with open('$SETTINGS_FILE', 'r') as f:
+        data = json.load(f)
+except Exception:
+    data = {}
+if 'statusLine' not in data or data.get('statusLine', {}).get('command') != 'openusage antigravity statusline':
+    data['statusLine'] = {'command': 'openusage antigravity statusline'}
+    with open('$SETTINGS_FILE', 'w') as f:
+        json.dump(data, f, indent=2)
+" 2>/dev/null || true
+fi
+
+# Re-sync global skills into the box on every launch
+for src in workflows global_workflows skills; do
+  [ -d "$HOME/.gemini/config/$src" ] && \
+    cp -ru "$HOME/.gemini/config/$src"/. "$PROFILE_DIR/.gemini/config/$src/" 2>/dev/null || true
+done
+
+BWRAP_BIN=$(which bwrap 2>/dev/null || echo "/home/linuxbrew/.linuxbrew/bin/bwrap")
+if [ ! -x "$BWRAP_BIN" ]; then
+  echo "Error: bubblewrap (bwrap) not found." >&2
+  exit 1
+fi
+
+exec "$BWRAP_BIN" \
+  --ro-bind / / \
+  --dev /dev \
+  --proc /proc \
+  --bind /tmp /tmp \
+  --bind "$HOME" "$HOME" \
+  --bind "$PROFILE_DIR/.gemini" "$HOME/.gemini" \
+  --bind "$HOME/.local/state/openusage" "$HOME/.local/state/openusage" \
+  --setenv HOME "$HOME" \
+  --setenv AGY_ACCOUNT "$ACCOUNT" \
+  --chdir "$PWD" \
+  agy --dangerously-skip-permissions "$@"

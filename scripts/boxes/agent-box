@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# agent-box: Lightweight Container Runner for Multi-Account Cursor Agent
+# ==============================================================================
+set -euo pipefail
+
+CONTAINERS_DIR="$HOME/.agent-containers"
+CMD="$(basename "$0")"
+
+# Handle Subcommands: add / new / create
+if [ "${1:-}" = "add" ] || [ "${1:-}" = "new" ] || [ "${1:-}" = "create" ]; then
+  if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+    echo "Usage: $CMD add <box-name>" >&2
+    exit 1
+  fi
+  BOX_NAME="$2"
+  if [[ "$BOX_NAME" =~ ^- ]]; then
+    echo "Error: Invalid box name '$BOX_NAME'" >&2
+    exit 1
+  fi
+  PROFILE_DIR="$CONTAINERS_DIR/$BOX_NAME"
+  if [ -d "$PROFILE_DIR" ]; then
+    echo "Box '$BOX_NAME' already exists ($PROFILE_DIR)."
+    exit 0
+  fi
+
+  mkdir -p "$PROFILE_DIR/.cursor" \
+           "$PROFILE_DIR/.config/cursor" \
+           "$PROFILE_DIR/.config/Cursor" \
+           "$HOME/.config/cursor" \
+           "$HOME/.config/Cursor" \
+           "$HOME/.local/state/openusage"
+
+  # Auto-inject OpenUsage statusline telemetry hook into the box's cli-config
+  CLI_CONFIG="$PROFILE_DIR/.cursor/cli-config.json"
+  cat << 'JSON' > "$CLI_CONFIG"
+{
+  "statusLine": {
+    "type": "command",
+    "command": "openusage cursor statusline"
+  }
+}
+JSON
+
+  echo "✨ Created Cursor box '$BOX_NAME' in $PROFILE_DIR"
+  echo "Launch with: $CMD $BOX_NAME"
+  exit 0
+fi
+
+# Handle Subcommands: list / ls
+if [ "${1:-}" = "list" ] || [ "${1:-}" = "ls" ]; then
+  mkdir -p "$CONTAINERS_DIR"
+  echo "📦 Cursor Agent Boxes in ~/.agent-containers:"
+  echo ""
+
+  boxes=("$CONTAINERS_DIR"/*)
+  if [ ! -e "${boxes[0]}" ]; then
+    echo "  (No boxes created yet. Create one with: $CMD add <name>)"
+    exit 0
+  fi
+
+  printf "  %-20s %-18s %s\n" "BOX NAME" "STATUS" "STORAGE LOCATION"
+  printf "  %-20s %-18s %s\n" "────────" "──────" "────────────────"
+
+  for dir in "$CONTAINERS_DIR"/*; do
+    if [ -d "$dir" ]; then
+      name=$(basename "$dir")
+      status="Ready"
+      if [ -f "$dir/.config/cursor/auth.json" ]; then
+        status="Authenticated"
+      elif [ -f "$dir/.cursor/cli-config.json" ] || [ -f "$dir/.cursor/agent-cli-state.json" ]; then
+        status="Configured"
+      elif [ -d "$dir/.cursor" ]; then
+        status="Initialized"
+      fi
+      printf "  %-20s %-18s %s\n" "$name" "$status" "$dir"
+    fi
+  done
+  echo ""
+  echo "Usage:"
+  echo "  $CMD add <box-name>     Create a new box"
+  echo "  $CMD <box-name> [args]  Launch an existing box"
+  exit 0
+fi
+
+# Handle Subcommands: rm / delete / remove
+if [ "${1:-}" = "rm" ] || [ "${1:-}" = "delete" ] || [ "${1:-}" = "remove" ]; then
+  if [ $# -lt 2 ]; then
+    echo "Usage: $CMD rm <box-name>" >&2
+    exit 1
+  fi
+  TARGET="$CONTAINERS_DIR/$2"
+  if [ -d "$TARGET" ]; then
+    rm -rf "$TARGET"
+    echo "🗑️  Removed box '$2' ($TARGET)"
+  else
+    echo "Box '$2' does not exist." >&2
+  fi
+  exit 0
+fi
+
+# Handle Help
+if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ "$1" = "help" ]; then
+  cat << HELP
+Usage:
+  $CMD add <box-name>         Create a new box profile
+  $CMD <box-name> [options]   Launch an existing box
+  $CMD list                   List all active boxes
+  $CMD rm <box-name>          Delete a box profile
+
+Examples:
+  $CMD add nurulz
+  $CMD nurulz
+  $CMD nurulz login
+  $CMD nurulz status
+  $CMD list
+
+HELP
+  exit 0
+fi
+
+ACCOUNT="$1"
+shift || true
+
+PROFILE_DIR="$CONTAINERS_DIR/$ACCOUNT"
+if [ ! -d "$PROFILE_DIR" ]; then
+  echo "Error: Box '$ACCOUNT' does not exist." >&2
+  echo "To create this box, run: $CMD add $ACCOUNT" >&2
+  exit 1
+fi
+
+mkdir -p "$PROFILE_DIR/.cursor" \
+         "$PROFILE_DIR/.config/cursor" \
+         "$PROFILE_DIR/.config/Cursor" \
+         "$HOME/.config/cursor" \
+         "$HOME/.config/Cursor" \
+         "$HOME/.local/state/openusage"
+
+# Auto-inject OpenUsage statusline telemetry hook into the box's cli-config
+CLI_CONFIG="$PROFILE_DIR/.cursor/cli-config.json"
+if [ ! -f "$CLI_CONFIG" ]; then
+  cat << 'JSON' > "$CLI_CONFIG"
+{
+  "statusLine": {
+    "type": "command",
+    "command": "openusage cursor statusline"
+  }
+}
+JSON
+else
+  python3 -c "
+import json
+try:
+    with open('$CLI_CONFIG', 'r') as f:
+        data = json.load(f)
+except Exception:
+    data = {}
+sl = data.get('statusLine', {})
+if not isinstance(sl, dict) or sl.get('command') != 'openusage cursor statusline':
+    data['statusLine'] = {'type': 'command', 'command': 'openusage cursor statusline'}
+    with open('$CLI_CONFIG', 'w') as f:
+        json.dump(data, f, indent=2)
+" 2>/dev/null || true
+fi
+
+BWRAP_BIN=$(which bwrap 2>/dev/null || echo "/home/linuxbrew/.linuxbrew/bin/bwrap")
+if [ ! -x "$BWRAP_BIN" ]; then
+  echo "Error: bubblewrap (bwrap) not found." >&2
+  exit 1
+fi
+
+AGENT_BIN=$(which agent 2>/dev/null || echo "$HOME/.local/bin/agent")
+if [ ! -x "$AGENT_BIN" ]; then
+  echo "Error: Cursor agent CLI not found in PATH or ~/.local/bin/agent." >&2
+  exit 1
+fi
+
+exec "$BWRAP_BIN" \
+  --ro-bind / / \
+  --dev /dev \
+  --proc /proc \
+  --bind /tmp /tmp \
+  --bind "$HOME" "$HOME" \
+  --bind "$PROFILE_DIR/.cursor" "$HOME/.cursor" \
+  --bind "$PROFILE_DIR/.config/cursor" "$HOME/.config/cursor" \
+  --bind "$PROFILE_DIR/.config/Cursor" "$HOME/.config/Cursor" \
+  --bind "$HOME/.local/state/openusage" "$HOME/.local/state/openusage" \
+  --setenv HOME "$HOME" \
+  --setenv AGENT_CLI_CREDENTIAL_STORE file \
+  --setenv CURSOR_ACCOUNT "$ACCOUNT" \
+  --setenv AGENT_ACCOUNT "$ACCOUNT" \
+  --chdir "$PWD" \
+  "$AGENT_BIN" --auto-review --trust --approve-mcps "$@"

@@ -87,7 +87,7 @@ ifneq ($(filter box box-list box-rm,$(MAKECMDGOALS)),)
 endif
 
 .PHONY: box
-box: ## Create a box profile: make box agent-box NAME=foo
+box: ## Install box CLI to ~/.local/bin if needed, then create a profile: make box agent-box NAME=foo
 	@./scripts/box.sh add $(BOX_ARGS) $(NAME)
 
 .PHONY: box-list

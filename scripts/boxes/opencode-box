@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# opencode-box: Bubblewrap multi-profile container runner for OpenCode
+# Isolates ~/.config/opencode, ~/.local/share/opencode, and ~/.local/state/opencode per profile.
+# ==============================================================================
+
+CONTAINERS_DIR="$HOME/.opencode-containers"
+CMD="$(basename "$0")"
+
+# Handle Subcommands: add / new / create
+if [ "${1:-}" = "add" ] || [ "${1:-}" = "new" ] || [ "${1:-}" = "create" ]; then
+    if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "Usage: $CMD add <box-name>" >&2
+        exit 1
+    fi
+    BOX_NAME="$2"
+    if [[ "$BOX_NAME" =~ ^- ]]; then
+        echo "Error: Invalid box name '$BOX_NAME'" >&2
+        exit 1
+    fi
+    PROFILE_DIR="$CONTAINERS_DIR/$BOX_NAME"
+    if [ -d "$PROFILE_DIR" ]; then
+        echo "Box '$BOX_NAME' already exists ($PROFILE_DIR)."
+        exit 0
+    fi
+
+    mkdir -p "$PROFILE_DIR/config" "$PROFILE_DIR/share" "$PROFILE_DIR/state"
+    echo "✨ Created OpenCode box '$BOX_NAME' in $PROFILE_DIR"
+    echo "Launch with: $CMD $BOX_NAME"
+    exit 0
+fi
+
+if [ "${1:-}" = "list" ] || [ "${1:-}" = "--list" ] || [ "${1:-}" = "-l" ] || [ "${1:-}" = "ls" ]; then
+    mkdir -p "$CONTAINERS_DIR"
+    echo -e "\033[1;36mAvailable OpenCode Boxes in $CONTAINERS_DIR:\033[0m"
+    boxes=("$CONTAINERS_DIR"/*)
+    if [ ! -e "${boxes[0]}" ]; then
+        echo "  (No boxes found. Create one by running: $CMD add <box-name>)"
+        exit 0
+    fi
+    for box in "$CONTAINERS_DIR"/*; do
+        if [ -d "$box" ]; then
+            name="$(basename "$box")"
+            db_size="0B"
+            if [ -f "$box/share/opencode.db" ]; then
+                db_size="$(du -sh "$box/share/opencode.db" | cut -f1)"
+            fi
+            echo -e "  ✦ \033[1;32m$name\033[0m \033[2m(db: $db_size)\033[0m"
+        fi
+    done
+    echo ""
+    echo "Usage:"
+    echo "  $CMD add <box-name>     Create a new box"
+    echo "  $CMD <box-name> [args]  Launch an existing box"
+    exit 0
+fi
+
+if [ "${1:-}" = "rm" ] || [ "${1:-}" = "remove" ] || [ "${1:-}" = "delete" ]; then
+    if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "Usage: $CMD rm <box-name>" >&2
+        exit 1
+    fi
+    target="$CONTAINERS_DIR/$2"
+    if [ -d "$target" ]; then
+        rm -rf "$target"
+        echo -e "\033[1;31m✓ Removed box: $2\033[0m"
+    else
+        echo "Box '$2' does not exist." >&2
+    fi
+    exit 0
+fi
+
+if [ -z "${1:-}" ] || [ "$1" = "--help" ] || [ "$1" = "-h" ] || [ "$1" = "help" ]; then
+    echo "Usage:"
+    echo "  $CMD add <box-name>         Create a new box profile"
+    echo "  $CMD <box-name> [args...]   Launch an existing box"
+    echo "  $CMD list                   List all active boxes"
+    echo "  $CMD rm <box-name>          Delete a box profile"
+    echo ""
+    echo "Examples:"
+    echo "  $CMD add mohammed"
+    echo "  $CMD mohammed"
+    echo "  $CMD nurulz providers login"
+    echo "  $CMD work stats"
+    exit 0
+fi
+
+PROFILE="$1"
+shift || true
+
+PROFILE_DIR="$CONTAINERS_DIR/$PROFILE"
+if [ ! -d "$PROFILE_DIR" ]; then
+    echo "Error: Box '$PROFILE' does not exist." >&2
+    echo "To create this box, run: $CMD add $PROFILE" >&2
+    exit 1
+fi
+
+mkdir -p "$PROFILE_DIR/config" "$PROFILE_DIR/share" "$PROFILE_DIR/state"
+
+OPENCODE_BIN="$(which opencode 2>/dev/null || echo "/home/linuxbrew/.linuxbrew/bin/opencode")"
+if [ ! -x "$OPENCODE_BIN" ]; then
+    echo "Error: opencode binary not found in PATH." >&2
+    exit 1
+fi
+
+BWRAP_BIN="$(which bwrap 2>/dev/null || echo "/usr/bin/bwrap")"
+if [ ! -x "$BWRAP_BIN" ]; then
+    echo "Error: bubblewrap (bwrap) is not installed." >&2
+    exit 1
+fi
+
+# Execute opencode inside the bubblewrap namespace isolating only OpenCode's dirs
+exec "$BWRAP_BIN" \
+    --ro-bind / / \
+    --dev /dev \
+    --proc /proc \
+    --tmpfs /tmp \
+    --bind "$HOME" "$HOME" \
+    --bind "$PROFILE_DIR/config" "$HOME/.config/opencode" \
+    --bind "$PROFILE_DIR/share" "$HOME/.local/share/opencode" \
+    --bind "$PROFILE_DIR/state" "$HOME/.local/state/opencode" \
+    --setenv OPENCODE_PROFILE "$PROFILE" \
+    "$OPENCODE_BIN" "$@"

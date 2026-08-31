@@ -101,11 +101,12 @@ agentusage integrations uninstall claude_code
 
 ### Multi-account boxes
 
-Box CLIs (`agent-box`, `agy-box`, `opencode-box`) live on `PATH`. From the
-agentusage repo:
+`make box` installs the matching CLI (`agent-box`, `agy-box`, `opencode-box`)
+into `~/.local/bin` (and appends that dir to `PATH` in `~/.bashrc` / `~/.zshrc`
+if needed), then creates the profile. From the agentusage repo:
 
 ```bash
-# Create a profile (same as `agent-box add physics`)
+# Create a profile (installs agent-box, then same as `agent-box add physics`)
 make box agent-box NAME=physics
 make box agent-box physics
 make box agy-box NAME=chaos
@@ -115,9 +116,14 @@ make box opencode-box NAME=work
 make box-list
 make box-list agent-box
 make box-rm agent-box NAME=physics
+
+# Launch (after the box exists)
+agent-box physics
 ```
 
 Aliases: `agent`/`cursor-box` → `agent-box`; `agy` → `agy-box`; `opencode` → `opencode-box`.
+Launching a box needs `bwrap` (`sudo apt install bubblewrap`) and the tool CLI
+(`agent`, `agy`, or `opencode`) on `PATH`.
 
 ---
 
