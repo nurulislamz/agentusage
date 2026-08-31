@@ -168,4 +168,13 @@ func TestPollScheduler_UnknownAccount(t *testing.T) {
 	}
 }
 
+func TestHTTPBasePollInterval(t *testing.T) {
+	if got := HTTPBasePollInterval(1 * time.Second); got != 5*time.Second {
+		t.Errorf("HTTPBasePollInterval(1s) = %s, want 5s floor", got)
+	}
+	if got := HTTPBasePollInterval(10 * time.Second); got != 10*time.Second {
+		t.Errorf("HTTPBasePollInterval(10s) = %s, want 10s", got)
+	}
+}
+
 func ptr(f float64) *float64 { return &f }

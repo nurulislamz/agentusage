@@ -295,4 +295,47 @@ func TestReadModelRequestKeyIncludesNormalizedTimeWindow(t *testing.T) {
 	}
 }
 
+func TestSameAutoDetectedAccounts_And_SamePathMap(t *testing.T) {
+	a1 := []core.AccountConfig{
+		{ID: "acc1", Provider: "prov1", Auth: "oauth", Paths: map[string]string{"p1": "/path1"}},
+		{ID: "acc2", Provider: "prov2"},
+	}
+	a2 := []core.AccountConfig{
+		{ID: "acc1", Provider: "prov1", Auth: "oauth", Paths: map[string]string{"p1": "/path1"}},
+		{ID: "acc2", Provider: "prov2"},
+	}
+	a3 := []core.AccountConfig{
+		{ID: "acc1", Provider: "prov1", Auth: "oauth", Paths: map[string]string{"p1": "/different"}},
+		{ID: "acc2", Provider: "prov2"},
+	}
+
+	if !sameAutoDetectedAccounts(a1, a2) {
+		t.Error("sameAutoDetectedAccounts(a1, a2) should be true")
+	}
+	if sameAutoDetectedAccounts(a1, a3) {
+		t.Error("sameAutoDetectedAccounts(a1, a3) should be false")
+	}
+	if sameAutoDetectedAccounts(a1, a1[:1]) {
+		t.Error("sameAutoDetectedAccounts with different length should be false")
+	}
+
+	// samePathMap
+	if !samePathMap(nil, map[string]string{}) {
+		t.Error("nil and empty path map should be equal")
+	}
+	if !samePathMap(map[string]string{"a": "1"}, map[string]string{"a": "1"}) {
+		t.Error("identical path maps should be equal")
+	}
+	if samePathMap(map[string]string{"a": "1"}, map[string]string{"a": "2"}) {
+		t.Error("different path maps should not be equal")
+	}
+}
+
+func TestResolveSocketPath_EnvOverride(t *testing.T) {
+	t.Setenv("AGENTUSAGE_TELEMETRY_SOCKET", "/tmp/custom_override.sock")
+	if got := ResolveSocketPath(); got != "/tmp/custom_override.sock" {
+		t.Errorf("ResolveSocketPath() = %q, want '/tmp/custom_override.sock'", got)
+	}
+}
+
 func float64Ptr(v float64) *float64 { return &v }

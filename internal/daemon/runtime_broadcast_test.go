@@ -80,3 +80,45 @@ func TestSnapshotFingerprint_DiffersOnMetricCountChange(t *testing.T) {
 		t.Fatal("fingerprints should differ when metric count changes (telemetry enrichment)")
 	}
 }
+
+func TestViewRuntime_LifecycleAndNilSafety(t *testing.T) {
+	// 1. Nil receiver safety
+	var nilRuntime *ViewRuntime
+	if client := nilRuntime.CurrentClient(); client != nil {
+		t.Errorf("nil.CurrentClient() = %v, want nil", client)
+	}
+	nilRuntime.SetClient(nil)
+	if st := nilRuntime.State(); st.Status != DaemonStatusUnknown {
+		t.Errorf("nil.State() = %v, want Unknown", st.Status)
+	}
+	nilRuntime.SetTimeWindow(core.TimeWindow7d)
+	if tw := nilRuntime.TimeWindow(); tw != core.TimeWindow30d {
+		t.Errorf("nil.TimeWindow() = %v, want 30d", tw)
+	}
+	nilRuntime.ResetEnsureThrottle()
+	if c := nilRuntime.EnsureClient(nil); c != nil {
+		t.Errorf("nil.EnsureClient() = %v, want nil", c)
+	}
+
+	// 2. Normal ViewRuntime lifecycle
+	rt := NewViewRuntime(nil, "/tmp/test.sock", false)
+	if st := rt.State(); st.Status != DaemonStatusConnecting {
+		t.Errorf("initial state = %v, want Connecting", st.Status)
+	}
+
+	mockClient := &Client{SocketPath: "/tmp/test.sock"}
+	rt.SetClient(mockClient)
+	if rt.CurrentClient() != mockClient {
+		t.Errorf("CurrentClient() = %v, want %v", rt.CurrentClient(), mockClient)
+	}
+
+	rt.SetTimeWindow(core.TimeWindow7d)
+	if rt.TimeWindow() != core.TimeWindow7d {
+		t.Errorf("TimeWindow() = %v, want 7d", rt.TimeWindow())
+	}
+
+	rt.ResetEnsureThrottle()
+	if rt.CurrentClient() != nil {
+		t.Error("ResetEnsureThrottle should clear client")
+	}
+}
