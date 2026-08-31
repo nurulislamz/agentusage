@@ -67,6 +67,7 @@ After=default.target
 
 [Service]
 Type=simple
+Environment=PATH=%%h/.local/bin:%%h/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 EnvironmentFile=-%s
 ExecStart=%s telemetry daemon run --socket-path %s
 Restart=always

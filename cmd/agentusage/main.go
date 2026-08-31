@@ -13,6 +13,8 @@ import (
 )
 
 func main() {
+	core.EnsureUserLocalBinOnPATH()
+
 	if core.DebugEnabled() {
 		log.SetOutput(os.Stderr)
 	} else {

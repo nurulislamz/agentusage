@@ -223,23 +223,50 @@ func pingBoxForToken(ctx context.Context, acct core.AccountConfig) error {
 	box := boxName(acct)
 	var cmd *exec.Cmd
 	if box != "" {
-		cmd = exec.CommandContext(ctx, "agy-box", box, "-p", "ping")
+		bin := resolveCLI("agy-box")
+		cmd = exec.CommandContext(ctx, bin, box, "-p", "ping")
 	} else {
 		bin := strings.TrimSpace(acct.Binary)
 		if bin == "" {
 			bin = "agy"
 		}
+		if !filepath.IsAbs(bin) {
+			bin = resolveCLI(bin)
+		}
 		cmd = exec.CommandContext(ctx, bin, "-p", "ping")
 	}
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
+	cmd.Env = core.EnvironWithUserLocalBin(os.Environ())
 	if err := cmd.Run(); err != nil {
 		if box != "" {
-			return fmt.Errorf("agy-box %s -p ping: %w", box, err)
+			return fmt.Errorf("agy-box %s -p ping (%s): %w", box, cmd.Path, err)
 		}
 		return fmt.Errorf("%s -p ping: %w", cmd.Path, err)
 	}
 	return nil
+}
+
+// resolveCLI returns an absolute path for a box CLI when PATH (typical of
+// systemd user units) does not include ~/.local/bin.
+func resolveCLI(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return name
+	}
+	if filepath.IsAbs(name) {
+		return name
+	}
+	if path, err := exec.LookPath(name); err == nil && strings.TrimSpace(path) != "" {
+		return path
+	}
+	if dir := core.UserLocalBinDir(); dir != "" {
+		candidate := filepath.Join(dir, name)
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	return name
 }
 
 // ensureAccessToken returns a usable access token, refreshing or pinging the

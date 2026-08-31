@@ -111,6 +111,7 @@ install: build ## Install binary to ~/.local/bin and set up telemetry daemon ser
 	install -d $(HOME)/.local/bin
 	install -m 755 $(BIN_DIR)/$(APP_NAME)$(EXE) $(HOME)/.local/bin/$(APP_NAME)$(EXE)
 	@$(HOME)/.local/bin/$(APP_NAME)$(EXE) telemetry daemon install
+	-@systemctl --user try-restart agentusage-serve.service >/dev/null 2>&1 || true
 
 .PHONY: uninstall
 uninstall: ## Uninstall binary from ~/.local/bin and remove telemetry daemon service

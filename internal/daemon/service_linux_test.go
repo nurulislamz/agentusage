@@ -16,4 +16,7 @@ func TestSystemdUnit_UsesDaemonRunSubcommand(t *testing.T) {
 	if !strings.Contains(unit, "EnvironmentFile=-/tmp/agentusage.env") {
 		t.Fatalf("systemd unit does not include env file:\n%s", unit)
 	}
+	if !strings.Contains(unit, "Environment=PATH=%h/.local/bin:%h/bin:") {
+		t.Fatalf("systemd unit does not prepend user-local bin to PATH:\n%s", unit)
+	}
 }
