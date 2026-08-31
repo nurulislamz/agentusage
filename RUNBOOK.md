@@ -13,6 +13,13 @@ agentusage
 # Launch local browser web dashboard (http://127.0.0.1:8080)
 agentusage serve
 
+# Run the dashboard in the background (survives the terminal)
+agentusage serve --detach
+agentusage serve --listen 127.0.0.1:8088 --base-path /agentusage --detach
+
+# Stop a detached dashboard
+agentusage serve --stop
+
 # Launch web dashboard with synthetic demo data
 agentusage serve --demo
 
@@ -91,6 +98,26 @@ agentusage integrations upgrade --all
 # Uninstall an integration hook
 agentusage integrations uninstall claude_code
 ```
+
+### Multi-account boxes
+
+Box CLIs (`agent-box`, `agy-box`, `opencode-box`) live on `PATH`. From the
+agentusage repo:
+
+```bash
+# Create a profile (same as `agent-box add physics`)
+make box agent-box NAME=physics
+make box agent-box physics
+make box agy-box NAME=chaos
+make box opencode-box NAME=work
+
+# List / remove
+make box-list
+make box-list agent-box
+make box-rm agent-box NAME=physics
+```
+
+Aliases: `agent`/`cursor-box` → `agent-box`; `agy` → `agy-box`; `opencode` → `opencode-box`.
 
 ---
 

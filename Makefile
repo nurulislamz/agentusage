@@ -76,6 +76,32 @@ run: ## Run the application locally
 serve: ## Run the local web dashboard (agentusage serve)
 	$(GO) run $(CMD_DIR) serve $(ARGS)
 
+# Extra words after box / box-list / box-rm become arguments, e.g.
+#   make box agent-box NAME=physics
+#   make box agent-box physics
+ifneq ($(filter box box-list box-rm,$(MAKECMDGOALS)),)
+  BOX_ARGS := $(filter-out box box-list box-rm,$(MAKECMDGOALS))
+  .PHONY: $(BOX_ARGS)
+  $(BOX_ARGS):
+	@:
+endif
+
+.PHONY: box
+box: ## Create a box profile: make box agent-box NAME=foo
+	@./scripts/box.sh add $(BOX_ARGS) $(NAME)
+
+.PHONY: box-list
+box-list: ## List box profiles: make box-list [agent-box]
+	@./scripts/box.sh list $(BOX_ARGS)
+
+.PHONY: box-rm
+box-rm: ## Remove a box profile: make box-rm agent-box NAME=foo
+	@./scripts/box.sh rm $(BOX_ARGS) $(NAME)
+
+.PHONY: test-scripts
+test-scripts: ## Run shell script tests
+	@./scripts/box_test.sh
+
 .PHONY: build
 build: deps ## Build the binary
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/$(APP_NAME)$(EXE) $(CMD_DIR)

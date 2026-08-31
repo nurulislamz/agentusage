@@ -28,9 +28,17 @@ func TestFirstNonEmpty(t *testing.T) {
 
 func TestNewServeCommandFlags(t *testing.T) {
 	cmd := newServeCommand()
-	for _, name := range []string{"listen", "source", "demo", "open", "no-open", "allow-public", "verify", "base-path"} {
+	for _, name := range []string{"listen", "source", "demo", "open", "no-open", "allow-public", "verify", "base-path", "detach", "stop"} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("missing flag --%s", name)
 		}
+	}
+}
+
+func TestServeDetachStopMutuallyExclusive(t *testing.T) {
+	cmd := newServeCommand()
+	cmd.SetArgs([]string{"--detach", "--stop"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected --detach and --stop to be mutually exclusive")
 	}
 }

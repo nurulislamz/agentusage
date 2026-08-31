@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 	"github.com/nurulislamz/agentusage/internal/tui"
 	"github.com/nurulislamz/agentusage/internal/version"
 	"github.com/nurulislamz/agentusage/internal/webserve"
@@ -34,6 +36,8 @@ func newServeCommand() *cobra.Command {
 		noOpen      bool
 		allowPublic bool
 		verify      bool
+		detach      bool
+		stop        bool
 	)
 
 	cmd := &cobra.Command{
@@ -54,6 +58,9 @@ func newServeCommand() *cobra.Command {
 			"Pass --verify to collect the same payload the web port serves and compare it to",
 			"TUI-rendered detail (accounts, badges, percents, timers). Exits 1 on mismatch.",
 			"",
+			"Pass --detach to run in the background (pid + log under the agentusage state dir).",
+			"Stop that process with --stop. --detach, --stop, and --verify are mutually exclusive.",
+			"",
 			"Security: without AGENTUSAGE_SERVE_TOKEN the server refuses to bind a non-loopback",
 			"interface unless you pass --allow-public.",
 		}, "\n"),
@@ -64,6 +71,8 @@ func newServeCommand() *cobra.Command {
 			"  agentusage serve --verify",
 			"  agentusage serve --verify --demo",
 			"  agentusage serve --listen 127.0.0.1:8088 --base-path /agentusage --no-open",
+			"  agentusage serve --listen 127.0.0.1:8088 --base-path /agentusage --detach",
+			"  agentusage serve --stop",
 			"  AGENTUSAGE_SERVE_TOKEN=s3cret agentusage serve --listen :8080",
 		}, "\n"),
 		SilenceUsage: true,
@@ -89,8 +98,17 @@ func newServeCommand() *cobra.Command {
 				AllowPublic:    allowPublic,
 				Config:         &cfg,
 			}
+			if err := webserve.ValidateServeMode(detach, stop, verify); err != nil {
+				return err
+			}
+			if stop {
+				return stopDetachedServe()
+			}
 			if verify {
 				return runVerify(opts)
+			}
+			if detach {
+				return detachServe(opts)
 			}
 			shouldOpen := openBrowser
 			if noOpen {
@@ -111,7 +129,105 @@ func newServeCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&noOpen, "no-open", false, "Do not open a browser")
 	cmd.Flags().BoolVar(&allowPublic, "allow-public", false, "Allow binding a non-loopback interface without AGENTUSAGE_SERVE_TOKEN")
 	cmd.Flags().BoolVar(&verify, "verify", false, "Compare TUI detail to the web snapshot payload and exit")
+	cmd.Flags().BoolVar(&detach, "detach", false, "Run the dashboard in the background")
+	cmd.Flags().BoolVar(&stop, "stop", false, "Stop a dashboard started with --detach")
+	cmd.MarkFlagsMutuallyExclusive("detach", "stop", "verify")
 	return cmd
+}
+
+func detachServe(opts webserve.Options) error {
+	stateDir, err := telemetry.DefaultStateDir()
+	if err != nil {
+		return err
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("serve: executable: %w", err)
+	}
+	exe, err = persistDetachExecutable(exe, stateDir)
+	if err != nil {
+		return err
+	}
+	pidPath := webserve.PIDFile(stateDir)
+	logPath := webserve.LogFile(stateDir)
+	health := webserve.HealthzURL(opts.ListenAddr, opts.BasePath)
+	pid, err := webserve.StartDetached(webserve.DetachConfig{
+		Executable: exe,
+		Args:       webserve.ChildServeArgs(os.Args),
+		PIDPath:    pidPath,
+		LogPath:    logPath,
+		HealthURL:  health,
+	})
+	if err != nil {
+		return err
+	}
+	displayURL := strings.TrimSuffix(health, "healthz")
+	fmt.Printf("agentUsage web dashboard detached pid=%d\n", pid)
+	fmt.Printf("  %s\n", displayURL)
+	fmt.Printf("  logs: %s\n", logPath)
+	fmt.Printf("  stop with: agentusage serve --stop\n")
+	return nil
+}
+
+func stopDetachedServe() error {
+	stateDir, err := telemetry.DefaultStateDir()
+	if err != nil {
+		return err
+	}
+	pidPath := webserve.PIDFile(stateDir)
+	pid, running := webserve.RunningPID(pidPath)
+	if err := webserve.StopDetached(pidPath); err != nil {
+		return err
+	}
+	if running {
+		fmt.Printf("stopped agentUsage web dashboard (pid %d)\n", pid)
+		return nil
+	}
+	fmt.Println("agentUsage web dashboard is not running")
+	return nil
+}
+
+func persistDetachExecutable(src, stateDir string) (string, error) {
+	if !transientGoBuildPath(src) {
+		return src, nil
+	}
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		return "", fmt.Errorf("serve: state dir: %w", err)
+	}
+	dst := filepath.Join(stateDir, "serve.bin")
+	in, err := os.Open(src)
+	if err != nil {
+		return "", fmt.Errorf("serve: open executable: %w", err)
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+	if err != nil {
+		return "", fmt.Errorf("serve: copy executable: %w", err)
+	}
+	if _, err := out.ReadFrom(in); err != nil {
+		_ = out.Close()
+		return "", fmt.Errorf("serve: copy executable: %w", err)
+	}
+	if err := out.Close(); err != nil {
+		return "", err
+	}
+	return dst, nil
+}
+
+func transientGoBuildPath(path string) bool {
+	p := strings.TrimSpace(path)
+	if p == "" {
+		return true
+	}
+	normalized := filepath.ToSlash(strings.ToLower(filepath.Clean(p)))
+	if strings.Contains(normalized, "/go-build") && strings.Contains(normalized, "/exe/") {
+		return true
+	}
+	tmpRoot := filepath.ToSlash(strings.ToLower(filepath.Clean(os.TempDir())))
+	if tmpRoot == "" || tmpRoot == "." {
+		return false
+	}
+	return strings.HasPrefix(normalized, tmpRoot+"/go-build")
 }
 
 func runVerify(opts webserve.Options) error {

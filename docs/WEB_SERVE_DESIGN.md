@@ -60,5 +60,5 @@ follows `docs/DESIGN.md` / `~/open-design/design-systems/agentusage/`.
 ## 7. CLI
 
 ```
-agentusage serve [--listen ADDR] [--base-path /prefix] [--source auto|direct|daemon] [--demo] [--open|--no-open] [--allow-public]
+agentusage serve [--listen ADDR] [--base-path /prefix] [--source auto|direct|daemon] [--demo] [--open|--no-open] [--allow-public] [--detach|--stop]
 ```
