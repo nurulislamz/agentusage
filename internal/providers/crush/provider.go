@@ -159,6 +159,9 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 // metrics, per-model usage records, and per-day series. Kept private
 // and pure so it can be exercised without going through Fetch.
 func populateSnapshot(snap *core.UsageSnapshot, sessions []crushSession, dbCount int, now time.Time) {
+	if snap.DailySeries == nil {
+		snap.DailySeries = make(map[string][]core.TimePoint)
+	}
 	type modelTotals struct {
 		input    int64
 		output   int64
@@ -306,6 +309,9 @@ func buildStatusMessage(snap core.UsageSnapshot) string {
 func setUsedMetric(snap *core.UsageSnapshot, key string, value float64, unit, window string) {
 	if value <= 0 {
 		return
+	}
+	if snap.Metrics == nil {
+		snap.Metrics = make(map[string]core.Metric)
 	}
 	v := value
 	snap.Metrics[key] = core.Metric{

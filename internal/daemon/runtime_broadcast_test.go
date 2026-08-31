@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -121,4 +123,32 @@ func TestViewRuntime_LifecycleAndNilSafety(t *testing.T) {
 	if rt.CurrentClient() != nil {
 		t.Error("ResetEnsureThrottle should clear client")
 	}
+}
+
+func TestViewRuntime_ReadWithFallback_And_Refresh(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Fallback when client fails or is nil
+	rt := NewViewRuntime(nil, "", false)
+	frame := rt.ReadWithFallback(ctx)
+	if rt.State().Status != DaemonStatusError && rt.State().Status != DaemonStatusConnecting {
+		t.Errorf("rt.State().Status = %v", rt.State().Status)
+	}
+	_ = frame
+
+	// 2. ReadWithFallbackForWindow with offline client
+	offlineClient := &Client{
+		SocketPath: "/tmp/nonexistent_socket_test.sock",
+		http:       &http.Client{Timeout: 100 * time.Millisecond},
+	}
+	rt.SetClient(offlineClient)
+	frame2 := rt.ReadWithFallbackForWindow(ctx, core.TimeWindow30d)
+	if rt.State().Status != DaemonStatusError && rt.State().Status != DaemonStatusConnecting {
+		t.Errorf("rt.State().Status = %v", rt.State().Status)
+	}
+	_ = frame2
+
+	// 3. RefreshForWindow with offline client returns frame
+	frame3 := rt.RefreshForWindow(ctx, core.TimeWindow7d)
+	_ = frame3
 }

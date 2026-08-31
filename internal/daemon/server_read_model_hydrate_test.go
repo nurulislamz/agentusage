@@ -91,3 +91,57 @@ func TestOverlayPollStateSnapshots_PrefersPolledData(t *testing.T) {
 		t.Fatalf("status = %q, want OK", got["antigravity-physics"].Status)
 	}
 }
+
+func TestSnapshotMoreUsableThan_And_HasUsableData(t *testing.T) {
+	now := time.Now().UTC()
+
+	// 1. snapshotHasUsableData
+	emptySnap := core.UsageSnapshot{}
+	if snapshotHasUsableData(emptySnap) {
+		t.Error("empty snapshot should not be usable")
+	}
+
+	unknownSnap := core.UsageSnapshot{Status: core.StatusUnknown}
+	if snapshotHasUsableData(unknownSnap) {
+		t.Error("unknown status with no metrics should not be usable")
+	}
+
+	statusSnap := core.UsageSnapshot{Status: core.StatusOK}
+	if !snapshotHasUsableData(statusSnap) {
+		t.Error("status OK should be usable")
+	}
+
+	ten := 10.0
+	metricSnap := core.UsageSnapshot{
+		Status:  core.StatusUnknown,
+		Metrics: map[string]core.Metric{"tokens": {Used: &ten}},
+	}
+	if !snapshotHasUsableData(metricSnap) {
+		t.Error("snapshot with metrics should be usable")
+	}
+
+	resetSnap := core.UsageSnapshot{
+		Status: core.StatusUnknown,
+		Resets: map[string]time.Time{"limit": now},
+	}
+	if !snapshotHasUsableData(resetSnap) {
+		t.Error("snapshot with resets should be usable")
+	}
+
+	// 2. snapshotMoreUsableThan
+	if snapshotMoreUsableThan(emptySnap, statusSnap) {
+		t.Error("empty candidate should not be more usable")
+	}
+	if !snapshotMoreUsableThan(statusSnap, emptySnap) {
+		t.Error("usable candidate should be more usable than empty")
+	}
+
+	newerSnap := core.UsageSnapshot{Status: core.StatusOK, Timestamp: now.Add(time.Minute)}
+	olderSnap := core.UsageSnapshot{Status: core.StatusOK, Timestamp: now}
+	if !snapshotMoreUsableThan(newerSnap, olderSnap) {
+		t.Error("newer candidate should be more usable")
+	}
+	if snapshotMoreUsableThan(olderSnap, newerSnap) {
+		t.Error("older candidate should not be more usable")
+	}
+}

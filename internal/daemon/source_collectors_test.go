@@ -104,3 +104,31 @@ func findSourceCollector(t *testing.T, collectors []telemetry.Collector, name st
 	t.Fatalf("collector %q not found", name)
 	return nil
 }
+
+func TestResolveTelemetrySourceOptions_NilSource(t *testing.T) {
+	opts, acct, warns := ResolveTelemetrySourceOptions(nil, "my-acct")
+	if acct != "my-acct" || len(opts.Paths) != 0 || len(warns) != 0 {
+		t.Errorf("expected empty opts for nil source, got opts=%+v, acct=%s, warns=%v", opts, acct, warns)
+	}
+}
+
+func TestResolveTelemetrySourceOptions_LiveSource(t *testing.T) {
+	source, ok := providers.TelemetrySourceBySystem("codex")
+	if !ok {
+		t.Fatal("codex source not found")
+	}
+	opts, _, _ := ResolveTelemetrySourceOptions(source, "")
+	_ = opts
+}
+
+func TestTelemetrySourceCount_And_Systems(t *testing.T) {
+	count := telemetrySourceCount()
+	if count <= 0 {
+		t.Errorf("telemetrySourceCount = %d, want >0", count)
+	}
+
+	bySys := telemetrySourcesBySystem()
+	if len(bySys) == 0 {
+		t.Error("telemetrySourcesBySystem returned empty map")
+	}
+}

@@ -215,3 +215,18 @@ func TestSocketOwnerSummary(t *testing.T) {
 		t.Errorf("SocketOwnerSummary(nonexistent) = %q, want empty", got)
 	}
 }
+
+func TestServiceManager_InstallHint_DomainCandidates_LoadServiceEnv(t *testing.T) {
+	mgr := ServiceManager{
+		Kind: "darwin",
+	}
+	if hint := mgr.InstallHint(); !strings.Contains(hint, "agentusage") {
+		t.Errorf("InstallHint() = %q", hint)
+	}
+	if doms := mgr.domainCandidates(); len(doms) == 0 {
+		t.Error("domainCandidates() should return candidates on darwin")
+	}
+
+	// LoadServiceEnv should run safely without panic
+	LoadServiceEnv()
+}

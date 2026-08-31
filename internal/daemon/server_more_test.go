@@ -2,11 +2,14 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 )
 
 func TestSnapshotResetPassed(t *testing.T) {
@@ -190,4 +193,77 @@ func TestSkipUnchangedProvider(t *testing.T) {
 	if snap := svc.skipUnchangedProvider(detector, acct); snap != nil {
 		t.Error("expected nil when detector.HasChanged is true")
 	}
+}
+
+func TestProcessHookSpool_And_Cleanup(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "telemetry.db")
+	store, err := telemetry.OpenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	svc := &Service{
+		store:       store,
+		logThrottle: core.NewLogThrottle(5, time.Minute),
+	}
+
+	hookDir := filepath.Join(tempDir, "hooks")
+	_ = os.MkdirAll(hookDir, 0755)
+
+	// 1. Write a valid hook file
+	validPayload := []byte(`{"hook":"chat.message","timestamp":"2026-02-26T20:00:00Z","input":{"sessionID":"s1","messageID":"m1"},"output":{"usage":{"input_tokens":10,"output_tokens":5}}}`)
+	rawFile := rawHookFile{
+		Source:    "opencode",
+		AccountID: "work",
+		Payload:   validPayload,
+	}
+	rawBytes, _ := json.Marshal(rawFile)
+	_ = os.WriteFile(filepath.Join(hookDir, "hook1.json"), rawBytes, 0644)
+
+	// 2. Write a corrupt/invalid hook file
+	_ = os.WriteFile(filepath.Join(hookDir, "corrupt.json"), []byte("invalid json!"), 0644)
+
+	// 3. Write a .tmp file
+	_ = os.WriteFile(filepath.Join(hookDir, "test.json.tmp"), []byte("tmp"), 0644)
+
+	// Run processHookSpool
+	svc.processHookSpool(context.Background(), hookDir)
+
+	// Verify hook1 was ingested and removed
+	if _, err := os.Stat(filepath.Join(hookDir, "hook1.json")); !os.IsNotExist(err) {
+		t.Error("expected hook1.json to be processed and removed")
+	}
+
+	// Run cleanupHookSpool
+	svc.cleanupHookSpool(hookDir)
+	if _, err := os.Stat(filepath.Join(hookDir, "test.json.tmp")); !os.IsNotExist(err) {
+		t.Error("expected test.json.tmp to be cleaned up")
+	}
+}
+
+func TestPushToExporter(t *testing.T) {
+	// 1. Nil exporter is safe no-op
+	svc := &Service{}
+	svc.pushToExporter(context.Background(), map[string]core.UsageSnapshot{"acc": {ProviderID: "test"}})
+
+	// 2. Nil snapshots is safe no-op
+	svc.pushToExporter(context.Background(), nil)
+}
+
+func TestRunCollectLoop_And_WatchLoop_Cancel(t *testing.T) {
+	svc := &Service{
+		cfg: Config{
+			CollectInterval: 10 * time.Millisecond,
+		},
+		logThrottle: core.NewLogThrottle(5, time.Minute),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // canceled immediately
+
+	// Both loops should exit cleanly on ctx.Done()
+	svc.runCollectLoop(ctx)
+	svc.runWatchLoop(ctx)
 }
