@@ -22,10 +22,12 @@ import (
 )
 
 const envServeToken = "AGENTUSAGE_SERVE_TOKEN"
+const envServeBasePath = "AGENTUSAGE_SERVE_BASE_PATH"
 
 func newServeCommand() *cobra.Command {
 	var (
 		listenAddr  string
+		basePath    string
 		sourceFlag  string
 		demo        bool
 		openBrowser bool
@@ -45,6 +47,10 @@ func newServeCommand() *cobra.Command {
 			"Collection prefers the telemetry daemon and falls back to a direct provider poll",
 			"(same as `agentusage export --source auto`).",
 			"",
+			"Pass --base-path /agentusage (or AGENTUSAGE_SERVE_BASE_PATH) when a reverse proxy",
+			"exposes the dashboard under a URL prefix (Tailscale Serve --set-path=/agentusage).",
+			"UI assets and /api/v1/* are then served under that prefix.",
+			"",
 			"Pass --verify to collect the same payload the web port serves and compare it to",
 			"TUI-rendered detail (accounts, badges, percents, timers). Exits 1 on mismatch.",
 			"",
@@ -57,6 +63,7 @@ func newServeCommand() *cobra.Command {
 			"  agentusage serve --listen 127.0.0.1:9090 --no-open",
 			"  agentusage serve --verify",
 			"  agentusage serve --verify --demo",
+			"  agentusage serve --listen 127.0.0.1:8088 --base-path /agentusage --no-open",
 			"  AGENTUSAGE_SERVE_TOKEN=s3cret agentusage serve --listen :8080",
 		}, "\n"),
 		SilenceUsage: true,
@@ -68,6 +75,7 @@ func newServeCommand() *cobra.Command {
 			}
 			opts := webserve.Options{
 				ListenAddr:     firstNonEmpty(listenAddr, cfg.Serve.ListenAddr),
+				BasePath:       firstNonEmpty(basePath, os.Getenv(envServeBasePath), cfg.Serve.BasePath),
 				AuthToken:      firstNonEmpty(cfg.Serve.AuthToken, os.Getenv(envServeToken)),
 				Source:         sourceFlag,
 				TimeWindow:     cfg.Data.TimeWindow,
@@ -96,6 +104,7 @@ func newServeCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&listenAddr, "listen", "", "TCP address to listen on (default 127.0.0.1:8080)")
+	cmd.Flags().StringVar(&basePath, "base-path", "", "URL prefix for reverse proxies (e.g. /agentusage); empty means /")
 	cmd.Flags().StringVar(&sourceFlag, "source", "auto", "collection source: auto, direct, or daemon")
 	cmd.Flags().BoolVar(&demo, "demo", false, "Serve synthetic snapshots (no daemon or API keys required)")
 	cmd.Flags().BoolVar(&openBrowser, "open", false, "Open the dashboard in the default browser")
@@ -151,6 +160,9 @@ func runServe(opts webserve.Options, openBrowser bool) error {
 	}()
 
 	displayURL := serveURL(srv.Addr())
+	if p := srv.BasePath(); p != "" {
+		displayURL += p + "/"
+	}
 	source := opts.Source
 	if opts.Demo {
 		source = "demo"

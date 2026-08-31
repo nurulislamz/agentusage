@@ -67,3 +67,27 @@ func normalizeListenAddr(addr string) string {
 	}
 	return addr
 }
+
+// normalizeBasePath returns a single-segment URL prefix with no trailing slash.
+// Empty and "/" mean the app is served at root (returned as "").
+func normalizeBasePath(p string) (string, error) {
+	p = strings.TrimSpace(p)
+	if p == "" || p == "/" {
+		return "", nil
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	p = strings.TrimRight(p, "/")
+	if p == "" {
+		return "", nil
+	}
+	if strings.Contains(p, "//") || strings.ContainsAny(p, " \t") {
+		return "", fmt.Errorf("serve: invalid base path %q (use a single segment like /agentusage)", p)
+	}
+	rest := strings.TrimPrefix(p, "/")
+	if rest == "" || rest == "." || rest == ".." || strings.Contains(rest, "/") {
+		return "", fmt.Errorf("serve: invalid base path %q (use a single segment like /agentusage)", p)
+	}
+	return p, nil
+}

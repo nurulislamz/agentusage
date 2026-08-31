@@ -161,6 +161,10 @@ type ServeConfig struct {
 	// ListenAddr is the TCP address to bind. Empty means 127.0.0.1:8080 at
 	// runtime. Overridden by --listen.
 	ListenAddr string `json:"listen_addr"`
+	// BasePath is an optional URL prefix (e.g. "/agentusage") for reverse
+	// proxies such as Tailscale Serve. Empty or "/" means the app is at "/".
+	// Overridden by --base-path or AGENTUSAGE_SERVE_BASE_PATH. No trailing slash.
+	BasePath string `json:"base_path,omitempty"`
 	// AuthToken is the optional Bearer token required on /api/v1/* endpoints.
 	// It must NOT be persisted to settings.json — supply it via
 	// AGENTUSAGE_SERVE_TOKEN at runtime. Empty disables auth.

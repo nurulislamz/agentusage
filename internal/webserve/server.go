@@ -20,6 +20,7 @@ type Server struct {
 	mu        sync.Mutex
 	addr      string
 	authToken string
+	basePath  string
 	collector *collector
 }
 
@@ -29,9 +30,14 @@ func NewServer(opts Options) (*Server, error) {
 	if err := ValidateExposure(addr, token, opts.AllowPublic); err != nil {
 		return nil, err
 	}
+	basePath, err := normalizeBasePath(opts.BasePath)
+	if err != nil {
+		return nil, err
+	}
 	return &Server{
 		addr:      addr,
 		authToken: token,
+		basePath:  basePath,
 		collector: newCollector(opts),
 	}, nil
 }
@@ -52,6 +58,11 @@ func (s *Server) AuthEnabled() bool {
 	return s.authToken != ""
 }
 
+// BasePath is the URL prefix the dashboard is mounted at ("" means "/").
+func (s *Server) BasePath() string {
+	return s.basePath
+}
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.handleHealth)
@@ -64,11 +75,30 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ui assets missing"})
 		})
-		return mux
+		return s.withBasePath(mux)
 	}
 	fileServer := http.FileServer(http.FS(sub))
 	mux.Handle("/", noCacheUI(fileServer))
-	return mux
+	return s.withBasePath(mux)
+}
+
+func (s *Server) withBasePath(h http.Handler) http.Handler {
+	if s.basePath == "" {
+		return h
+	}
+	stripped := http.StripPrefix(s.basePath, h)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if path == s.basePath {
+			http.Redirect(w, r, s.basePath+"/", http.StatusMovedPermanently)
+			return
+		}
+		if path != s.basePath+"/" && !strings.HasPrefix(path, s.basePath+"/") {
+			http.NotFound(w, r)
+			return
+		}
+		stripped.ServeHTTP(w, r)
+	})
 }
 
 // noCacheUI disables browser caching of the embedded SPA so serve upgrades

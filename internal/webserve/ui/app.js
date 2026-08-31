@@ -230,7 +230,7 @@
       if (opts && opts.accountID) {
         qs += (qs ? "&" : "?") + `account_id=${encodeURIComponent(opts.accountID)}`;
       }
-      const fetchPromise = fetch("/api/v1/snapshots" + qs, { headers: headers() });
+      const fetchPromise = fetch("api/v1/snapshots" + qs, { headers: headers() });
       const minDurationPromise = manual ? new Promise((r) => setTimeout(r, 350)) : Promise.resolve();
       const [res] = await Promise.all([fetchPromise, minDurationPromise]);
       if (res.status === 401) {
@@ -287,7 +287,7 @@
   async function cycleUsageMode() {
     const next = usageMode() === "used" ? "remaining" : "used";
     try {
-      const res = await fetch("/api/v1/usage-mode", {
+      const res = await fetch("api/v1/usage-mode", {
         method: "POST",
         headers: { ...headers(), "Content-Type": "application/json" },
         body: JSON.stringify({ usage_mode: next }),

@@ -79,3 +79,41 @@ func TestNormalizeListenAddr(t *testing.T) {
 		t.Errorf("trimmed = %q, want :9090", got)
 	}
 }
+
+func TestNormalizeBasePath(t *testing.T) {
+	cases := []struct {
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{"", "", false},
+		{"/", "", false},
+		{"/agentusage", "/agentusage", false},
+		{"/agentusage/", "/agentusage", false},
+		{"agentusage", "/agentusage", false},
+		{"  /agentusage  ", "/agentusage", false},
+		{"/app3", "/app3", false},
+		{"..", "", true},
+		{"/../secret", "", true},
+		{"//agentusage", "", true},
+		{"/agent usage", "", true},
+		{"/agentusage/extra", "", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			got, err := normalizeBasePath(tc.in)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for %q, got %q", tc.in, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error for %q: %v", tc.in, err)
+			}
+			if got != tc.want {
+				t.Errorf("normalizeBasePath(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}

@@ -162,3 +162,38 @@ killall agentusage 2>/dev/null
 # Clean reset (wipes cache and restarts cleanly)
 rm -rf ~/.cache/agentusage ~/.local/state/openusage/daemon.sock
 ```
+
+---
+
+## 8. Tailscale Serve (`/agentusage` on a shared hostname)
+
+On `jobby-dev-use`, HTTPS Serve already uses `/` (OpenCode) and `/app2` (Jobagami).
+Mount the web dashboard at **`/agentusage`** — do not steal `/`.
+
+Never run `tailscale serve reset`, `tailscale serve clear`, or `tailscale serve <port>`
+without `--set-path`. Check `tailscale serve status` before and after.
+
+```bash
+# 1. Build if needed, then serve on loopback :8088 under /agentusage
+cd ~/agentusage && make build
+./bin/agentusage serve --listen 127.0.0.1:8088 --base-path /agentusage --no-open
+
+# Installed binary:
+# agentusage serve --listen 127.0.0.1:8088 --base-path /agentusage --no-open
+
+# 2. Add Serve path (does not replace / or /app2)
+tailscale serve --bg --https=443 --set-path=/agentusage http://127.0.0.1:8088/agentusage
+
+# 3. Confirm all three rows
+tailscale serve status
+curl -fsS http://127.0.0.1:8088/agentusage/healthz
+```
+
+Open `https://jobby-dev-use.tail95afc9.ts.net/agentusage` on a tailnet device
+(use the hostname from `tailscale serve status` if it differs).
+
+Remove only this path:
+
+```bash
+tailscale serve --https=443 --set-path=/agentusage off
+```

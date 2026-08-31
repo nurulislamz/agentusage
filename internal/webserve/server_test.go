@@ -139,7 +139,10 @@ func TestIndexServed(t *testing.T) {
 	if strings.Contains(html, "tui-frame") {
 		t.Error("index.html should not paint a TUI frame")
 	}
-	if !strings.Contains(html, "/app.js") {
+	if strings.Contains(html, `src="/app.js"`) || strings.Contains(html, `href="/app.css"`) {
+		t.Error("index.html should not load assets with root-absolute URLs")
+	}
+	if !strings.Contains(html, `src="app.js"`) {
 		t.Error("index.html should load app.js")
 	}
 }
@@ -509,5 +512,72 @@ func TestAppJSFetchingIndicatorsPreserved(t *testing.T) {
 	renderFooterBody := js[renderFooterIdx:renderFuncIdx]
 	if !strings.Contains(renderFooterBody, `id="fetching-footer"`) {
 		t.Error("renderFooter must define id=\"fetching-footer\"")
+	}
+}
+
+func TestBasePathServesUnderPrefix(t *testing.T) {
+	srv := testServer(t, Options{Demo: true, BasePath: "/agentusage"})
+	handler := srv.Handler()
+
+	root := httptest.NewRequest(http.MethodGet, "/", nil)
+	rootW := httptest.NewRecorder()
+	handler.ServeHTTP(rootW, root)
+	if rootW.Code != http.StatusNotFound {
+		t.Fatalf("GET / status = %d, want 404 when base path is set", rootW.Code)
+	}
+
+	redir := httptest.NewRequest(http.MethodGet, "/agentusage", nil)
+	redirW := httptest.NewRecorder()
+	handler.ServeHTTP(redirW, redir)
+	if redirW.Code != http.StatusMovedPermanently {
+		t.Fatalf("GET /agentusage status = %d, want 301", redirW.Code)
+	}
+	if loc := redirW.Header().Get("Location"); loc != "/agentusage/" {
+		t.Fatalf("Location = %q, want /agentusage/", loc)
+	}
+
+	for _, path := range []string{
+		"/agentusage/",
+		"/agentusage/healthz",
+		"/agentusage/app.js",
+		"/agentusage/app.css",
+		"/agentusage/api/v1/snapshots",
+		"/agentusage/api/v1/meta",
+	} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("%s status = %d, want 200", path, w.Code)
+		}
+	}
+
+	idx := httptest.NewRequest(http.MethodGet, "/agentusage/", nil)
+	idxW := httptest.NewRecorder()
+	handler.ServeHTTP(idxW, idx)
+	html := idxW.Body.String()
+	if strings.Contains(html, `href="/app.css"`) || strings.Contains(html, `src="/app.js"`) {
+		t.Error("index.html must not use root-absolute /app.css or /app.js (breaks Tailscale Serve subpaths)")
+	}
+	if !strings.Contains(html, `href="app.css"`) || !strings.Contains(html, `src="app.js"`) {
+		t.Error("index.html should load app.css and app.js with relative URLs")
+	}
+
+	jsReq := httptest.NewRequest(http.MethodGet, "/agentusage/app.js", nil)
+	jsW := httptest.NewRecorder()
+	handler.ServeHTTP(jsW, jsReq)
+	js := jsW.Body.String()
+	if strings.Contains(js, `fetch("/api/v1/snapshots`) || strings.Contains(js, `fetch("/api/v1/usage-mode"`) {
+		t.Error("app.js must not fetch root-absolute /api/v1/* (breaks Tailscale Serve subpaths)")
+	}
+	if !strings.Contains(js, `fetch("api/v1/snapshots`) || !strings.Contains(js, `fetch("api/v1/usage-mode"`) {
+		t.Error("app.js should fetch api/v1/* with relative URLs")
+	}
+}
+
+func TestNewServerRejectsInvalidBasePath(t *testing.T) {
+	_, err := NewServer(Options{Demo: true, ListenAddr: "127.0.0.1:0", BasePath: "/../secret"})
+	if err == nil {
+		t.Fatal("expected invalid base path to fail")
 	}
 }

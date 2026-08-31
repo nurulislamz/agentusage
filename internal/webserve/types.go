@@ -143,6 +143,7 @@ type Options struct {
 	Version        string
 	Demo           bool
 	AllowPublic    bool
+	BasePath       string // URL prefix, e.g. "/agentusage". Empty means "/".
 	Config         *config.Config
 	Collect        CollectFunc // optional override for tests
 	Now            func() time.Time
