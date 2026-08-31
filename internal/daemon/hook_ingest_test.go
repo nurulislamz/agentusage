@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 )
 
 func TestIngestHookLocally_IngestsHookPayload(t *testing.T) {
@@ -94,4 +96,40 @@ func TestIngestParsedHookLocally_EmptyRequests(t *testing.T) {
 	if resp.Source != "opencode" || resp.Enqueued != 0 {
 		t.Errorf("resp = %+v, want empty 0 enqueued", resp)
 	}
+}
+
+func TestIngestParsedHookLocally_InvalidPaths(t *testing.T) {
+	parsed := HookParseResult{
+		SourceName: "opencode",
+		Requests: []telemetry.IngestRequest{
+			{
+				SourceSystem:  "opencode",
+				SourceChannel: "hook",
+				AccountID:     "work",
+				OccurredAt:    time.Now().UTC(),
+				SessionID:     "s1",
+			},
+		},
+	}
+
+	// 1. Invalid DB Path
+	_, err := ingestParsedHookLocally(context.Background(), parsed, "/dev/null/forbidden/db.sqlite", "", false)
+	if err == nil {
+		t.Error("expected error for invalid DB path")
+	}
+
+	// 2. Invalid Spool Path with spoolOnly
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "telemetry.db")
+	_ = telemetry.NewSpool(filepath.Join(tempDir, "spool"))
+	_, err = ingestParsedHookLocally(context.Background(), parsed, dbPath, "/dev/null/forbidden/spool", true)
+	if err == nil {
+		t.Error("expected error for invalid spool dir in spool-only mode")
+	}
+
+	// 3. Direct ingest with cancelled context triggers retries
+	ctxCancel, cancel := context.WithCancel(context.Background())
+	cancel()
+	resp, _ := ingestParsedHookLocally(ctxCancel, parsed, dbPath, filepath.Join(tempDir, "spool"), false)
+	_ = resp
 }

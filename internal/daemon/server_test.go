@@ -3,6 +3,7 @@ package daemon
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -250,10 +251,29 @@ func TestHandleHook_Validation(t *testing.T) {
 	if wInvalid.Code != http.StatusBadRequest {
 		t.Errorf("POST /v1/hook/opencode (invalid) status = %d, want 400", wInvalid.Code)
 	}
+
+	// 5. Valid hook payload returns 200
+	validPayload := []byte(`{"hook":"chat.message","timestamp":"2026-02-26T20:00:00Z","input":{"sessionID":"sess-1","agent":"main","messageID":"turn-1","variant":"default","model":{"providerID":"openrouter","modelID":"openai/gpt-oss-20b"}},"output":{"message":{"id":"msg-1","sessionID":"sess-1","role":"assistant"},"route":{"provider_name":"DeepInfra"},"usage":{"input_tokens":12,"output_tokens":4,"total_tokens":16,"cost_usd":0.00012}}}`)
+	reqValid := httptest.NewRequest(http.MethodPost, "/v1/hook/opencode", bytes.NewReader(validPayload))
+	wValid := httptest.NewRecorder()
+	svc.handleHook(wValid, reqValid)
+	if wValid.Code != http.StatusOK {
+		t.Errorf("POST /v1/hook/opencode status = %d, want 200", wValid.Code)
+	}
 }
 
 func TestHandleReadModel_Validation(t *testing.T) {
-	svc := &Service{}
+	cache := newReadModelCache()
+	reqAccounts := []ReadModelAccount{{AccountID: "acc1", ProviderID: "prov1"}}
+	rmReq := ReadModelRequest{Accounts: reqAccounts}
+	key := ReadModelRequestKey(rmReq)
+	cache.set(key, map[string]core.UsageSnapshot{
+		"acc1": {AccountID: "acc1", ProviderID: "prov1", Status: core.StatusOK},
+	})
+
+	svc := &Service{
+		rmCache: cache,
+	}
 
 	// 1. GET returns 405
 	reqGet := httptest.NewRequest(http.MethodGet, "/v1/read-model", nil)
@@ -269,6 +289,33 @@ func TestHandleReadModel_Validation(t *testing.T) {
 	svc.handleReadModel(wInvalid, reqInvalid)
 	if wInvalid.Code != http.StatusBadRequest {
 		t.Errorf("POST /v1/read-model (invalid) status = %d, want 400", wInvalid.Code)
+	}
+
+	// 3. Cache Hit -> 200 with cached snapshots
+	reqBody, _ := json.Marshal(rmReq)
+	reqCache := httptest.NewRequest(http.MethodPost, "/v1/read-model", bytes.NewReader(reqBody))
+	wCache := httptest.NewRecorder()
+	svc.handleReadModel(wCache, reqCache)
+	if wCache.Code != http.StatusOK {
+		t.Errorf("POST /v1/read-model cache hit status = %d, want 200", wCache.Code)
+	}
+
+	// 4. Empty accounts request -> reads from config
+	reqEmpty := httptest.NewRequest(http.MethodPost, "/v1/read-model", bytes.NewReader([]byte(`{"accounts":[]}`)))
+	wEmpty := httptest.NewRecorder()
+	svc.handleReadModel(wEmpty, reqEmpty)
+	if wEmpty.Code != http.StatusOK {
+		t.Errorf("POST /v1/read-model empty accounts status = %d, want 200", wEmpty.Code)
+	}
+
+	// 5. Refresh=true bypasses cache
+	rmReqRefresh := ReadModelRequest{Accounts: reqAccounts, Refresh: true}
+	reqRefreshBody, _ := json.Marshal(rmReqRefresh)
+	reqRefresh := httptest.NewRequest(http.MethodPost, "/v1/read-model", bytes.NewReader(reqRefreshBody))
+	wRefresh := httptest.NewRecorder()
+	svc.handleReadModel(wRefresh, reqRefresh)
+	if wRefresh.Code != http.StatusOK {
+		t.Errorf("POST /v1/read-model refresh=true status = %d, want 200", wRefresh.Code)
 	}
 }
 

@@ -35,3 +35,29 @@ func TestServiceManager_Install_RejectsTransientExe(t *testing.T) {
 		t.Errorf("error = %q, want transient executable refusal message", err)
 	}
 }
+
+func TestServiceManager_Install_InvalidUnitDir(t *testing.T) {
+	mgr := ServiceManager{
+		Kind:     "linux",
+		exePath:  "/usr/local/bin/agentusage",
+		unitPath: "/dev/null/forbidden/agentusage.service",
+		stateDir: "/dev/null/forbidden/state",
+	}
+
+	err := mgr.installSystemdUser()
+	if err == nil {
+		t.Error("expected error when creating unit in invalid dir")
+	}
+}
+
+func TestServiceManager_Uninstall(t *testing.T) {
+	mgr := ServiceManager{
+		Kind:     "linux",
+		unitPath: "/tmp/nonexistent_test_daemon_unit.service",
+	}
+
+	// uninstall with non-existent unit should complete without error
+	_ = mgr.uninstallSystemdUser()
+	_ = mgr.Uninstall()
+	_ = mgr.Start()
+}

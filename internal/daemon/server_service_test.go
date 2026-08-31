@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/telemetry"
 )
@@ -28,6 +29,10 @@ func TestService_FullIntegration(t *testing.T) {
 		CollectInterval: 10 * time.Minute,
 		PollInterval:    10 * time.Minute,
 		Verbose:         true,
+		Export: config.ExportConfig{
+			Target:          "http://127.0.0.1:9190",
+			IntervalSeconds: 60,
+		},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -147,5 +152,11 @@ func TestStartService_InvalidConfig(t *testing.T) {
 	_, err := startService(context.Background(), cfg)
 	if err == nil {
 		t.Error("expected error for invalid DBPath in startService")
+	}
+
+	// RunServer with invalid DB Path returns error
+	runErr := RunServer(cfg)
+	if runErr == nil {
+		t.Error("expected error for invalid DBPath in RunServer")
 	}
 }

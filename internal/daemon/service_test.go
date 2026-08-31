@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 )
 
 func TestLastErrorLine_ReturnsMostRecentError(t *testing.T) {
@@ -214,6 +216,11 @@ func TestSocketOwnerSummary(t *testing.T) {
 	if got := SocketOwnerSummary("/tmp/nonexistent_test_owner.sock"); got != "" {
 		t.Errorf("SocketOwnerSummary(nonexistent) = %q, want empty", got)
 	}
+
+	// Existing file
+	tmpFile := filepath.Join(t.TempDir(), "dummy.sock")
+	_ = os.WriteFile(tmpFile, []byte(""), 0644)
+	_ = SocketOwnerSummary(tmpFile)
 }
 
 func TestServiceManager_InstallHint_DomainCandidates_LoadServiceEnv(t *testing.T) {
@@ -227,6 +234,39 @@ func TestServiceManager_InstallHint_DomainCandidates_LoadServiceEnv(t *testing.T
 		t.Error("domainCandidates() should return candidates on darwin")
 	}
 
-	// LoadServiceEnv should run safely without panic
-	LoadServiceEnv()
+	// LoadServiceEnv should parse daemon.env file if present
+	stateDir, err := telemetry.DefaultStateDir()
+	if err == nil && stateDir != "" {
+		_ = os.MkdirAll(stateDir, 0755)
+		envPath := filepath.Join(stateDir, "daemon.env")
+		_ = os.WriteFile(envPath, []byte("# comment line\n\nTEST_AGENTUSAGE_ENV_TEST_VAR=\"test_val_123\"\nINVALID_LINE\n"), 0644)
+		defer os.Remove(envPath)
+		LoadServiceEnv()
+		if os.Getenv("TEST_AGENTUSAGE_ENV_TEST_VAR") != "test_val_123" {
+			t.Errorf("TEST_AGENTUSAGE_ENV_TEST_VAR = %q, want test_val_123", os.Getenv("TEST_AGENTUSAGE_ENV_TEST_VAR"))
+		}
+	}
+}
+
+func TestInstallService_And_RunCommand(t *testing.T) {
+	// 1. RunCommand success
+	out, err := RunCommand("echo", "agentusage-test")
+	if err != nil || out != "agentusage-test" {
+		t.Errorf("RunCommand(echo) = %q, err=%v", out, err)
+	}
+
+	// 2. RunCommand failure
+	_, err = RunCommand("sh", "-c", "echo 'cmd error' >&2; exit 1")
+	if err == nil {
+		t.Error("expected error from failed command")
+	}
+
+	// 3. InstallService from test binary (which is transient) should return transient error
+	err = InstallService("/tmp/test.sock")
+	if err == nil {
+		t.Error("expected error installing service from transient test binary")
+	}
+
+	// 4. UninstallService
+	_ = UninstallService("/tmp/test.sock")
 }

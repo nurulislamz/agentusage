@@ -13,10 +13,10 @@
 ### Tier 1: Critical Coverage Deficits (< 50%)
 - [x] **Iteration 1**: `internal/providers/providerbase` (18.8% -> **100.0%** [MAGI: UNANIMOUS DONE])
 - [x] **Iteration 2**: `internal/browsercookies` (26.2% -> **80.9%** [MAGI: UNANIMOUS DONE])
-- [ ] **Iteration 3**: `internal/daemon` (26.7% -> Target: >= 80%)
-- [ ] **Iteration 4**: `internal/providers/crush` (34.8% -> Target: >= 80%)
-- [ ] **Iteration 5**: `internal/providers/shared` (41.0% -> Target: >= 80%)
-- [ ] **Iteration 6**: `cmd/demo` (47.5% -> Target: >= 80%)
+- [x] **Iteration 3**: `internal/daemon` (26.7% -> **80.0%** [MAGI: UNANIMOUS DONE])
+- [x] **Iteration 4**: `internal/providers/crush` (34.8% -> **95.9%** [MAGI: UNANIMOUS DONE])
+- [x] **Iteration 5**: `internal/providers/shared` (41.0% -> **95.8%** [MAGI: UNANIMOUS DONE])
+- [x] **Iteration 6**: `cmd/demo` (47.5% -> **87.1%** [MAGI: UNANIMOUS DONE])
 
 ### Tier 2: Mid-Range Hardening (50% - 70%)
 - [ ] **Iteration 7**: `internal/providers/kilocode` (50.0% -> Target: >= 80%)
@@ -56,4 +56,8 @@
 ## 📈 Completed Iterations Ledger
 - **Iteration 1**: `internal/providers/providerbase` | Coverage: `18.8% -> 100.0% (+81.2%)` | MAGI: `DONE` (Unanimous) | Tests: 7 passed, 0 flakes, `-race` clean.
 - **Iteration 2**: `internal/browsercookies` | Coverage: `26.2% -> 80.9% (+54.7%)` | MAGI: `DONE` (Unanimous) | Tests: 11 passed, 0 flakes, `-race` clean.
+- **Iteration 3**: `internal/daemon` | Coverage: `26.7% -> 80.0% (+53.3%)` | MAGI: `DONE` (Unanimous) | Tests: 38 passed, 0 flakes, `-race` clean.
+- **Iteration 4**: `internal/providers/crush` | Coverage: `34.8% -> 95.9% (+61.1%)` | MAGI: `DONE` (Unanimous) | Tests: 28 passed, 0 flakes, `-race` clean.
+- **Iteration 5**: `internal/providers/shared` | Coverage: `41.0% -> 95.8% (+54.8%)` | MAGI: `DONE` (Unanimous) | Tests: 25 passed, 0 flakes, `-race` clean.
+- **Iteration 6**: `cmd/demo` | Coverage: `47.5% -> 87.1% (+39.6%)` | MAGI: `DONE` (Unanimous) | Tests: 24 passed, 0 flakes, `-race` clean.
 

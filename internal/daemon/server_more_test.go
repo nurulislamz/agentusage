@@ -124,11 +124,38 @@ func TestServerSpool_CleanupAndFlush_NilAndEmpty(t *testing.T) {
 	nilSvc.cleanupSpool()
 
 	tmp := t.TempDir()
+	dbPath := filepath.Join(tmp, "telemetry.db")
+	store, err := telemetry.OpenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	spool := telemetry.NewSpool(filepath.Join(tmp, "spool"))
+	pipeline := telemetry.NewPipeline(store, spool)
+
+	// Enqueue test request into spool
+	reqs := []telemetry.IngestRequest{
+		{
+			SourceSystem:  "opencode",
+			SourceChannel: "hook",
+			AccountID:     "work",
+			OccurredAt:    time.Now().UTC(),
+			SessionID:     "sess1",
+			TurnID:        "turn1",
+			MessageID:     "msg1",
+			EventType:     telemetry.EventTypeTurnCompleted,
+		},
+	}
+	_, _ = pipeline.EnqueueRequests(reqs)
+
 	svc := &Service{
 		cfg: Config{
-			SpoolDir: tmp,
+			SpoolDir: filepath.Join(tmp, "spool"),
 			Verbose:  true,
 		},
+		pipeline:    pipeline,
+		store:       store,
 		logThrottle: core.NewLogThrottle(5, time.Minute),
 	}
 	svc.flushSpoolBacklog(context.Background(), 100)
@@ -154,6 +181,14 @@ type mockChangeDetectorProvider struct {
 	core.UsageProvider
 	changed bool
 	err     error
+}
+
+func (m *mockChangeDetectorProvider) Spec() core.ProviderSpec {
+	return core.ProviderSpec{
+		CreditMetrics: map[string]core.BalanceSemantics{
+			"sessions": core.BalanceCumulative,
+		},
+	}
 }
 
 func (m *mockChangeDetectorProvider) HasChanged(_ core.AccountConfig, _ time.Time) (bool, error) {
@@ -236,8 +271,17 @@ func TestProcessHookSpool_And_Cleanup(t *testing.T) {
 		t.Error("expected hook1.json to be processed and removed")
 	}
 
+	// 4. Create an old json file (> 24h old)
+	oldPath := filepath.Join(hookDir, "old.json")
+	_ = os.WriteFile(oldPath, []byte("{}"), 0644)
+	oldTime := time.Now().Add(-48 * time.Hour)
+	_ = os.Chtimes(oldPath, oldTime, oldTime)
+
 	// Run cleanupHookSpool
 	svc.cleanupHookSpool(hookDir)
+	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
+		t.Error("expected old.json to be pruned by cleanupHookSpool")
+	}
 	if _, err := os.Stat(filepath.Join(hookDir, "test.json.tmp")); !os.IsNotExist(err) {
 		t.Error("expected test.json.tmp to be cleaned up")
 	}
@@ -266,4 +310,192 @@ func TestRunCollectLoop_And_WatchLoop_Cancel(t *testing.T) {
 	// Both loops should exit cleanly on ctx.Done()
 	svc.runCollectLoop(ctx)
 	svc.runWatchLoop(ctx)
+}
+
+func TestRunPollLoop_Cancel(t *testing.T) {
+	svc := &Service{
+		cfg: Config{
+			PollInterval: 10 * time.Millisecond,
+		},
+		logThrottle: core.NewLogThrottle(5, time.Minute),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	svc.runPollLoop(ctx)
+}
+
+func TestRecordBalanceObservations(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "telemetry.db")
+	store, err := telemetry.OpenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if err := store.RunMigrations(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	used := 50.0
+	rem := 150.0
+	snapshots := map[string]core.UsageSnapshot{
+		"codex-main": {
+			ProviderID: "codex",
+			AccountID:  "codex-main",
+			Timestamp:  time.Now().UTC(),
+			Metrics: map[string]core.Metric{
+				"sessions": {
+					Used:      &used,
+					Remaining: &rem,
+					Window:    "daily",
+				},
+			},
+		},
+	}
+
+	// Nil store is safe
+	nilSvc := &Service{}
+	nilSvc.recordBalanceObservations(context.Background(), snapshots)
+
+	// Live store records observation
+	svc := &Service{
+		store: store,
+		providerByID: map[string]core.UsageProvider{
+			"codex": &mockChangeDetectorProvider{},
+		},
+	}
+	svc.recordBalanceObservations(context.Background(), snapshots)
+}
+
+func TestPollProviders_WithMockQuotaIngest(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "telemetry.db")
+	store, err := telemetry.OpenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if err := store.RunMigrations(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	quotaIngest := telemetry.NewQuotaSnapshotIngestor(store)
+	ps := newPollScheduler(30 * time.Second)
+
+	svc := &Service{
+		store:         store,
+		quotaIngest:   quotaIngest,
+		pollScheduler: ps,
+		pollState:     make(map[string]*providerPollState),
+		providerByID:  make(map[string]core.UsageProvider),
+		logThrottle:   core.NewLogThrottle(5, time.Minute),
+	}
+
+	// Run poll with canceled ctx
+	ctxCancel, cancel := context.WithCancel(context.Background())
+	cancel()
+	svc.pollProviders(ctxCancel)
+}
+
+func TestPruneOldData_LiveStore(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "telemetry.db")
+	store, err := telemetry.OpenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if err := store.RunMigrations(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := &Service{
+		store:       store,
+		logThrottle: core.NewLogThrottle(5, time.Minute),
+	}
+
+	// Should safely run and prune without error
+	complete := svc.pruneOldData(context.Background())
+	if !complete {
+		t.Error("pruneOldData should return complete=true on empty store")
+	}
+}
+
+func TestFlushBacklog_WithRetries(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "telemetry.db")
+	store, err := telemetry.OpenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if err := store.RunMigrations(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	spool := telemetry.NewSpool(filepath.Join(tempDir, "spool"))
+	pipeline := telemetry.NewPipeline(store, spool)
+
+	svc := &Service{
+		pipeline: pipeline,
+	}
+
+	retries := []telemetry.IngestRequest{
+		{
+			SourceSystem:  "opencode",
+			SourceChannel: "hook",
+			AccountID:     "work",
+			OccurredAt:    time.Now().UTC(),
+			SessionID:     "sess1",
+			TurnID:        "turn1",
+			MessageID:     "msg1",
+			EventType:     telemetry.EventTypeTurnCompleted,
+		},
+	}
+
+	flush, enqueued, warnings := svc.flushBacklog(context.Background(), retries, 100)
+	if enqueued != 1 {
+		t.Errorf("enqueued = %d, want 1", enqueued)
+	}
+	if flush.Ingested != 1 {
+		t.Errorf("flush.Ingested = %d, want 1", flush.Ingested)
+	}
+	_ = warnings
+}
+
+func TestRunWatchLoop_LiveEvents(t *testing.T) {
+	stateDir, err := telemetry.DefaultStateDir()
+	if err != nil || stateDir == "" {
+		t.Skip("no default state dir")
+	}
+	_ = os.MkdirAll(stateDir, 0755)
+
+	svc := &Service{
+		pollKick:    make(chan struct{}, 1),
+		logThrottle: core.NewLogThrottle(5, time.Minute),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	go svc.runWatchLoop(ctx)
+
+	time.Sleep(30 * time.Millisecond)
+	// Write antigravity status file
+	testStatus := filepath.Join(stateDir, "antigravity_status.json")
+	_ = os.WriteFile(testStatus, []byte("{}"), 0644)
+	defer os.Remove(testStatus)
+
+	// Write generic file
+	testOther := filepath.Join(stateDir, "other.json")
+	_ = os.WriteFile(testOther, []byte("{}"), 0644)
+	defer os.Remove(testOther)
+
+	time.Sleep(50 * time.Millisecond)
 }

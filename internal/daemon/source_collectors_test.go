@@ -119,6 +119,11 @@ func TestResolveTelemetrySourceOptions_LiveSource(t *testing.T) {
 	}
 	opts, _, _ := ResolveTelemetrySourceOptions(source, "")
 	_ = opts
+	opts2, acct2, _ := ResolveTelemetrySourceOptions(source, "explicit-account")
+	if acct2 != "explicit-account" {
+		t.Errorf("acct2 = %q, want explicit-account", acct2)
+	}
+	_ = opts2
 }
 
 func TestTelemetrySourceCount_And_Systems(t *testing.T) {
@@ -130,5 +135,18 @@ func TestTelemetrySourceCount_And_Systems(t *testing.T) {
 	bySys := telemetrySourcesBySystem()
 	if len(bySys) == 0 {
 		t.Error("telemetrySourcesBySystem returned empty map")
+	}
+}
+
+func TestTelemetryAccountsForSource_EdgeCases(t *testing.T) {
+	// 1. Nil source
+	if accts := telemetryAccountsForSource(nil, []core.AccountConfig{{ID: "a"}}); len(accts) != 0 {
+		t.Errorf("telemetryAccountsForSource(nil) = %+v, want nil", accts)
+	}
+
+	// 2. Empty accounts
+	source, _ := providers.TelemetrySourceBySystem("codex")
+	if accts := telemetryAccountsForSource(source, nil); len(accts) != 0 {
+		t.Errorf("telemetryAccountsForSource(empty) = %+v, want nil", accts)
 	}
 }
