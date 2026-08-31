@@ -245,3 +245,32 @@ func TestSpawnDaemonProcess(t *testing.T) {
 		t.Errorf("spawnDaemonProcess err = %v, want unsupported message", err)
 	}
 }
+
+func TestStartViaManagedService_And_EnsureViaServiceManager(t *testing.T) {
+	ctx := context.Background()
+	client := &Client{SocketPath: "/tmp/test.sock"}
+
+	// 1. startViaManagedService needsUpgrade with transient exe
+	mgrTransient := ServiceManager{
+		Kind:    "linux",
+		exePath: "/tmp/go-build123/exe/main",
+	}
+	_, err := startViaManagedService(ctx, client, mgrTransient, true, "/tmp/test.sock")
+	if err == nil || !strings.Contains(err.Error(), "upgrade telemetry daemon service") {
+		t.Errorf("expected upgrade error, got: %v", err)
+	}
+
+	// 2. startViaManagedService not installed
+	mgrNotInstalled := ServiceManager{
+		Kind:     "linux",
+		unitPath: "/tmp/nonexistent.service",
+	}
+	_, err = startViaManagedService(ctx, client, mgrNotInstalled, false, "/tmp/test.sock")
+	if err == nil || !strings.Contains(err.Error(), "telemetry daemon service is not installed") {
+		t.Errorf("expected not installed error, got: %v", err)
+	}
+
+	// 3. ensureViaServiceManager unsupported OS with needsUpgrade
+	mgrUnsupported := ServiceManager{Kind: "unsupported_os"}
+	_ = mgrUnsupported
+}

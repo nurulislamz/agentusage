@@ -152,3 +152,31 @@ func TestViewRuntime_ReadWithFallback_And_Refresh(t *testing.T) {
 	frame3 := rt.RefreshForWindow(ctx, core.TimeWindow7d)
 	_ = frame3
 }
+
+func TestStartBroadcaster_And_WarmUp(t *testing.T) {
+	rt := NewViewRuntime(nil, "", false)
+	var handledFrames []SnapshotFrame
+	handler := func(f SnapshotFrame) {
+		handledFrames = append(handledFrames, f)
+	}
+	stateEmitted := 0
+	stateHandler := func(st DaemonState) {
+		stateEmitted++
+	}
+
+	// 1. WarmUp with canceled context
+	ctxCancel, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cancelled := warmUp(ctxCancel, rt, handler, func() { stateEmitted++ })
+	if !cancelled {
+		t.Error("warmUp with canceled ctx should return true")
+	}
+
+	// 2. StartBroadcaster with quick cancel
+	ctxBroadcast, cancelBroadcast := context.WithCancel(context.Background())
+	StartBroadcaster(ctxBroadcast, rt, 10*time.Millisecond, handler, stateHandler)
+	time.Sleep(50 * time.Millisecond)
+	cancelBroadcast()
+	time.Sleep(20 * time.Millisecond)
+}
