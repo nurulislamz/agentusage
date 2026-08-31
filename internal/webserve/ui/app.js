@@ -225,20 +225,46 @@
     }
   }
 
+  let toastTimer = 0;
+  function showToast(message, isInfo = true) {
+    const sb = $("status-bar");
+    if (!sb) return;
+    clearTimeout(toastTimer);
+    sb.textContent = message;
+    sb.classList.toggle("info", !!isInfo);
+    sb.hidden = false;
+    sb.style.opacity = "1";
+    toastTimer = setTimeout(() => {
+      sb.style.opacity = "0";
+      setTimeout(() => {
+        if (sb.textContent === message) {
+          sb.hidden = true;
+          sb.style.opacity = "1";
+        }
+      }, 250);
+    }, 2500);
+  }
+
   async function cycleUsageMode() {
     const next = usageMode() === "used" ? "remaining" : "used";
-    const res = await fetch("/api/v1/usage-mode", {
-      method: "POST",
-      headers: { ...headers(), "Content-Type": "application/json" },
-      body: JSON.stringify({ usage_mode: next }),
-    });
-    if (res.status === 401) {
-      $("token-modal").hidden = false;
-      return;
+    try {
+      const res = await fetch("/api/v1/usage-mode", {
+        method: "POST",
+        headers: { ...headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({ usage_mode: next }),
+      });
+      if (res.status === 401) {
+        $("token-modal").hidden = false;
+        return;
+      }
+      if (!res.ok) throw new Error(`usage-mode ${res.status}`);
+      applyEnvelope(await res.json());
+      render();
+      showToast(`Usage mode: ${usageModeLabel()}`);
+    } catch (err) {
+      console.error(err);
+      showToast(`Failed to update mode: ${err.message || err}`, false);
     }
-    if (!res.ok) throw new Error(`usage-mode ${res.status}`);
-    applyEnvelope(await res.json());
-    render();
   }
 
   function showDashboard(hasData) {
@@ -248,19 +274,9 @@
   }
 
   function renderHeader() {
-    const env = state.envelope || {};
     const views = filteredViews();
-    const ok = env.ok_count || 0;
-    const warn = env.warn_count || 0;
-    const err = env.err_count || 0;
-    const unmapped = env.unmapped_count || 0;
     const n = views.length;
     const filteredNote = state.filter ? " (filtered)" : "";
-    let counts = "";
-    if (ok) counts += `<span class="ok">${ok}●</span> `;
-    if (warn) counts += `<span class="warn">${warn}◐</span> `;
-    if (err) counts += `<span class="err">${err}✗</span>`;
-    if (unmapped) counts += ` <span class="unmapped">⚠ ${unmapped} unmapped</span>`;
     const switcher = views.length
       ? `<select id="switcher" class="switcher" aria-label="Account">${views.map((v, i) =>
           `<option value="${i}"${i === state.selected ? " selected" : ""}>${esc(v.account_id)}</option>`
@@ -269,7 +285,6 @@
     $("header").innerHTML = `
       <span class="bolt">⚡</span>
       <span class="brand">agentUsage</span>
-      <span class="counts">${counts}</span>
       ${switcher}
       <span class="spacer"></span>
       <span class="header-meta">⊞ ${n} providers${filteredNote}</span>
@@ -439,13 +454,26 @@
     $("footer").innerHTML = `
       <span>auto-refresh ⟳ ${sec}s</span>
       <span><kbd>j</kbd>/<kbd>k</kbd> move</span>
-      <span><kbd>/</kbd> filter</span>
-      <span><kbd>u</kbd> ${esc(usageModeLabel())}</span>
-      <span><kbd>r</kbd> refresh</span>
-      <span><kbd>t</kbd> theme</span>
+      <button type="button" class="footer-btn" id="footer-btn-filter" title="Filter providers (/)"><kbd>/</kbd> filter</button>
+      <button type="button" class="footer-btn" id="footer-btn-mode" title="Toggle usage mode (u)"><kbd>u</kbd> <span>${esc(usageModeLabel())}</span></button>
+      <button type="button" class="footer-btn" id="footer-btn-refresh" title="Refresh snapshots (r)"><kbd>r</kbd> refresh</button>
+      <button type="button" class="footer-btn" id="footer-btn-theme" title="Cycle theme (t)"><kbd>t</kbd> theme</button>
       <span class="grow"></span>
       <span>${esc(theme)}</span>
     `;
+
+    $("footer-btn-filter")?.addEventListener("click", () => {
+      openFilter();
+    });
+    $("footer-btn-mode")?.addEventListener("click", () => {
+      cycleUsageMode().catch(console.error);
+    });
+    $("footer-btn-refresh")?.addEventListener("click", () => {
+      load({ manual: true }).catch(console.error);
+    });
+    $("footer-btn-theme")?.addEventListener("click", () => {
+      cycleThemeOverride();
+    });
   }
 
   function render() {
@@ -504,15 +532,26 @@
   document.addEventListener("keydown", (ev) => {
     if ($("token-modal").hidden === false) return;
     if (state.filterOpen) return;
-    if (ev.target.matches("input, textarea")) return;
-    switch (ev.key) {
+    // Don't intercept typing in text input or textarea
+    if (ev.target && ev.target.matches("input, textarea")) return;
+
+    const key = ev.key;
+    if (["ArrowUp", "ArrowDown", "j", "J", "k", "K", "/", "r", "R", "u", "U", "t", "T"].includes(key)) {
+      if (ev.target && typeof ev.target.blur === "function" && ev.target !== document.body) {
+        ev.target.blur();
+      }
+    }
+
+    switch (key) {
       case "ArrowUp":
       case "k":
+      case "K":
         ev.preventDefault();
         moveSelection(-1);
         break;
       case "ArrowDown":
       case "j":
+      case "J":
         ev.preventDefault();
         moveSelection(1);
         break;

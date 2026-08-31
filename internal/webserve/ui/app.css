@@ -124,11 +124,6 @@ code { font: inherit; color: var(--accent); }
   letter-spacing: 0.02em;
   color: var(--accent);
 }
-.counts { font-weight: 600; }
-.counts .ok { color: var(--success); }
-.counts .warn { color: var(--warn); }
-.counts .err { color: var(--danger); }
-.counts .unmapped { color: var(--peach); }
 .header .spacer { flex: 1; }
 .header-meta { color: var(--muted); font-size: var(--text-xs); }
 .fetching {
@@ -410,6 +405,29 @@ code { font: inherit; color: var(--accent); }
   color: var(--accent);
   font-weight: 600;
 }
+.footer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: inherit;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+}
+.footer-btn:hover {
+  background: var(--surface0);
+  color: var(--fg);
+  border-color: var(--border);
+}
+.footer-btn:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
 .footer .grow { flex: 1; }
 
 .filter-bar {
@@ -483,6 +501,11 @@ code { font: inherit; color: var(--accent); }
   border-radius: var(--radius-sm);
   z-index: 100;
   pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.status-bar.info {
+  border-color: var(--accent);
+  color: var(--fg);
 }
 
 .shell.refreshing .header {
