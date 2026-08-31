@@ -5,16 +5,20 @@ import (
 	"math"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func titleCase(s string) string {
-	if len(s) <= 1 {
-		return s
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
 	}
-	return strings.ToUpper(s[:1]) + strings.ToLower(s[1:])
+	r, size := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(r)) + strings.ToLower(s[size:])
 }
 
 func renderDetailSectionHeader(sb *strings.Builder, title string, w int) {

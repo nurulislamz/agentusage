@@ -1,6 +1,10 @@
 package core
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+	"unicode/utf8"
+)
 
 var prettifyKeyOverrides = map[string]string{
 	"plan_percent_used":    "Plan Used",
@@ -48,7 +52,8 @@ func PrettifyMetricKey(key string) string {
 	parts := strings.Split(key, "_")
 	for i, p := range parts {
 		if len(p) > 0 {
-			parts[i] = strings.ToUpper(p[:1]) + p[1:]
+			r, size := utf8.DecodeRuneInString(p)
+			parts[i] = string(unicode.ToUpper(r)) + p[size:]
 		}
 	}
 	result := strings.Join(parts, " ")

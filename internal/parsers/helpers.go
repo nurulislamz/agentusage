@@ -64,10 +64,14 @@ func ParseRateLimitGroup(h http.Header, limitHeader, remainingHeader, resetHeade
 }
 
 func ApplyRateLimitGroup(h http.Header, snap *core.UsageSnapshot, key, unit, window, limitH, remainH, resetH string) {
+	if snap == nil {
+		return
+	}
 	rlg := ParseRateLimitGroup(h, limitH, remainH, resetH)
 	if rlg == nil {
 		return
 	}
+	snap.EnsureMaps()
 	snap.Metrics[key] = core.Metric{
 		Limit:     rlg.Limit,
 		Remaining: rlg.Remaining,

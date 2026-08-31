@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func float64Ptr(v float64) *float64 { return &v }
@@ -84,3 +86,73 @@ func TestRedactHeaders(t *testing.T) {
 		t.Errorf("X-RateLimit-Remaining = %q, want '42'", redacted["X-Ratelimit-Remaining"])
 	}
 }
+
+func TestApplyRateLimitGroup(t *testing.T) {
+	t.Run("uninitialized snapshot with limit, remaining, and reset headers", func(t *testing.T) {
+		snap := &core.UsageSnapshot{}
+		h := http.Header{}
+		h.Set("X-RateLimit-Limit", "1000")
+		h.Set("X-RateLimit-Remaining", "500")
+		h.Set("X-RateLimit-Reset", "1700000000")
+
+		ApplyRateLimitGroup(h, snap, "requests", "req", "1m", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset")
+
+		if snap.Metrics == nil {
+			t.Fatal("expected snap.Metrics to be initialized")
+		}
+		if snap.Resets == nil {
+			t.Fatal("expected snap.Resets to be initialized")
+		}
+		metric, ok := snap.Metrics["requests"]
+		if !ok {
+			t.Fatal("expected snap.Metrics['requests'] to exist")
+		}
+		if metric.Limit == nil || *metric.Limit != 1000 {
+			t.Errorf("got limit %v, want 1000", metric.Limit)
+		}
+		if metric.Remaining == nil || *metric.Remaining != 500 {
+			t.Errorf("got remaining %v, want 500", metric.Remaining)
+		}
+		if metric.Unit != "req" || metric.Window != "1m" {
+			t.Errorf("got unit %q window %q, want 'req' and '1m'", metric.Unit, metric.Window)
+		}
+		reset, ok := snap.Resets["requests_reset"]
+		if !ok {
+			t.Fatal("expected snap.Resets['requests_reset'] to exist")
+		}
+		expectedReset := time.Unix(1700000000, 0)
+		if !reset.Equal(expectedReset) {
+			t.Errorf("got reset %v, want %v", reset, expectedReset)
+		}
+	})
+
+	t.Run("nil snapshot does not panic", func(t *testing.T) {
+		h := http.Header{}
+		h.Set("X-RateLimit-Limit", "1000")
+		h.Set("X-RateLimit-Remaining", "500")
+		h.Set("X-RateLimit-Reset", "1700000000")
+
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("unexpected panic on nil snapshot: %v", r)
+			}
+		}()
+
+		ApplyRateLimitGroup(h, nil, "requests", "req", "1m", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset")
+	})
+
+	t.Run("header without rate limits returns gracefully without modifying empty snapshot", func(t *testing.T) {
+		snap := &core.UsageSnapshot{}
+		h := http.Header{}
+
+		ApplyRateLimitGroup(h, snap, "requests", "req", "1m", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset")
+
+		if snap.Metrics != nil {
+			t.Errorf("expected snap.Metrics to remain nil, got %v", snap.Metrics)
+		}
+		if snap.Resets != nil {
+			t.Errorf("expected snap.Resets to remain nil, got %v", snap.Resets)
+		}
+	})
+}
+

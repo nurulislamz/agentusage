@@ -466,8 +466,14 @@
   function renderDetail() {
     const views = filteredViews();
     const panel = $("panel");
+    const fetchVisible = state.refreshing ? "" : " hidden";
+    const fetchText = esc(state.refreshText || "Fetching...");
+    const spinChar = SPINNER[state.animFrame] || "⠋";
     if (!views.length) {
-      panel.innerHTML = `<p class="dim">${state.filter ? "No matches." : "No providers."}</p>`;
+      panel.innerHTML = `
+        <span id="fetching-detail" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
+        <p class="dim">${state.filter ? "No matches." : "No providers."}</p>
+      `;
       return;
     }
     const v = views[state.selected];
@@ -478,9 +484,6 @@
     const cards = v.detail_cards && v.detail_cards.length
       ? renderCards(v.detail_cards)
       : (v.detail_html ? `<section class="card">${v.detail_html}</section>` : "");
-    const fetchVisible = state.refreshing ? "" : " hidden";
-    const fetchText = esc(state.refreshText || "Fetching...");
-    const spinChar = SPINNER[state.animFrame] || "⠋";
     panel.innerHTML = `
       <div class="hero">
         <h1>

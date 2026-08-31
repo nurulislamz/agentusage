@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/nurulislamz/agentusage/internal/core"
@@ -41,7 +43,8 @@ func prettifyMCPName(s string) string {
 	words := strings.Fields(s)
 	for i, word := range words {
 		if len(word) > 0 {
-			words[i] = strings.ToUpper(word[:1]) + word[1:]
+			r, size := utf8.DecodeRuneInString(word)
+			words[i] = string(unicode.ToUpper(r)) + word[size:]
 		}
 	}
 	return strings.Join(words, " ")

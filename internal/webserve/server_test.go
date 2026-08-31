@@ -395,6 +395,11 @@ func TestFetchingUXAssetsContract(t *testing.T) {
 		}
 
 		// #fetching-detail should be inside #panel or inline to avoid layout jump
+		panelIdx := strings.Index(html, `id="panel"`)
+		fetchingDetailIdx := strings.Index(html, `id="fetching-detail"`)
+		if panelIdx == -1 || fetchingDetailIdx == -1 || fetchingDetailIdx < panelIdx {
+			t.Errorf("expected fetching-detail inside/after panel, got panelIdx=%d, fetchingDetailIdx=%d", panelIdx, fetchingDetailIdx)
+		}
 		if strings.Contains(html, `<div id="fetching-detail" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> Fetching...</div>`+"\n"+`        <div id="panel"></div>`) {
 			t.Error("fetching-detail should not be placed above #panel causing layout shift")
 		}
@@ -440,5 +445,69 @@ func TestFetchingUXAssetsContract(t *testing.T) {
 		if !strings.Contains(js, "350") {
 			t.Error("app.js should enforce minimum visual display time (350ms)")
 		}
+	}
+}
+
+func TestAppJSFetchingIndicatorsPreserved(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /app.js status = %d", w.Code)
+	}
+	js := w.Body.String()
+
+	// 1. Assert renderHeader defines #fetching-header
+	renderHeaderIdx := strings.Index(js, "function renderHeader()")
+	if renderHeaderIdx == -1 {
+		t.Fatal("renderHeader not found in app.js")
+	}
+	renderNavIdx := strings.Index(js, "function renderNav()")
+	if renderNavIdx == -1 || renderNavIdx < renderHeaderIdx {
+		t.Fatal("renderNav not found after renderHeader in app.js")
+	}
+	renderHeaderBody := js[renderHeaderIdx:renderNavIdx]
+	if !strings.Contains(renderHeaderBody, `id="fetching-header"`) {
+		t.Error("renderHeader must define id=\"fetching-header\"")
+	}
+
+	// 2. Assert renderDetail defines #fetching-detail in both empty view and normal view
+	renderDetailIdx := strings.Index(js, "function renderDetail()")
+	if renderDetailIdx == -1 {
+		t.Fatal("renderDetail not found in app.js")
+	}
+	renderFooterIdx := strings.Index(js, "function renderFooter()")
+	if renderFooterIdx == -1 || renderFooterIdx < renderDetailIdx {
+		t.Fatal("renderFooter not found after renderDetail in app.js")
+	}
+	renderDetailBody := js[renderDetailIdx:renderFooterIdx]
+
+	emptyViewIdx := strings.Index(renderDetailBody, "if (!views.length)")
+	if emptyViewIdx == -1 {
+		t.Fatal("renderDetail missing 'if (!views.length)' check")
+	}
+	emptyReturnIdx := strings.Index(renderDetailBody[emptyViewIdx:], "return;")
+	if emptyReturnIdx == -1 {
+		t.Fatal("renderDetail missing return in empty view branch")
+	}
+	emptyViewBranch := renderDetailBody[emptyViewIdx : emptyViewIdx+emptyReturnIdx]
+	if !strings.Contains(emptyViewBranch, `id="fetching-detail"`) {
+		t.Error("renderDetail empty view (!views.length) must include id=\"fetching-detail\"")
+	}
+
+	normalViewBranch := renderDetailBody[emptyViewIdx+emptyReturnIdx:]
+	if !strings.Contains(normalViewBranch, `id="fetching-detail"`) {
+		t.Error("renderDetail normal view must include id=\"fetching-detail\"")
+	}
+
+	// 3. Assert renderFooter defines #fetching-footer
+	renderFuncIdx := strings.Index(js, "function render()")
+	if renderFuncIdx == -1 || renderFuncIdx < renderFooterIdx {
+		t.Fatal("render not found after renderFooter in app.js")
+	}
+	renderFooterBody := js[renderFooterIdx:renderFuncIdx]
+	if !strings.Contains(renderFooterBody, `id="fetching-footer"`) {
+		t.Error("renderFooter must define id=\"fetching-footer\"")
 	}
 }

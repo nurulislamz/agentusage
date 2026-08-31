@@ -207,3 +207,77 @@ func TestFormatLastRefreshed(t *testing.T) {
 		})
 	}
 }
+
+func TestTitleCase(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "empty string",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "whitespace only",
+			input: "   ",
+			want:  "",
+		},
+		{
+			name:  "single ASCII lowercase",
+			input: "a",
+			want:  "A",
+		},
+		{
+			name:  "single ASCII uppercase",
+			input: "A",
+			want:  "A",
+		},
+		{
+			name:  "single multibyte rune lowercase",
+			input: "ü",
+			want:  "Ü",
+		},
+		{
+			name:  "single multibyte rune uppercase",
+			input: "Ü",
+			want:  "Ü",
+		},
+		{
+			name:  "normal word",
+			input: "hello",
+			want:  "Hello",
+		},
+		{
+			name:  "multibyte word ecran",
+			input: "écran",
+			want:  "Écran",
+		},
+		{
+			name:  "multibyte word uber",
+			input: "über",
+			want:  "Über",
+		},
+		{
+			name:  "mixed casing",
+			input: "hELLO",
+			want:  "Hello",
+		},
+		{
+			name:  "mixed casing with multibyte",
+			input: "éCRAN",
+			want:  "Écran",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := titleCase(tc.input)
+			if got != tc.want {
+				t.Errorf("titleCase(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
