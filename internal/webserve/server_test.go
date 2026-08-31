@@ -287,3 +287,91 @@ func TestSnapshotsWrongMethod(t *testing.T) {
 		t.Fatalf("status = %d, want 405", w.Code)
 	}
 }
+
+func TestSnapshotsRefreshWithAccountIDQueryParam(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/snapshots?refresh=1&account_id=test-acc", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+}
+
+func TestFetchingUXAssetsContract(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+
+	// Test index.html structure
+	{
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET / status = %d", w.Code)
+		}
+		html := w.Body.String()
+		// #fetching-header inside .header-main
+		if !strings.Contains(html, `class="header-main"`) || !strings.Contains(html, `id="fetching-header"`) {
+			t.Error("index.html missing header-main or fetching-header")
+		}
+		headerMainIdx := strings.Index(html, `class="header-main"`)
+		fetchingHeaderIdx := strings.Index(html, `id="fetching-header"`)
+		if headerMainIdx == -1 || fetchingHeaderIdx == -1 || fetchingHeaderIdx < headerMainIdx {
+			t.Errorf("expected fetching-header inside/after header-main, got headerMainIdx=%d, fetchingHeaderIdx=%d", headerMainIdx, fetchingHeaderIdx)
+		}
+
+		// #fetching-footer inside .footer-main
+		footerMainIdx := strings.Index(html, `class="footer-main"`)
+		fetchingFooterIdx := strings.Index(html, `id="fetching-footer"`)
+		if footerMainIdx == -1 || fetchingFooterIdx == -1 || fetchingFooterIdx < footerMainIdx {
+			t.Errorf("expected fetching-footer inside/after footer-main, got footerMainIdx=%d, fetchingFooterIdx=%d", footerMainIdx, fetchingFooterIdx)
+		}
+
+		// #fetching-detail should be inside #panel or inline to avoid layout jump
+		if strings.Contains(html, `<div id="fetching-detail" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> Fetching...</div>`+"\n"+`        <div id="panel"></div>`) {
+			t.Error("fetching-detail should not be placed above #panel causing layout shift")
+		}
+	}
+
+	// Test app.css rules
+	{
+		req := httptest.NewRequest(http.MethodGet, "/app.css", nil)
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET /app.css status = %d", w.Code)
+		}
+		css := w.Body.String()
+		if strings.Contains(css, ".shell.refreshing .footer-main { display: none; }") ||
+			strings.Contains(css, ".shell.refreshing .footer-main{display:none}") ||
+			strings.Contains(css, ".shell.refreshing .footer-main { display: none") {
+			t.Error("app.css should NOT hide .footer-main when refreshing")
+		}
+		if !strings.Contains(css, ".item.refreshing") {
+			t.Error("app.css should contain styles for .item.refreshing")
+		}
+	}
+
+	// Test app.js rules
+	{
+		req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET /app.js status = %d", w.Code)
+		}
+		js := w.Body.String()
+		if !strings.Contains(js, "Fetching (") {
+			t.Error("app.js should format dynamic fetching message with account ID")
+		}
+		if !strings.Contains(js, "Fetching all...") {
+			t.Error("app.js should format dynamic fetching message for all accounts")
+		}
+		if !strings.Contains(js, "account_id=") {
+			t.Error("app.js should pass account_id in query string for focused refresh")
+		}
+		if !strings.Contains(js, "350") {
+			t.Error("app.js should enforce minimum visual display time (350ms)")
+		}
+	}
+}

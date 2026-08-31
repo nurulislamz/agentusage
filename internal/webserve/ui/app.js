@@ -10,6 +10,8 @@
     themeOverride: localStorage.getItem("au-serve-theme-override") || "",
     loading: true,
     refreshing: false,
+    refreshOpts: null,
+    refreshText: "Fetching...",
     animFrame: 0,
     error: null,
     filterOpen: false,
@@ -128,18 +130,48 @@
   let spinnerTimer = 0;
   let loadInFlight = false;
 
-  function setRefreshing(on) {
+  function isViewRefreshing(v) {
+    if (!state.refreshing) return false;
+    if (!state.refreshOpts || state.refreshOpts.all) return true;
+    if (state.refreshOpts.accountID) return state.refreshOpts.accountID === v.account_id;
+    return true;
+  }
+
+  function setRefreshing(on, opts) {
     state.refreshing = !!on;
+    state.refreshOpts = on ? (opts || null) : null;
+    const accountID = opts?.accountID;
+    const all = opts?.all;
+    let text = "Fetching...";
+    if (accountID) {
+      text = "Fetching (" + accountID + ")...";
+    } else if (all) {
+      text = "Fetching all...";
+    }
+    state.refreshText = text;
+
     const appShell = $("app");
     if (appShell) appShell.classList.toggle("refreshing", state.refreshing);
     ["fetching-header", "fetching-detail", "fetching-footer"].forEach((id) => {
       const el = $(id);
       if (el) el.hidden = !state.refreshing;
     });
+    document.querySelectorAll(".fetching-text").forEach((el) => {
+      el.textContent = text;
+    });
+
+    const views = filteredViews();
+    $("nav")?.querySelectorAll(".item").forEach((el) => {
+      const idx = Number(el.dataset.idx);
+      const v = views[idx];
+      const refreshing = v && isViewRefreshing(v);
+      el.classList.toggle("refreshing", !!refreshing);
+    });
+
     if (state.refreshing) {
       state.animFrame = 0;
       const frame = SPINNER[0];
-      document.querySelectorAll(".fetching .spin").forEach((el) => {
+      document.querySelectorAll(".spin").forEach((el) => {
         el.textContent = frame;
       });
       startSpinner();
@@ -174,7 +206,7 @@
     spinnerTimer = setInterval(() => {
       if (!state.refreshing) return;
       state.animFrame = (state.animFrame + 1) % SPINNER.length;
-      document.querySelectorAll(".fetching .spin").forEach((el) => {
+      document.querySelectorAll(".spin").forEach((el) => {
         el.textContent = SPINNER[state.animFrame];
       });
     }, 150);
@@ -190,10 +222,17 @@
     if (loadInFlight) return;
     loadInFlight = true;
     const showFetching = manual && state.views.length > 0;
-    if (showFetching) setRefreshing(true);
+    if (showFetching) {
+      setRefreshing(true, { accountID: opts?.accountID, all: opts ? (opts.all || !opts.accountID) : true });
+    }
     try {
-      const qs = manual ? "?refresh=1" : "";
-      const res = await fetch("/api/v1/snapshots" + qs, { headers: headers() });
+      let qs = manual ? "?refresh=1" : "";
+      if (opts && opts.accountID) {
+        qs += (qs ? "&" : "?") + "account_id=" + encodeURIComponent(opts.accountID);
+      }
+      const fetchPromise = fetch("/api/v1/snapshots" + qs, { headers: headers() });
+      const minDurationPromise = manual ? new Promise((r) => setTimeout(r, 350)) : Promise.resolve();
+      const [res] = await Promise.all([fetchPromise, minDurationPromise]);
       if (res.status === 401) {
         $("token-modal").hidden = false;
         $("token-error").hidden = false;
@@ -282,9 +321,13 @@
           `<option value="${i}"${i === state.selected ? " selected" : ""}>${esc(v.account_id)}</option>`
         ).join("")}</select>`
       : "";
+    const fetchVisible = state.refreshing ? "" : " hidden";
+    const fetchText = esc(state.refreshText || "Fetching...");
+    const spinChar = SPINNER[state.animFrame] || "⠋";
     $("header").innerHTML = `
       <span class="bolt">⚡</span>
       <span class="brand">agentUsage</span>
+      <span id="fetching-header" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
       ${switcher}
       <span class="spacer"></span>
       <span class="header-meta">⊞ ${n} providers${filteredNote}</span>
@@ -320,7 +363,8 @@
       const reset = v.reset_hint || "";
       const summary = v.has_gauge ? (v.summary || `${pct.toFixed(2)}%`) : (v.summary || v.message || "");
       const inGroup = v.provider_id === selected.provider_id && counts[v.provider_id] > 1;
-      html += `<button type="button" class="item${sel ? " selected" : ""}${inGroup ? " in-group" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")}">
+      const refreshing = isViewRefreshing(v);
+      html += `<button type="button" class="item${sel ? " selected" : ""}${inGroup ? " in-group" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")}">
         <span class="rail"></span>
         <span class="name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
         <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
@@ -434,9 +478,15 @@
     const cards = v.detail_cards && v.detail_cards.length
       ? renderCards(v.detail_cards)
       : (v.detail_html ? `<section class="card">${v.detail_html}</section>` : "");
+    const fetchVisible = state.refreshing ? "" : " hidden";
+    const fetchText = esc(state.refreshText || "Fetching...");
+    const spinChar = SPINNER[state.animFrame] || "⠋";
     panel.innerHTML = `
       <div class="hero">
-        <h1>${esc(v.status_icon || "●")} ${esc(v.account_id)}</h1>
+        <h1>
+          ${esc(v.status_icon || "●")} ${esc(v.account_id)}
+          <span id="fetching-detail" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
+        </h1>
         <div class="hero-right">${esc(meta)} <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || "")}</span></div>
       </div>
       <div class="subhero">
@@ -451,7 +501,11 @@
   function renderFooter() {
     const sec = Math.max(5, state.envelope?.refresh_interval_seconds || 30);
     const theme = state.envelope?.theme_tokens?.name || state.envelope?.theme || "";
+    const fetchVisible = state.refreshing ? "" : " hidden";
+    const fetchText = esc(state.refreshText || "Fetching...");
+    const spinChar = SPINNER[state.animFrame] || "⠋";
     $("footer").innerHTML = `
+      <span id="fetching-footer" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
       <span>auto-refresh ⟳ ${sec}s</span>
       <span><kbd>j</kbd>/<kbd>k</kbd> move</span>
       <button type="button" class="footer-btn" id="footer-btn-filter" title="Filter providers (/)"><kbd>/</kbd> filter</button>
@@ -469,7 +523,7 @@
       cycleUsageMode().catch(console.error);
     });
     $("footer-btn-refresh")?.addEventListener("click", () => {
-      load({ manual: true }).catch(console.error);
+      load({ manual: true, accountID: filteredViews()[state.selected]?.account_id }).catch(console.error);
     });
     $("footer-btn-theme")?.addEventListener("click", () => {
       cycleThemeOverride();
@@ -560,9 +614,12 @@
         openFilter();
         break;
       case "r":
+        ev.preventDefault();
+        load({ manual: true, accountID: filteredViews()[state.selected]?.account_id }).catch(console.error);
+        break;
       case "R":
         ev.preventDefault();
-        load({ manual: true }).catch(console.error);
+        load({ manual: true, all: true }).catch(console.error);
         break;
       case "u":
       case "U":
