@@ -1,6 +1,6 @@
 # Project TODO
 
-Backlog for upcoming infrastructure work.
+Backlog for upcoming infrastructure and UX work.
 
 ## 1. OpenTelemetry logging stack
 
@@ -46,3 +46,28 @@ Backlog for upcoming infrastructure work.
 - [ ] **Version tagging** — tag images with semver, git SHA, and `latest` (main only); pass ldflags (`Version`, `CommitHash`, `BuildDate`) as build-args.
 - [ ] **Document usage** — README section: build locally, run daemon/hub in Docker, required volumes (`~/.config/agentusage`, socket paths), and CGO/runtime notes.
 - [ ] **Security hardening** — non-root runtime user, minimal Alpine/distroless final stage, scan images in CI (optional Trivy/Grype step).
+
+---
+
+## 3. In-app account add form
+
+**Goal:** Let users add provider accounts from inside the app via a simple guided form — no hand-editing `settings.json`.
+
+**Current state:**
+- Accounts come from auto-detection or manual JSON config (`accounts` / `auto_detected_accounts`).
+- Settings modal (tab **5 KEYS**) supports editing credentials for *existing* accounts (API key entry, browser-session connect).
+- Copy still says “Add an account first under 1 PROV / 5 KEYS” — there is no first-class **Add account** flow.
+- `Model.SetOnAddAccount` and `onAddAccount` exist for browser-session connect side effects; persistence wiring is partial.
+
+### Tasks
+
+- [ ] **UX design** — single “Add account” entry point (settings modal action or dedicated modal); fields: provider picker, account ID/label, auth method (API key / browser session / local path where applicable).
+- [ ] **Drive form from `ProviderSpec`** — use each provider’s `Auth` metadata (default account ID, supported auth types, env var names, browser cookie refs) so the form stays in sync with the registry.
+- [ ] **Implement add-account modal** — Bubble Tea form with validation, inline errors, and keyboard-first navigation consistent with existing settings UX.
+- [ ] **Persist new accounts** — save to `config.Accounts` (manual accounts take precedence over auto-detected); call existing credential helpers for API keys / browser sessions.
+- [ ] **Validate before save** — reuse `ValidateAPIKey`; for browser-session providers, optional “test connection” step; block duplicate `account.id + provider` pairs.
+- [ ] **Refresh dashboard state** — append to `providerOrder`, enable by default, trigger `requestRefreshAll()` so the new tile appears immediately.
+- [ ] **Edit / remove accounts** — optional follow-up: rename account ID, disable vs delete, clear credentials without removing the row.
+- [ ] **Web dashboard parity** — if `serve` / web UI is in scope, expose the same add-account form over the existing web settings API.
+- [ ] **Tests** — TUI input tests for form validation, duplicate rejection, and successful persist callback; config round-trip test for saved account shape.
+- [ ] **Docs** — README snippet: “Adding an account from the app” with screenshots; deprecate JSON-only instructions where the form covers the flow.
