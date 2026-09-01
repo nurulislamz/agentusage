@@ -12,6 +12,8 @@ func demoSnapshots(now time.Time) []core.UsageSnapshot {
 	return []core.UsageSnapshot{
 		demoClaude(now),
 		demoCursor(now),
+		demoOpenCode(now),
+		demoCommandCode(now),
 		demoOpenRouter(now),
 		demoCopilot(now),
 		demoCodex(now),
@@ -160,6 +162,64 @@ func demoOllama(now time.Time) core.UsageSnapshot {
 	snap.Attributes = map[string]string{"base_url": "http://127.0.0.1:11434"}
 	snap.DailySeries = map[string][]core.TimePoint{
 		"requests": demoSeries(now, 12, 18, 9, 22, 16, 28, 38),
+	}
+	return snap
+}
+
+func demoOpenCode(now time.Time) core.UsageSnapshot {
+	snap := core.NewUsageSnapshot("opencode", "opencode-pro")
+	snap.Timestamp = now
+	snap.Status = core.StatusOK
+	snap.Message = "$42.50 balance · 85.00% 5h · 72.00% weekly"
+	snap.Metrics = map[string]core.Metric{
+		"rolling_usage":     {Used: f64(15), Remaining: f64(85), Unit: "percent", Window: "rolling-5h"},
+		"weekly_usage":      {Used: f64(28), Remaining: f64(72), Unit: "percent", Window: "7d"},
+		"monthly_usage_pct": {Used: f64(40), Remaining: f64(60), Unit: "percent", Window: "month"},
+		"console_balance":   {Remaining: f64(42.50), Unit: "USD", Window: "current"},
+		"monthly_usage":     {Used: f64(17.50), Unit: "USD", Window: "month"},
+		"monthly_limit":     {Limit: f64(60.00), Used: f64(17.50), Remaining: f64(42.50), Unit: "USD", Window: "month"},
+	}
+	snap.Resets = map[string]time.Time{
+		"rolling_usage":     now.Add(2*time.Hour + 30*time.Minute),
+		"weekly_usage":      now.Add(3*24*time.Hour + 12*time.Hour),
+		"monthly_usage_pct": now.Add(18*24*time.Hour + 6*time.Hour),
+	}
+	snap.Attributes = map[string]string{
+		"subscription_plan": "Pro",
+		"auth_scope":        "zen+console",
+	}
+	return snap
+}
+
+func demoCommandCode(now time.Time) core.UsageSnapshot {
+	snap := core.NewUsageSnapshot("command_code", "command-code")
+	snap.Timestamp = now
+	snap.Status = core.StatusOK
+	snap.Message = "Command Code (GOAT) · 80.0% wk rem"
+	snap.Attributes = map[string]string{
+		"plan_name":         "GOAT",
+		"plan_id":           "individual-goat",
+		"monthly_cap":       "$70.00",
+		"monthly_used":      "$35.84",
+		"monthly_remaining": "$34.16",
+		"weekly_cap":        "$35.00",
+		"weekly_used":       "$7.00",
+		"five_hour_cap":     "$14.00",
+		"five_hour_used":    "$0.00",
+	}
+	snap.Metrics = map[string]core.Metric{
+		"monthly_subscription": {Limit: f64(100), Used: f64(51.2), Remaining: f64(48.8), Unit: "percent", Window: "month"},
+		"monthly_credits":      {Limit: f64(70.0), Used: f64(35.84), Remaining: f64(34.16), Unit: "USD", Window: "month"},
+		"weekly_usage":         {Used: f64(20.0), Remaining: f64(80.0), Unit: "percent", Window: "7d"},
+		"five_hour_usage":      {Used: f64(0.0), Remaining: f64(100.0), Unit: "percent", Window: "5h"},
+		"balance":              {Remaining: f64(34.16), Unit: "USD"},
+		"total_cost":           {Used: f64(35.84), Unit: "USD", Window: "billing-period"},
+		"total_tokens":         {Used: f64(1420000), Unit: "tokens", Window: "billing-period"},
+	}
+	snap.Resets = map[string]time.Time{
+		"monthly_subscription": now.Add(15 * 24 * time.Hour),
+		"weekly_usage":         now.Add(3 * 24 * time.Hour),
+		"five_hour_usage":      now.Add(4 * time.Hour),
 	}
 	return snap
 }

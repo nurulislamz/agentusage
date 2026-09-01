@@ -184,7 +184,7 @@ func TestEnrichSnapshotsWithFetch(t *testing.T) {
 			return core.UsageSnapshot{Status: core.StatusUnknown}, nil // unusable
 		}
 		snaps := map[string]core.UsageSnapshot{
-			"prov-err":    {ProviderID: "prov", AccountID: "prov-err", Message: "initial"},
+			"prov-err":      {ProviderID: "prov", AccountID: "prov-err", Message: "initial"},
 			"prov-unusable": {ProviderID: "prov", AccountID: "prov-unusable", Message: "initial"},
 		}
 		EnrichSnapshotsWithFetch(context.Background(), "prov", fetch, nil, snaps, nil)
@@ -241,13 +241,13 @@ func TestOverlayLiveFetch(t *testing.T) {
 	t.Run("all fresh fields overlaid", func(t *testing.T) {
 		now := time.Now()
 		base := core.UsageSnapshot{
-			ProviderID: "prov",
-			AccountID:  "acct-1",
-			Metrics:    map[string]core.Metric{"old_m": {Used: core.Float64Ptr(1)}},
-			Resets:     map[string]time.Time{"old_r": now.Add(-time.Hour)},
-			Attributes: map[string]string{"old_a": "1"},
+			ProviderID:  "prov",
+			AccountID:   "acct-1",
+			Metrics:     map[string]core.Metric{"old_m": {Used: core.Float64Ptr(1)}},
+			Resets:      map[string]time.Time{"old_r": now.Add(-time.Hour)},
+			Attributes:  map[string]string{"old_a": "1"},
 			Diagnostics: map[string]string{"old_d": "1"},
-			Raw:        map[string]string{"old_raw": "1"},
+			Raw:         map[string]string{"old_raw": "1"},
 		}
 
 		freshNow := now.Add(time.Hour)

@@ -104,9 +104,11 @@
 
   function pillClass(badge) {
     const b = (badge || "").toUpperCase();
-    if (b.includes("LIMIT") || b.includes("ERROR")) return "crit";
-    if (b.includes("LOW") || b.includes("NEAR")) return "warn";
+    if (b.includes("LIMIT") || b.includes("ERROR") || b.includes("CRIT") || b.includes("DANGER")) return "crit";
+    if (b.includes("LOW") || b.includes("NEAR") || b.includes("WARN")) return "warn";
+    if (b.includes("PEACH")) return "peach";
     if (b.includes("AUTH")) return "auth";
+    if (b.includes("DIM")) return "dim";
     if (b === "OK") return "ok";
     return "ok";
   }
@@ -439,7 +441,7 @@
           </div>`;
         }
         if (row.kind === "kv") {
-          return `<div class="kv"><span class="dim">${esc(row.label || "")}</span> ${esc(row.value || "")}</div>`;
+          return `<div class="kv"><span class="dim">${esc(row.label || "")}</span><span class="kv-val">${esc(row.value || "")}</span></div>`;
         }
         return `<div class="text-row">${esc(row.value || row.label || "")}</div>`;
       }).join("");

@@ -79,21 +79,47 @@ func newCollector(opts Options) *collector {
 		}
 		enrichCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 		defer cancel()
+
+		cursorSnaps := make(map[string]core.UsageSnapshot, len(targetSnaps))
+		agSnaps := make(map[string]core.UsageSnapshot, len(targetSnaps))
+		opencodeSnaps := make(map[string]core.UsageSnapshot, len(targetSnaps))
+		for k, v := range targetSnaps {
+			cursorSnaps[k] = v
+			agSnaps[k] = v
+			opencodeSnaps[k] = v
+		}
+
 		var wg sync.WaitGroup
 		wg.Add(3)
 		go func() {
 			defer wg.Done()
-			cursorProv.EnrichSnapshots(enrichCtx, cachedAccounts, targetSnaps)
+			cursorProv.EnrichSnapshots(enrichCtx, cachedAccounts, cursorSnaps)
 		}()
 		go func() {
 			defer wg.Done()
-			antigravityProv.EnrichSnapshots(enrichCtx, cachedAccounts, targetSnaps)
+			antigravityProv.EnrichSnapshots(enrichCtx, cachedAccounts, agSnaps)
 		}()
 		go func() {
 			defer wg.Done()
-			opencodeProv.EnrichSnapshots(enrichCtx, cachedAccounts, targetSnaps)
+			opencodeProv.EnrichSnapshots(enrichCtx, cachedAccounts, opencodeSnaps)
 		}()
 		wg.Wait()
+
+		for k, v := range cursorSnaps {
+			if v.ProviderID == "cursor" || strings.HasPrefix(k, "cursor") {
+				targetSnaps[k] = v
+			}
+		}
+		for k, v := range agSnaps {
+			if v.ProviderID == "antigravity" || strings.HasPrefix(k, "antigravity") || strings.HasPrefix(k, "ag-") {
+				targetSnaps[k] = v
+			}
+		}
+		for k, v := range opencodeSnaps {
+			if v.ProviderID == "opencode" || strings.HasPrefix(k, "opencode") {
+				targetSnaps[k] = v
+			}
+		}
 		if accountID != "" {
 			if snap, ok := targetSnaps[accountID]; ok {
 				snaps[accountID] = snap

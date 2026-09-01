@@ -284,6 +284,7 @@ func applyCursorCSVToSnapshot(records []cursorCSVRecord, snap *core.UsageSnapsho
 	if len(records) == 0 || snap == nil {
 		return
 	}
+	snap.EnsureMaps()
 	var totalCost float64
 	var totalRequests int64
 	var totalInput, totalOutput, totalCacheRead int64

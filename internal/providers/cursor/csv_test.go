@@ -1,6 +1,7 @@
 package cursor
 
 import (
+	"github.com/nurulislamz/agentusage/internal/core"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,5 +102,34 @@ func TestParseCursorCSVFile_RoundTrip(t *testing.T) {
 	}
 	if version != cursorCSVV2 || len(records) != 1 {
 		t.Fatalf("v=%d records=%d", version, len(records))
+	}
+}
+
+func TestApplyCursorCSVToSnapshot_NilMetrics(t *testing.T) {
+	snap := &core.UsageSnapshot{
+		ProviderID: "cursor",
+		AccountID:  "default",
+		Metrics:    nil,
+		Raw:        nil,
+	}
+	records := []cursorCSVRecord{
+		{
+			Model:             "claude-3.5-sonnet",
+			Cost:              0.05,
+			InputWithCache:    100,
+			InputWithoutCache: 50,
+			OutputTokens:      200,
+			CacheRead:         20,
+		},
+	}
+
+	applyCursorCSVToSnapshot(records, snap)
+
+	if snap.Metrics == nil {
+		t.Fatal("expected snap.Metrics to be initialized")
+	}
+	metric, ok := snap.Metrics["composer_cost"]
+	if !ok || metric.Used == nil || *metric.Used != 0.05 {
+		t.Fatalf("unexpected composer_cost metric: %+v", metric)
 	}
 }
