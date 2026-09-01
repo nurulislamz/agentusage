@@ -245,6 +245,11 @@ func TestWebProjectorCommandCodeDetailCards(t *testing.T) {
 	if !foundMonthly {
 		t.Errorf("expected monthly subscription gauge with cap info, got %#v", gauges)
 	}
+
+	kvRows := rowsOfKind(usage, "kv")
+	if len(kvRows) == 0 {
+		t.Errorf("expected compact KV summary row in usage card, got %#v", usage.Rows)
+	}
 }
 
 func TestWebProjectorGroupsOpenCodeAccounts(t *testing.T) {

@@ -36,6 +36,8 @@ var (
 	barePercentRe     = regexp.MustCompile(`^[\d.]+%$`)
 	barGlyphsRe       = regexp.MustCompile(`^[█░▒▓▀▄▌▐▏▎▍▋▊▉─━│┃┌┐└┘╭╮╰╯├┤┬┴┼\s]+$`)
 	singleLineGaugeRe = regexp.MustCompile(`^(.+?)\s+([█░▒▓▀▄▌▐▏▎▍▋▊▉─━│┃┌┐└┘╭╮╰╯├┤┬┴┼]+)\s+([\d.]+)%\s*$`)
+	dotLeaderRe       = regexp.MustCompile(`^(.+?)\s+[·•]{2,}\s+(.+)$`)
+	colonKvRe         = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9 _\-\/]{1,30}):\s+(.+)$`)
 )
 
 func projectDetailCards(
@@ -177,6 +179,34 @@ func rowsFromSectionLines(lines []string, isUsedMode bool) []WebDetailRow {
 		if len(rows) > 0 && rows[len(rows)-1].Kind == "gauge" && rows[len(rows)-1].Hint == "" &&
 			(strings.HasPrefix(strings.ToLower(plain), "resets in") || strings.HasPrefix(strings.ToLower(plain), "reset in") || strings.HasPrefix(strings.ToLower(plain), "projected")) {
 			rows[len(rows)-1].Hint = plain
+			continue
+		}
+		if loc := dotLeaderRe.FindStringSubmatch(plain); loc != nil {
+			if pendingLabel != "" {
+				flushText(pendingLabel)
+				pendingLabel = ""
+			}
+			label := strings.TrimSpace(loc[1])
+			val := strings.TrimSpace(loc[2])
+			rows = append(rows, WebDetailRow{
+				Kind:  "kv",
+				Label: label,
+				Value: val,
+			})
+			continue
+		}
+		if loc := colonKvRe.FindStringSubmatch(plain); loc != nil && !looksLikeHeading(plain) && !looksLikeGaugeLabel(plain) {
+			if pendingLabel != "" {
+				flushText(pendingLabel)
+				pendingLabel = ""
+			}
+			label := strings.TrimSpace(loc[1])
+			val := strings.TrimSpace(loc[2])
+			rows = append(rows, WebDetailRow{
+				Kind:  "kv",
+				Label: label,
+				Value: val,
+			})
 			continue
 		}
 		if pendingLabel != "" {

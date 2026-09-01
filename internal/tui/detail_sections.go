@@ -453,6 +453,11 @@ func buildOpenCodeDetailUsageSection(snap core.UsageSnapshot, innerW int, warnTh
 		renderItem("Monthly Limit Remaining", "monthly_usage_pct")
 	}
 
+	compactLines, _ := buildTileCompactMetricSummaryLinesWithHide(snap, dashboardWidget(snap.ProviderID), innerW, false)
+	if len(compactLines) > 0 {
+		lines = append(lines, compactLines...)
+	}
+
 	return lines
 }
 
@@ -560,10 +565,9 @@ func buildCommandCodeDetailUsageSection(snap core.UsageSnapshot, innerW int, war
 		renderItem("Five Hour Limit Remaining", "five_hour_usage", "five_hour_cap", "five_hour_used")
 	}
 
-	if bal, ok := snap.Metrics["balance"]; ok && bal.Remaining != nil {
-		lines = append(lines, "  "+lipgloss.NewStyle().Foreground(colorSubtext).Render("Credit Balance"))
-		lines = append(lines, "    "+lipgloss.NewStyle().Bold(true).Foreground(colorText).Render(fmt.Sprintf("$%.2f monthly balance", *bal.Remaining)))
-		lines = append(lines, "")
+	compactLines, _ := buildTileCompactMetricSummaryLinesWithHide(snap, dashboardWidget(snap.ProviderID), innerW, false)
+	if len(compactLines) > 0 {
+		lines = append(lines, compactLines...)
 	}
 
 	return lines
