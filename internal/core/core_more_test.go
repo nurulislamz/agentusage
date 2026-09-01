@@ -612,11 +612,11 @@ func TestUsageBreakdowns_UpstreamAndClientBreakdown(t *testing.T) {
 	// 1. ExtractUpstreamProviderBreakdown
 	snapUpstream := UsageSnapshot{
 		Metrics: map[string]Metric{
-			"upstream_openai_cost_usd":     {Used: Float64Ptr(1.50)},
-			"upstream_openai_input_tokens":  {Used: Float64Ptr(1000)},
-			"upstream_openai_output_tokens": {Used: Float64Ptr(500)},
-			"upstream_openai_requests":      {Used: Float64Ptr(10)},
-			"upstream_anthropic_cost_usd":   {Used: Float64Ptr(2.00)},
+			"upstream_openai_cost_usd":        {Used: Float64Ptr(1.50)},
+			"upstream_openai_input_tokens":    {Used: Float64Ptr(1000)},
+			"upstream_openai_output_tokens":   {Used: Float64Ptr(500)},
+			"upstream_openai_requests":        {Used: Float64Ptr(10)},
+			"upstream_anthropic_cost_usd":     {Used: Float64Ptr(2.00)},
 			"upstream_anthropic_input_tokens": {Used: Float64Ptr(2000)},
 		},
 	}

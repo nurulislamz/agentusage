@@ -737,4 +737,3 @@ func TestApplyStatusFromCode_CustomKeyHint(t *testing.T) {
 		t.Errorf("Status = %v, want empty for 500", snap2.Status)
 	}
 }
-

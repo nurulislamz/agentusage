@@ -1334,4 +1334,3 @@ func TestProvider_DomainInvariants_ProviderAndAuthSpecs(t *testing.T) {
 		}
 	}
 }
-

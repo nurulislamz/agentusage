@@ -89,15 +89,20 @@ func isCycleResetWeeklyKey(k string) bool {
 	return strings.Contains(k, "_weekly") || strings.Contains(k, "_7d") || strings.Contains(k, "seven_day")
 }
 
-func collectCycleResetEntries(snap core.UsageSnapshot) []cycleResetEntry {
+func collectCycleResetEntries(snap core.UsageSnapshot, now ...time.Time) []cycleResetEntry {
 	if len(snap.Resets) == 0 {
 		return nil
+	}
+
+	ref := time.Now()
+	if len(now) > 0 && !now[0].IsZero() {
+		ref = now[0]
 	}
 
 	seen := make(map[string]bool)
 	var entries []cycleResetEntry
 	for key, at := range snap.Resets {
-		if at.IsZero() || time.Until(at) < 0 {
+		if at.IsZero() || at.Before(ref) {
 			continue
 		}
 		tier, ok := cycleResetTierForKey(key, snap)
@@ -170,7 +175,7 @@ func formatCycleResetTierLabel(tier cycleResetTier, dates []time.Time, now time.
 }
 
 func formatCycleResetSchedule(snap core.UsageSnapshot, now time.Time) string {
-	entries := collectCycleResetEntries(snap)
+	entries := collectCycleResetEntries(snap, now)
 	if len(entries) == 0 {
 		return ""
 	}
@@ -215,8 +220,8 @@ func monthlyQuotaExhausted(snap core.UsageSnapshot) bool {
 	return false
 }
 
-func sidebarCycleResetAt(snap core.UsageSnapshot) (time.Time, bool) {
-	entries := collectCycleResetEntries(snap)
+func sidebarCycleResetAt(snap core.UsageSnapshot, now ...time.Time) (time.Time, bool) {
+	entries := collectCycleResetEntries(snap, now...)
 	if len(entries) == 0 {
 		return time.Time{}, false
 	}
@@ -232,7 +237,7 @@ func sidebarCycleResetAt(snap core.UsageSnapshot) (time.Time, bool) {
 
 // formatCycleResetScheduleSidebar renders the primary cycle reset for the navigator row.
 func formatCycleResetScheduleSidebar(snap core.UsageSnapshot, now time.Time) string {
-	at, ok := sidebarCycleResetAt(snap)
+	at, ok := sidebarCycleResetAt(snap, now)
 	if !ok {
 		return ""
 	}
@@ -246,7 +251,7 @@ func SidebarResetHint(snap core.UsageSnapshot, now time.Time) string {
 
 // formatCycleResetScheduleCompact renders all cycle resets on one line.
 func formatCycleResetScheduleCompact(snap core.UsageSnapshot, now time.Time) string {
-	entries := collectCycleResetEntries(snap)
+	entries := collectCycleResetEntries(snap, now)
 	if len(entries) == 0 {
 		return ""
 	}

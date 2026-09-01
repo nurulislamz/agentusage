@@ -1214,30 +1214,30 @@ func TestTrimWindowVariant(t *testing.T) {
 func TestPruneBreakdownsForWindow_Entities(t *testing.T) {
 	metrics := map[string]core.Metric{
 		// Models: ranked by cost (cost > alt)
-		"model_m1_cost_usd":  {Used: ptr(100.0)},
-		"model_m2_cost_usd":  {Used: ptr(50.0)},
-		"model_m3_cost_usd":  {Used: ptr(20.0)},
-		"model_m4_cost_usd":  {Used: ptr(10.0)},
-		"model_m5_tokens":    {Used: ptr(500.0)}, // no cost
+		"model_m1_cost_usd": {Used: ptr(100.0)},
+		"model_m2_cost_usd": {Used: ptr(50.0)},
+		"model_m3_cost_usd": {Used: ptr(20.0)},
+		"model_m4_cost_usd": {Used: ptr(10.0)},
+		"model_m5_tokens":   {Used: ptr(500.0)}, // no cost
 		// Clients
 		"client_c1_cost_usd": {Used: ptr(10.0)},
 		"client_c2_cost_usd": {Used: ptr(20.0)},
 		"client_c3_cost_usd": {Used: ptr(30.0)},
 		"client_c4_cost_usd": {Used: ptr(40.0)},
 		// Languages
-		"lang_go":            {Used: ptr(100.0)},
-		"lang_py":            {Used: ptr(80.0)},
-		"lang_ts":            {Used: ptr(60.0)},
-		"lang_rs":            {Used: ptr(40.0)},
-		"lang_c":             {Used: ptr(20.0)},
+		"lang_go": {Used: ptr(100.0)},
+		"lang_py": {Used: ptr(80.0)},
+		"lang_ts": {Used: ptr(60.0)},
+		"lang_rs": {Used: ptr(40.0)},
+		"lang_c":  {Used: ptr(20.0)},
 		// Tools
-		"tool_calls_total":   {Used: ptr(1000.0)}, // aggregate, kept
-		"tool_bash":          {Used: ptr(500.0)},
-		"tool_bash_today":    {Used: ptr(50.0)},
-		"tool_read":          {Used: ptr(400.0)},
-		"tool_write":         {Used: ptr(300.0)},
-		"tool_grep":          {Used: ptr(200.0)},
-		"tool_glob":          {Used: ptr(100.0)},
+		"tool_calls_total": {Used: ptr(1000.0)}, // aggregate, kept
+		"tool_bash":        {Used: ptr(500.0)},
+		"tool_bash_today":  {Used: ptr(50.0)},
+		"tool_read":        {Used: ptr(400.0)},
+		"tool_write":       {Used: ptr(300.0)},
+		"tool_grep":        {Used: ptr(200.0)},
+		"tool_glob":        {Used: ptr(100.0)},
 		// MCP
 		"mcp_servers_active": {Used: ptr(3.0)}, // aggregate, kept
 		"mcp_github_total":   {Used: ptr(300.0)},
@@ -1450,8 +1450,8 @@ func TestWidgetRenderingAndTUIModel(t *testing.T) {
 func TestPruning_BranchEdgeCases(t *testing.T) {
 	// 1. pruneEntityMetrics with empty entity, no suffix, nil Used, and ranking
 	metrics := map[string]core.Metric{
-		"model_mix_source":  {Used: ptr(1.0)},  // no suffix
-		"model__cost_usd":   {Used: ptr(1.0)},  // empty entity name
+		"model_mix_source":  {Used: ptr(1.0)}, // no suffix
+		"model__cost_usd":   {Used: ptr(1.0)}, // empty entity name
 		"model_m1_cost_usd": {},               // nil Used
 		"model_m2_cost_usd": {Used: ptr(50.0)},
 		"model_m3_tokens":   {Used: ptr(100.0)},
@@ -1473,8 +1473,8 @@ func TestPruning_BranchEdgeCases(t *testing.T) {
 
 	// 3. pruneMCPServers with servers_active, empty rest, server without underscore
 	mcpMetrics := map[string]core.Metric{
-		"mcp_servers_active": {Used: ptr(1.0)},
-		"mcp_":               {Used: ptr(1.0)},
+		"mcp_servers_active":          {Used: ptr(1.0)},
+		"mcp_":                        {Used: ptr(1.0)},
 		"mcp_serverwithoutunderscore": {Used: ptr(10.0)},
 	}
 	droppedMCP := pruneMCPServers(mcpMetrics, 5) // len <= keep
@@ -1508,5 +1508,3 @@ func TestDemoMetricUsed_EdgeCases(t *testing.T) {
 		t.Errorf("expected (0, false) for remaining-only metric, got (%v, %v)", val, ok)
 	}
 }
-
-
