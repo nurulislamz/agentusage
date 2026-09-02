@@ -478,3 +478,97 @@ func (m Model) renderSettingsIntegrationsBody(w, h int) string {
 	lines = append(lines, "  Install/configure command writes plugin/hook files and updates tool configs automatically.")
 	return padToSize(strings.Join(lines, "\n"), w, h)
 }
+
+func (m Model) renderSettingsBoxesBody(w, h int) string {
+	boxList := m.settings.boxes.boxes
+	readyCount := 0
+	for _, b := range boxList {
+		if b.Status == "Ready" {
+			readyCount++
+		}
+	}
+
+	subTitle := fmt.Sprintf("%d boxes · %d ready · a create · Enter login · d delete", len(boxList), readyCount)
+	if m.settings.boxes.loading {
+		subTitle = "loading boxes..."
+	}
+	lines := settingsBodyHeaderLines("Antigravity Container Boxes", subTitle)
+
+	if m.settings.boxes.creating {
+		inputChar := PulseChar("█", "▌", m.animFrame)
+		promptLine := fmt.Sprintf("  %s %s[%s%s]",
+			lipgloss.NewStyle().Foreground(colorAccent).Bold(true).Render("New Box Name:"),
+			lipgloss.NewStyle().Foreground(colorSapphire).Bold(true).Render(""),
+			m.settings.boxes.createInput,
+			inputChar,
+		)
+		lines = append(lines, settingsBodyRule(w), promptLine, dimStyle.Render("  Enter: Confirm create  ·  Esc: Cancel"), settingsBodyRule(w))
+	} else if m.settings.boxes.loggingIn {
+		spinner := PulseChar("◐", "◑", m.animFrame)
+		loginLine := fmt.Sprintf("  %s Logging into %s... Opening browser to authenticate (polling token)",
+			lipgloss.NewStyle().Foreground(colorAccent).Bold(true).Render(spinner),
+			lipgloss.NewStyle().Foreground(colorLavender).Bold(true).Render(m.settings.boxes.loginTarget),
+		)
+		lines = append(lines, settingsBodyRule(w), loginLine, settingsBodyRule(w))
+	} else {
+		lines = append(lines, settingsBodyRule(w))
+	}
+
+	if len(boxList) == 0 && !m.settings.boxes.creating {
+		lines = append(lines, dimStyle.Render("No Antigravity container boxes found in ~/.agy-containers. Press 'a' to create one."))
+		return padToSize(strings.Join(lines, "\n"), w, h)
+	}
+
+	nameW := 18
+	statusW := 16
+	acctW := 22
+	pathW := max(12, w-nameW-statusW-acctW-16)
+
+	lines = append(lines, dimStyle.Render(fmt.Sprintf("    %-3s %-*s %-*s %-*s %-*s", "#", statusW, "STATUS", nameW, "BOX NAME", acctW, "ACCOUNT ID", pathW, "LOCATION")))
+
+	cursor := clamp(m.settings.boxes.cursor, 0, len(boxList)-1)
+	start, end := listWindow(len(boxList), cursor, max(1, h-len(lines)-2))
+
+	for i := start; i < end; i++ {
+		box := boxList[i]
+		prefix := "  "
+		if i == cursor {
+			prefix = lipgloss.NewStyle().Foreground(colorAccent).Bold(true).Render("➤ ")
+		}
+
+		sBadge := string(box.Status)
+		var sStyle lipgloss.Style
+		switch box.Status {
+		case "Ready":
+			sStyle = lipgloss.NewStyle().Foreground(colorGreen).Bold(true)
+			sBadge = "● Ready"
+		case "Authenticated":
+			sStyle = lipgloss.NewStyle().Foreground(colorTeal)
+			sBadge = "● Authenticated"
+		default:
+			sStyle = lipgloss.NewStyle().Foreground(colorYellow)
+			sBadge = "○ Initialized"
+		}
+
+		bNameStyled := box.Name
+		if i == cursor {
+			bNameStyled = lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render(box.Name)
+		}
+
+		lines = append(lines, fmt.Sprintf("%s%-3d %-*s %-*s %-*s %-*s",
+			prefix,
+			i+1,
+			statusW, sStyle.Render(sBadge),
+			nameW, bNameStyled,
+			acctW, dimStyle.Render(box.AccountID),
+			pathW, dimStyle.Render(truncateToWidth(box.Path, pathW)),
+		))
+	}
+
+	if m.settings.boxes.status != "" {
+		lines = append(lines, "", "  "+lipgloss.NewStyle().Foreground(colorGreen).Render(m.settings.boxes.status))
+	}
+
+	return padToSize(strings.Join(lines, "\n"), w, h)
+}
+

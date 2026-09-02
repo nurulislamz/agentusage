@@ -1,6 +1,13 @@
 package tui
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"fmt"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+
 
 // Per-tab handlers extracted from handleSettingsModalKey, which used to be a
 // single 348-line function with seven nested switch blocks. Each handler
@@ -301,3 +308,79 @@ func (m Model) handleSettingsTabIntegrationsKey(msg tea.KeyMsg) (Model, tea.Cmd,
 	}
 	return m, nil, false
 }
+
+func (m Model) handleSettingsTabBoxesKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
+	if m.settings.boxes.creating {
+		switch msg.String() {
+		case "esc":
+			m.settings.boxes.creating = false
+			m.settings.boxes.createInput = ""
+			m.settings.boxes.status = ""
+			return m, nil, true
+		case "backspace":
+			if len(m.settings.boxes.createInput) > 0 {
+				m.settings.boxes.createInput = m.settings.boxes.createInput[:len(m.settings.boxes.createInput)-1]
+			}
+			return m, nil, true
+		case "enter":
+			name := strings.TrimSpace(m.settings.boxes.createInput)
+			if name == "" {
+				m.settings.boxes.status = "box name cannot be empty"
+				return m, nil, true
+			}
+			m.settings.boxes.creating = false
+			m.settings.boxes.createInput = ""
+			m.settings.boxes.loading = true
+			m.settings.boxes.status = fmt.Sprintf("creating box %q...", name)
+			return m, m.createAntigravityBoxCmd(name), true
+		default:
+			if msg.Type == tea.KeyRunes {
+				m.settings.boxes.createInput += string(msg.Runes)
+				return m, nil, true
+			}
+		}
+		return m, nil, true
+	}
+
+	boxList := m.settings.boxes.boxes
+	switch msg.String() {
+	case "up", "k":
+		if m.settings.boxes.cursor > 0 {
+			m.settings.boxes.cursor--
+		}
+		return m, nil, true
+	case "down", "j":
+		if m.settings.boxes.cursor < len(boxList)-1 {
+			m.settings.boxes.cursor++
+		}
+		return m, nil, true
+	case "a", "A":
+		m.settings.boxes.creating = true
+		m.settings.boxes.createInput = ""
+		m.settings.boxes.status = ""
+		return m, nil, true
+	case "r", "R":
+		m.settings.boxes.loading = true
+		m.settings.boxes.status = "refreshing boxes..."
+		return m, m.loadAntigravityBoxesCmd(), true
+	case "enter", "l", "L":
+		if len(boxList) == 0 {
+			return m, nil, true
+		}
+		sel := boxList[clamp(m.settings.boxes.cursor, 0, len(boxList)-1)]
+		m.settings.boxes.loggingIn = true
+		m.settings.boxes.loginTarget = sel.Name
+		m.settings.boxes.status = fmt.Sprintf("starting login session for %s...", sel.Name)
+		return m, m.loginAntigravityBoxCmd(sel.Name), true
+	case "d", "D", "x", "X", "backspace":
+		if len(boxList) == 0 {
+			return m, nil, true
+		}
+		sel := boxList[clamp(m.settings.boxes.cursor, 0, len(boxList)-1)]
+		m.settings.boxes.loading = true
+		m.settings.boxes.status = fmt.Sprintf("deleting box %q...", sel.Name)
+		return m, m.deleteAntigravityBoxCmd(sel.Name), true
+	}
+	return m, nil, false
+}
+

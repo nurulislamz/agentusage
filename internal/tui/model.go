@@ -1,15 +1,18 @@
 package tui
 
 import (
+	"context"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nurulislamz/agentusage/internal/boxes"
 	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/integrations"
 	"github.com/samber/lo"
 )
+
 
 type tickMsg time.Time
 
@@ -153,6 +156,18 @@ type settingsState struct {
 
 	providerLinkPicker providerLinkPickerState
 	browserPicker      browserPickerState
+	boxes              boxesState
+}
+
+type boxesState struct {
+	boxes       []boxes.AntigravityBox
+	cursor      int
+	loading     bool
+	status      string
+	creating    bool
+	createInput string
+	loggingIn   bool
+	loginTarget string
 }
 
 // providerLinkPickerState tracks the in-modal target picker for a telemetry
@@ -183,6 +198,31 @@ type browserPickerState struct {
 	status     string // user-facing hint (e.g. "looking for installed browsers...")
 }
 
+type antigravityBoxesLoadedMsg struct {
+	Boxes []boxes.AntigravityBox
+	Err   error
+}
+
+type antigravityBoxCreatedMsg struct {
+	Name string
+	Err  error
+}
+
+type antigravityBoxDeletedMsg struct {
+	Name string
+	Err  error
+}
+
+type antigravityBoxOAuthURLMsg struct {
+	BoxName string
+	URL     string
+}
+
+type antigravityBoxLoggedInMsg struct {
+	BoxName string
+	Err     error
+}
+
 type Services interface {
 	SaveTheme(themeName string) error
 	SaveDashboardProviders(providers []config.DashboardProviderConfig) error
@@ -204,7 +244,13 @@ type Services interface {
 	SaveCredential(accountID, apiKey string) error
 	DeleteCredential(accountID string) error
 	InstallIntegration(id integrations.ID) ([]integrations.Status, error)
+	CreateAntigravityBox(name string) error
+	DeleteAntigravityBox(name string) error
+	ListAntigravityBoxes() ([]boxes.AntigravityBox, error)
+	LoginAntigravityBox(ctx context.Context, name string, onURL func(string)) error
 }
+
+
 
 type Model struct {
 	snapshots map[string]core.UsageSnapshot

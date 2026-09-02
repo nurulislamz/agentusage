@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nurulislamz/agentusage/internal/boxes"
 	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/integrations"
@@ -54,6 +56,16 @@ func (s *mockUsageModeService) DeleteCredential(accountID string) error       { 
 func (s *mockUsageModeService) InstallIntegration(id integrations.ID) ([]integrations.Status, error) {
 	return nil, nil
 }
+func (s *mockUsageModeService) CreateAntigravityBox(string) error { return nil }
+func (s *mockUsageModeService) DeleteAntigravityBox(string) error { return nil }
+func (s *mockUsageModeService) ListAntigravityBoxes() ([]boxes.AntigravityBox, error) {
+	return nil, nil
+}
+func (s *mockUsageModeService) LoginAntigravityBox(context.Context, string, func(string)) error {
+	return nil
+}
+
+
 
 func TestUsageModeToggle_KeybindingAndPersistence(t *testing.T) {
 	accounts := []core.AccountConfig{

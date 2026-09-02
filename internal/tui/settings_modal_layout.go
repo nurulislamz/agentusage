@@ -112,7 +112,7 @@ func (m Model) renderSettingsModalTabs(w int) string {
 		cellW = w / n
 	}
 
-	tabTokens := []string{"PROV", "SECT", "THEME", "KEYS", "TELEM", "INTEG"}
+	tabTokens := []string{"PROV", "SECT", "THEME", "KEYS", "TELEM", "INTEG", "BOXES"}
 	if len(tabTokens) < n {
 		tabTokens = append(tabTokens, settingsTabNames[len(tabTokens):]...)
 	}
@@ -163,6 +163,11 @@ func (m Model) settingsModalHint() string {
 		return "Up/Down: select  ·  Space/Enter: apply time window  ·  Left/Right: switch tab  ·  Esc: close"
 	case settingsTabIntegrations:
 		return "Up/Down: select  ·  Enter/i: install/configure  ·  u: upgrade  ·  r: refresh  ·  Esc: close"
+	case settingsTabBoxes:
+		if m.settings.boxes.creating {
+			return "Type box name  ·  Enter: create box  ·  Esc: cancel"
+		}
+		return "Up/Down: select box  ·  a: create box  ·  Enter/l: login via browser  ·  d: delete box  ·  r: refresh  ·  Esc: close"
 	default:
 		return "Up/Down: select theme  ·  Space/Enter: apply theme  ·  Left/Right: switch tab  ·  Esc: close"
 	}
@@ -180,10 +185,13 @@ func (m Model) renderSettingsModalBody(w, h int) string {
 		return m.renderSettingsTelemetryBody(w, h)
 	case settingsTabIntegrations:
 		return m.renderSettingsIntegrationsBody(w, h)
+	case settingsTabBoxes:
+		return m.renderSettingsBoxesBody(w, h)
 	default:
 		return m.renderSettingsThemeBody(w, h)
 	}
 }
+
 
 func settingsBodyHeaderLines(title, subtitle string) []string {
 	lines := []string{

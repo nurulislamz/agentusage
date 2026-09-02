@@ -178,6 +178,66 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m = m.requestRefreshAll()
 		return m, nil
 
+	case antigravityBoxesLoadedMsg:
+		m.settings.boxes.loading = false
+		if msg.Err != nil {
+			m.settings.boxes.status = "error loading boxes: " + msg.Err.Error()
+			return m, nil
+		}
+		m.settings.boxes.boxes = msg.Boxes
+		m.settings.boxes.cursor = clamp(m.settings.boxes.cursor, 0, len(msg.Boxes)-1)
+		return m, nil
+
+	case antigravityBoxCreatedMsg:
+		m.settings.boxes.loading = false
+		if msg.Err != nil {
+			m.settings.boxes.status = "create box failed: " + msg.Err.Error()
+			return m, nil
+		}
+		m.settings.boxes.status = fmt.Sprintf("created box %q", msg.Name)
+		acctID := "antigravity-" + msg.Name
+		if m.providerOrderIndex(acctID) < 0 {
+			m.providerOrder = append(m.providerOrder, acctID)
+			m.providerEnabled[acctID] = true
+			m.accountProviders[acctID] = "antigravity"
+		}
+		m = m.requestRefreshAll()
+		return m, m.loadAntigravityBoxesCmd()
+
+	case antigravityBoxDeletedMsg:
+		m.settings.boxes.loading = false
+		if msg.Err != nil {
+			m.settings.boxes.status = "delete box failed: " + msg.Err.Error()
+			return m, nil
+		}
+		m.settings.boxes.status = fmt.Sprintf("deleted box %q", msg.Name)
+		acctID := "antigravity-" + msg.Name
+		m.providerEnabled[acctID] = false
+		m = m.requestRefreshAll()
+		return m, m.loadAntigravityBoxesCmd()
+
+	case antigravityBoxOAuthURLMsg:
+		m.settings.boxes.status = fmt.Sprintf("OAuth URL detected for %s: opening browser...", msg.BoxName)
+		return m, nil
+
+	case antigravityBoxLoggedInMsg:
+		m.settings.boxes.loggingIn = false
+		m.settings.boxes.loginTarget = ""
+		if msg.Err != nil {
+			m.settings.boxes.status = "login failed: " + msg.Err.Error()
+			return m, nil
+		}
+		m.settings.boxes.status = fmt.Sprintf("logged in box %q!", msg.BoxName)
+		acctID := "antigravity-" + msg.BoxName
+		if m.providerOrderIndex(acctID) < 0 {
+			m.providerOrder = append(m.providerOrder, acctID)
+			m.providerEnabled[acctID] = true
+			m.accountProviders[acctID] = "antigravity"
+		}
+		m = m.requestRefreshAll()
+		return m, m.loadAntigravityBoxesCmd()
+
+
 	case providerConsoleOpenedMsg:
 		if msg.Err != nil {
 			m.settings.apiKeyStatus = "open browser failed: " + msg.Err.Error()
@@ -206,12 +266,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		m.lastInteraction = time.Now()
 		cmd := m.restartTickIfNeeded()
+		if m.settings.show {
+			mdl, keyCmd := m.handleSettingsModalKey(msg)
+			return mdl, tea.Batch(cmd, keyCmd)
+		}
 		if !m.hasData {
 			mdl, keyCmd := m.handleSplashKey(msg)
 			return mdl, tea.Batch(cmd, keyCmd)
 		}
 		mdl, keyCmd := m.handleKey(msg)
 		return mdl, tea.Batch(cmd, keyCmd)
+
 	case tea.MouseMsg:
 		m.lastInteraction = time.Now()
 		cmd := m.restartTickIfNeeded()

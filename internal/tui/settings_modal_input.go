@@ -12,12 +12,18 @@ func (m Model) handleSettingsModalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.settings.apiKeyEditing {
 		return m.handleAPIKeyEditKey(msg)
 	}
+	if m.settings.tab == settingsTabBoxes && m.settings.boxes.creating {
+		if next, cmd, handled := m.handleSettingsTabBoxesKey(msg); handled {
+			return next, cmd
+		}
+	}
 	if m.settings.tab == settingsTabTelemetry && m.settings.providerLinkPicker.active {
 		return m.handleProviderLinkPickerKey(msg)
 	}
 	if m.settings.tab == settingsTabAPIKeys && m.settings.browserPicker.active {
 		return m.handleBrowserPickerKey(msg)
 	}
+
 
 	ids := m.settingsIDs()
 	if m.settings.tab == settingsTabAPIKeys {
@@ -87,10 +93,15 @@ func (m Model) handleSettingsModalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if next, cmd, handled := m.handleSettingsTabIntegrationsKey(msg); handled {
 			return next, cmd
 		}
+	case settingsTabBoxes:
+		if next, cmd, handled := m.handleSettingsTabBoxesKey(msg); handled {
+			return next, cmd
+		}
 	}
 
 	return m, nil
 }
+
 
 func (m *Model) moveSelectedProvider(ids []string, delta int) tea.Cmd {
 	if len(ids) == 0 || delta == 0 {
@@ -179,8 +190,11 @@ func (m *Model) toggleSelectedDetailSection() tea.Cmd {
 
 func (m *Model) resetSettingsCursorForTab() {
 	switch m.settings.tab {
-	case settingsTabProviders, settingsTabAPIKeys, settingsTabIntegrations, settingsTabTelemetry:
+	case settingsTabProviders, settingsTabAPIKeys, settingsTabIntegrations, settingsTabTelemetry, settingsTabBoxes:
 		m.settings.cursor = 0
+		if m.settings.tab == settingsTabBoxes {
+			m.settings.boxes.cursor = 0
+		}
 	case settingsTabWidgetSections:
 		m.settings.sectionRowCursor = 0
 		m.settings.sectionSubTab = 0
@@ -189,6 +203,7 @@ func (m *Model) resetSettingsCursorForTab() {
 		m.settings.themeCursor = clamp(ActiveThemeIndex(), 0, max(0, len(AvailableThemes())-1))
 	}
 }
+
 
 func (m Model) handleAPIKeyEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
