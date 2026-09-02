@@ -1,31 +1,56 @@
 package daemon
 
 import (
+	"context"
+	"fmt"
 	"log"
+	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/nurulislamz/agentusage/internal/observability"
 )
 
 func (s *Service) infof(event, format string, args ...any) {
-	if s == nil || !s.cfg.Verbose {
+	if s == nil {
 		return
 	}
+	var msg string
 	if strings.TrimSpace(format) == "" {
-		log.Printf("daemon level=info event=%s", event)
-		return
+		if s.cfg.Verbose {
+			log.Printf("daemon level=info event=%s", event)
+		}
+	} else {
+		msg = fmt.Sprintf(format, args...)
+		if s.cfg.Verbose {
+			log.Printf("daemon level=info event=%s %s", event, msg)
+		}
 	}
-	log.Printf("daemon level=info event=%s "+format, append([]any{event}, args...)...)
+
+	if observability.IsEnabled() {
+		observability.EmitLog(context.Background(), slog.LevelInfo, "daemon", event, msg)
+	}
 }
 
 func (s *Service) warnf(event, format string, args ...any) {
-	if s == nil || !s.cfg.Verbose {
+	if s == nil {
 		return
 	}
+	var msg string
 	if strings.TrimSpace(format) == "" {
-		log.Printf("daemon level=warn event=%s", event)
-		return
+		if s.cfg.Verbose {
+			log.Printf("daemon level=warn event=%s", event)
+		}
+	} else {
+		msg = fmt.Sprintf(format, args...)
+		if s.cfg.Verbose {
+			log.Printf("daemon level=warn event=%s %s", event, msg)
+		}
 	}
-	log.Printf("daemon level=warn event=%s "+format, append([]any{event}, args...)...)
+
+	if observability.IsEnabled() {
+		observability.EmitLog(context.Background(), slog.LevelWarn, "daemon", event, msg)
+	}
 }
 
 func (s *Service) shouldLog(key string, interval time.Duration) bool {

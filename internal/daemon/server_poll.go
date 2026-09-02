@@ -110,17 +110,32 @@ func (s *Service) pollProviders(ctx context.Context) {
 				return
 			}
 
+			fetchStart := time.Now()
 			fetchCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 			defer cancel()
 
 			snap, fetchErr := provider.Fetch(fetchCtx, account)
+			fetchDurationMs := time.Since(fetchStart).Milliseconds()
 			if fetchErr != nil {
+				s.warnf(
+					"provider_fetch_error",
+					"provider=%s account_id=%s duration_ms=%d error=%v",
+					account.Provider, account.ID, fetchDurationMs, fetchErr,
+				)
 				snap = core.UsageSnapshot{
 					ProviderID: account.Provider,
 					AccountID:  account.ID,
 					Timestamp:  s.now().UTC(),
 					Status:     core.StatusError,
 					Message:    fetchErr.Error(),
+				}
+			} else {
+				if s.shouldLog("provider_fetch_"+account.ID, 60*time.Second) {
+					s.infof(
+						"provider_fetch_success",
+						"provider=%s account_id=%s duration_ms=%d status=%s",
+						account.Provider, account.ID, fetchDurationMs, snap.Status,
+					)
 				}
 			}
 			snap = core.NormalizeUsageSnapshotWithConfig(snap, modelNorm)

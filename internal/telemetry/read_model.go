@@ -56,9 +56,10 @@ func ApplyCanonicalTelemetryViewWithOptions(
 ) (map[string]core.UsageSnapshot, error) {
 	totalStart := time.Now()
 	defer func() {
-		core.Tracef("[read_model_perf] TOTAL ApplyCanonicalTelemetryView: %dms (window=%s, windowHours=%d, accounts=%d)",
+		core.Tracef("[read_model_perf] TOTAL ApplyCanonicalTelemetryView: %dms (window=%s, since=%s, accounts=%d)",
 			time.Since(totalStart).Milliseconds(), options.TimeWindow, options.Since.Format(time.RFC3339), len(snaps))
 	}()
+
 
 	dbPath = strings.TrimSpace(dbPath)
 	if dbPath == "" {
