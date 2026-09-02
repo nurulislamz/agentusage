@@ -22,18 +22,18 @@ func (m Model) View() string {
 	if m.referenceTime.IsZero() {
 		m.referenceTime = time.Now()
 	}
+	if m.settings.show || m.settings.addAccount.active {
+		return m.renderSettingsModalOverlay()
+	}
 	if !m.hasData {
 		return m.renderSplash(m.width, m.height)
 	}
 	if m.showHelp {
 		return m.renderHelpOverlay(m.width, m.height)
 	}
-	view := m.renderDashboard()
-	if m.settings.show {
-		return m.renderSettingsModalOverlay()
-	}
-	return view
+	return m.renderDashboard()
 }
+
 
 func (m Model) renderDashboardContent(w, contentH int) string {
 	if m.mode == modeDetail {

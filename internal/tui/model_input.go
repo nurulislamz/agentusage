@@ -98,6 +98,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m = m.requestRefreshAll()
 		return m, nil
 
+	case validateNewAccountKeyResultMsg:
+		if !msg.Valid {
+			m.settings.addAccount.validating = false
+			errMsg := msg.Error
+			if errMsg == "" {
+				errMsg = "invalid API key"
+			}
+			m.settings.addAccount.status = "invalid: " + errMsg
+			return m, nil
+		}
+		m.settings.addAccount.validating = false
+		m.applyAddedAccount(msg.Account)
+		m.closeAddAccountModal()
+		m.settings.status = fmt.Sprintf("account %s added ✓", msg.Account.ID)
+		m = m.requestRefreshAll()
+		var cmds []tea.Cmd
+		if m.services != nil {
+			cmds = append(cmds, m.saveCredentialCmd(msg.Account.ID, msg.APIKey), m.saveAccountCmd(msg.Account))
+		}
+		return m, tea.Batch(cmds...)
+
+	case accountSavedMsg:
+		if msg.Err != nil {
+			m.settings.addAccount.status = "save failed: " + msg.Err.Error()
+			return m, nil
+		}
+		m.applyAddedAccount(msg.Account)
+		m.closeAddAccountModal()
+		m.settings.status = fmt.Sprintf("account %s added ✓", msg.Account.ID)
+		m = m.requestRefreshAll()
+		return m, nil
+
+
 	case availableBrowsersLoadedMsg:
 		// Picker may have been dismissed (esc) before the scan finished —
 		// or a fresh open replaced it for a different account. In either
@@ -745,6 +778,9 @@ func (m Model) handleSettingsLeftClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.settings.addAccount.active {
+		return m.handleAddAccountKey(msg)
+	}
 	if msg.String() == "?" && !m.filter.active && !m.analyticsFilter.active && !m.settings.show {
 		m.showHelp = !m.showHelp
 		return m, nil
@@ -765,10 +801,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		switch msg.String() {
+		case "a", "A":
+			m.openAddAccountModal()
+			return m, nil
 		case "p", "P", ",", "S":
 			m.openSettingsModal()
 			m.settings.tab = settingsTabProviders
 			return m, nil
+
 		case "tab":
 			m.screen = m.nextScreen(1)
 			m.mode = modeList

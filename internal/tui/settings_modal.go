@@ -44,6 +44,7 @@ func (m *Model) openSettingsModal() {
 	m.settings.sectionRowCursor = 0
 	m.settings.sectionSubTab = 0
 	m.settings.previewOffset = 0
+	m.settings.addAccount = addAccountModalState{}
 	themes := AvailableThemes()
 	if len(themes) > 0 {
 		m.settings.themeCursor = clamp(ActiveThemeIndex(), 0, len(themes)-1)
@@ -64,7 +65,9 @@ func (m *Model) closeSettingsModal() {
 	m.settings.sectionRowCursor = 0
 	m.settings.sectionSubTab = 0
 	m.settings.previewOffset = 0
+	m.settings.addAccount = addAccountModalState{}
 }
+
 
 func (m Model) settingsModalInfo() string {
 	ids := m.settingsIDs()

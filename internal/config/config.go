@@ -219,6 +219,14 @@ type TmuxAlerts struct {
 	Mode                  string  `json:"mode,omitempty"` // message|bell|both|none
 }
 
+type ObservabilityConfig struct {
+	Enabled     bool              `json:"enabled"`
+	Endpoint    string            `json:"endpoint,omitempty"`
+	Insecure    bool              `json:"insecure,omitempty"`
+	ServiceName string            `json:"service_name,omitempty"`
+	Headers     map[string]string `json:"headers,omitempty"`
+}
+
 type Config struct {
 	UI                   UIConfig                      `json:"ui"`
 	Theme                string                        `json:"theme"`
@@ -235,6 +243,7 @@ type Config struct {
 	Hub                  HubConfig                     `json:"hub,omitempty"`
 	Serve                ServeConfig                   `json:"serve,omitempty"`
 	Tmux                 TmuxConfig                    `json:"tmux,omitempty"`
+	Observability        ObservabilityConfig           `json:"observability,omitempty"`
 }
 
 // DefaultProviderLinks returns built-in telemetry provider-id to dashboard provider-id mappings.
@@ -349,6 +358,7 @@ func loadFrom(path string) (Config, bool, error) {
 	cfg.Dashboard.UsageMode = normalizeDashboardUsageMode(cfg.Dashboard.UsageMode)
 	cfg.Dashboard.WidgetSections = normalizeDashboardWidgetSections(cfg.Dashboard.WidgetSections)
 	cfg.Dashboard.DetailSections = normalizeDetailWidgetSections(cfg.Dashboard.DetailSections)
+	cfg.Observability = normalizeObservabilityConfig(cfg.Observability)
 
 	return cfg, salvaged, nil
 }
@@ -874,3 +884,113 @@ func SaveIntegrationStateTo(path string, id string, state IntegrationState) erro
 		cfg.Integrations[id] = state
 	})
 }
+
+// SaveAccount persists a new or updated account configuration into the config file.
+func SaveAccount(acct core.AccountConfig) error {
+	return SaveAccountTo(ConfigPath(), acct)
+}
+
+// SaveAccountTo saves an account configuration to a specific config file path.
+func SaveAccountTo(path string, acct core.AccountConfig) error {
+	accountID := strings.TrimSpace(acct.ID)
+	providerID := strings.TrimSpace(acct.Provider)
+	if accountID == "" || providerID == "" {
+		return fmt.Errorf("save account: account id and provider must be non-empty")
+	}
+
+	return modifyConfig(path, func(cfg *Config) {
+		found := false
+		for i := range cfg.Accounts {
+			if strings.TrimSpace(cfg.Accounts[i].ID) == accountID {
+				found = true
+				if providerID != "" {
+					cfg.Accounts[i].Provider = providerID
+				}
+				if acct.Auth != "" {
+					cfg.Accounts[i].Auth = acct.Auth
+				}
+				if acct.APIKeyEnv != "" {
+					cfg.Accounts[i].APIKeyEnv = acct.APIKeyEnv
+				}
+				if acct.BrowserCookie != nil {
+					cookie := *acct.BrowserCookie
+					cfg.Accounts[i].BrowserCookie = &cookie
+				}
+				break
+			}
+		}
+
+		if !found {
+			newAcct := core.AccountConfig{
+				ID:        accountID,
+				Provider:  providerID,
+				Auth:      acct.Auth,
+				APIKeyEnv: acct.APIKeyEnv,
+			}
+			if acct.BrowserCookie != nil {
+				cookie := *acct.BrowserCookie
+				newAcct.BrowserCookie = &cookie
+			}
+			cfg.Accounts = append(cfg.Accounts, newAcct)
+		}
+
+		// Ensure the account is present and enabled in Dashboard.Providers
+		provFound := false
+		for _, p := range cfg.Dashboard.Providers {
+			if p.AccountID == accountID {
+				provFound = true
+				break
+			}
+		}
+		if !provFound {
+			cfg.Dashboard.Providers = append(cfg.Dashboard.Providers, DashboardProviderConfig{
+				AccountID: accountID,
+				Enabled:   true,
+			})
+		}
+	})
+}
+
+func normalizeObservabilityConfig(in ObservabilityConfig) ObservabilityConfig {
+	if v := os.Getenv("AGENTUSAGE_OTEL_ENABLED"); v != "" {
+		in.Enabled = parseBoolEnv(v)
+	}
+	if ep := os.Getenv("AGENTUSAGE_OTEL_ENDPOINT"); ep != "" {
+		in.Endpoint = ep
+	} else if in.Endpoint == "" {
+		if ep := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); ep != "" {
+			in.Endpoint = ep
+		}
+	}
+	if v := os.Getenv("AGENTUSAGE_OTEL_INSECURE"); v != "" {
+		in.Insecure = parseBoolEnv(v)
+	} else if v := os.Getenv("OTEL_EXPORTER_OTLP_INSECURE"); v != "" && os.Getenv("AGENTUSAGE_OTEL_INSECURE") == "" {
+		in.Insecure = parseBoolEnv(v)
+	}
+	if sn := os.Getenv("AGENTUSAGE_OTEL_SERVICE_NAME"); sn != "" {
+		in.ServiceName = sn
+	} else if in.ServiceName == "" {
+		if sn := os.Getenv("OTEL_SERVICE_NAME"); sn != "" {
+			in.ServiceName = sn
+		}
+	}
+	return in
+}
+
+func parseBoolEnv(val string) bool {
+	v := strings.ToLower(strings.TrimSpace(val))
+	return v == "1" || v == "true" || v == "yes" || v == "on"
+}
+
+// SaveObservability persists observability settings into the config file (read-modify-write).
+func SaveObservability(obs ObservabilityConfig) error {
+	return SaveObservabilityTo(ConfigPath(), obs)
+}
+
+func SaveObservabilityTo(path string, obs ObservabilityConfig) error {
+	return modifyConfig(path, func(cfg *Config) {
+		cfg.Observability = obs
+	})
+}
+
+

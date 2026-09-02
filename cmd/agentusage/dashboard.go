@@ -90,56 +90,11 @@ func runDashboard(cfg config.Config) {
 		if strings.TrimSpace(acct.ID) == "" || strings.TrimSpace(acct.Provider) == "" {
 			return
 		}
-
-		cfgNow, err := config.Load()
-		if err != nil {
-			log.Printf("add account: load config failed, skipping save: %v", err)
-			return
-		}
-
-		accountID := strings.TrimSpace(acct.ID)
-		providerID := strings.TrimSpace(acct.Provider)
-		authType := strings.TrimSpace(acct.Auth)
-
-		found := false
-		for i := range cfgNow.Accounts {
-			if strings.TrimSpace(cfgNow.Accounts[i].ID) != accountID {
-				continue
-			}
-			found = true
-			if strings.TrimSpace(cfgNow.Accounts[i].Provider) == "" {
-				cfgNow.Accounts[i].Provider = providerID
-			}
-			if strings.TrimSpace(cfgNow.Accounts[i].Auth) == "" {
-				cfgNow.Accounts[i].Auth = authType
-			}
-			if strings.TrimSpace(cfgNow.Accounts[i].APIKeyEnv) == "" && strings.TrimSpace(acct.APIKeyEnv) != "" {
-				cfgNow.Accounts[i].APIKeyEnv = strings.TrimSpace(acct.APIKeyEnv)
-			}
-			if acct.BrowserCookie != nil {
-				cookie := *acct.BrowserCookie
-				cfgNow.Accounts[i].BrowserCookie = &cookie
-			}
-			break
-		}
-		if !found {
-			newAccount := core.AccountConfig{
-				ID:        accountID,
-				Provider:  providerID,
-				Auth:      authType,
-				APIKeyEnv: strings.TrimSpace(acct.APIKeyEnv),
-			}
-			if acct.BrowserCookie != nil {
-				cookie := *acct.BrowserCookie
-				newAccount.BrowserCookie = &cookie
-			}
-			cfgNow.Accounts = append(cfgNow.Accounts, newAccount)
-		}
-
-		if err := config.Save(cfgNow); err != nil {
+		if err := config.SaveAccount(acct); err != nil {
 			log.Printf("add account: save config failed: %v", err)
 		}
 	})
+
 
 	model.SetOnRefresh(func(req tui.RefreshRequest) uint64 {
 		return dispatcher.refresh(ctx, viewRuntime, req)

@@ -153,6 +153,7 @@ type settingsState struct {
 
 	providerLinkPicker providerLinkPickerState
 	browserPicker      browserPickerState
+	addAccount         addAccountModalState
 }
 
 // providerLinkPickerState tracks the in-modal target picker for a telemetry
@@ -195,6 +196,7 @@ type Services interface {
 	SaveTimeWindow(window string) error
 	SaveProviderLink(source, target string) error
 	DeleteProviderLink(source string) error
+	SaveAccount(acct core.AccountConfig) error
 	ConnectBrowserSession(accountID, domain, cookieName, preferredBrowser string) (core.BrowserSessionInfo, error)
 	DisconnectBrowserSession(accountID string) error
 	LoadBrowserSessionInfo(accountID string) core.BrowserSessionInfo
@@ -205,6 +207,7 @@ type Services interface {
 	DeleteCredential(accountID string) error
 	InstallIntegration(id integrations.ID) ([]integrations.Status, error)
 }
+
 
 type Model struct {
 	snapshots map[string]core.UsageSnapshot
