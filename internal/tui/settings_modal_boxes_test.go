@@ -171,3 +171,38 @@ func TestSettingsModal_BoxesTab_LifecycleAndActions(t *testing.T) {
 		t.Errorf("svc.deletedBox = %q, want %q", svc.deletedBox, "box-alpha")
 	}
 }
+
+func TestSettingsModal_BoxesTab_CreateCancelAndEmptyValidation(t *testing.T) {
+	svc := &mockBoxesService{}
+	m := NewModel(0.2, 0.05, false, config.DashboardConfig{}, nil, core.TimeWindow30d)
+	m.SetServices(svc)
+	m.openSettingsModal()
+	m.settings.tab = settingsTabBoxes
+
+	// 1. Enter create mode with 'a'
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	m = updatedModel.(Model)
+	if !m.settings.boxes.creating {
+		t.Fatalf("expected creating to be true")
+	}
+
+	// 2. Press Esc to cancel
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updatedModel.(Model)
+	if m.settings.boxes.creating {
+		t.Errorf("expected creating to be false after Esc")
+	}
+
+	// 3. Press 'a', then Enter with empty input
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	m = updatedModel.(Model)
+	updatedModel, emptyCmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedModel.(Model)
+	if emptyCmd != nil {
+		t.Errorf("expected no command when submitting empty box name")
+	}
+	if m.settings.boxes.status == "" {
+		t.Errorf("expected error status when submitting empty box name")
+	}
+}
+
