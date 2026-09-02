@@ -4,6 +4,7 @@
 .idea
 .vscode
 .claude
+.venv*
 *.swp
 *.swo
 
@@ -11,18 +12,13 @@
 bin/
 dist/
 build/
-coverage.out
-coverage.html
+coverage.*
 *.test
 *.prof
 
 # Node / docs site — not used by the Go build.
-docs/site/node_modules
-docs/site/build
-docs/site/.docusaurus
-website/node_modules
-website/build
-website/.docusaurus
+docs/site/
+website/
 
 # Misc large assets that bloat the context.
 screenshots/

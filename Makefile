@@ -137,6 +137,43 @@ icon-font: ## Regenerate the provider icon font (internal/tmux/assets/openusage-
 	@.venv-font/bin/pip install --quiet 'fonttools==4.63.0'
 	@.venv-font/bin/python scripts/gen-icon-font.py
 
+.PHONY: docker-build
+docker-build: ## Build the unified Docker image
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT_HASH=$(COMMIT_HASH) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(APP_NAME):latest \
+		-f Dockerfile .
+
+.PHONY: docker-build-hub
+docker-build-hub: ## Build the hub Docker image
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT_HASH=$(COMMIT_HASH) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(APP_NAME)-hub:latest \
+		-f Dockerfile.hub .
+
+.PHONY: docker-run-hub
+docker-run-hub: ## Run the headless hub server in Docker
+	docker run --rm -it -p 9190:9190 -e AGENTUSAGE_HUB_TOKEN="your-secret-token" $(APP_NAME):latest hub --headless
+
+.PHONY: docker-run-serve
+docker-run-serve: ## Run the web dashboard in Docker
+	docker run --rm -it -p 8080:8080 \
+		-v $(HOME)/.config/agentusage:/home/agentusage/.config/agentusage \
+		-v $(HOME)/.local/state/agentusage:/home/agentusage/.local/state/agentusage \
+		$(APP_NAME):latest serve --listen :8080 --no-open
+
+.PHONY: docker-run-daemon
+docker-run-daemon: ## Run the telemetry daemon in Docker
+	docker run --rm -it \
+		-v $(HOME)/.config/agentusage:/home/agentusage/.config/agentusage \
+		-v $(HOME)/.local/state/agentusage:/home/agentusage/.local/state/agentusage \
+		$(APP_NAME):latest telemetry daemon run
+
 .PHONY: clean
 clean: ## Clean build artifacts
 	@rm -rf $(BIN_DIR) dist coverage.out
+
