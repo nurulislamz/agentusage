@@ -33,7 +33,6 @@ type costData struct {
 	tokenActivity []tokenActivityEntry
 	clients       []clientAnalyticsEntry
 	projects      []projectAnalyticsEntry
-	mcpServers    []mcpAnalyticsEntry
 	timeSeries    []timeSeriesGroup
 	snapshots     map[string]core.UsageSnapshot
 }
@@ -118,13 +117,6 @@ type projectAnalyticsEntry struct {
 	color    lipgloss.Color
 }
 
-type mcpAnalyticsEntry struct {
-	name   string
-	calls  float64
-	series []core.TimePoint
-	color  lipgloss.Color
-}
-
 type collapsedGaugeGroup struct {
 	provider string
 	name     string
@@ -175,7 +167,6 @@ func extractCostData(snapshots map[string]core.UsageSnapshot, filter string, tim
 	lowerFilter := strings.ToLower(filter)
 	clientAgg := make(map[string]clientAnalyticsEntry)
 	projectAgg := make(map[string]projectAnalyticsEntry)
-	mcpAgg := make(map[string]mcpAnalyticsEntry)
 
 	keys := core.SortedStringKeys(snapshots)
 
@@ -222,7 +213,6 @@ func extractCostData(snapshots map[string]core.UsageSnapshot, filter string, tim
 		data.tokenActivity = append(data.tokenActivity, extractTokenActivity(snap, provColor)...)
 		mergeClientAnalytics(clientAgg, extractClientAnalytics(snap, provColor))
 		mergeProjectAnalytics(projectAgg, extractProjectAnalytics(snap, provColor))
-		mergeMCPAnalytics(mcpAgg, extractMCPAnalytics(snap, provColor))
 
 		if len(snap.DailySeries) > 0 {
 			data.timeSeries = append(data.timeSeries, timeSeriesGroup{
@@ -240,10 +230,8 @@ func extractCostData(snapshots map[string]core.UsageSnapshot, filter string, tim
 	}
 	data.clients = collectClientAnalytics(clientAgg)
 	data.projects = collectProjectAnalytics(projectAgg)
-	data.mcpServers = collectMCPAnalytics(mcpAgg)
 	sortClientAnalytics(data.clients)
 	sortProjectAnalytics(data.projects)
-	sortMCPAnalytics(data.mcpServers)
 
 	return data
 }
@@ -568,20 +556,6 @@ func prettifyProjectName(name string) string {
 	return titleCase(s)
 }
 
-func extractMCPAnalytics(snap core.UsageSnapshot, color lipgloss.Color) []mcpAnalyticsEntry {
-	servers, _ := core.ExtractMCPBreakdown(snap)
-	result := make([]mcpAnalyticsEntry, 0, len(servers))
-	for _, server := range servers {
-		result = append(result, mcpAnalyticsEntry{
-			name:   prettifyMCPServerName(server.RawName),
-			calls:  server.Calls,
-			series: server.Series,
-			color:  color,
-		})
-	}
-	return result
-}
-
 func mergeClientAnalytics(dst map[string]clientAnalyticsEntry, entries []clientAnalyticsEntry) {
 	for _, entry := range entries {
 		merged := dst[entry.name]
@@ -613,19 +587,6 @@ func mergeProjectAnalytics(dst map[string]projectAnalyticsEntry, entries []proje
 	}
 }
 
-func mergeMCPAnalytics(dst map[string]mcpAnalyticsEntry, entries []mcpAnalyticsEntry) {
-	for _, entry := range entries {
-		merged := dst[entry.name]
-		merged.name = entry.name
-		merged.calls += entry.calls
-		merged.series = mergeAnalyticsSeries(merged.series, entry.series)
-		if merged.color == "" {
-			merged.color = colorForTool(nil, entry.name)
-		}
-		dst[entry.name] = merged
-	}
-}
-
 func collectClientAnalytics(entries map[string]clientAnalyticsEntry) []clientAnalyticsEntry {
 	out := make([]clientAnalyticsEntry, 0, len(entries))
 	for _, entry := range entries {
@@ -636,14 +597,6 @@ func collectClientAnalytics(entries map[string]clientAnalyticsEntry) []clientAna
 
 func collectProjectAnalytics(entries map[string]projectAnalyticsEntry) []projectAnalyticsEntry {
 	out := make([]projectAnalyticsEntry, 0, len(entries))
-	for _, entry := range entries {
-		out = append(out, entry)
-	}
-	return out
-}
-
-func collectMCPAnalytics(entries map[string]mcpAnalyticsEntry) []mcpAnalyticsEntry {
-	out := make([]mcpAnalyticsEntry, 0, len(entries))
 	for _, entry := range entries {
 		out = append(out, entry)
 	}
@@ -724,14 +677,5 @@ func sortProjectAnalytics(projects []projectAnalyticsEntry) {
 			return projects[i].name < projects[j].name
 		}
 		return projects[i].requests > projects[j].requests
-	})
-}
-
-func sortMCPAnalytics(servers []mcpAnalyticsEntry) {
-	sort.Slice(servers, func(i, j int) bool {
-		if servers[i].calls == servers[j].calls {
-			return servers[i].name < servers[j].name
-		}
-		return servers[i].calls > servers[j].calls
 	})
 }

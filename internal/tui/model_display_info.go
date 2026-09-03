@@ -739,9 +739,6 @@ func computeDisplayInfoRaw(snap core.UsageSnapshot, widget core.DashboardWidget,
 		info.tagLabel = "Usage"
 		info.summary = fmt.Sprintf("%.0f msgs today", *m.Used)
 		var detailParts []string
-		if tc, ok2 := snap.Metrics["tool_calls_today"]; ok2 && tc.Used != nil {
-			detailParts = append(detailParts, fmt.Sprintf("%.0f tools", *tc.Used))
-		}
 		if sc, ok2 := snap.Metrics["sessions_today"]; ok2 && sc.Used != nil {
 			detailParts = append(detailParts, fmt.Sprintf("%.0f sessions", *sc.Used))
 		}

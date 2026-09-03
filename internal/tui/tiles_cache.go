@@ -60,21 +60,15 @@ func tileBodyCacheKey(
 }
 
 func tileWidgetCacheKey(widget core.DashboardWidget) string {
-	parts := make([]string, 0, len(widget.EffectiveStandardSectionOrder())+10)
+	parts := make([]string, 0, len(widget.EffectiveStandardSectionOrder())+4)
 	for _, section := range widget.EffectiveStandardSectionOrder() {
 		parts = append(parts, string(section))
 	}
 	parts = append(parts,
 		fmt.Sprintf("client:%t", widget.ShowClientComposition),
-		fmt.Sprintf("tool:%t", widget.ShowToolComposition),
-		fmt.Sprintf("actual:%t", widget.ShowActualToolUsage),
-		fmt.Sprintf("mcp:%t", widget.ShowMCPUsage),
-		fmt.Sprintf("lang:%t", widget.ShowLanguageComposition),
-		fmt.Sprintf("code:%t", widget.ShowCodeStatsComposition),
 		fmt.Sprintf("fold_iface:%t", widget.ClientCompositionIncludeInterfaces),
 		fmt.Sprintf("hide_zero:%t", widget.SuppressZeroNonUsageMetrics),
 		"client_heading:"+widget.ClientCompositionHeading,
-		"tool_heading:"+widget.ToolCompositionHeading,
 	)
 	return strings.Join(parts, ",")
 }
@@ -174,45 +168,6 @@ func (m *Model) buildTileBodyLines(
 		sectionsByID[core.DashboardSectionProjectBreakdown] = section{withSectionPadding(projectBreakdownLines)}
 	}
 	compactMetricKeys = addUsedKeys(compactMetricKeys, projectBreakdownKeys)
-
-	var toolBurnLines []string
-	if widget.ShowToolComposition {
-		var toolBurnKeys map[string]bool
-		toolBurnLines, toolBurnKeys = buildProviderToolCompositionLines(snap, innerW, modelMixExpanded, widget)
-		compactMetricKeys = addUsedKeys(compactMetricKeys, toolBurnKeys)
-	}
-
-	actualToolLines, actualToolKeys := buildActualToolUsageLines(snap, innerW, modelMixExpanded)
-	compactMetricKeys = addUsedKeys(compactMetricKeys, actualToolKeys)
-	if len(actualToolLines) > 0 {
-		sectionsByID[core.DashboardSectionToolUsage] = section{withSectionPadding(actualToolLines)}
-	} else if len(toolBurnLines) > 0 {
-		sectionsByID[core.DashboardSectionToolUsage] = section{withSectionPadding(toolBurnLines)}
-	}
-
-	if widget.ShowMCPUsage {
-		mcpUsageLines, mcpUsageKeys := buildMCPUsageLines(snap, innerW, modelMixExpanded)
-		if len(mcpUsageLines) > 0 {
-			sectionsByID[core.DashboardSectionMCPUsage] = section{withSectionPadding(mcpUsageLines)}
-		}
-		compactMetricKeys = addUsedKeys(compactMetricKeys, mcpUsageKeys)
-	}
-
-	if widget.ShowLanguageComposition {
-		langBurnLines, langBurnKeys := buildProviderLanguageCompositionLines(snap, innerW, modelMixExpanded)
-		if len(langBurnLines) > 0 {
-			sectionsByID[core.DashboardSectionLanguageBurn] = section{withSectionPadding(langBurnLines)}
-		}
-		compactMetricKeys = addUsedKeys(compactMetricKeys, langBurnKeys)
-	}
-
-	if widget.ShowCodeStatsComposition {
-		codeStatsLines, codeStatsKeys := buildProviderCodeStatsLines(snap, widget, innerW)
-		if len(codeStatsLines) > 0 {
-			sectionsByID[core.DashboardSectionCodeStats] = section{withSectionPadding(codeStatsLines)}
-		}
-		compactMetricKeys = addUsedKeys(compactMetricKeys, codeStatsKeys)
-	}
 
 	dailyUsageLines := buildProviderDailyTrendLinesWithHide(snap, innerW, hideCosts)
 	if len(dailyUsageLines) > 0 {

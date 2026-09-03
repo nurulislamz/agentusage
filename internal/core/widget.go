@@ -68,16 +68,6 @@ type StackedGaugeConfig struct {
 	SegmentColors     []string // Theme color names: "teal", "peach", "green", etc.
 }
 
-// CodeStatsConfig maps metric keys to code statistics roles for graphical display.
-type CodeStatsConfig struct {
-	LinesAdded   string // metric key for lines added
-	LinesRemoved string // metric key for lines removed
-	FilesChanged string // metric key for files changed
-	Commits      string // metric key for scored commits
-	AIPercent    string // metric key for AI code %
-	Prompts      string // metric key for total prompts
-}
-
 // WidgetDataSpec describes the expected metric payload for a dashboard widget.
 // RequiredMetricKeys provide a strict contract; MetricPrefixes provide extensibility.
 type WidgetDataSpec struct {
@@ -95,13 +85,6 @@ const (
 	DashboardSectionModelBurn        DashboardStandardSection = "model_burn"
 	DashboardSectionClientBurn       DashboardStandardSection = "client_burn"
 	DashboardSectionProjectBreakdown DashboardStandardSection = "project_breakdown"
-	DashboardSectionToolUsage        DashboardStandardSection = "tool_usage"
-	// DashboardSectionActualToolUsage is a legacy section ID kept for backward compatibility.
-	// It is normalized to DashboardSectionToolUsage at runtime and config load.
-	DashboardSectionActualToolUsage   DashboardStandardSection = "actual_tool_usage"
-	DashboardSectionMCPUsage          DashboardStandardSection = "mcp_usage"
-	DashboardSectionLanguageBurn      DashboardStandardSection = "language_burn"
-	DashboardSectionCodeStats         DashboardStandardSection = "code_stats"
 	DashboardSectionDailyUsage        DashboardStandardSection = "daily_usage"
 	DashboardSectionProviderBurn      DashboardStandardSection = "provider_burn"
 	DashboardSectionUpstreamProviders DashboardStandardSection = "upstream_providers"
@@ -115,10 +98,6 @@ func defaultDashboardSectionOrder() []DashboardStandardSection {
 		DashboardSectionModelBurn,
 		DashboardSectionClientBurn,
 		DashboardSectionProjectBreakdown,
-		DashboardSectionToolUsage,
-		DashboardSectionMCPUsage,
-		DashboardSectionLanguageBurn,
-		DashboardSectionCodeStats,
 		DashboardSectionDailyUsage,
 		DashboardSectionProviderBurn,
 		DashboardSectionUpstreamProviders,
@@ -128,12 +107,7 @@ func defaultDashboardSectionOrder() []DashboardStandardSection {
 
 // NormalizeDashboardStandardSection maps legacy aliases to canonical section IDs.
 func NormalizeDashboardStandardSection(section DashboardStandardSection) DashboardStandardSection {
-	switch section {
-	case DashboardSectionActualToolUsage:
-		return DashboardSectionToolUsage
-	default:
-		return section
-	}
+	return section
 }
 
 func isKnownDashboardSection(section DashboardStandardSection) bool {
@@ -144,10 +118,6 @@ func isKnownDashboardSection(section DashboardStandardSection) bool {
 		DashboardSectionModelBurn,
 		DashboardSectionClientBurn,
 		DashboardSectionProjectBreakdown,
-		DashboardSectionToolUsage,
-		DashboardSectionMCPUsage,
-		DashboardSectionLanguageBurn,
-		DashboardSectionCodeStats,
 		DashboardSectionDailyUsage,
 		DashboardSectionProviderBurn,
 		DashboardSectionUpstreamProviders,
@@ -180,20 +150,6 @@ type DashboardWidget struct {
 	ClientCompositionHeading string
 	// When true, fold interface_ metrics into the client composition as separate entries.
 	ClientCompositionIncludeInterfaces bool
-	// Opt-in tool composition panel (tool share) in tile view.
-	ShowToolComposition bool
-	// Override the default "Tool Usage (calls)" heading for the tool composition section.
-	ToolCompositionHeading string
-	// Opt-in language composition panel (by-language request share) in tile view.
-	ShowLanguageComposition bool
-	// Opt-in graphical code statistics panel (lines added/removed, commits, AI %).
-	ShowCodeStatsComposition bool
-	// Metric keys for the code stats section (added, removed, files, commits, ai%).
-	CodeStatsMetrics CodeStatsConfig
-	// Opt-in actual tool usage panel (tool calls from agent bubbles).
-	ShowActualToolUsage bool
-	// Opt-in MCP server usage panel (MCP tool calls per server).
-	ShowMCPUsage bool
 
 	// API key provider metadata. APIKeyEnv marks a provider as configurable in API Keys tab.
 	APIKeyEnv        string
@@ -235,7 +191,6 @@ func (w DashboardWidget) IsZero() bool {
 		w.ResetStyle == "" &&
 		w.ColorRole == "" &&
 		!w.ShowClientComposition &&
-		!w.ShowToolComposition &&
 		w.APIKeyEnv == "" &&
 		w.DefaultAccountID == "" &&
 		w.ResetCompactThreshold == 0 &&
@@ -262,7 +217,6 @@ func DefaultDashboardWidget() DashboardWidget {
 		DisplayStyle:        DashboardDisplayStyleDefault,
 		ResetStyle:          DashboardResetStyleDefault,
 		ColorRole:           DashboardColorRoleAuto,
-		ShowToolComposition: true,
 		GaugePriority: []string{
 			"spend_limit", "plan_spend", "credits", "credit_balance",
 		},
@@ -392,10 +346,6 @@ const (
 	DetailSectionModels          DetailStandardSection = "models"
 	DetailSectionClients         DetailStandardSection = "clients"
 	DetailSectionProjects        DetailStandardSection = "projects"
-	DetailSectionTools           DetailStandardSection = "tools"
-	DetailSectionMCP             DetailStandardSection = "mcp"
-	DetailSectionLanguages       DetailStandardSection = "languages"
-	DetailSectionCodeStats       DetailStandardSection = "code_stats"
 	DetailSectionTrends          DetailStandardSection = "trends"
 	DetailSectionActivityHeatmap DetailStandardSection = "activity_heatmap"
 	DetailSectionCostRequests    DetailStandardSection = "cost_requests"
@@ -414,10 +364,6 @@ func defaultDetailSectionOrder() []DetailStandardSection {
 		DetailSectionModels,
 		DetailSectionClients,
 		DetailSectionProjects,
-		DetailSectionTools,
-		DetailSectionMCP,
-		DetailSectionLanguages,
-		DetailSectionCodeStats,
 		DetailSectionTrends,
 		DetailSectionActivityHeatmap,
 		DetailSectionCostRequests,
@@ -443,10 +389,6 @@ func isKnownDetailSection(section DetailStandardSection) bool {
 		DetailSectionModels,
 		DetailSectionClients,
 		DetailSectionProjects,
-		DetailSectionTools,
-		DetailSectionMCP,
-		DetailSectionLanguages,
-		DetailSectionCodeStats,
 		DetailSectionTrends,
 		DetailSectionActivityHeatmap,
 		DetailSectionCostRequests,
@@ -481,14 +423,6 @@ func DetailSectionLabel(s DetailStandardSection) string {
 		return "Clients"
 	case DetailSectionProjects:
 		return "Projects"
-	case DetailSectionTools:
-		return "Tools"
-	case DetailSectionMCP:
-		return "MCP Usage"
-	case DetailSectionLanguages:
-		return "Languages"
-	case DetailSectionCodeStats:
-		return "Code Statistics"
 	case DetailSectionTrends:
 		return "Trends"
 	case DetailSectionActivityHeatmap:

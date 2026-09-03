@@ -149,30 +149,15 @@ func WithSuppressZeroMetricKeys(keys ...string) DashboardOption {
 }
 
 // CodingToolDashboard returns a DashboardWidget pre-configured for coding-tool
-// providers (Cursor, Claude Code, Codex, Copilot, Gemini CLI). It enables client/
-// language/code-stats composition panels, applies standard hidden prefixes and
-// section ordering, and merges shared code-stats metric labels.
+// providers (Cursor, Claude Code, Codex, Copilot, Gemini CLI). It enables client
+// composition panel and applies standard hidden prefixes and section ordering.
 func CodingToolDashboard(options ...DashboardOption) core.DashboardWidget {
 	cfg := core.DefaultDashboardWidget()
 
 	cfg.ShowClientComposition = true
 	cfg.ClientCompositionHeading = "Clients"
-	cfg.ShowToolComposition = false
-	cfg.ShowActualToolUsage = true
-	cfg.ShowMCPUsage = true
-	cfg.ShowLanguageComposition = true
-	cfg.ShowCodeStatsComposition = true
-	cfg.CodeStatsMetrics = shared.DefaultCodeStatsConfig()
 	cfg.StandardSectionOrder = shared.CodingToolSectionOrder()
 	cfg.HideMetricPrefixes = append(cfg.HideMetricPrefixes, shared.CodingToolHidePrefixes()...)
-
-	// Merge shared code-stats labels.
-	for k, v := range shared.CodeStatsMetricLabels {
-		cfg.MetricLabelOverrides[k] = v
-	}
-	for k, v := range shared.CodeStatsCompactLabels {
-		cfg.CompactMetricLabelOverrides[k] = v
-	}
 
 	for _, opt := range options {
 		if opt != nil {

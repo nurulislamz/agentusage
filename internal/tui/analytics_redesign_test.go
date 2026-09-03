@@ -53,12 +53,6 @@ func TestExtractCostDataAggregatesCrossProviderAnalyticsEntities(t *testing.T) {
 	if got := data.projects[0].requests; got != 5 {
 		t.Fatalf("project requests = %v, want 5", got)
 	}
-	if len(data.mcpServers) != 1 {
-		t.Fatalf("mcp servers = %d, want 1", len(data.mcpServers))
-	}
-	if got := data.mcpServers[0].calls; got != 12 {
-		t.Fatalf("mcp calls = %v, want 12", got)
-	}
 }
 
 func TestAnalyticsCropSeriesRespectsReferenceTime(t *testing.T) {

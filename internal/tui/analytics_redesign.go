@@ -103,27 +103,16 @@ func renderAnalyticsUnifiedRedesign(data costData, summary analyticsSummary, w i
 	}
 
 	switch {
-	case w >= 132:
-		colW := analyticsColumnWidth(w, 3, 2)
-		sections = append(sections, analyticsJoinColumns(
-			renderAnalyticsClientPanel(data, colW, 6),
-			renderAnalyticsProjectPanel(data, colW, 6),
-			renderAnalyticsMCPPanel(data, colW, 6),
-		))
 	case w >= 92:
 		colW := analyticsColumnWidth(w, 2, 2)
 		sections = append(sections, analyticsJoinColumns(
 			renderAnalyticsClientPanel(data, colW, 6),
 			renderAnalyticsProjectPanel(data, colW, 6),
 		))
-		if mcp := renderAnalyticsMCPPanel(data, w, 6); mcp != "" {
-			sections = append(sections, mcp)
-		}
 	default:
 		sections = append(sections,
 			renderAnalyticsClientPanel(data, w, 6),
 			renderAnalyticsProjectPanel(data, w, 6),
-			renderAnalyticsMCPPanel(data, w, 6),
 		)
 	}
 

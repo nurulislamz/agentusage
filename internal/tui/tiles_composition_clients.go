@@ -164,14 +164,9 @@ func buildProviderProjectBreakdownLines(snap core.UsageSnapshot, innerW int, exp
 		barW = 40
 	}
 
-	barEntries := make([]toolMixEntry, 0, len(allProjects))
-	for _, project := range allProjects {
-		barEntries = append(barEntries, toolMixEntry{name: project.name, count: project.requests})
-	}
-
 	lines := []string{
 		lipgloss.NewStyle().Foreground(colorSubtext).Bold(true).Render("Project Breakdown") + "  " + dimStyle.Render(shortCompact(totalRequests)+" req"),
-		"  " + renderToolMixBar(barEntries, totalRequests, barW, projectColors),
+		"  " + renderProjectMixBar(allProjects, totalRequests, barW, projectColors),
 	}
 
 	for idx, project := range projects {
@@ -401,4 +396,24 @@ func colorForClient(colors map[string]lipgloss.Color, name string) lipgloss.Colo
 		return color
 	}
 	return stableModelColor("client:"+name, "client")
+}
+
+func renderProjectMixBar(top []projectMixEntry, total float64, barW int, colors map[string]lipgloss.Color) string {
+	if len(top) == 0 || total <= 0 {
+		return ""
+	}
+
+	segs := make([]ntBarSegment, 0, len(top)+1)
+	sumTop := float64(0)
+	for _, project := range top {
+		if project.requests <= 0 {
+			continue
+		}
+		sumTop += project.requests
+		segs = append(segs, ntBarSegment{Value: project.requests, Color: colorForProject(colors, project.name)})
+	}
+	if sumTop < total {
+		segs = append(segs, ntBarSegment{Value: total - sumTop, Color: colorLine})
+	}
+	return renderNTStackedBar(segs, total, barW)
 }

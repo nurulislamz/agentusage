@@ -92,23 +92,6 @@ func TestRenderHeatmapNtcharts(t *testing.T) {
 	}
 }
 
-func TestRenderToolMixBarNtcharts(t *testing.T) {
-	colors := map[string]lipgloss.Color{
-		"read": colorTeal,
-		"edit": colorPeach,
-	}
-	out := renderToolMixBar([]toolMixEntry{
-		{name: "read", count: 7},
-		{name: "edit", count: 3},
-	}, 10, 20, colors)
-	if out == "" {
-		t.Fatal("expected stacked tool bar output")
-	}
-	if got := len(StripANSI(out)); got != 20 {
-		t.Fatalf("expected visible width 20, got %d", got)
-	}
-}
-
 func TestSanitizeSeriesPoints_ClampsNegatives(t *testing.T) {
 	pts := []core.TimePoint{
 		{Date: "2026-01-01", Value: 100},

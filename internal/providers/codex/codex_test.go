@@ -40,20 +40,8 @@ func TestDashboardWidgetCursorParityFlags(t *testing.T) {
 	if !widget.ClientCompositionIncludeInterfaces {
 		t.Fatal("expected ClientCompositionIncludeInterfaces=true")
 	}
-	if widget.ShowToolComposition {
-		t.Fatal("expected ShowToolComposition=false")
-	}
-	if !widget.ShowLanguageComposition {
-		t.Fatal("expected ShowLanguageComposition=true")
-	}
-	if !widget.ShowCodeStatsComposition {
-		t.Fatal("expected ShowCodeStatsComposition=true")
-	}
-	if !widget.ShowActualToolUsage {
-		t.Fatal("expected ShowActualToolUsage=true")
-	}
-	if len(widget.CompactRows) < 5 {
-		t.Fatalf("expected >=5 compact rows, got %d", len(widget.CompactRows))
+	if len(widget.CompactRows) < 4 {
+		t.Fatalf("expected >=4 compact rows, got %d", len(widget.CompactRows))
 	}
 	if len(widget.GaugePriority) == 0 || widget.GaugePriority[0] != "codex_credit_percent_used" {
 		t.Fatalf("expected credit percentage to be the primary gauge, got %#v", widget.GaugePriority)

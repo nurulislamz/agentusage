@@ -63,11 +63,6 @@ type sourceMixEntry struct {
 	series     []core.TimePoint
 }
 
-type toolMixEntry struct {
-	name  string
-	count float64
-}
-
 func buildProviderModelCompositionLines(snap core.UsageSnapshot, innerW int, expanded bool) ([]string, map[string]bool) {
 	return buildProviderModelCompositionLinesWithHide(snap, innerW, expanded, false)
 }
@@ -520,26 +515,6 @@ func renderModelMixBar(models []modelMixEntry, total float64, barW int, mode str
 		}
 		sumTop += value
 		segs = append(segs, ntBarSegment{Value: value, Color: colorForModel(colors, model.name)})
-	}
-	if sumTop < total {
-		segs = append(segs, ntBarSegment{Value: total - sumTop, Color: colorLine})
-	}
-	return renderNTStackedBar(segs, total, barW)
-}
-
-func renderToolMixBar(top []toolMixEntry, total float64, barW int, colors map[string]lipgloss.Color) string {
-	if len(top) == 0 || total <= 0 {
-		return ""
-	}
-
-	segs := make([]ntBarSegment, 0, len(top)+1)
-	sumTop := float64(0)
-	for _, tool := range top {
-		if tool.count <= 0 {
-			continue
-		}
-		sumTop += tool.count
-		segs = append(segs, ntBarSegment{Value: tool.count, Color: colorForTool(colors, tool.name)})
 	}
 	if sumTop < total {
 		segs = append(segs, ntBarSegment{Value: total - sumTop, Color: colorLine})

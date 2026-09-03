@@ -41,8 +41,8 @@ func TestRenderTile_NoDataSectionsShownOrHiddenBySetting(t *testing.T) {
 	if !strings.Contains(shownTile, "No model data for this time range") {
 		t.Fatalf("expected no-data model section to be visible, got: %q", shownTile)
 	}
-	if !strings.Contains(shownTile, "No code stats for this time range") {
-		t.Fatalf("expected no-data code stats section to be visible, got: %q", shownTile)
+	if !strings.Contains(shownTile, "No daily usage data for this time range") {
+		t.Fatalf("expected no-data daily usage section to be visible, got: %q", shownTile)
 	}
 
 	hidden := Model{
@@ -53,7 +53,7 @@ func TestRenderTile_NoDataSectionsShownOrHiddenBySetting(t *testing.T) {
 	if strings.Contains(hiddenTile, "No model data for this time range") {
 		t.Fatalf("expected no-data model section to be hidden, got: %q", hiddenTile)
 	}
-	if strings.Contains(hiddenTile, "No code stats for this time range") {
-		t.Fatalf("expected no-data code stats section to be hidden, got: %q", hiddenTile)
+	if strings.Contains(hiddenTile, "No daily usage data for this time range") {
+		t.Fatalf("expected no-data daily usage section to be hidden, got: %q", hiddenTile)
 	}
 }

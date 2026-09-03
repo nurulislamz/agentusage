@@ -498,10 +498,6 @@ func TestCompositionBars_AreStableAcrossCollapsedAndExpanded(t *testing.T) {
 	checks := []sectionCheck{
 		{name: "model", fn: buildProviderModelCompositionLines},
 		{name: "provider", fn: buildProviderVendorCompositionLines},
-		{name: "tool", fn: func(snap core.UsageSnapshot, innerW int, expanded bool) ([]string, map[string]bool) {
-			return buildProviderToolCompositionLines(snap, innerW, expanded, core.DefaultDashboardWidget())
-		}},
-		{name: "actual_tool", fn: buildActualToolUsageLines},
 	}
 
 	for _, tc := range checks {
@@ -555,96 +551,6 @@ func TestRenderModelTokenBreakdown_TotalExcludesCacheReads(t *testing.T) {
 	}
 	if got := m.totalTokens(); got != 370 {
 		t.Errorf("totalTokens() = %v, want 370 (input 100 + output 200 + cache_write 50 + reasoning 20, excluding cache_read 10000)", got)
-	}
-}
-
-func TestSortToolMixEntries_BreaksTiesAlphabetically(t *testing.T) {
-	tools := []toolMixEntry{
-		{name: "read_today", count: 1},
-		{name: "glob", count: 1},
-		{name: "read", count: 2},
-		{name: "alpha", count: 1},
-	}
-
-	sortToolMixEntries(tools)
-
-	got := []string{tools[0].name, tools[1].name, tools[2].name, tools[3].name}
-	want := []string{"read", "alpha", "glob", "read_today"}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("tool order[%d] = %q, want %q (full order: %v)", i, got[i], want[i], got)
-		}
-	}
-}
-
-func TestBuildActualToolUsageLines_FiltersMCPToolNames(t *testing.T) {
-	snap := core.UsageSnapshot{
-		AccountID: "copilot",
-		Metrics: map[string]core.Metric{
-			"tool_view":                          {Used: float64Ptr(10), Unit: "calls"},
-			"tool_bash":                          {Used: float64Ptr(3), Unit: "calls"},
-			"tool_mcp_github_list_issues":        {Used: float64Ptr(4), Unit: "calls"},
-			"tool_github_mcp_server_get_commit":  {Used: float64Ptr(2), Unit: "calls"},
-			"tool_gopls_go_workspace_mcp":        {Used: float64Ptr(1), Unit: "calls"},
-			"tool_calls_total":                   {Used: float64Ptr(20), Unit: "calls"},
-			"tool_success_rate":                  {Used: float64Ptr(98), Unit: "%"},
-			"tool_github_mcp_server_list_issues": {Used: float64Ptr(5), Unit: "calls"},
-		},
-	}
-
-	lines, used := buildActualToolUsageLines(snap, 120, false)
-	joined := strings.Join(lines, "\n")
-
-	if !strings.Contains(joined, "13 calls") {
-		t.Fatalf("expected non-MCP total in heading, got:\n%s", joined)
-	}
-	if !strings.Contains(joined, "view") || !strings.Contains(joined, "bash") {
-		t.Fatalf("expected non-MCP tools to remain, got:\n%s", joined)
-	}
-	if strings.Contains(joined, "github_mcp_server") || strings.Contains(joined, "mcp_github") || strings.Contains(joined, "_mcp") {
-		t.Fatalf("expected MCP tools to be excluded from tool usage, got:\n%s", joined)
-	}
-	for _, key := range []string{
-		"tool_mcp_github_list_issues",
-		"tool_github_mcp_server_get_commit",
-		"tool_gopls_go_workspace_mcp",
-		"tool_github_mcp_server_list_issues",
-	} {
-		if !used[key] {
-			t.Fatalf("expected key %q to be marked as consumed", key)
-		}
-	}
-}
-
-func TestBuildMCPUsageLines_ExpandedShowsHiddenFunctions(t *testing.T) {
-	snap := core.UsageSnapshot{
-		AccountID: "copilot",
-		Metrics: map[string]core.Metric{
-			"mcp_calls_total":              {Used: float64Ptr(11), Unit: "calls"},
-			"mcp_servers_active":           {Used: float64Ptr(1), Unit: "servers"},
-			"mcp_github_total":             {Used: float64Ptr(11), Unit: "calls"},
-			"mcp_github_get_file_contents": {Used: float64Ptr(2), Unit: "calls"},
-			"mcp_github_actions_list":      {Used: float64Ptr(2), Unit: "calls"},
-			"mcp_github_get_commit":        {Used: float64Ptr(2), Unit: "calls"},
-			"mcp_github_list_branches":     {Used: float64Ptr(2), Unit: "calls"},
-			"mcp_github_list_issues":       {Used: float64Ptr(2), Unit: "calls"},
-			"mcp_github_search_code":       {Used: float64Ptr(1), Unit: "calls"},
-		},
-	}
-
-	collapsed, _ := buildMCPUsageLines(snap, 120, false)
-	expanded, _ := buildMCPUsageLines(snap, 120, true)
-	collapsedJoined := strings.Join(collapsed, "\n")
-	expandedJoined := strings.Join(expanded, "\n")
-
-	if !strings.Contains(collapsedJoined, "+ 3 more (Ctrl+O)") {
-		t.Fatalf("collapsed MCP view should show expand hint, got:\n%s", collapsedJoined)
-	}
-	if strings.Contains(expandedJoined, "+ 3 more") {
-		t.Fatalf("expanded MCP view should show all functions, got:\n%s", expandedJoined)
-	}
-	if len(expanded) <= len(collapsed) {
-		t.Fatalf("expanded MCP view should contain more rows; collapsed=%d expanded=%d", len(collapsed), len(expanded))
 	}
 }
 
