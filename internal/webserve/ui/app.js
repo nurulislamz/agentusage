@@ -447,9 +447,7 @@
   }
 
   function isUsageCard(card) {
-    const id = (card.id || "").toLowerCase();
-    const title = (card.title || "").toLowerCase();
-    return id === "usage" || title === "usage";
+    return String(card.title || "").toLowerCase() === "usage";
   }
 
   function usageOnlyCards(v) {
