@@ -7,6 +7,47 @@ import (
 	"unicode/utf8"
 )
 
+type ansiStyleState struct {
+	bold, italic, dim bool
+	fg, bg            string
+}
+
+func (s *ansiStyleState) reset() {
+	s.bold = false
+	s.italic = false
+	s.dim = false
+	s.fg = ""
+	s.bg = ""
+}
+
+func (s *ansiStyleState) hasStyle() bool {
+	return s.bold || s.italic || s.dim || s.fg != "" || s.bg != ""
+}
+
+func (s *ansiStyleState) buildCSS() string {
+	var style strings.Builder
+	if s.bold {
+		style.WriteString("font-weight:700;")
+	}
+	if s.italic {
+		style.WriteString("font-style:italic;")
+	}
+	if s.dim {
+		style.WriteString("opacity:0.65;")
+	}
+	if s.fg != "" {
+		style.WriteString("color:")
+		style.WriteString(s.fg)
+		style.WriteByte(';')
+	}
+	if s.bg != "" {
+		style.WriteString("background:")
+		style.WriteString(s.bg)
+		style.WriteByte(';')
+	}
+	return style.String()
+}
+
 // ANSIToHTML converts lipgloss/ANSI colored terminal text into HTML spans.
 // Supports SGR reset, bold, italic, dim, 256-color, and truecolor fg/bg.
 func ANSIToHTML(s string) string {
@@ -16,11 +57,8 @@ func ANSIToHTML(s string) string {
 	var b strings.Builder
 	b.Grow(len(s) + 64)
 
-	var (
-		bold, italic, dim bool
-		fg, bg            string
-		open              bool
-	)
+	var state ansiStyleState
+	open := false
 
 	flushOpen := func() {
 		if open {
@@ -30,36 +68,17 @@ func ANSIToHTML(s string) string {
 	}
 	openSpan := func() {
 		flushOpen()
-		var style strings.Builder
-		if bold {
-			style.WriteString("font-weight:700;")
-		}
-		if italic {
-			style.WriteString("font-style:italic;")
-		}
-		if dim {
-			style.WriteString("opacity:0.65;")
-		}
-		if fg != "" {
-			style.WriteString("color:")
-			style.WriteString(fg)
-			style.WriteByte(';')
-		}
-		if bg != "" {
-			style.WriteString("background:")
-			style.WriteString(bg)
-			style.WriteByte(';')
-		}
-		if style.Len() == 0 {
+		css := state.buildCSS()
+		if css == "" {
 			return
 		}
 		b.WriteString(`<span style="`)
-		b.WriteString(style.String())
+		b.WriteString(css)
 		b.WriteString(`">`)
 		open = true
 	}
 	ensureStyle := func() {
-		if !open && (bold || italic || dim || fg != "" || bg != "") {
+		if !open && state.hasStyle() {
 			openSpan()
 		}
 	}
@@ -77,83 +96,9 @@ func ANSIToHTML(s string) string {
 			cmd := s[end]
 			params := s[i+2 : end]
 			i = end + 1
-			if cmd != 'm' {
-				continue
-			}
-			flushOpen()
-			if params == "" || params == "0" {
-				bold, italic, dim = false, false, false
-				fg, bg = "", ""
-				continue
-			}
-			parts := strings.Split(params, ";")
-			for j := 0; j < len(parts); j++ {
-				n, err := strconv.Atoi(parts[j])
-				if err != nil {
-					continue
-				}
-				switch {
-				case n == 0:
-					bold, italic, dim = false, false, false
-					fg, bg = "", ""
-				case n == 1:
-					bold = true
-				case n == 2:
-					dim = true
-				case n == 3:
-					italic = true
-				case n == 22:
-					bold, dim = false, false
-				case n == 23:
-					italic = false
-				case n == 39:
-					fg = ""
-				case n == 49:
-					bg = ""
-				case n >= 30 && n <= 37:
-					fg = basicANSIColor(n - 30)
-				case n >= 90 && n <= 97:
-					fg = brightANSIColor(n - 90)
-				case n >= 40 && n <= 47:
-					bg = basicANSIColor(n - 40)
-				case n >= 100 && n <= 107:
-					bg = brightANSIColor(n - 100)
-				case n == 38 || n == 48:
-					isFG := n == 38
-					if j+1 >= len(parts) {
-						continue
-					}
-					mode, _ := strconv.Atoi(parts[j+1])
-					j++
-					switch mode {
-					case 5:
-						if j+1 >= len(parts) {
-							continue
-						}
-						idx, _ := strconv.Atoi(parts[j+1])
-						j++
-						c := ansi256(idx)
-						if isFG {
-							fg = c
-						} else {
-							bg = c
-						}
-					case 2:
-						if j+3 >= len(parts) {
-							continue
-						}
-						r, _ := strconv.Atoi(parts[j+1])
-						g, _ := strconv.Atoi(parts[j+2])
-						bl, _ := strconv.Atoi(parts[j+3])
-						j += 3
-						c := rgb(r, g, bl)
-						if isFG {
-							fg = c
-						} else {
-							bg = c
-						}
-					}
-				}
+			if cmd == 'm' {
+				flushOpen()
+				parseSGRParams(params, &state)
 			}
 			continue
 		}
@@ -169,6 +114,84 @@ func ANSIToHTML(s string) string {
 	}
 	flushOpen()
 	return b.String()
+}
+
+func parseSGRParams(params string, state *ansiStyleState) {
+	if params == "" || params == "0" {
+		state.reset()
+		return
+	}
+	parts := strings.Split(params, ";")
+	for j := 0; j < len(parts); j++ {
+		n, err := strconv.Atoi(parts[j])
+		if err != nil {
+			continue
+		}
+		switch {
+		case n == 0:
+			state.reset()
+		case n == 1:
+			state.bold = true
+		case n == 2:
+			state.dim = true
+		case n == 3:
+			state.italic = true
+		case n == 22:
+			state.bold, state.dim = false, false
+		case n == 23:
+			state.italic = false
+		case n == 39:
+			state.fg = ""
+		case n == 49:
+			state.bg = ""
+		case n >= 30 && n <= 37:
+			state.fg = basicANSIColor(n - 30)
+		case n >= 90 && n <= 97:
+			state.fg = brightANSIColor(n - 90)
+		case n >= 40 && n <= 47:
+			state.bg = basicANSIColor(n - 40)
+		case n >= 100 && n <= 107:
+			state.bg = brightANSIColor(n - 100)
+		case n == 38 || n == 48:
+			parseExtendedColor(n == 38, parts, &j, state)
+		}
+	}
+}
+
+func parseExtendedColor(isFG bool, parts []string, j *int, state *ansiStyleState) {
+	if *j+1 >= len(parts) {
+		return
+	}
+	mode, _ := strconv.Atoi(parts[*j+1])
+	*j++
+	switch mode {
+	case 5:
+		if *j+1 >= len(parts) {
+			return
+		}
+		idx, _ := strconv.Atoi(parts[*j+1])
+		*j++
+		c := ansi256(idx)
+		if isFG {
+			state.fg = c
+		} else {
+			state.bg = c
+		}
+	case 2:
+		if *j+3 >= len(parts) {
+			return
+		}
+		r, _ := strconv.Atoi(parts[*j+1])
+		g, _ := strconv.Atoi(parts[*j+2])
+		bl, _ := strconv.Atoi(parts[*j+3])
+		*j += 3
+		c := rgb(r, g, bl)
+		if isFG {
+			state.fg = c
+		} else {
+			state.bg = c
+		}
+	}
 }
 
 func rgb(r, g, b int) string {
