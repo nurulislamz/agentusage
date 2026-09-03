@@ -526,7 +526,8 @@
       const bar = pct != null
         ? `<span class="mini"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>`
         : "";
-      return `<span class="meter ${toneClass(tone)}">
+      const layout = pct != null ? "" : " text";
+      return `<span class="meter${layout} ${toneClass(tone)}">
         <span class="meter-lab">${esc(line.short || line.label || "")}</span>
         ${bar}
         <span class="meter-val">${val}</span>

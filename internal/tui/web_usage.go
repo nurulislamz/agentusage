@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
 )
 
@@ -23,6 +24,13 @@ func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, car
 	timers := projectTimerRows(snap, widget, now)
 	used := make([]bool, len(timers))
 	card := findUsageCard(cards)
+	hasGauge := false
+	for _, row := range card.Rows {
+		if row.Kind == "gauge" {
+			hasGauge = true
+			break
+		}
+	}
 
 	lines := make([]WebUsageLine, 0, len(card.Rows)+len(timers))
 	for _, row := range card.Rows {
@@ -43,15 +51,21 @@ func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, car
 			}
 			lines = append(lines, line)
 		case "kv":
-			if looksLikeUsageKV(row.Label) {
-				lines = append(lines, WebUsageLine{
-					Label: row.Label,
-					Short: shortUsageLabel(row.Label),
-					Value: row.Value,
-					Hint:  row.Hint,
-					Tone:  row.Tone,
-				})
+			if skipUsageKV(row.Label, hasGauge) {
+				continue
 			}
+			line := WebUsageLine{
+				Label: row.Label,
+				Short: shortUsageLabel(row.Label),
+				Value: row.Value,
+				Hint:  row.Hint,
+				Tone:  row.Tone,
+			}
+			if i, timer := matchTimerRow(row.Label+" "+row.Value, timers); i >= 0 {
+				used[i] = true
+				line = applyTimerToUsageLine(line, timer)
+			}
+			lines = append(lines, line)
 		}
 	}
 
@@ -66,16 +80,33 @@ func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, car
 		}
 		lines = append(lines, applyTimerToUsageLine(line, timer))
 	}
-
-	if len(lines) == 0 && strings.TrimSpace(snap.Message) != "" {
-		lines = append(lines, WebUsageLine{
-			Label: "Status",
-			Short: "Status",
-			Value: strings.TrimSpace(snap.Message),
-			Tone:  "dim",
-		})
-	}
 	return lines
+}
+
+func ensureUsageLines(view *WebAccountView, usageMode string) {
+	if view == nil || len(view.UsageLines) > 0 {
+		return
+	}
+	isUsed := usageMode == config.UsageModeUsed
+	if view.HasGauge {
+		pct := view.GaugePercent
+		view.UsageLines = []WebUsageLine{{
+			Label:   "Usage",
+			Short:   "Usage",
+			Percent: &pct,
+			Value:   view.Summary,
+			Tone:    quotaTone(pct, isUsed),
+		}}
+		return
+	}
+	if s := strings.TrimSpace(view.Summary); s != "" {
+		view.UsageLines = []WebUsageLine{{
+			Label: "Usage",
+			Short: "Usage",
+			Value: s,
+			Tone:  "dim",
+		}}
+	}
 }
 
 func findUsageCard(cards []WebDetailCard) WebDetailCard {
@@ -104,19 +135,16 @@ func isUsageCardTitle(id, title string) bool {
 	return title == "usage"
 }
 
-func looksLikeUsageKV(label string) bool {
-	lower := strings.ToLower(label)
-	if strings.Contains(lower, "cost") || strings.Contains(lower, "spend") || strings.Contains(lower, "$") {
+func skipUsageKV(label string, hasGauge bool) bool {
+	lower := strings.ToLower(strings.TrimSpace(label))
+	switch lower {
+	case "tokens", "activity", "models", "tools", "spend", "spending":
+		return true
+	case "quota", "credits", "subscription":
+		return hasGauge
+	default:
 		return false
 	}
-	return strings.Contains(lower, "limit") ||
-		strings.Contains(lower, "quota") ||
-		strings.Contains(lower, "cap") ||
-		strings.Contains(lower, "remaining") ||
-		strings.Contains(lower, "used") ||
-		strings.Contains(lower, "allowance") ||
-		strings.Contains(lower, "window") ||
-		strings.Contains(lower, "reset")
 }
 
 func matchTimerRow(label string, timers []WebDetailRow) (int, WebDetailRow) {

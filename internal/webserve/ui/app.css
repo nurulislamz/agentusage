@@ -365,6 +365,10 @@ code {
   white-space: nowrap;
 }
 
+.meter.text {
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+}
+
 .meter-reset.urgent {
   color: var(--warn);
 }

@@ -228,6 +228,7 @@ func (p WebProjector) ProjectSnapshot(snap core.UsageSnapshot, providerName stri
 	if di.gaugePercent >= 0 {
 		view.GaugePercent = di.gaugePercent
 	}
+	ensureUsageLines(&view, m.usageMode)
 	if cost := snap.DailySeries["cost"]; len(cost) > 0 {
 		view.DailyCost = cost
 	} else if cost := snap.DailySeries["analytics_cost"]; len(cost) > 0 {
