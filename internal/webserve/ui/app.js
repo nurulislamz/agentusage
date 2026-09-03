@@ -1119,113 +1119,160 @@
   function renderMatrixLayout(views, fetchHtml) {
     const panel = $("panel");
     const hasAnyTrends = views.some((v) => v.daily_cost && v.daily_cost.length > 1);
+    const groups = groupViewsByProvider(views);
 
-    const rows = views.map((v, i) => {
-      const sel = i === state.selected;
-      const isExp = state.matrixExpanded === i;
-      const lines = usageLines(v);
-      const refreshing = isViewRefreshing(v);
+    const trendTh = hasAnyTrends ? `<th scope="col">TREND</th>` : "";
+    const colSpan = hasAnyTrends ? 8 : 7;
+    const colgroup = `
+      <colgroup>
+        <col style="width: 25%">
+        <col style="width: 12%">
+        <col style="width: 17%">
+        <col style="width: 17%">
+        <col style="width: 17%">
+        <col style="width: 12%">
+        ${hasAnyTrends ? '<col style="width: 80px">' : ''}
+        <col style="width: 32px">
+      </colgroup>
+    `;
 
-      const renderQuotaCell = (l) => {
-        if (!l) return `<span class="dim">—</span>`;
-        const pct = clampPct(l.percent);
-        const tone = l.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
-        if (pct == null) {
-          return `<span class="matrix-metric-wrap"><span class="matrix-metric-lab">${esc(l.short || l.label || "")}</span><span class="matrix-metric-val">${esc(l.value || "—")}</span></span>`;
+    const groupHtml = groups.map((grp) => {
+      const anyCrit = grp.items.some(({ view }) => {
+        const s = (view.status_badge || view.status || "").toLowerCase();
+        return s.includes("limit") || s.includes("err") || s.includes("crit");
+      });
+      const anyWarn = !anyCrit && grp.items.some(({ view }) => {
+        const s = (view.status_badge || view.status || "").toLowerCase();
+        return s.includes("warn") || s.includes("auth");
+      });
+      const statusBadge = anyCrit
+        ? `<span class="pill pill-crit">ATTENTION</span>`
+        : anyWarn
+        ? `<span class="pill pill-warn">WARNING</span>`
+        : `<span class="pill pill-ok">ALL OK</span>`;
+
+      const rows = grp.items.map(({ view: v, index: i }) => {
+        const sel = i === state.selected;
+        const isExp = state.matrixExpanded === i;
+        const lines = usageLines(v);
+        const refreshing = isViewRefreshing(v);
+
+        const renderQuotaCell = (l) => {
+          if (!l) return `<span class="dim">—</span>`;
+          const pct = clampPct(l.percent);
+          const tone = l.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+          if (pct == null) {
+            return `<span class="matrix-metric-wrap"><span class="matrix-metric-lab">${esc(l.short || l.label || "")}</span><span class="matrix-metric-val">${esc(l.value || "—")}</span></span>`;
+          }
+          return `
+            <div class="matrix-metric-wrap ${toneClass(tone)}">
+              <span class="matrix-metric-lab">${esc(l.short || l.label || "")}</span>
+              <span class="matrix-metric-bar"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>
+              <span class="matrix-metric-val">${pct.toFixed(0)}%</span>
+            </div>
+          `;
+        };
+
+        // In the matrix view, Antigravity only has 2 quotas (5h and Week); it does not have a Quota 3.
+        // Secondary model pools should not spill into Quota 3, and quota windows should not duplicate across columns.
+        let matrixLines = lines;
+        if ((v.provider_id || "") === "antigravity") {
+          const firstGroup = lines[0]?.group || "";
+          matrixLines = lines.filter((l) => (l.group || "") === firstGroup).slice(0, 2);
+        } else {
+          const seen = new Set();
+          matrixLines = lines.filter((l) => {
+            const k = (l.short || l.label || "").toLowerCase().trim();
+            if (!k || seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
         }
-        return `
-          <div class="matrix-metric-wrap ${toneClass(tone)}">
-            <span class="matrix-metric-lab">${esc(l.short || l.label || "")}</span>
-            <span class="matrix-metric-bar"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>
-            <span class="matrix-metric-val">${pct.toFixed(0)}%</span>
-          </div>
-        `;
-      };
 
-      // In the matrix view, Antigravity only has 2 quotas (5h and Week); it does not have a Quota 3.
-      // Secondary model pools should not spill into Quota 3, and quota windows should not duplicate across columns.
-      let matrixLines = lines;
-      if ((v.provider_id || "") === "antigravity") {
-        const firstGroup = lines[0]?.group || "";
-        matrixLines = lines.filter((l) => (l.group || "") === firstGroup).slice(0, 2);
-      } else {
-        const seen = new Set();
-        matrixLines = lines.filter((l) => {
-          const k = (l.short || l.label || "").toLowerCase().trim();
-          if (!k || seen.has(k)) return false;
-          seen.add(k);
-          return true;
-        });
-      }
+        const q1 = renderQuotaCell(matrixLines[0]);
+        const q2 = renderQuotaCell(matrixLines[1]);
+        const q3 = renderQuotaCell(matrixLines[2]);
+        const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
+        const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
+        const spark = (v.daily_cost && v.daily_cost.length > 1)
+          ? sparkBars(v.daily_cost, 72, 18) || sparkLine(v.daily_cost, 72, 18)
+          : `<span class="dim">—</span>`;
 
-      const q1 = renderQuotaCell(matrixLines[0]);
-      const q2 = renderQuotaCell(matrixLines[1]);
-      const q3 = renderQuotaCell(matrixLines[2]);
-      const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
-      const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
-      const spark = (v.daily_cost && v.daily_cost.length > 1)
-        ? sparkBars(v.daily_cost, 72, 18) || sparkLine(v.daily_cost, 72, 18)
-        : `<span class="dim">—</span>`;
+        const trendTd = hasAnyTrends ? `<td><div class="matrix-trend">${spark}</div></td>` : "";
 
-      const trendTd = hasAnyTrends ? `<td><div class="matrix-trend">${spark}</div></td>` : "";
-      const colSpan = hasAnyTrends ? 8 : 7;
-
-      const mainRow = `
-        <tr class="matrix-row${sel ? " selected" : ""}${isExp ? " expanded" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}" style="--p:${esc(v.accent_color || "var(--accent)")}">
-          <td>
-            <div class="matrix-app">
-              <span class="matrix-app-icon">${esc(v.status_icon || "●")}</span>
-              <div>
-                <div class="matrix-app-title">${esc(v.account_id)}</div>
-                <div class="matrix-app-sub">${esc(v.provider_id)}</div>
+        const mainRow = `
+          <tr class="matrix-row${sel ? " selected" : ""}${isExp ? " expanded" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}" style="--p:${esc(v.accent_color || grp.accent_color)}">
+            <td>
+              <div class="matrix-app">
+                <span class="matrix-app-icon">${esc(v.status_icon || "●")}</span>
+                <div>
+                  <div class="matrix-app-title">${esc(v.account_id)}</div>
+                </div>
               </div>
+            </td>
+            <td><span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span></td>
+            <td>${q1}</td>
+            <td>${q2}</td>
+            <td>${q3}</td>
+            <td><span class="matrix-reset${isUrgent ? " urgent" : ""}">${esc(next ? "⏱ " + next : "—")}</span></td>
+            ${trendTd}
+            <td><span class="matrix-toggle" title="Toggle details">${isExp ? "▾" : "▸"}</span></td>
+          </tr>
+        `;
+
+        const drawerRow = isExp ? `
+          <tr class="matrix-drawer-row">
+            <td colspan="${colSpan}">
+              <div class="matrix-drawer">
+                ${renderCockpit(v)}
+              </div>
+            </td>
+          </tr>
+        ` : "";
+
+        return mainRow + drawerRow;
+      }).join("");
+
+      return `
+        <section class="provider-group-box" style="--p:${esc(grp.accent_color)}">
+          <header class="provider-group-header">
+            <div class="provider-group-title">
+              <span class="provider-indicator" aria-hidden="true"></span>
+              <span class="provider-name">${esc(grp.provider_name.toUpperCase())}</span>
+              <span class="provider-count">${grp.items.length} ${grp.items.length === 1 ? 'AGENT' : 'AGENTS'}</span>
             </div>
-          </td>
-          <td><span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span></td>
-          <td>${q1}</td>
-          <td>${q2}</td>
-          <td>${q3}</td>
-          <td><span class="matrix-reset${isUrgent ? " urgent" : ""}">${esc(next ? "⏱ " + next : "—")}</span></td>
-          ${trendTd}
-          <td><span class="matrix-toggle" title="Toggle details">${isExp ? "▾" : "▸"}</span></td>
-        </tr>
+            <div class="provider-group-meta">
+              ${statusBadge}
+            </div>
+          </header>
+          <div class="matrix-table-wrap">
+            <table class="matrix-table" role="table" aria-label="${esc(grp.provider_name)} Matrix">
+              ${colgroup}
+              <thead>
+                <tr>
+                  <th scope="col">ACCOUNT</th>
+                  <th scope="col">STATUS</th>
+                  <th scope="col">QUOTA 1</th>
+                  <th scope="col">QUOTA 2</th>
+                  <th scope="col">QUOTA 3</th>
+                  <th scope="col">NEXT RESET</th>
+                  ${trendTh}
+                  <th scope="col" aria-label="Toggle"></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows}
+              </tbody>
+            </table>
+          </div>
+        </section>
       `;
-
-      const drawerRow = isExp ? `
-        <tr class="matrix-drawer-row">
-          <td colspan="${colSpan}">
-            <div class="matrix-drawer">
-              ${renderCockpit(v)}
-            </div>
-          </td>
-        </tr>
-      ` : "";
-
-      return mainRow + drawerRow;
     }).join("");
-
-    const trendTh = hasAnyTrends ? `<th scope="col">Trend</th>` : "";
 
     panel.innerHTML = `
       ${fetchHtml}
-      <div class="matrix-container">
-        <table class="matrix-table" role="table" aria-label="Dense Roster Matrix">
-          <thead>
-            <tr>
-              <th scope="col">Account</th>
-              <th scope="col">Status</th>
-              <th scope="col">Quota 1</th>
-              <th scope="col">Quota 2</th>
-              <th scope="col">Quota 3</th>
-              <th scope="col">Next Reset</th>
-              ${trendTh}
-              <th scope="col" aria-label="Toggle"></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
+      <div class="matrix-container" role="grid" aria-label="Dense Roster Matrix HUD">
+        ${groupHtml}
       </div>
     `;
 
