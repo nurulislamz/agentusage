@@ -20,14 +20,7 @@ func detectCommandCode(result *Result) {
 		}
 	}
 
-	binPath, _ := exec.LookPath("command-code")
-	if binPath == "" {
-		binPath, _ = exec.LookPath("cmdc")
-	}
-	if binPath == "" {
-		binPath, _ = exec.LookPath("commandcode")
-	}
-
+	binPath := findCommandCodeBinary()
 	if binPath == "" && cmdcConfigDir == "" {
 		return
 	}
@@ -39,45 +32,7 @@ func detectCommandCode(result *Result) {
 		Type:       "cli",
 	})
 
-	var apiKey string
-
-	// 1. Env var check
-	if envKey := os.Getenv("COMMAND_CODE_API_KEY"); strings.TrimSpace(envKey) != "" {
-		apiKey = strings.TrimSpace(envKey)
-	}
-
-	// 2. ~/.commandcode/auth.json check
-	if apiKey == "" && home != "" {
-		authPath := filepath.Join(home, ".commandcode", "auth.json")
-		if raw, err := os.ReadFile(authPath); err == nil {
-			var payload map[string]any
-			if json.Unmarshal(raw, &payload) == nil {
-				if k, ok := payload["apiKey"].(string); ok && strings.TrimSpace(k) != "" {
-					apiKey = strings.TrimSpace(k)
-				} else if k, ok := payload["key"].(string); ok && strings.TrimSpace(k) != "" {
-					apiKey = strings.TrimSpace(k)
-				}
-			}
-		}
-	}
-
-	// 3. ~/.secrets/commandcode.env check
-	if apiKey == "" && home != "" {
-		secPath := filepath.Join(home, ".secrets", "commandcode.env")
-		if raw, err := os.ReadFile(secPath); err == nil {
-			for _, line := range strings.Split(string(raw), "\n") {
-				line = strings.TrimSpace(line)
-				if strings.HasPrefix(line, "COMMAND_CODE_API_KEY=") {
-					k := strings.TrimPrefix(line, "COMMAND_CODE_API_KEY=")
-					k = strings.Trim(k, `"' `)
-					if k != "" {
-						apiKey = k
-						break
-					}
-				}
-			}
-		}
-	}
+	apiKey := findCommandCodeKey(home)
 
 	acct := core.AccountConfig{
 		ID:        "command_code",
@@ -95,4 +50,62 @@ func detectCommandCode(result *Result) {
 		}
 	}
 	result.Accounts = append(result.Accounts, acct)
+}
+
+func findCommandCodeBinary() string {
+	for _, name := range []string{"command-code", "cmdc", "commandcode"} {
+		if binPath, err := exec.LookPath(name); err == nil && binPath != "" {
+			return binPath
+		}
+	}
+	return ""
+}
+
+func findCommandCodeKey(home string) string {
+	if envKey := os.Getenv("COMMAND_CODE_API_KEY"); strings.TrimSpace(envKey) != "" {
+		return strings.TrimSpace(envKey)
+	}
+	if home == "" {
+		return ""
+	}
+	if key := readCommandCodeAuthJSON(filepath.Join(home, ".commandcode", "auth.json")); key != "" {
+		return key
+	}
+	return readCommandCodeSecretsEnv(filepath.Join(home, ".secrets", "commandcode.env"))
+}
+
+func readCommandCodeAuthJSON(path string) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var payload map[string]any
+	if json.Unmarshal(raw, &payload) != nil {
+		return ""
+	}
+	if k, ok := payload["apiKey"].(string); ok && strings.TrimSpace(k) != "" {
+		return strings.TrimSpace(k)
+	}
+	if k, ok := payload["key"].(string); ok && strings.TrimSpace(k) != "" {
+		return strings.TrimSpace(k)
+	}
+	return ""
+}
+
+func readCommandCodeSecretsEnv(path string) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "COMMAND_CODE_API_KEY=") {
+			k := strings.TrimPrefix(line, "COMMAND_CODE_API_KEY=")
+			k = strings.Trim(k, `"' `)
+			if k != "" {
+				return k
+			}
+		}
+	}
+	return ""
 }
