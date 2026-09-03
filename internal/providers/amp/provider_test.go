@@ -40,12 +40,6 @@ func TestDashboardWidgetWiresThroughCodingToolDefaults(t *testing.T) {
 	if !w.ShowClientComposition {
 		t.Error("expected ShowClientComposition=true via CodingToolDashboard")
 	}
-	if !w.ShowLanguageComposition {
-		t.Error("expected ShowLanguageComposition=true via CodingToolDashboard")
-	}
-	if !w.ShowCodeStatsComposition {
-		t.Error("expected ShowCodeStatsComposition=true via CodingToolDashboard")
-	}
 	if len(w.CompactRows) < 3 {
 		t.Errorf("expected >= 3 compact rows, got %d", len(w.CompactRows))
 	}

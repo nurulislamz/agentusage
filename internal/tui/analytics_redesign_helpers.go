@@ -135,15 +135,6 @@ func analyticsTopProject(data costData) (string, float64) {
 	return "—", 0
 }
 
-func analyticsTopMCP(data costData) (string, float64) {
-	for _, server := range data.mcpServers {
-		if server.calls > 0 {
-			return server.name, server.calls
-		}
-	}
-	return "—", 0
-}
-
 func analyticsHotspotValueLabel(value float64, unit string) string {
 	if value <= 0 {
 		return "no data"

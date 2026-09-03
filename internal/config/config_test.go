@@ -843,7 +843,7 @@ func TestLoadFrom_DashboardWidgetSections(t *testing.T) {
 	}
 }
 
-func TestLoadFrom_DashboardWidgetSections_LegacyActualToolUsageAlias(t *testing.T) {
+func TestLoadFrom_DashboardWidgetSections_LegacyActualToolUsageIgnored(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	content := `{
   "dashboard": {
@@ -862,11 +862,8 @@ func TestLoadFrom_DashboardWidgetSections_LegacyActualToolUsageAlias(t *testing.
 		t.Fatal(err)
 	}
 
-	if len(cfg.Dashboard.WidgetSections) != 1 {
-		t.Fatalf("widget_sections count = %d, want 1", len(cfg.Dashboard.WidgetSections))
-	}
-	if cfg.Dashboard.WidgetSections[0].ID != core.DashboardSectionToolUsage || !cfg.Dashboard.WidgetSections[0].Enabled {
-		t.Fatalf("section[0] = %#v, want tool_usage enabled=true", cfg.Dashboard.WidgetSections[0])
+	if len(cfg.Dashboard.WidgetSections) != 0 {
+		t.Fatalf("widget_sections count = %d, want 0", len(cfg.Dashboard.WidgetSections))
 	}
 }
 

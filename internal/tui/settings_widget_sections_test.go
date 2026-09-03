@@ -278,14 +278,10 @@ func TestSettingsWidgetPreviewBodyHeight_SideBySideShrinksToContent(t *testing.T
 	m.setWidgetSectionEntries([]config.DashboardWidgetSection{
 		{ID: core.DashboardSectionTopUsageProgress, Enabled: true},
 		{ID: core.DashboardSectionModelBurn, Enabled: true},
-		{ID: core.DashboardSectionToolUsage, Enabled: false},
 		{ID: core.DashboardSectionClientBurn, Enabled: false},
-		{ID: core.DashboardSectionLanguageBurn, Enabled: false},
-		{ID: core.DashboardSectionCodeStats, Enabled: false},
 		{ID: core.DashboardSectionDailyUsage, Enabled: false},
 		{ID: core.DashboardSectionProviderBurn, Enabled: false},
 		{ID: core.DashboardSectionUpstreamProviders, Enabled: false},
-		{ID: core.DashboardSectionMCPUsage, Enabled: false},
 		{ID: core.DashboardSectionOtherData, Enabled: false},
 	})
 

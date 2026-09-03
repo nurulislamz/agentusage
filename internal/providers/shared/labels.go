@@ -2,40 +2,6 @@ package shared
 
 import "github.com/nurulislamz/agentusage/internal/core"
 
-// DefaultCodeStatsConfig returns the standard CodeStatsConfig used by coding-tool providers.
-func DefaultCodeStatsConfig() core.CodeStatsConfig {
-	return core.CodeStatsConfig{
-		LinesAdded:   "composer_lines_added",
-		LinesRemoved: "composer_lines_removed",
-		FilesChanged: "composer_files_changed",
-		Commits:      "scored_commits",
-		AIPercent:    "ai_code_percentage",
-		Prompts:      "total_prompts",
-	}
-}
-
-// CodeStatsMetricLabels are display labels shared across coding-tool providers.
-var CodeStatsMetricLabels = map[string]string{
-	"composer_lines_added":   "Lines Added",
-	"composer_lines_removed": "Lines Removed",
-	"composer_files_changed": "Files Changed",
-	"scored_commits":         "Commits",
-	"total_prompts":          "Prompts",
-	"ai_code_percentage":     "AI Code",
-	"cache_hit_ratio":        "Cache Hit",
-}
-
-// CodeStatsCompactLabels are compact (tile pill) labels for code stats metrics.
-var CodeStatsCompactLabels = map[string]string{
-	"composer_lines_added":   "added",
-	"composer_lines_removed": "removed",
-	"composer_files_changed": "files",
-	"scored_commits":         "commits",
-	"total_prompts":          "prompts",
-	"ai_code_percentage":     "ai %",
-	"cache_hit_ratio":        "cache hit",
-}
-
 // CodingToolHidePrefixes returns the set of metric prefixes hidden by most coding-tool providers.
 func CodingToolHidePrefixes() []string {
 	return []string{
@@ -51,10 +17,7 @@ func CodingToolSectionOrder() []core.DashboardStandardSection {
 		core.DashboardSectionTopUsageProgress,
 		core.DashboardSectionModelBurn,
 		core.DashboardSectionClientBurn,
-		core.DashboardSectionToolUsage,
-		core.DashboardSectionMCPUsage,
-		core.DashboardSectionLanguageBurn,
-		core.DashboardSectionCodeStats,
 		core.DashboardSectionOtherData,
 	}
 }
+

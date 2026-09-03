@@ -500,18 +500,6 @@ func emptyTileSectionContent(sectionID core.DashboardStandardSection, widget cor
 		return heading, "No client data for this time range"
 	case core.DashboardSectionProjectBreakdown:
 		return "Project Breakdown", "No project data for this time range"
-	case core.DashboardSectionToolUsage:
-		heading = "Tool Usage"
-		if strings.TrimSpace(widget.ToolCompositionHeading) != "" {
-			heading = strings.TrimSpace(widget.ToolCompositionHeading)
-		}
-		return heading, "No tool data for this time range"
-	case core.DashboardSectionMCPUsage:
-		return "MCP Usage", "No MCP data for this time range"
-	case core.DashboardSectionLanguageBurn:
-		return "Language", "No language data for this time range"
-	case core.DashboardSectionCodeStats:
-		return "Code Statistics", "No code stats for this time range"
 	case core.DashboardSectionDailyUsage:
 		return "Daily Usage", "No daily usage data for this time range"
 	case core.DashboardSectionProviderBurn:

@@ -85,7 +85,7 @@ func TestBuildDetailTrendsSection_IncludesBreakdownCharts(t *testing.T) {
 	lines := buildDetailTrendsSection(snap, widget, 96, core.TimeWindowAll)
 	out := StripANSI(strings.Join(lines, "\n"))
 
-	for _, title := range []string{"Model Breakdown", "Client Breakdown", "Project Breakdown", "MCP Usage"} {
+	for _, title := range []string{"Model Breakdown", "Client Breakdown", "Project Breakdown"} {
 		if !strings.Contains(out, title) {
 			t.Fatalf("expected %q chart in trends output, got:\n%s", title, out)
 		}

@@ -17,18 +17,16 @@ func dashboardWidget() core.DashboardWidget {
 			core.DashboardCompactRow{Label: "Team", Keys: []string{"team_size", "team_owners"}, MaxSegments: 4},
 			core.DashboardCompactRow{Label: "Usage", Keys: []string{"plan_percent_used", "plan_auto_percent_used", "plan_api_percent_used", "composer_context_pct"}, MaxSegments: 4},
 			core.DashboardCompactRow{Label: "Activity", Keys: []string{"requests_today", "total_ai_requests", "composer_sessions", "composer_requests"}, MaxSegments: 4},
-			core.DashboardCompactRow{Label: "Lines", Keys: []string{"composer_lines_added", "composer_lines_removed", "scored_commits", "total_prompts"}, MaxSegments: 4},
 		),
 		providerbase.WithHideMetricKeys(
 			"plan_total_spend_usd", "plan_limit_usd", "plan_included_amount",
 			"team_budget_self", "team_budget_others",
-			"tool_calls_total", "tool_completed", "tool_errored", "tool_cancelled", "tool_success_rate",
 			"session_input_tokens", "session_output_tokens", "session_cached_tokens", "session_reasoning_tokens",
 		),
 		providerbase.WithRawGroups(
 			core.DashboardRawGroup{
 				Label: "Usage Split",
-				Keys:  []string{"model_usage", "client_usage", "tool_usage", "language_usage"},
+				Keys:  []string{"model_usage", "client_usage"},
 			},
 		),
 		providerbase.WithMetricLabels(map[string]string{

@@ -179,15 +179,15 @@ func TestBase_Widgets(t *testing.T) {
 
 	// Custom dashboard preserved
 	customDash := core.DashboardWidget{
-		ShowToolComposition: true,
-		ColorRole:           core.DashboardColorRoleTeal,
+		ShowClientComposition: true,
+		ColorRole:              core.DashboardColorRoleTeal,
 	}
 	bCustomDash := New(core.ProviderSpec{
 		ID:        "test",
 		Dashboard: customDash,
 	})
-	if !bCustomDash.DashboardWidget().ShowToolComposition {
-		t.Error("expected custom DashboardWidget to preserve ShowToolComposition = true")
+	if !bCustomDash.DashboardWidget().ShowClientComposition {
+		t.Error("expected custom DashboardWidget to preserve ShowClientComposition = true")
 	}
 
 	// Default detail fallback when sections empty
@@ -225,7 +225,7 @@ func TestDashboardOptions_AllMutators(t *testing.T) {
 		WithCompactRows(compactRow),
 		WithHideMetricPrefixes("debug_", "internal_"),
 		WithHideMetricKeys("hidden_key"),
-		WithSectionOrder(core.DashboardSectionHeader, core.DashboardSectionToolUsage),
+		WithSectionOrder(core.DashboardSectionHeader, core.DashboardSectionModelBurn),
 		WithMetricLabels(labels),
 		WithCompactLabels(compactLabels),
 		WithRawGroups(rawGroup),
@@ -280,28 +280,8 @@ func TestCodingToolDashboard_DefaultsAndOptions(t *testing.T) {
 	if cd.ClientCompositionHeading != "Clients" {
 		t.Errorf("ClientCompositionHeading = %q, want 'Clients'", cd.ClientCompositionHeading)
 	}
-	if !cd.ShowActualToolUsage {
-		t.Error("expected ShowActualToolUsage = true")
-	}
-	if !cd.ShowMCPUsage {
-		t.Error("expected ShowMCPUsage = true")
-	}
-	if !cd.ShowLanguageComposition {
-		t.Error("expected ShowLanguageComposition = true")
-	}
-	if !cd.ShowCodeStatsComposition {
-		t.Error("expected ShowCodeStatsComposition = true")
-	}
 	if cd.ColorRole != core.DashboardColorRoleGreen {
 		t.Errorf("ColorRole = %v, want Green from option", cd.ColorRole)
-	}
-
-	// Verify shared code-stats labels are mapped
-	if len(cd.MetricLabelOverrides) == 0 {
-		t.Error("MetricLabelOverrides should contain shared CodeStatsMetricLabels")
-	}
-	if len(cd.CompactMetricLabelOverrides) == 0 {
-		t.Error("CompactMetricLabelOverrides should contain shared CodeStatsCompactLabels")
 	}
 }
 

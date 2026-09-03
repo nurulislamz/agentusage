@@ -31,8 +31,6 @@ func dashboardWidget() core.DashboardWidget {
 			core.DashboardSectionModelBurn,
 			core.DashboardSectionClientBurn,
 			core.DashboardSectionUpstreamProviders,
-			core.DashboardSectionToolUsage,
-			core.DashboardSectionLanguageBurn,
 			core.DashboardSectionDailyUsage,
 			core.DashboardSectionOtherData,
 		),
@@ -53,7 +51,7 @@ func dashboardWidget() core.DashboardWidget {
 			core.DashboardRawGroup{
 				Label: "Usage Split",
 				Keys: []string{
-					"model_usage", "model_usage_window", "client_usage", "tool_usage", "tool_usage_source", "language_usage", "language_usage_source", "model_mix_source",
+					"model_usage", "model_usage_window", "client_usage", "model_mix_source",
 				},
 			},
 			core.DashboardRawGroup{
@@ -158,9 +156,6 @@ func dashboardWidget() core.DashboardWidget {
 	cfg.DisplayStyle = core.DashboardDisplayStyleDetailedCredits
 	cfg.ShowClientComposition = true
 	cfg.ClientCompositionHeading = "Projects"
-	cfg.ShowToolComposition = false
-	cfg.ShowActualToolUsage = true
-	cfg.ShowLanguageComposition = true
 	cfg.HideCreditsWhenBalancePresent = true
 	cfg.SuppressZeroNonUsageMetrics = true
 

@@ -213,14 +213,6 @@ func settingsSectionLabel(id core.DashboardStandardSection) string {
 		return "Client Burn"
 	case core.DashboardSectionProjectBreakdown:
 		return "Project Breakdown"
-	case core.DashboardSectionToolUsage:
-		return "Tool Usage"
-	case core.DashboardSectionMCPUsage:
-		return "MCP Usage"
-	case core.DashboardSectionLanguageBurn:
-		return "Language"
-	case core.DashboardSectionCodeStats:
-		return "Code Statistics"
 	case core.DashboardSectionDailyUsage:
 		return "Daily Usage"
 	case core.DashboardSectionProviderBurn:

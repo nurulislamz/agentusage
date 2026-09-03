@@ -75,36 +75,6 @@ func buildDetailSections(snap core.UsageSnapshot, widget core.DashboardWidget, w
 			detailSection{id: "Projects", title: "Projects", lines: projectLines, hasOwnHeader: true})
 	}
 
-	// 6. Tool Usage.
-	if toolLines := buildDetailToolSection(snap, widget, innerW); len(toolLines) > 0 {
-		candidates[core.DetailSectionTools] = append(candidates[core.DetailSectionTools],
-			detailSection{id: "Tools", title: "Tools", lines: toolLines, hasOwnHeader: true})
-	}
-
-	// 7. MCP Usage.
-	if hasMCPMetrics(snap) {
-		if mcpLines := buildDetailMCPLines(snap, innerW); len(mcpLines) > 0 {
-			candidates[core.DetailSectionMCP] = append(candidates[core.DetailSectionMCP],
-				detailSection{id: "MCP", title: "MCP Usage", icon: "🔌", color: colorSky, lines: mcpLines})
-		}
-	}
-
-	// 8. Language breakdown.
-	if hasLanguageMetrics(snap) {
-		if langLines := buildDetailLanguageLines(snap, innerW); len(langLines) > 0 {
-			candidates[core.DetailSectionLanguages] = append(candidates[core.DetailSectionLanguages],
-				detailSection{id: "Languages", title: "Language", icon: "🗂", color: colorPeach, lines: langLines})
-		}
-	}
-
-	// 9. Code Statistics.
-	if widget.ShowCodeStatsComposition {
-		if codeLines, _ := buildProviderCodeStatsLines(snap, widget, innerW); len(codeLines) > 0 {
-			candidates[core.DetailSectionCodeStats] = append(candidates[core.DetailSectionCodeStats],
-				detailSection{id: "Tools", title: "Code Stats", lines: codeLines, hasOwnHeader: true})
-		}
-	}
-
 	// 10. Daily Usage & Trends (with zoom support).
 	if trendLines := buildDetailTrendsSectionWithHide(snap, widget, innerW, timeWindow, hideCosts); len(trendLines) > 0 {
 		candidates[core.DetailSectionTrends] = append(candidates[core.DetailSectionTrends],
@@ -873,41 +843,6 @@ func buildDetailCodexCreditForecastSection(snap core.UsageSnapshot, innerW int) 
 	return lines
 }
 
-// buildDetailToolSection builds the tool usage section.
-func buildDetailToolSection(snap core.UsageSnapshot, widget core.DashboardWidget, innerW int) []string {
-	actualLines, _ := buildActualToolUsageLines(snap, innerW, true)
-	if len(actualLines) > 0 {
-		return actualLines
-	}
-	if widget.ShowToolComposition {
-		toolLines, _ := buildProviderToolCompositionLines(snap, innerW, true, widget)
-		return toolLines
-	}
-	return nil
-}
-
-// buildDetailMCPLines renders MCP usage into lines.
-func buildDetailMCPLines(snap core.UsageSnapshot, innerW int) []string {
-	var sb strings.Builder
-	renderMCPSection(&sb, snap, innerW)
-	out := sb.String()
-	if strings.TrimSpace(out) == "" {
-		return nil
-	}
-	return strings.Split(strings.TrimRight(out, "\n"), "\n")
-}
-
-// buildDetailLanguageLines renders language breakdown into lines.
-func buildDetailLanguageLines(snap core.UsageSnapshot, innerW int) []string {
-	var sb strings.Builder
-	renderLanguagesSection(&sb, snap, innerW)
-	out := sb.String()
-	if strings.TrimSpace(out) == "" {
-		return nil
-	}
-	return strings.Split(strings.TrimRight(out, "\n"), "\n")
-}
-
 // buildDetailOtherMetrics renders remaining metrics not covered by other sections.
 func buildDetailOtherMetrics(snap core.UsageSnapshot, widget core.DashboardWidget, innerW int, hideCosts bool) []string {
 	if len(snap.Metrics) == 0 {
@@ -940,10 +875,6 @@ func buildDetailOtherMetrics(snap core.UsageSnapshot, widget core.DashboardWidge
 	}
 	_, projectKeys := buildProviderProjectBreakdownLines(snap, innerW, true)
 	for k := range projectKeys {
-		skipKeys[k] = true
-	}
-	_, toolKeys := buildActualToolUsageLines(snap, innerW, true)
-	for k := range toolKeys {
 		skipKeys[k] = true
 	}
 

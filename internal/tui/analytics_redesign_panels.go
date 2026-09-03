@@ -62,7 +62,6 @@ func renderAnalyticsInsightPanel(data costData, summary analyticsSummary, width 
 	topProvider, topProviderCost := analyticsTopProvider(data)
 	topClient, clientValue := analyticsTopClient(data)
 	topProject, projectValue := analyticsTopProject(data)
-	topMCP, mcpValue := analyticsTopMCP(data)
 
 	lines := []string{
 		renderDotLeaderRow("Window", data.timeWindow.Label(), width-4),
@@ -79,9 +78,6 @@ func renderAnalyticsInsightPanel(data costData, summary analyticsSummary, width 
 	}
 	if topProject != "" {
 		lines = append(lines, renderDotLeaderRow("Top project", fmt.Sprintf("%s · %s", topProject, analyticsHotspotValueLabel(projectValue, "req")), width-4))
-	}
-	if topMCP != "" {
-		lines = append(lines, renderDotLeaderRow("Top MCP", fmt.Sprintf("%s · %s", topMCP, analyticsHotspotValueLabel(mcpValue, "calls")), width-4))
 	}
 
 	return renderAnalyticsPanel("What Changed", colorLavender, width, strings.Join(lines, "\n"))
@@ -240,26 +236,6 @@ func renderAnalyticsProjectPanel(data costData, width, limit int) string {
 		}
 	}
 	return renderAnalyticsRankPanel("Project Hotspots", colorPeach, rows, width, "Which projects generated the most usage")
-}
-
-func renderAnalyticsMCPPanel(data costData, width, limit int) string {
-	rows := make([]analyticsRankRow, 0, min(limit, len(data.mcpServers)))
-	for _, server := range data.mcpServers {
-		if server.calls <= 0 {
-			continue
-		}
-		rows = append(rows, analyticsRankRow{
-			name:   server.name,
-			value:  shortCompact(server.calls) + " calls",
-			detail: analyticsHotspotValueLabel(server.calls, "calls"),
-			series: analyticsCropSeries(server.series, data.timeWindow, data.referenceTime),
-			color:  server.color,
-		})
-		if len(rows) >= limit {
-			break
-		}
-	}
-	return renderAnalyticsRankPanel("MCP Hotspots", colorYellow, rows, width, "Server activity distribution across the selected window")
 }
 
 func renderAnalyticsActivityHeatmap(data costData, width int) string {
