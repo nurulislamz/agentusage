@@ -2,6 +2,7 @@ package tui
 
 import (
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -88,6 +89,7 @@ func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, car
 			lines = append(lines, applyTimerToUsageLine(line, timer))
 		}
 	}
+	sortUsageLines(lines)
 	return lines
 }
 
@@ -270,7 +272,7 @@ func usageWindowKey(s string) string {
 	switch {
 	case strings.Contains(s, "five hour"), strings.Contains(s, "5 hour"), strings.Contains(s, "5h"), strings.Contains(s, "rolling"):
 		return "5h"
-	case strings.Contains(s, "week"):
+	case strings.Contains(s, "week"), strings.Contains(s, "7d"), strings.Contains(s, "7 day"), strings.Contains(s, "seven day"):
 		return "week"
 	case strings.Contains(s, "month"):
 		return "month"
@@ -383,3 +385,67 @@ func resetDurationRank(s string) time.Duration {
 	}
 	return d
 }
+
+func sortUsageLines(lines []WebUsageLine) {
+	if len(lines) <= 1 {
+		return
+	}
+	groupOrder := make(map[string]int)
+	for _, l := range lines {
+		if _, ok := groupOrder[l.Group]; !ok {
+			groupOrder[l.Group] = len(groupOrder)
+		}
+	}
+	sort.SliceStable(lines, func(i, j int) bool {
+		gi := groupOrder[lines[i].Group]
+		gj := groupOrder[lines[j].Group]
+		if gi != gj {
+			return gi < gj
+		}
+		return quotaWindowPriority(lines[i]) < quotaWindowPriority(lines[j])
+	})
+}
+
+func quotaWindowPriority(line WebUsageLine) int {
+	s := strings.ToLower(strings.Join([]string{line.Label, line.Short, line.Hint, line.Value}, " "))
+	s = strings.ReplaceAll(s, "-", " ")
+	s = strings.ReplaceAll(s, "_", " ")
+
+	// 5h quota is always first
+	if strings.Contains(s, "five hour") ||
+		strings.Contains(s, "5 hour") ||
+		strings.Contains(s, "5h") ||
+		strings.Contains(s, "rolling") {
+		return 1
+	}
+
+	// Weekly quota is always second
+	if strings.Contains(s, "week") ||
+		strings.Contains(s, "7d") ||
+		strings.Contains(s, "7 day") ||
+		strings.Contains(s, "seven day") {
+		return 2
+	}
+
+	// Monthly quota
+	if strings.Contains(s, "month") ||
+		strings.Contains(s, "30d") ||
+		strings.Contains(s, "monthly") {
+		return 3
+	}
+
+	// Daily quota
+	if strings.Contains(s, "day") ||
+		strings.Contains(s, "daily") ||
+		strings.Contains(s, "today") {
+		return 4
+	}
+
+	// Session quota
+	if strings.Contains(s, "session") {
+		return 5
+	}
+
+	return 10
+}
+

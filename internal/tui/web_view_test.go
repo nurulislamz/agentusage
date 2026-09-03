@@ -481,3 +481,97 @@ func TestAntigravityUsageLinesGroupGeminiAndClaude(t *testing.T) {
 		t.Fatalf("reset-only leftover lines = %d, want 0 (shown on gauges) %#v", resetOnly, view.UsageLines)
 	}
 }
+
+func TestUsageLinesOrder_FiveHourFirstThenWeekly(t *testing.T) {
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	// 1. Single-group / ungrouped snapshot (Command Code)
+	snapCC := core.UsageSnapshot{
+		ProviderID: "command_code",
+		AccountID:  "command-code-main",
+		Timestamp:  now,
+		Status:     core.StatusOK,
+		Attributes: map[string]string{
+			"plan_name":   "GOAT",
+			"monthly_cap": "$70.00",
+			"weekly_cap":  "$35.00",
+		},
+		Metrics: map[string]core.Metric{
+			"monthly_subscription": {Remaining: core.Float64Ptr(48.8)},
+			"weekly_usage":         {Remaining: core.Float64Ptr(80.0)},
+			"five_hour_usage":      {Remaining: core.Float64Ptr(100.0)},
+		},
+		Resets: map[string]time.Time{
+			"monthly_subscription": now.Add(15 * 24 * time.Hour),
+			"weekly_usage":         now.Add(3 * 24 * time.Hour),
+			"five_hour_usage":      now.Add(4 * time.Hour),
+		},
+	}
+
+	p := WebProjector{
+		Now:         now,
+		UsageMode:   config.UsageModeRemaining,
+		TileWidth:   72,
+		DetailWidth: 80,
+	}
+	viewCC := p.ProjectSnapshot(snapCC, "Command Code")
+	if len(viewCC.UsageLines) < 2 {
+		t.Fatalf("expected at least 2 usage lines, got %d", len(viewCC.UsageLines))
+	}
+	// Verify 5h quota is FIRST
+	if !strings.Contains(strings.ToLower(viewCC.UsageLines[0].Label), "five hour") && viewCC.UsageLines[0].Short != "5h" {
+		t.Fatalf("expected 5h quota to be first, got %#v", viewCC.UsageLines[0])
+	}
+	// Verify weekly quota is SECOND
+	if !strings.Contains(strings.ToLower(viewCC.UsageLines[1].Label), "week") && viewCC.UsageLines[1].Short != "Week" {
+		t.Fatalf("expected weekly quota to be second, got %#v", viewCC.UsageLines[1])
+	}
+
+	// 2. Multi-group snapshot (Antigravity with Gemini & Claude)
+	snapAG := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		AccountID:  "antigravity-main",
+		Timestamp:  now,
+		Status:     core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"quota_gemini_weekly": {Remaining: core.Float64Ptr(60), Unit: "%", Window: "week"},
+			"quota_gemini_5h":     {Remaining: core.Float64Ptr(80), Unit: "%", Window: "5h"},
+			"quota_claude_weekly": {Remaining: core.Float64Ptr(70), Unit: "%", Window: "week"},
+			"quota_claude_5h":     {Remaining: core.Float64Ptr(40), Unit: "%", Window: "5h"},
+		},
+		Resets: map[string]time.Time{
+			"quota_gemini_weekly": now.Add(6 * 24 * time.Hour),
+			"quota_gemini_5h":     now.Add(4 * time.Hour),
+			"quota_claude_weekly": now.Add(5 * 24 * time.Hour),
+			"quota_claude_5h":     now.Add(50 * time.Minute),
+		},
+	}
+	viewAG := p.ProjectSnapshot(snapAG, "Antigravity")
+	var geminiLines []WebUsageLine
+	var claudeLines []WebUsageLine
+	for _, l := range viewAG.UsageLines {
+		if l.Group == "Gemini" {
+			geminiLines = append(geminiLines, l)
+		} else if l.Group == "Claude / GPT" {
+			claudeLines = append(claudeLines, l)
+		}
+	}
+	if len(geminiLines) < 2 {
+		t.Fatalf("expected at least 2 Gemini lines, got %d", len(geminiLines))
+	}
+	if !strings.Contains(strings.ToLower(geminiLines[0].Label), "5h") && geminiLines[0].Short != "5h" {
+		t.Fatalf("expected Gemini 5h to be first in group, got %#v", geminiLines[0])
+	}
+	if !strings.Contains(strings.ToLower(geminiLines[1].Label), "week") && geminiLines[1].Short != "Week" {
+		t.Fatalf("expected Gemini weekly to be second in group, got %#v", geminiLines[1])
+	}
+
+	if len(claudeLines) < 2 {
+		t.Fatalf("expected at least 2 Claude lines, got %d", len(claudeLines))
+	}
+	if !strings.Contains(strings.ToLower(claudeLines[0].Label), "5h") && claudeLines[0].Short != "5h" {
+		t.Fatalf("expected Claude 5h to be first in group, got %#v", claudeLines[0])
+	}
+	if !strings.Contains(strings.ToLower(claudeLines[1].Label), "week") && claudeLines[1].Short != "Week" {
+		t.Fatalf("expected Claude weekly to be second in group, got %#v", claudeLines[1])
+	}
+}

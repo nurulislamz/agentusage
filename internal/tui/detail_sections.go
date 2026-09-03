@@ -299,11 +299,11 @@ func buildAntigravityDetailUsageSection(snap core.UsageSnapshot, innerW int, war
 		}
 
 		if isUsedMode {
-			renderItem("Weekly Limit Used", weeklyKeys, weeklyRemaining)
 			renderItem("Five Hour Limit Used", fiveHourKeys, fiveHourDefault)
+			renderItem("Weekly Limit Used", weeklyKeys, weeklyRemaining)
 		} else {
-			renderItem("Weekly Limit Remaining", weeklyKeys, weeklyRemaining)
 			renderItem("Five Hour Limit Remaining", fiveHourKeys, fiveHourDefault)
+			renderItem("Weekly Limit Remaining", weeklyKeys, weeklyRemaining)
 		}
 	}
 
@@ -519,20 +519,20 @@ func buildCommandCodeDetailUsageSection(snap core.UsageSnapshot, innerW int, war
 		lines = append(lines, "")
 	}
 
+	if isUsedMode {
+		renderItem("Five Hour Limit Used", "five_hour_usage", "five_hour_cap", "five_hour_used")
+		renderItem("Weekly Limit Used", "weekly_usage", "weekly_cap", "weekly_used")
+	} else {
+		renderItem("Five Hour Limit Remaining", "five_hour_usage", "five_hour_cap", "five_hour_used")
+		renderItem("Weekly Limit Remaining", "weekly_usage", "weekly_cap", "weekly_used")
+	}
+
 	if _, ok := snap.Metrics["monthly_subscription"]; ok {
 		if isUsedMode {
 			renderItem("Monthly Subscription Used", "monthly_subscription", "monthly_cap", "monthly_used")
 		} else {
 			renderItem("Monthly Subscription Remaining", "monthly_subscription", "monthly_cap", "monthly_used")
 		}
-	}
-
-	if isUsedMode {
-		renderItem("Weekly Limit Used", "weekly_usage", "weekly_cap", "weekly_used")
-		renderItem("Five Hour Limit Used", "five_hour_usage", "five_hour_cap", "five_hour_used")
-	} else {
-		renderItem("Weekly Limit Remaining", "weekly_usage", "weekly_cap", "weekly_used")
-		renderItem("Five Hour Limit Remaining", "five_hour_usage", "five_hour_cap", "five_hour_used")
 	}
 
 	compactLines, _ := buildTileCompactMetricSummaryLinesWithHide(snap, dashboardWidget(snap.ProviderID), innerW, false)

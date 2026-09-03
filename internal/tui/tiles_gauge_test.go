@@ -483,3 +483,54 @@ func TestBuildTileGaugeLines_CustomProviders(t *testing.T) {
 		t.Errorf("expected Monthly Subscription Remaining in command_code lines, got %v", linesCc)
 	}
 }
+
+func TestBuildTileGaugeLines_FiveHourBeforeWeekly(t *testing.T) {
+	now := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	m := tileGaugeTestModel(now)
+	widget := tileGaugeTestWidget()
+
+	// 1. Antigravity Tile
+	snapAg := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		Metrics: map[string]core.Metric{
+			"quota_gemini_weekly": {Remaining: core.Float64Ptr(60), Window: "week"},
+			"quota_gemini_5h":     {Remaining: core.Float64Ptr(80), Window: "5h"},
+		},
+		Resets: map[string]time.Time{
+			"quota_gemini_weekly": now.Add(24 * time.Hour),
+			"quota_gemini_5h":     now.Add(4 * time.Hour),
+		},
+	}
+	linesAg := strings.Join(m.buildTileGaugeLines(snapAg, widget, 60), "\n")
+	idxAg5h := strings.Index(linesAg, "Five Hour Limit Remaining")
+	idxAgWk := strings.Index(linesAg, "Weekly Limit Remaining")
+	if idxAg5h == -1 || idxAgWk == -1 {
+		t.Fatalf("expected both 5h and weekly in antigravity tile, got:\n%s", linesAg)
+	}
+	if idxAg5h > idxAgWk {
+		t.Fatalf("expected Five Hour Limit (pos %d) before Weekly Limit (pos %d) in antigravity tile", idxAg5h, idxAgWk)
+	}
+
+	// 2. Command Code Tile
+	snapCc := core.UsageSnapshot{
+		ProviderID: "command_code",
+		Metrics: map[string]core.Metric{
+			"five_hour_usage": {Remaining: core.Float64Ptr(90), Window: "5h"},
+			"weekly_usage":    {Remaining: core.Float64Ptr(70), Window: "week"},
+		},
+		Resets: map[string]time.Time{
+			"five_hour_usage": now.Add(4 * time.Hour),
+			"weekly_usage":    now.Add(36 * time.Hour),
+		},
+	}
+	linesCc := strings.Join(m.buildTileGaugeLines(snapCc, widget, 60), "\n")
+	idxCc5h := strings.Index(linesCc, "Five Hour Limit Remaining")
+	idxCcWk := strings.Index(linesCc, "Weekly Limit Remaining")
+	if idxCc5h == -1 || idxCcWk == -1 {
+		t.Fatalf("expected both 5h and weekly in command code tile, got:\n%s", linesCc)
+	}
+	if idxCc5h > idxCcWk {
+		t.Fatalf("expected Five Hour Limit (pos %d) before Weekly Limit (pos %d) in command code tile", idxCc5h, idxCcWk)
+	}
+}
+

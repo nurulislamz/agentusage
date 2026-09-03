@@ -148,7 +148,7 @@ func New() *Provider {
 			},
 			Dashboard: providerbase.DefaultDashboard(
 				providerbase.WithColorRole(core.DashboardColorRoleBlue),
-				providerbase.WithGaugePriority("monthly_subscription", "weekly_usage", "five_hour_usage", "balance"),
+				providerbase.WithGaugePriority("five_hour_usage", "weekly_usage", "monthly_subscription", "balance"),
 				providerbase.WithGaugeMaxLines(3),
 				providerbase.WithCompactRows(
 					core.DashboardCompactRow{

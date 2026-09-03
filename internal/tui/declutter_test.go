@@ -278,3 +278,56 @@ func TestTileDeclutter_NoTileHeaderResetPills(t *testing.T) {
 		t.Errorf("expected tile not to contain weekly reset pill, got:\n%s", tile)
 	}
 }
+
+func TestDetailContent_FiveHourBeforeWeekly(t *testing.T) {
+	now := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
+
+	// 1. Antigravity Detail
+	snapAg := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		AccountID:  "antigravity-test",
+		Timestamp:  now,
+		Metrics: map[string]core.Metric{
+			"quota_gemini_weekly": {Remaining: core.Float64Ptr(60)},
+			"quota_gemini_5h":     {Remaining: core.Float64Ptr(80)},
+		},
+		Resets: map[string]time.Time{
+			"quota_gemini_weekly": now.Add(24 * time.Hour),
+			"quota_gemini_5h":     now.Add(4 * time.Hour),
+		},
+	}
+	detailAg := RenderDetailContent(snapAg, now, 80, 0.2, 0.05, 0, core.TimeWindow30d, false, config.UsageModeRemaining)
+	posAg5h := strings.Index(detailAg, "Five Hour Limit Remaining")
+	posAgWk := strings.Index(detailAg, "Weekly Limit Remaining")
+	if posAg5h == -1 || posAgWk == -1 {
+		t.Fatalf("expected both 5h and weekly in antigravity detail, got:\n%s", detailAg)
+	}
+	if posAg5h > posAgWk {
+		t.Fatalf("expected Five Hour Limit (pos %d) before Weekly Limit (pos %d) in antigravity detail", posAg5h, posAgWk)
+	}
+
+	// 2. Command Code Detail
+	snapCc := core.UsageSnapshot{
+		ProviderID: "command_code",
+		AccountID:  "command-code-test",
+		Timestamp:  now,
+		Metrics: map[string]core.Metric{
+			"five_hour_usage": {Remaining: core.Float64Ptr(90)},
+			"weekly_usage":    {Remaining: core.Float64Ptr(70)},
+		},
+		Resets: map[string]time.Time{
+			"five_hour_usage": now.Add(4 * time.Hour),
+			"weekly_usage":    now.Add(36 * time.Hour),
+		},
+	}
+	detailCc := RenderDetailContent(snapCc, now, 80, 0.2, 0.05, 0, core.TimeWindow30d, false, config.UsageModeRemaining)
+	posCc5h := strings.Index(detailCc, "Five Hour Limit Remaining")
+	posCcWk := strings.Index(detailCc, "Weekly Limit Remaining")
+	if posCc5h == -1 || posCcWk == -1 {
+		t.Fatalf("expected both 5h and weekly in command code detail, got:\n%s", detailCc)
+	}
+	if posCc5h > posCcWk {
+		t.Fatalf("expected Five Hour Limit (pos %d) before Weekly Limit (pos %d) in command code detail", posCc5h, posCcWk)
+	}
+}
+

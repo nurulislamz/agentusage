@@ -408,9 +408,34 @@
     return String(s || "").replace(/^(resets?\s+in\s+|in\s+)/i, "").trim();
   }
 
+  function quotaWindowPriority(line) {
+    const s = String((line.label || "") + " " + (line.short || "") + " " + (line.hint || "") + " " + (line.value || "")).toLowerCase().replace(/[-_]/g, " ");
+    if (s.includes("five hour") || s.includes("5 hour") || s.includes("5h") || s.includes("rolling")) return 1;
+    if (s.includes("week") || s.includes("7d") || s.includes("7 day") || s.includes("seven day")) return 2;
+    if (s.includes("month") || s.includes("30d") || s.includes("monthly")) return 3;
+    if (s.includes("day") || s.includes("daily") || s.includes("today")) return 4;
+    if (s.includes("session")) return 5;
+    return 10;
+  }
+
+  function sortUsageLines(lines) {
+    if (!lines || lines.length <= 1) return lines;
+    const groupOrder = new Map();
+    lines.forEach((l) => {
+      const g = l.group || "";
+      if (!groupOrder.has(g)) groupOrder.set(g, groupOrder.size);
+    });
+    return lines.slice().sort((a, b) => {
+      const ga = groupOrder.get(a.group || "");
+      const gb = groupOrder.get(b.group || "");
+      if (ga !== gb) return ga - gb;
+      return quotaWindowPriority(a) - quotaWindowPriority(b);
+    });
+  }
+
   function usageLines(v) {
     if (!v) return [];
-    if (v.usage_lines && v.usage_lines.length) return v.usage_lines;
+    if (v.usage_lines && v.usage_lines.length) return sortUsageLines(v.usage_lines);
     const lines = [];
     if (v.has_gauge) {
       lines.push({
@@ -434,7 +459,7 @@
         tone: r.urgent ? "crit" : "ok",
       });
     });
-    return lines;
+    return sortUsageLines(lines);
   }
 
   function parseRatio(s) {

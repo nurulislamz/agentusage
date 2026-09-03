@@ -479,11 +479,11 @@ func (m Model) buildAntigravityTileGaugeLines(snap core.UsageSnapshot, innerW in
 		}
 
 		if isUsed {
-			renderItem("Weekly Limit Used", weeklyKeys, weeklyRemaining)
 			renderItem("Five Hour Limit Used", fiveHourKeys, fiveHourDefault)
+			renderItem("Weekly Limit Used", weeklyKeys, weeklyRemaining)
 		} else {
-			renderItem("Weekly Limit Remaining", weeklyKeys, weeklyRemaining)
 			renderItem("Five Hour Limit Remaining", fiveHourKeys, fiveHourDefault)
+			renderItem("Weekly Limit Remaining", weeklyKeys, weeklyRemaining)
 		}
 	}
 
@@ -678,20 +678,20 @@ func (m Model) buildCommandCodeTileGaugeLines(snap core.UsageSnapshot, innerW in
 		lines = append(lines, "")
 	}
 
+	if isUsed {
+		renderItem("Five Hour Limit Used", "five_hour_usage", "five_hour_cap", "five_hour_used")
+		renderItem("Weekly Limit Used", "weekly_usage", "weekly_cap", "weekly_used")
+	} else {
+		renderItem("Five Hour Limit Remaining", "five_hour_usage", "five_hour_cap", "five_hour_used")
+		renderItem("Weekly Limit Remaining", "weekly_usage", "weekly_cap", "weekly_used")
+	}
+
 	if _, ok := snap.Metrics["monthly_subscription"]; ok {
 		if isUsed {
 			renderItem("Monthly Subscription Used", "monthly_subscription", "monthly_cap", "monthly_used")
 		} else {
 			renderItem("Monthly Subscription Remaining", "monthly_subscription", "monthly_cap", "monthly_used")
 		}
-	}
-
-	if isUsed {
-		renderItem("Weekly Limit Used", "weekly_usage", "weekly_cap", "weekly_used")
-		renderItem("Five Hour Limit Used", "five_hour_usage", "five_hour_cap", "five_hour_used")
-	} else {
-		renderItem("Weekly Limit Remaining", "weekly_usage", "weekly_cap", "weekly_used")
-		renderItem("Five Hour Limit Remaining", "five_hour_usage", "five_hour_cap", "five_hour_used")
 	}
 
 	if bal, ok := snap.Metrics["balance"]; ok && bal.Remaining != nil {

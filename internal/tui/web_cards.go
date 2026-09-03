@@ -2,6 +2,7 @@ package tui
 
 import (
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -110,6 +111,7 @@ func projectTimerRows(snap core.UsageSnapshot, widget core.DashboardWidget, now 
 		}
 		rows = append(rows, row)
 	}
+	sortTimerRows(rows)
 	return rows
 }
 
@@ -351,3 +353,51 @@ func headerTone(snap core.UsageSnapshot) string {
 		return "dim"
 	}
 }
+
+func sortTimerRows(rows []WebDetailRow) {
+	if len(rows) <= 1 {
+		return
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		return timerWindowPriority(rows[i]) < timerWindowPriority(rows[j])
+	})
+}
+
+func timerWindowPriority(row WebDetailRow) int {
+	s := strings.ToLower(strings.Join([]string{row.Label, row.Hint, row.Value}, " "))
+	s = strings.ReplaceAll(s, "-", " ")
+	s = strings.ReplaceAll(s, "_", " ")
+
+	if strings.Contains(s, "five hour") ||
+		strings.Contains(s, "5 hour") ||
+		strings.Contains(s, "5h") ||
+		strings.Contains(s, "rolling") {
+		return 1
+	}
+
+	if strings.Contains(s, "week") ||
+		strings.Contains(s, "7d") ||
+		strings.Contains(s, "7 day") ||
+		strings.Contains(s, "seven day") {
+		return 2
+	}
+
+	if strings.Contains(s, "month") ||
+		strings.Contains(s, "30d") ||
+		strings.Contains(s, "monthly") {
+		return 3
+	}
+
+	if strings.Contains(s, "day") ||
+		strings.Contains(s, "daily") ||
+		strings.Contains(s, "today") {
+		return 4
+	}
+
+	if strings.Contains(s, "session") {
+		return 5
+	}
+
+	return 10
+}
+
