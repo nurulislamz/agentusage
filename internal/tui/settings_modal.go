@@ -13,6 +13,7 @@ const (
 	settingsTabAPIKeys
 	settingsTabTelemetry
 	settingsTabIntegrations
+	settingsTabBoxes
 	settingsTabCount
 )
 
@@ -28,6 +29,7 @@ var settingsTabNames = []string{
 	"API Keys",
 	"Telemetry",
 	"Integrations",
+	"Boxes",
 }
 
 func (m *Model) openSettingsModal() {
@@ -64,7 +66,11 @@ func (m *Model) closeSettingsModal() {
 	m.settings.sectionRowCursor = 0
 	m.settings.sectionSubTab = 0
 	m.settings.previewOffset = 0
+	m.settings.boxes.creating = false
+	m.settings.boxes.createInput = ""
+	m.settings.boxes.status = ""
 }
+
 
 func (m Model) settingsModalInfo() string {
 	ids := m.settingsIDs()

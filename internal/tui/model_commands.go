@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/integrations"
 )
+
 
 func (m Model) persistThemeCmd(themeName string) tea.Cmd {
 	return func() tea.Msg {
@@ -351,6 +353,50 @@ func (m Model) installDaemonCmd() tea.Cmd {
 		return daemonInstallResultMsg{err: fn()}
 	}
 }
+
+func (m Model) loadAntigravityBoxesCmd() tea.Cmd {
+	return func() tea.Msg {
+		if m.services == nil {
+			return antigravityBoxesLoadedMsg{Err: fmt.Errorf("box service unavailable")}
+		}
+		boxList, err := m.services.ListAntigravityBoxes()
+		return antigravityBoxesLoadedMsg{Boxes: boxList, Err: err}
+	}
+}
+
+func (m Model) createAntigravityBoxCmd(name string) tea.Cmd {
+	return func() tea.Msg {
+		if m.services == nil {
+			return antigravityBoxCreatedMsg{Name: name, Err: fmt.Errorf("box service unavailable")}
+		}
+		err := m.services.CreateAntigravityBox(name)
+		return antigravityBoxCreatedMsg{Name: name, Err: err}
+	}
+}
+
+func (m Model) deleteAntigravityBoxCmd(name string) tea.Cmd {
+	return func() tea.Msg {
+		if m.services == nil {
+			return antigravityBoxDeletedMsg{Name: name, Err: fmt.Errorf("box service unavailable")}
+		}
+		err := m.services.DeleteAntigravityBox(name)
+		return antigravityBoxDeletedMsg{Name: name, Err: err}
+	}
+}
+
+func (m Model) loginAntigravityBoxCmd(name string) tea.Cmd {
+	return func() tea.Msg {
+		if m.services == nil {
+			return antigravityBoxLoggedInMsg{BoxName: name, Err: fmt.Errorf("box service unavailable")}
+		}
+		err := m.services.LoginAntigravityBox(context.Background(), name, func(authURL string) {
+			// Callback invoked on OAuth URL detection
+		})
+		return antigravityBoxLoggedInMsg{BoxName: name, Err: err}
+	}
+}
+
+
 
 func snapshotsReady(snaps map[string]core.UsageSnapshot) bool {
 	if len(snaps) == 0 {

@@ -9,12 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nurulislamz/agentusage/internal/boxes"
 	"github.com/nurulislamz/agentusage/internal/browsercookies"
 	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/integrations"
 	"github.com/nurulislamz/agentusage/internal/providers"
 )
+
 
 type Service struct {
 	ctx           context.Context
@@ -252,6 +254,28 @@ func (s *Service) AvailableBrowsers() ([]string, error) {
 	return s.cookieReader.AvailableBrowsers(ctx)
 }
 
+func (s *Service) CreateAntigravityBox(name string) error {
+	_, err := boxes.CreateBox(s.ctx, name)
+	return err
+}
+
+func (s *Service) DeleteAntigravityBox(name string) error {
+	return boxes.DeleteBox(s.ctx, name)
+}
+
+func (s *Service) ListAntigravityBoxes() ([]boxes.AntigravityBox, error) {
+	return boxes.ListBoxes(s.ctx)
+}
+
+func (s *Service) LoginAntigravityBox(ctx context.Context, name string, onURL func(string)) error {
+	opts := boxes.LoginOptions{
+		BrowserOpener: s.browserOpener,
+		OnAuthURL:     onURL,
+	}
+	return boxes.LoginBoxSession(ctx, name, opts)
+}
+
+
 // openInDefaultBrowser is the production browser-launcher. exec.Command
 // shells out to the OS-specific URL handler. Tests override via
 // SetBrowserOpener.
@@ -265,3 +289,4 @@ func openInDefaultBrowser(url string) error {
 		return exec.Command("xdg-open", url).Start()
 	}
 }
+

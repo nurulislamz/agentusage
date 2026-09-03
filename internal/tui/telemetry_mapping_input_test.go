@@ -1,13 +1,16 @@
 package tui
 
 import (
+	"context"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nurulislamz/agentusage/internal/boxes"
 	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/integrations"
 )
+
 
 type fakeServices struct {
 	savedSource string
@@ -52,6 +55,15 @@ func (f *fakeServices) LoadBrowserSessionInfo(string) core.BrowserSessionInfo {
 }
 func (f *fakeServices) OpenProviderConsole(string) error     { return nil }
 func (f *fakeServices) AvailableBrowsers() ([]string, error) { return nil, nil }
+func (f *fakeServices) CreateAntigravityBox(string) error    { return nil }
+func (f *fakeServices) DeleteAntigravityBox(string) error    { return nil }
+func (f *fakeServices) ListAntigravityBoxes() ([]boxes.AntigravityBox, error) {
+	return nil, nil
+}
+func (f *fakeServices) LoginAntigravityBox(context.Context, string, func(string)) error {
+	return nil
+}
+
 
 func telemetryFixtureModel() Model {
 	return Model{
