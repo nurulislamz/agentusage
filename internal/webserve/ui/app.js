@@ -919,16 +919,21 @@
     const quotaSection = gaugeCards ? `<section class="card"><div class="card-header"><h2>⚡ USAGE &amp; QUOTAS</h2></div><div class="lin-list">${gaugeCards}</div></section>` : "";
 
     const resets = (v.resets || []).filter((r) => r && r.duration);
-    let timerRows = resets.map((r) => `
+    let timerRows = resets.map((r) => {
+      const hasDistinctTarget = r.target && r.target !== r.duration;
+      const durText = r.duration ? (r.duration.startsWith("in ") ? r.duration : "in " + r.duration) : "";
+      return `
       <div class="timer ${toneClass(r.urgent ? "warn" : "ok")}">
         <span class="dot"></span>
         <span>${esc(r.label || "Reset")}</span>
-        <span class="when">${esc(r.target || r.duration)}</span>
-        <span class="hint">${esc(r.duration ? "in " + r.duration : "")}</span>
+        <span class="when">${esc(hasDistinctTarget ? r.target : durText)}</span>
+        ${hasDistinctTarget ? `<span class="hint">${esc(durText)}</span>` : ""}
       </div>
-    `).join("");
+    `;
+    }).join("");
     if (!timerRows && v.next_reset) {
-      timerRows = `<div class="timer tone-ok"><span class="dot"></span><span>Next Reset</span><span class="when">${esc(v.next_reset)}</span></div>`;
+      const nr = v.next_reset.startsWith("in ") ? v.next_reset : "in " + v.next_reset;
+      timerRows = `<div class="timer tone-ok"><span class="dot"></span><span>Next Reset</span><span class="when">${esc(nr)}</span></div>`;
     }
     const timerSection = timerRows ? `<section class="card"><div class="card-header"><h2>⏱ TIMERS &amp; SCHEDULE</h2></div>${timerRows}</section>` : "";
 
@@ -952,6 +957,11 @@
       }
     }
 
+    let summaryDisplay = summary;
+    if (summaryDisplay && /^\d+(\.\d+)?%$/.test(summaryDisplay.trim())) {
+      summaryDisplay = `${summaryDisplay.trim()} remaining`;
+    }
+
     return `
       <div class="hero">
         <h1>
@@ -965,7 +975,7 @@
         </div>
       </div>
       <div class="subhero">
-        <div>${summary ? `<strong>${esc(summary)}</strong>` : ""}${schedule ? ` · ${esc(schedule)}` : ""}</div>
+        <div>${summaryDisplay ? `<strong>${esc(summaryDisplay)}</strong>` : ""}${schedule ? ` · ${esc(schedule)}` : ""}</div>
         ${refreshed ? `<div class="last-refreshed">${esc(refreshed)}</div>` : ""}
       </div>
       <div class="accent-line ${esc(v.header_tone || "ok")}"></div>

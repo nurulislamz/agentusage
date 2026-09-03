@@ -1,0 +1,7 @@
+# Ralph Loop Progress Ledger — agentUsage Views
+
+- [ ] Iteration 1: Split Layout (Submenu Master-Detail & Cockpit)
+- [ ] Iteration 2: Matrix Layout (Dense Roster Matrix HUD)
+- [ ] Iteration 3: Bento Grid Layout (Viewport-Fitted Modular Glance Tiles)
+- [ ] Iteration 4: Gauge Wall Layouts (Bars, Dials, Strips)
+- [ ] Iteration 5: TUI Views (Terminal Split, Detail & Analytics)
