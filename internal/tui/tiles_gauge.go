@@ -287,43 +287,49 @@ func tileGaugeProjectionAnnotation(snap core.UsageSnapshot, key string, met core
 		resetPart = "resets " + formatDurationShort(resetIn)
 	}
 
-	var projPart string
-	if usedPct > 0 && usedPct < 100 {
-		elapsed := windowDur - resetIn
-		if elapsed > 0 {
-			elapsedMin := elapsed.Minutes()
-			if elapsedMin > 0 {
-				paceFraction := (usedPct / 100) / elapsedMin
-				if !math.IsNaN(paceFraction) && !math.IsInf(paceFraction, 0) && paceFraction > 0 {
-					pctPerMinute := paceFraction * 100
-					if pctPerMinute > 0 {
-						remainingPct := 100 - usedPct
-						minutesTo100 := remainingPct / pctPerMinute
-						d := time.Duration(minutesTo100 * float64(time.Minute))
-						if d > 0 {
-							// If we would not reach 100% before reset,
-							// surface the projected % at reset instead.
-							if resetIn > 0 && d > resetIn {
-								projectedPct := usedPct + pctPerMinute*resetIn.Minutes()
-								n := int(math.Round(projectedPct))
-								if n < 0 {
-									n = 0
-								}
-								if n >= 100 {
-									n = 99
-								}
-								projPart = fmt.Sprintf("~%d%% by reset", n)
-							} else {
-								projPart = "100% in " + formatDurationShort(d)
-							}
-						}
-					}
-				}
-			}
-		}
+	projPart := calculatePaceProjectionPart(usedPct, windowDur, resetIn)
+	return joinAnnotationParts(resetPart, projPart)
+}
+
+func calculatePaceProjectionPart(usedPct float64, windowDur, resetIn time.Duration) string {
+	if usedPct <= 0 || usedPct >= 100 {
+		return ""
+	}
+	elapsed := windowDur - resetIn
+	if elapsed <= 0 {
+		return ""
+	}
+	elapsedMin := elapsed.Minutes()
+	if elapsedMin <= 0 {
+		return ""
+	}
+	paceFraction := (usedPct / 100) / elapsedMin
+	if math.IsNaN(paceFraction) || math.IsInf(paceFraction, 0) || paceFraction <= 0 {
+		return ""
+	}
+	pctPerMinute := paceFraction * 100
+	if pctPerMinute <= 0 {
+		return ""
+	}
+	remainingPct := 100 - usedPct
+	minutesTo100 := remainingPct / pctPerMinute
+	d := time.Duration(minutesTo100 * float64(time.Minute))
+	if d <= 0 {
+		return ""
 	}
 
-	return joinAnnotationParts(resetPart, projPart)
+	// If we would not reach 100% before reset, surface projected % at reset instead.
+	if resetIn > 0 && d > resetIn {
+		projectedPct := usedPct + pctPerMinute*resetIn.Minutes()
+		n := int(math.Round(projectedPct))
+		if n < 0 {
+			n = 0
+		} else if n >= 100 {
+			n = 99
+		}
+		return fmt.Sprintf("~%d%% by reset", n)
+	}
+	return "100% in " + formatDurationShort(d)
 }
 
 func tileCodexCreditProjectionAnnotation(snap core.UsageSnapshot, usedPct float64, now time.Time) string {
