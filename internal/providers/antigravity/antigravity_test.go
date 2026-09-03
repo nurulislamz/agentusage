@@ -952,6 +952,12 @@ func TestEnrichSnapshots_NilAndMultiple(t *testing.T) {
 			AccountID:  "antigravity-1",
 			Status:     core.StatusUnknown,
 			Metrics:    map[string]core.Metric{},
+			ModelUsage: []core.ModelUsageRecord{
+				{RawModelID: "gemini-flash", TotalTokens: core.Float64Ptr(42)},
+			},
+			DailySeries: map[string][]core.TimePoint{
+				"cost": {{Date: "2026-04-10", Value: 0.5}},
+			},
 		},
 		"antigravity-2": {
 			ProviderID: "antigravity",
@@ -988,6 +994,12 @@ func TestEnrichSnapshots_NilAndMultiple(t *testing.T) {
 	}
 	if snaps["antigravity-2"].Status != core.StatusOK {
 		t.Fatalf("snap2 status = %q, want ok", snaps["antigravity-2"].Status)
+	}
+	if len(snaps["antigravity-1"].ModelUsage) != 1 || snaps["antigravity-1"].ModelUsage[0].RawModelID != "gemini-flash" {
+		t.Fatalf("ModelUsage wiped on enrich: %+v", snaps["antigravity-1"].ModelUsage)
+	}
+	if len(snaps["antigravity-1"].DailySeries["cost"]) != 1 {
+		t.Fatalf("DailySeries wiped on enrich: %+v", snaps["antigravity-1"].DailySeries)
 	}
 }
 

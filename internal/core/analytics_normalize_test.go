@@ -70,6 +70,63 @@ func TestNormalizeAnalyticsDailySeries_DoesNotInventDailyFromWindowTotals(t *tes
 	}
 }
 
+func TestSanitizeAnalyticsMetricID_PreservesDistinctNonASCIIModels(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"模型甲", "模型甲"},
+		{"模型乙", "模型乙"},
+		{"模型-gpt", "模型_gpt"},
+		{"gpt-模型", "gpt_模型"},
+		{"foo@bar", "foo@bar"},
+		{"GPT-5", "gpt_5"},
+		{"claude-4.5", "claude_4_5"},
+		{"a--b", "a_b"},
+		{"__trim__", "trim"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		if got := sanitizeAnalyticsMetricID(tt.in); got != tt.want {
+			t.Errorf("sanitizeAnalyticsMetricID(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+	if normalizeSeriesModelKey("模型甲") == normalizeSeriesModelKey("模型乙") {
+		t.Fatal("distinct CJK model IDs must not collapse to the same series key")
+	}
+}
+
+func TestNormalizeAnalyticsDailySeries_KeepsDistinctNonASCIIModelSeries(t *testing.T) {
+	now := time.Date(2026, 2, 22, 10, 0, 0, 0, time.UTC)
+	snap := UsageSnapshot{
+		ProviderID: "test",
+		AccountID:  "acct",
+		Timestamp:  now,
+		Metrics:    map[string]Metric{},
+		ModelUsage: []ModelUsageRecord{
+			{RawModelID: "模型甲", TotalTokens: Float64Ptr(100)},
+			{RawModelID: "模型乙", TotalTokens: Float64Ptr(200)},
+		},
+	}
+
+	got := NormalizeUsageSnapshotWithConfig(snap, DefaultModelNormalizationConfig())
+
+	keyA := "tokens_model_" + normalizeSeriesModelKey("模型甲")
+	keyB := "tokens_model_" + normalizeSeriesModelKey("模型乙")
+	if keyA == keyB {
+		t.Fatalf("model series keys collided: %q", keyA)
+	}
+	if len(got.DailySeries[keyA]) == 0 {
+		t.Fatalf("missing series %q", keyA)
+	}
+	if len(got.DailySeries[keyB]) == 0 {
+		t.Fatalf("missing series %q", keyB)
+	}
+	if got.DailySeries[keyA][0].Value != 100 || got.DailySeries[keyB][0].Value != 200 {
+		t.Fatalf("series values merged incorrectly: a=%v b=%v", got.DailySeries[keyA], got.DailySeries[keyB])
+	}
+}
+
 func TestNormalizeUsageSnapshotWithConfig_SynthesizesProviderSelfMetrics(t *testing.T) {
 	snap := UsageSnapshot{
 		ProviderID: "codex",
