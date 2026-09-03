@@ -37,15 +37,15 @@ Backlog for upcoming infrastructure and UX work.
 
 ### Tasks
 
-- [ ] **Audit image targets** — confirm which binaries need images: `agentusage` daemon, `agentusage hub`, telemetry-only sidecar (if any).
-- [ ] **Add / refresh Dockerfiles** — multi-stage builds with pinned base images; align `Dockerfile.hub` module paths with current `cmd/agentusage` layout.
-- [ ] **Add `.dockerignore`** — exclude `.git`, test artifacts, `bin/`, coverage, and local config.
-- [ ] **CI: build job** — new workflow (or CI job) that runs `docker build` on PR and main; fail on build errors.
-- [ ] **CI: smoke test** — run container with `--headless` / health endpoint; basic startup + exit-code check.
-- [ ] **CI: publish on release** — push tagged images to GHCR (or chosen registry) from `release.yaml` / release-please flow.
-- [ ] **Version tagging** — tag images with semver, git SHA, and `latest` (main only); pass ldflags (`Version`, `CommitHash`, `BuildDate`) as build-args.
-- [ ] **Document usage** — README section: build locally, run daemon/hub in Docker, required volumes (`~/.config/agentusage`, socket paths), and CGO/runtime notes.
-- [ ] **Security hardening** — non-root runtime user, minimal Alpine/distroless final stage, scan images in CI (optional Trivy/Grype step).
+- [x] **Audit image targets** — confirm which binaries need images: `agentusage` daemon, `agentusage hub`, telemetry-only sidecar (if any).
+- [x] **Add / refresh Dockerfiles** — multi-stage builds with pinned base images; align `Dockerfile.hub` module paths with current `cmd/agentusage` layout.
+- [x] **Add `.dockerignore`** — exclude `.git`, test artifacts, `bin/`, coverage, and local config.
+- [x] **CI: build job** — new workflow (or CI job) that runs `docker build` on PR and main; fail on build errors.
+- [x] **CI: smoke test** — run container with `--headless` / health endpoint; basic startup + exit-code check.
+- [x] **CI: publish on release** — push tagged images to GHCR (or chosen registry) from `release.yaml` / release-please flow.
+- [x] **Version tagging** — tag images with semver, git SHA, and `latest` (main only); pass ldflags (`Version`, `CommitHash`, `BuildDate`) as build-args.
+- [x] **Document usage** — README section: build locally, run daemon/hub in Docker, required volumes (`~/.config/agentusage`, socket paths), and CGO/runtime notes.
+- [x] **Security hardening** — non-root runtime user, minimal Alpine/distroless final stage, scan images in CI (optional Trivy/Grype step).
 
 ---
 

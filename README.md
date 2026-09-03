@@ -38,6 +38,85 @@ go install github.com/nurulislamz/agentusage/cmd/agentusage@latest
 agentusage
 ```
 
+## Docker
+
+agentUsage provides multi-stage container images published to GitHub Container Registry (`ghcr.io/nurulislamz/agentusage` and `ghcr.io/nurulislamz/agentusage-hub`).
+
+Images are built with Alpine 3.21, include SQLite CGO support, and run under the unprivileged `agentusage` user (`UID 1000:1000`, `HOME=/home/agentusage`).
+
+### Running the Headless Hub Server
+
+The hub aggregates usage snapshots from multiple worker machines:
+
+```bash
+docker run -d \
+  --name agentusage-hub \
+  -p 9190:9190 \
+  -e AGENTUSAGE_HUB_TOKEN="your-secret-token" \
+  ghcr.io/nurulislamz/agentusage:latest
+```
+
+> **Note:** When binding a public port, set `AGENTUSAGE_HUB_TOKEN` to require Bearer token authentication from worker machines.
+
+### Running the Web Dashboard
+
+Serve the browser-based dashboard in a container by mounting your config and telemetry state volumes:
+
+```bash
+docker run -d \
+  --name agentusage-web \
+  -p 8080:8080 \
+  -v ~/.config/agentusage:/home/agentusage/.config/agentusage \
+  -v ~/.local/state/agentusage:/home/agentusage/.local/state/agentusage \
+  -e AGENTUSAGE_SERVE_TOKEN="your-secret-token" \
+  ghcr.io/nurulislamz/agentusage:latest serve --listen :8080 --no-open
+```
+
+### Running the Telemetry Daemon in Docker
+
+Run the background SQLite telemetry collector and expose its Unix domain socket or state directory:
+
+```bash
+docker run -d \
+  --name agentusage-daemon \
+  -v ~/.config/agentusage:/home/agentusage/.config/agentusage \
+  -v ~/.local/state/agentusage:/home/agentusage/.local/state/agentusage \
+  ghcr.io/nurulislamz/agentusage:latest telemetry daemon run
+```
+
+### Required Volumes and Paths
+
+| Host Path | Container Path (`$HOME=/home/agentusage`) | Purpose |
+|---|---|---|
+| `~/.config/agentusage` | `/home/agentusage/.config/agentusage` | Settings (`settings.json`) and secure API credentials (`credentials.json`) |
+| `~/.local/state/agentusage` | `/home/agentusage/.local/state/agentusage` | SQLite database (`telemetry.db`) and daemon socket (`daemon.sock`) |
+
+### Building Locally
+
+Build and run Docker images locally with `make`:
+
+```bash
+make docker-build        # Build unified agentusage image (agentusage:latest)
+make docker-build-hub    # Build dedicated hub image (agentusage-hub:latest)
+make docker-run-hub      # Run headless hub on port 9190
+make docker-run-serve    # Run web dashboard on port 8080
+make docker-run-daemon   # Run telemetry daemon in container
+```
+
+### Environment Variables
+
+| Variable | Description |
+|---|---|
+| `AGENTUSAGE_HUB_TOKEN` | Bearer token for authenticating hub connections and worker pushes |
+| `AGENTUSAGE_SERVE_TOKEN` | Bearer token for securing web dashboard access (`agentusage serve`) |
+| `AGENTUSAGE_SERVE_BASE_PATH` | URL prefix for serving behind reverse proxies (e.g. `/agentusage`) |
+| `AGENTUSAGE_DEBUG` | Set to `1` to enable debug logging |
+
+### CGO and Runtime Architecture
+
+- **CGO Required**: `CGO_ENABLED=1` is enabled in the builder stage with `gcc` and `musl-dev` because `mattn/go-sqlite3` requires CGO for local SQLite telemetry caching and the Cursor provider.
+- **Security Hardening**: Runtime containers drop privileges to user `agentusage` (`UID 1000:1000`), include minimal runtime dependencies (`ca-certificates`, `tzdata`, `wget`, `curl`), and include automated healthcheck monitoring.
+
 ## Supported Providers
 
 agentUsage supports 37 providers covering coding agents, IDEs, and LLM API platforms. All providers are automatically detected when available.
@@ -103,6 +182,8 @@ make deps           # Download and verify Go dependencies
 make tidy           # Tidy Go module dependencies
 make demo           # Build and run demo dashboard with simulated data
 make serve          # Run local web dashboard
+make docker-build   # Build Docker image for agentusage
+make docker-run-hub # Run headless hub container
 make install        # Install binary to ~/.local/bin and configure daemon service
 make uninstall      # Uninstall binary from ~/.local/bin and remove daemon service
 ```

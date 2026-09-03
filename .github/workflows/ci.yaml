@@ -168,3 +168,73 @@ jobs:
           python scripts/gen-icon-font.py
           git diff --exit-code internal/tmux/assets/openusage-icons.ttf \
             || (echo "::error::committed icon font is stale; run 'make icon-font' and commit the result" && exit 1)
+
+  docker-build:
+    name: Docker Build & Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build agentusage test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: agentusage:test
+          build-args: |
+            VERSION=test
+            COMMIT_HASH=${{ github.sha }}
+            BUILD_DATE=2026-01-01T00:00:00Z
+
+      - name: Build agentusage-hub test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.hub
+          load: true
+          tags: agentusage-hub:test
+          build-args: |
+            VERSION=test
+            COMMIT_HASH=${{ github.sha }}
+            BUILD_DATE=2026-01-01T00:00:00Z
+
+      - name: Smoke test agentusage image
+        run: |
+          docker run -d --name test-agentusage -p 9190:9190 -e AGENTUSAGE_HUB_TOKEN="ci-smoke-token" agentusage:test hub --headless
+          for i in $(seq 1 30); do
+            if curl -fsSL http://127.0.0.1:9190/healthz >/dev/null 2>&1; then
+              echo "agentusage container is healthy"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "agentusage container failed health check"
+              docker logs test-agentusage
+              docker stop test-agentusage
+              exit 1
+            fi
+            sleep 1
+          done
+          docker stop test-agentusage
+
+      - name: Smoke test agentusage-hub image
+        run: |
+          docker run -d --name test-agentusage-hub -p 9190:9190 -e AGENTUSAGE_HUB_TOKEN="ci-smoke-token" agentusage-hub:test
+          for i in $(seq 1 30); do
+            if curl -fsSL http://127.0.0.1:9190/healthz >/dev/null 2>&1; then
+              echo "agentusage-hub container is healthy"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "agentusage-hub container failed health check"
+              docker logs test-agentusage-hub
+              docker stop test-agentusage-hub
+              exit 1
+            fi
+            sleep 1
+          done
+          docker stop test-agentusage-hub
+
