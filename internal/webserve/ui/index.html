@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
-  <div id="app" class="shell layout-split" data-layout="split" hidden>
+  <div id="app" class="shell layout-bars" data-layout="bars" hidden>
     <header class="header">
       <div id="header" class="header-main">
         <span id="fetching-header" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>
@@ -18,9 +18,9 @@
     </header>
     <div class="hairline" aria-hidden="true"></div>
     <div class="body">
-      <nav id="nav" class="nav" aria-label="Providers"></nav>
+      <nav id="nav" class="nav" hidden aria-hidden="true"></nav>
       <div class="vsep" aria-hidden="true"></div>
-      <main class="panel" aria-label="Detail">
+      <main class="panel" aria-label="Usage dashboard">
         <div id="panel">
           <span id="fetching-detail" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>
         </div>

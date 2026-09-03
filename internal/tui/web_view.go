@@ -229,11 +229,7 @@ func (p WebProjector) ProjectSnapshot(snap core.UsageSnapshot, providerName stri
 		view.GaugePercent = di.gaugePercent
 	}
 	ensureUsageLines(&view, m.usageMode)
-	if cost := snap.DailySeries["cost"]; len(cost) > 0 {
-		view.DailyCost = cost
-	} else if cost := snap.DailySeries["analytics_cost"]; len(cost) > 0 {
-		view.DailyCost = cost
-	}
+	view.DailyCost = firstDailySeries(snap, "cost", "analytics_cost", "tokens", "requests")
 	return view
 }
 
@@ -361,6 +357,15 @@ func WebThemeTokensFromTheme(t Theme) WebThemeTokens {
 		Lavender: colorHex(t.Lavender),
 		Mauve:    colorHex(t.Mauve),
 	}
+}
+
+func firstDailySeries(snap core.UsageSnapshot, keys ...string) []core.TimePoint {
+	for _, key := range keys {
+		if pts := snap.DailySeries[key]; len(pts) > 0 {
+			return pts
+		}
+	}
+	return nil
 }
 
 func colorHex(c lipgloss.Color) string {

@@ -2,14 +2,14 @@
   "use strict";
 
   const LAYOUTS = [
-    { id: "split", label: "Split", hint: "Navigator + usage pane" },
-    { id: "roster", label: "Roster", hint: "All apps with usage and resets" },
-    { id: "matrix", label: "Matrix", hint: "Dense usage table" },
+    { id: "bars", label: "Bars", hint: "Linear gauges · OpenUsage-style cards" },
+    { id: "dials", label: "Dials", hint: "Radial gauges · at-a-glance remaining" },
+    { id: "strips", label: "Strips", hint: "Grafana bar-gauge wall" },
   ];
 
   function normalizeLayout(raw) {
     const id = String(raw || "").toLowerCase();
-    return LAYOUTS.some((l) => l.id === id) ? id : "split";
+    return LAYOUTS.some((l) => l.id === id) ? id : "bars";
   }
 
   const state = {
@@ -19,7 +19,7 @@
     filter: "",
     token: sessionStorage.getItem("au-serve-token") || "",
     themeOverride: localStorage.getItem("au-serve-theme-override") || "",
-    layout: normalizeLayout(localStorage.getItem("au-serve-layout") || "split"),
+    layout: normalizeLayout(localStorage.getItem("au-serve-layout") || "bars"),
     loading: true,
     refreshing: false,
     refreshOpts: null,
@@ -179,7 +179,7 @@
     });
 
     const views = filteredViews();
-    $("nav")?.querySelectorAll(".item").forEach((el) => {
+    document.querySelectorAll(".agent").forEach((el) => {
       const idx = Number(el.dataset.idx);
       const v = views[idx];
       const refreshing = v && isViewRefreshing(v);
@@ -334,69 +334,17 @@
     const views = filteredViews();
     const n = views.length;
     const filteredNote = state.filter ? " (filtered)" : "";
-    const switcher = views.length
-      ? `<select id="switcher" class="switcher" aria-label="Account">${views.map((v, i) =>
-          `<option value="${i}"${i === state.selected ? " selected" : ""}>${esc(v.account_id)}</option>`
-        ).join("")}</select>`
-      : "";
     const fetchVisible = state.refreshing ? "" : " hidden";
     const fetchText = esc(state.refreshText || "Fetching...");
     const spinChar = SPINNER[state.animFrame] || "⠋";
+    const meta = layoutMeta();
     $("header").innerHTML = `
       <span class="bolt">⚡</span>
       <span class="brand">agentUsage</span>
       <span id="fetching-header" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
-      ${switcher}
       <span class="spacer"></span>
-      <span class="header-meta">⊞ ${n} providers${filteredNote} · ${esc(layoutMeta().label)}</span>
+      <span class="header-meta">⊞ ${n} agents${filteredNote} · ${esc(meta.label)} · ${esc(meta.hint)}</span>
     `;
-    const sel = $("switcher");
-    if (sel) {
-      sel.addEventListener("change", () => {
-        state.selected = Number(sel.value);
-        render();
-      });
-    }
-  }
-
-  function renderNav() {
-    const views = filteredViews();
-    if (!views.length) {
-      $("nav").innerHTML = `<div class="group">${state.filter ? "No matches." : "Loading providers…"}</div>`;
-      return;
-    }
-    const selected = views[state.selected] || {};
-    const counts = {};
-    views.forEach((v) => { counts[v.provider_id] = (counts[v.provider_id] || 0) + 1; });
-    let html = "";
-    let last = "";
-    views.forEach((v, i) => {
-      if (v.provider_id !== last) {
-        const active = v.provider_id === selected.provider_id;
-        html += `<div class="group${active ? " active" : ""}" style="--p:${esc(v.accent_color || "var(--accent)")}">${esc((v.provider_id || "").toUpperCase())} (${counts[v.provider_id]})</div>`;
-        last = v.provider_id;
-      }
-      const sel = i === state.selected;
-      const inGroup = v.provider_id === selected.provider_id && counts[v.provider_id] > 1;
-      const refreshing = isViewRefreshing(v);
-      const next = v.next_reset || stripResetPrefix(v.reset_hint || "");
-      html += `<button type="button" class="item${sel ? " selected" : ""}${inGroup ? " in-group" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")}">
-        <span class="rail"></span>
-        <span class="name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
-        <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
-        ${renderUsageMeters(v)}
-        ${next ? `<span class="next${(v.resets || []).some((r) => r.urgent) ? " urgent" : ""}" title="Next reset">${esc(next)}</span>` : `<span class="next dim">—</span>`}
-      </button>`;
-    });
-    $("nav").innerHTML = html;
-    $("nav").querySelectorAll(".item").forEach((el) => {
-      el.addEventListener("click", () => {
-        state.selected = Number(el.dataset.idx);
-        render();
-      });
-    });
-    const selectedEl = $("nav").querySelector(".item.selected");
-    if (selectedEl) selectedEl.scrollIntoView({ block: "nearest" });
   }
 
   function toneFromPercent(pct, view) {
@@ -446,148 +394,229 @@
     return lines;
   }
 
-  function isUsageCard(card) {
-    return String(card.title || "").toLowerCase() === "usage";
+  function clampPct(n) {
+    const pct = Number(n);
+    if (!Number.isFinite(pct)) return null;
+    return Math.max(0, Math.min(100, pct));
   }
 
-  function usageOnlyCards(v) {
-    const cards = (v.detail_cards || []).filter(isUsageCard);
-    if (cards.length) {
-      return cards.map((card) => attachResetsToUsageCard(card, v));
-    }
-    const lines = usageLines(v);
-    if (!lines.length) return [];
-    return [{
-      id: "usage",
-      title: "Usage",
-      icon: "⚡",
-      rows: lines.map((line) => usageLineToRow(line)),
-    }].map((card) => attachResetsToUsageCard(card, v));
-  }
-
-  function usageLineToRow(line) {
+  function lineTone(line, v) {
     if (line.percent != null) {
-      return {
-        kind: "gauge",
-        label: line.label,
-        percent: line.percent,
-        hint: line.hint || (line.reset_in ? "Resets in " + line.reset_in : ""),
-        tone: line.tone || "ok",
-      };
+      return line.tone || toneFromPercent(Number(line.percent), v);
     }
-    if (line.reset_in) {
-      return {
-        kind: "timer",
-        label: line.label,
-        value: line.value || "",
-        hint: "in " + line.reset_in,
-        tone: line.tone || "ok",
-      };
-    }
-    return { kind: "kv", label: line.label, value: line.value || "" };
+    return line.tone || "ok";
   }
 
-  function attachResetsToUsageCard(card, v) {
-    const lines = usageLines(v);
-    const hasGauge = (card.rows || []).some((r) => r.kind === "gauge");
-    const rows = (card.rows || []).filter((row) => {
-      if (row.kind !== "kv") return true;
-      const lab = (row.label || "").toLowerCase();
-      if (["quota", "tokens", "activity", "spend", "spending", "subscription"].includes(lab)) return false;
-      if (hasGauge && lab === "credits") return false;
-      return true;
-    }).map((row) => {
-      if (row.kind !== "gauge") return row;
-      if (/reset/i.test(row.hint || "")) return row;
-      const match = lines.find((l) => l.label === row.label || l.short === row.label);
-      if (match && match.reset_in) {
-        const extra = "Resets in " + match.reset_in;
-        return { ...row, hint: row.hint ? row.hint + " · " + extra : extra };
-      }
-      return row;
+  function isDepleted(pct) {
+    if (pct == null) return false;
+    return usageMode() === "used" ? pct >= 99.5 : pct <= 0.5;
+  }
+
+  function percentCaption(pct) {
+    if (isDepleted(pct)) return "Limit reached";
+    const n = Math.round(pct);
+    return usageMode() === "used" ? n + "% used" : n + "% left";
+  }
+
+  function resetCaption(line) {
+    const reset = stripResetPrefix(line.reset_in || "");
+    if (!reset) return "";
+    if (/^expired$/i.test(reset)) return "Expired";
+    return "Resets in " + reset;
+  }
+
+  function formatCompact(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return "—";
+    const abs = Math.abs(v);
+    const trim = (x) => x.toFixed(1).replace(/\.0$/, "");
+    if (abs >= 1e9) return trim(v / 1e9) + "B";
+    if (abs >= 1e6) return trim(v / 1e6) + "M";
+    if (abs >= 1e3) return trim(v / 1e3) + "K";
+    if (abs >= 100 || Number.isInteger(v)) return String(Math.round(v));
+    return v.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  }
+
+  function trendLooksMoney(points) {
+    const vals = (points || []).map((p) => Number(p.value)).filter(Number.isFinite);
+    if (!vals.length) return false;
+    const max = Math.max(...vals.map(Math.abs));
+    return max < 5000 && vals.some((v) => !Number.isInteger(v));
+  }
+
+  function formatTrendValue(n, points) {
+    return trendLooksMoney(points) ? "$" + formatCompact(n) : formatCompact(n);
+  }
+
+  function trendStats(points) {
+    const pts = (points || []).filter((p) => Number.isFinite(Number(p.value)));
+    if (!pts.length) return [];
+    const last = pts[pts.length - 1];
+    const prev = pts.length > 1 ? pts[pts.length - 2] : null;
+    const sum = pts.reduce((a, p) => a + Number(p.value), 0);
+    const out = [{ label: "Today", value: formatTrendValue(last.value, pts) }];
+    if (prev) out.push({ label: "Yesterday", value: formatTrendValue(prev.value, pts) });
+    if (pts.length > 2) out.push({ label: pts.length + "d", value: formatTrendValue(sum, pts) });
+    return out;
+  }
+
+  function sparkBars(points, w, h) {
+    const vals = (points || []).map((p) => Number(p.value)).filter((v) => Number.isFinite(v) && v >= 0);
+    if (vals.length < 2) return "";
+    const width = w || 108;
+    const height = h || 26;
+    const max = Math.max(...vals, 1e-9);
+    const gap = 1.2;
+    const bw = Math.max(2, (width / vals.length) - gap);
+    const bars = vals.map((v, i) => {
+      const bh = Math.max(1.5, (v / max) * height);
+      const x = i * (width / vals.length);
+      return `<rect x="${x.toFixed(2)}" y="${(height - bh).toFixed(2)}" width="${bw.toFixed(2)}" height="${bh.toFixed(2)}" rx="0.6"/>`;
+    }).join("");
+    return `<svg class="spark spark-bars" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">${bars}</svg>`;
+  }
+
+  function sparkLine(points, w, h) {
+    const vals = (points || []).map((p) => Number(p.value)).filter(Number.isFinite);
+    if (vals.length < 2) return "";
+    const width = w || 88;
+    const height = h || 28;
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const span = Math.max(max - min, 1e-9);
+    const coords = vals.map((v, i) => {
+      const x = vals.length === 1 ? width / 2 : (i / (vals.length - 1)) * width;
+      const y = height - ((v - min) / span) * (height - 2) - 1;
+      return x.toFixed(1) + "," + y.toFixed(1);
     });
-    return { ...card, rows };
+    return `<svg class="spark spark-line" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true"><polyline fill="none" points="${coords.join(" ")}"/></svg>`;
   }
 
-  function renderUsageMeters(v) {
-    const lines = usageLines(v);
-    if (!lines.length) {
-      const summary = v.summary || v.message || "";
-      const reset = v.reset_hint || v.next_reset || "";
-      return `<span class="meters"><span class="meter dim"><span class="meter-val">${esc(summary)}</span>${reset ? `<span class="meter-reset">${esc(stripResetPrefix(reset))}</span>` : ""}</span></span>`;
+  function agentSubtitle(v) {
+    return v.tag_label || v.detail || v.provider_name || v.provider_id || "";
+  }
+
+  function agentShell(v, i, inner) {
+    const sel = i === state.selected;
+    const refreshing = isViewRefreshing(v);
+    return `<button type="button" class="agent${sel ? " selected" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")};--tone:${gaugeColor(lineTone(usageLines(v)[0] || {}, v))}">${inner}</button>`;
+  }
+
+  function agentHead(v, i) {
+    const sub = agentSubtitle(v);
+    return `<div class="agent-head">
+      <span class="agent-name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
+      <span class="agent-plan">${esc(sub)}</span>
+      <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
+    </div>`;
+  }
+
+  function renderLinearGauge(line, v) {
+    const pct = clampPct(line.percent);
+    const tone = lineTone(line, v);
+    if (pct == null) {
+      return `<div class="lin-stat">
+        <span class="lin-name">${esc(line.label || line.short || "")}</span>
+        <span class="lin-value">${esc(line.value || "—")}</span>
+      </div>`;
     }
-    const meters = lines.map((line) => {
-      const pct = line.percent == null ? null : Math.max(0, Math.min(100, Number(line.percent)));
-      const tone = line.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
-      const val = pct != null ? `${pct.toFixed(0)}%` : esc(line.value || "");
-      const reset = line.reset_in
-        ? `<span class="meter-reset${line.urgent ? " urgent" : ""}">${esc(line.reset_in)}</span>`
-        : "";
-      const bar = pct != null
-        ? `<span class="mini"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>`
-        : "";
-      const layout = pct != null ? "" : " text";
-      return `<span class="meter${layout} ${toneClass(tone)}">
-        <span class="meter-lab">${esc(line.short || line.label || "")}</span>
-        ${bar}
-        <span class="meter-val">${val}</span>
-        ${reset}
-      </span>`;
-    }).join("");
-    return `<span class="meters">${meters}</span>`;
+    const depleted = isDepleted(pct);
+    return `<div class="lin-gauge ${toneClass(tone)}${depleted ? " depleted" : ""}">
+      <div class="lin-name">${esc(line.label || line.short || "")}${depleted ? ` <span class="limit-flag">Limit reached</span>` : ""}</div>
+      <div class="lin-track"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></div>
+      <div class="lin-meta">
+        <span>${esc(percentCaption(pct))}</span>
+        <span class="${line.urgent ? "urgent" : ""}">${esc(resetCaption(line))}</span>
+      </div>
+    </div>`;
   }
 
-  function renderCards(cards) {
-    if (!cards || !cards.length) return "";
-    const isUsed = (state.envelope?.usage_mode || "remaining").toLowerCase() === "used";
-    const modeWord = isUsed ? "used" : "remaining";
-    const threshPct = isUsed ? 80 : 20;
+  function renderArcGauge(line, v) {
+    const pct = clampPct(line.percent);
+    const tone = lineTone(line, v);
+    if (pct == null) {
+      return `<div class="dial dial-stat ${toneClass(tone)}">
+        <span class="dial-num">${esc(line.value || "—")}</span>
+        <span class="dial-lab">${esc(line.short || line.label || "")}</span>
+      </div>`;
+    }
+    const color = gaugeColor(tone);
+    return `<div class="dial ${toneClass(tone)}${isDepleted(pct) ? " depleted" : ""}">
+      <svg viewBox="0 0 88 58" class="dial-svg" aria-hidden="true">
+        <path class="dial-track" d="M10 48 A34 34 0 0 1 78 48" pathLength="100"/>
+        <path class="dial-fill" d="M10 48 A34 34 0 0 1 78 48" pathLength="100" stroke="${color}" stroke-dasharray="${pct} 100"/>
+        <text x="44" y="44" text-anchor="middle">${Math.round(pct)}%</text>
+      </svg>
+      <span class="dial-lab">${esc(line.short || line.label || "")}</span>
+      <span class="dial-reset${line.urgent ? " urgent" : ""}">${esc(resetCaption(line) || percentCaption(pct))}</span>
+    </div>`;
+  }
 
-    const cardsHtml = cards.map((card, idx) => {
-      const color = card.color || "var(--fg-2)";
-      const cardId = (card.id || "").toLowerCase();
-      const cardTitle = (card.title || "").toLowerCase();
-      const isFeatured = idx === 0 || ["usage", "hero", "overview", "quota"].includes(cardId) || cardTitle === "usage";
-      const heroClass = isFeatured ? " card-hero" : "";
-      const rows = (card.rows || []).map((row) => {
-        if (row.kind === "heading") {
-          return `<div class="heading">${esc(row.value || row.label || "")}</div>`;
-        }
-        if (row.kind === "gauge") {
-          const pct = row.percent == null ? 0 : Number(row.percent);
-          const tone = row.tone || "ok";
-          return `<div class="gauge-block ${toneClass(tone)}">
-            <div class="gauge-header">
-              <span class="gauge-label">${esc(row.label || "")}</span>
-              <span class="gauge-stat">
-                <b class="stat-val">${pct.toFixed(2)}%</b>
-                <span class="pill ${pillClass(tone)}">${esc(modeWord)}</span>
-              </span>
-            </div>
-            <div class="gauge" style="color:${gaugeColor(tone)}">
-              <i style="width:${Math.max(0, Math.min(100, pct))}%;background:currentColor"></i>
-              <span class="gauge-threshold" style="left:${threshPct}%" aria-hidden="true"></span>
-            </div>
-            <div class="caption">${row.hint ? esc(row.hint) : `${pct.toFixed(2)}% ${esc(modeWord)}`}</div>
-          </div>`;
-        }
-        if (row.kind === "timer") {
-          return `<div class="timer ${toneClass(row.tone || "ok")}">
-            <span class="dot"></span>
-            <span>${esc(row.label || "")}</span>
-            <span class="when">${esc(row.value || "")}</span>
-            <span class="hint">${esc(row.hint || "")}</span>
-          </div>`;
-        }
-        if (row.kind === "kv") {
-          return `<div class="kv"><span class="dim">${esc(row.label || "")}</span><span class="kv-val">${esc(row.value || "")}</span></div>`;
-        }
-        return `<div class="text-row">${esc(row.value || row.label || "")}</div>`;
-      }).join("");
-      return `<section class="card${heroClass}" style="--card:${esc(color)}"><div class="card-header"><h2>${esc(card.icon || "")} ${esc((card.title || "").toUpperCase())}</h2></div>${rows}</section>`;
-    }).join("");
+  function renderStripGauge(line, v) {
+    const pct = clampPct(line.percent);
+    const tone = lineTone(line, v);
+    if (pct == null) {
+      return `<div class="strip-metric text ${toneClass(tone)}">
+        <span class="strip-lab">${esc(line.short || line.label || "")}</span>
+        <span class="strip-val">${esc(line.value || "—")}</span>
+      </div>`;
+    }
+    return `<div class="strip-metric ${toneClass(tone)}${isDepleted(pct) ? " depleted" : ""}">
+      <span class="strip-lab">${esc(line.short || line.label || "")}</span>
+      <span class="strip-track">
+        <i style="width:${pct}%;background:${gaugeColor(tone)}"></i>
+        <em>${esc(isDepleted(pct) ? "Limit" : Math.round(pct) + "%")}</em>
+      </span>
+      <span class="strip-reset${line.urgent ? " urgent" : ""}">${esc(stripResetPrefix(line.reset_in || "") || "—")}</span>
+    </div>`;
+  }
 
-    return `<div class="panel-cards-grid">${cardsHtml}</div>`;
+  function renderBarCard(v, i) {
+    const lines = usageLines(v);
+    const gauges = lines.map((line) => renderLinearGauge(line, v)).join("");
+    const stats = trendStats(v.daily_cost).map((s) =>
+      `<div class="hist-row"><span>${esc(s.label)}</span><span>${esc(s.value)}</span></div>`
+    ).join("");
+    const spark = sparkBars(v.daily_cost);
+    const inner = `
+      ${agentHead(v, i)}
+      <div class="lin-list">${gauges || `<p class="dim">${esc(v.message || "No usage yet")}</p>`}</div>
+      ${stats || spark ? `<div class="agent-foot">${stats ? `<div class="hist">${stats}</div>` : ""}${spark ? `<div class="spark-wrap" title="Usage trend">${spark}</div>` : ""}</div>` : ""}
+    `;
+    return agentShell(v, i, inner);
+  }
+
+  function renderDialCard(v, i) {
+    const lines = usageLines(v);
+    const dials = lines.map((line) => renderArcGauge(line, v)).join("");
+    const spark = sparkLine(v.daily_cost, 120, 32);
+    const next = v.next_reset || stripResetPrefix(v.reset_hint || "");
+    const inner = `
+      ${agentHead(v, i)}
+      <div class="dial-row">${dials || `<p class="dim">${esc(v.message || "No usage yet")}</p>`}</div>
+      <div class="agent-foot">
+        ${next ? `<span class="next-reset">Next reset ${esc(next)}</span>` : `<span class="dim">No reset</span>`}
+        ${spark ? `<div class="spark-wrap">${spark}</div>` : ""}
+      </div>
+    `;
+    return agentShell(v, i, inner);
+  }
+
+  function renderStripCard(v, i) {
+    const lines = usageLines(v);
+    const metrics = lines.map((line) => renderStripGauge(line, v)).join("");
+    const spark = sparkBars(v.daily_cost, 72, 22);
+    const sub = agentSubtitle(v);
+    const inner = `
+      <div class="strip-id">
+        <span class="agent-name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
+        <span class="agent-plan">${esc(sub)}</span>
+        <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
+      </div>
+      <div class="strip-gauges">${metrics || `<span class="dim">${esc(v.summary || v.message || "")}</span>`}</div>
+      <div class="strip-trend">${spark || ""}</div>
+    `;
+    return agentShell(v, i, inner);
   }
 
   function formatAge(ms) {
@@ -621,7 +650,7 @@
     return formatLastRefreshed(view.timestamp, view.last_refreshed || "");
   }
 
-  function renderDetail() {
+  function renderBoard() {
     const views = filteredViews();
     const panel = $("panel");
     const fetchVisible = state.refreshing ? "" : " hidden";
@@ -634,88 +663,20 @@
       `;
       return;
     }
-    const v = views[state.selected];
-    const meta = [v.provider_id, v.detail].filter(Boolean).join(" · ");
-    const schedule = v.cycle_schedule || "";
-    const summary = v.summary || "";
-    const refreshed = lastRefreshedText(v);
-    const cards = renderCards(usageOnlyCards(v));
-    panel.innerHTML = `
-      <div class="hero">
-        <h1>
-          ${esc(v.status_icon || "●")} ${esc(v.account_id)}
-          <span id="fetching-detail" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
-        </h1>
-        <div class="hero-right">${esc(meta)} <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || "")}</span></div>
-      </div>
-      <div class="subhero">
-        <div>${summary ? `<strong>${esc(summary)}</strong>` : ""}${schedule ? ` · ${esc(schedule)}` : ""}</div>
-        ${refreshed ? `<div id="last-refreshed" class="last-refreshed">${esc(refreshed)}</div>` : ""}
-      </div>
-      <div class="accent-line ${esc(v.header_tone || "ok")}"></div>
-      ${cards}
-    `;
-  }
-
-  function renderMatrix() {
-    const views = filteredViews();
-    const panel = $("panel");
-    const fetchVisible = state.refreshing ? "" : " hidden";
-    const fetchText = esc(state.refreshText || "Fetching...");
-    const spinChar = SPINNER[state.animFrame] || "⠋";
-    if (!views.length) {
-      panel.innerHTML = `
-        <span id="fetching-detail" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
-        <p class="dim">${state.filter ? "No matches." : "No providers."}</p>
-      `;
-      return;
-    }
-    const rows = views.map((v, i) => {
-      const sel = i === state.selected;
-      const lines = usageLines(v);
-      const usage = lines.map((line) => {
-        const pct = line.percent == null ? null : Math.max(0, Math.min(100, Number(line.percent)));
-        const tone = line.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
-        const val = pct != null ? `${pct.toFixed(0)}%` : esc(line.value || "—");
-        const bar = pct != null
-          ? `<span class="mini"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>`
-          : "";
-        return `<span class="matrix-metric ${toneClass(tone)}">
-          <span class="meter-lab">${esc(line.short || line.label || "")}</span>
-          ${bar}
-          <span class="meter-val">${val}</span>
-          ${line.reset_in ? `<span class="meter-reset${line.urgent ? " urgent" : ""}">${esc(line.reset_in)}</span>` : ""}
-        </span>`;
-      }).join("");
-      const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
-      return `<button type="button" class="matrix-row${sel ? " selected" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")}">
-        <span class="matrix-app">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
-        <span class="matrix-provider">${esc(v.provider_id || "")}</span>
-        <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
-        <span class="matrix-usage">${usage || `<span class="dim">${esc(v.summary || "")}</span>`}</span>
-        <span class="matrix-reset">${esc(next)}</span>
-      </button>`;
-    }).join("");
+    const id = state.layout;
+    const renderer = id === "dials" ? renderDialCard : id === "strips" ? renderStripCard : renderBarCard;
+    const cards = views.map((v, i) => renderer(v, i)).join("");
     panel.innerHTML = `
       <span id="fetching-detail" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
-      <div class="matrix" role="table" aria-label="Usage matrix">
-        <div class="matrix-head" role="row">
-          <span>App</span>
-          <span>Provider</span>
-          <span>Status</span>
-          <span>Usage</span>
-          <span>Next reset</span>
-        </div>
-        ${rows}
-      </div>
+      <div class="board board-${esc(id)}" role="list" aria-label="${esc(layoutMeta().hint)}">${cards}</div>
     `;
-    panel.querySelectorAll(".matrix-row").forEach((el) => {
+    panel.querySelectorAll(".agent").forEach((el) => {
       el.addEventListener("click", () => {
         state.selected = Number(el.dataset.idx);
         render();
       });
     });
-    const selectedEl = panel.querySelector(".matrix-row.selected");
+    const selectedEl = panel.querySelector(".agent.selected");
     if (selectedEl) selectedEl.scrollIntoView({ block: "nearest" });
   }
 
@@ -726,14 +687,8 @@
     state.layout = id;
     shell.dataset.layout = id;
     LAYOUTS.forEach((l) => shell.classList.toggle("layout-" + l.id, l.id === id));
-    const nav = $("nav");
     const panel = document.querySelector("main.panel");
-    if (nav) {
-      nav.setAttribute("aria-label", id === "roster" ? "Usage board" : "Providers");
-    }
-    if (panel) {
-      panel.setAttribute("aria-label", id === "matrix" ? "Usage matrix" : "Detail");
-    }
+    if (panel) panel.setAttribute("aria-label", layoutMeta().hint);
   }
 
   function cycleLayout() {
@@ -784,12 +739,7 @@
   function render() {
     applyLayout();
     renderHeader();
-    renderNav();
-    if (state.layout === "matrix") {
-      renderMatrix();
-    } else {
-      renderDetail();
-    }
+    renderBoard();
     renderFooter();
   }
 
@@ -915,10 +865,10 @@
   });
 
   setInterval(() => {
-    const el = $("last-refreshed");
-    if (!el) return;
     const views = filteredViews();
-    const text = lastRefreshedText(views[state.selected]);
-    if (text && el.textContent !== text) el.textContent = text;
+    document.querySelectorAll("[data-refreshed-idx]").forEach((el) => {
+      const text = lastRefreshedText(views[Number(el.dataset.refreshedIdx)]);
+      if (text && el.textContent !== text) el.textContent = text;
+    });
   }, 1000);
 })();

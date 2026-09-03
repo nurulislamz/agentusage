@@ -198,12 +198,14 @@ func TestAppJSUsageOnlyLayouts(t *testing.T) {
 	}
 	js := w.Body.String()
 	for _, want := range []string{
-		`id: "split"`,
-		`id: "roster"`,
-		`id: "matrix"`,
-		"function usageOnlyCards(",
-		"function renderUsageMeters(",
-		"function renderMatrix(",
+		`id: "bars"`,
+		`id: "dials"`,
+		`id: "strips"`,
+		"function renderBarCard(",
+		"function renderDialCard(",
+		"function renderStripCard(",
+		"function renderBoard(",
+		"function renderArcGauge(",
 		"function cycleLayout(",
 		`case "v":`,
 		`id="footer-btn-layout"`,
@@ -218,7 +220,7 @@ func TestAppJSUsageOnlyLayouts(t *testing.T) {
 	cssW := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(cssW, cssReq)
 	css := cssW.Body.String()
-	for _, want := range []string{".layout-roster", ".layout-matrix", ".meter-reset", ".matrix-row"} {
+	for _, want := range []string{".board-bars", ".board-dials", ".board-strips", ".lin-track", ".dial-svg", ".strip-track"} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css missing %q", want)
 		}
@@ -548,42 +550,42 @@ func TestAppJSFetchingIndicatorsPreserved(t *testing.T) {
 	if renderHeaderIdx == -1 {
 		t.Fatal("renderHeader not found in app.js")
 	}
-	renderNavIdx := strings.Index(js, "function renderNav()")
-	if renderNavIdx == -1 || renderNavIdx < renderHeaderIdx {
-		t.Fatal("renderNav not found after renderHeader in app.js")
+	toneFnIdx := strings.Index(js, "function toneFromPercent(")
+	if toneFnIdx == -1 || toneFnIdx < renderHeaderIdx {
+		t.Fatal("toneFromPercent not found after renderHeader in app.js")
 	}
-	renderHeaderBody := js[renderHeaderIdx:renderNavIdx]
+	renderHeaderBody := js[renderHeaderIdx:toneFnIdx]
 	if !strings.Contains(renderHeaderBody, `id="fetching-header"`) {
 		t.Error("renderHeader must define id=\"fetching-header\"")
 	}
 
-	// 2. Assert renderDetail defines #fetching-detail in both empty view and normal view
-	renderDetailIdx := strings.Index(js, "function renderDetail()")
-	if renderDetailIdx == -1 {
-		t.Fatal("renderDetail not found in app.js")
+	// 2. Assert renderBoard defines #fetching-detail in both empty view and normal view
+	renderBoardIdx := strings.Index(js, "function renderBoard()")
+	if renderBoardIdx == -1 {
+		t.Fatal("renderBoard not found in app.js")
 	}
 	renderFooterIdx := strings.Index(js, "function renderFooter()")
-	if renderFooterIdx == -1 || renderFooterIdx < renderDetailIdx {
-		t.Fatal("renderFooter not found after renderDetail in app.js")
+	if renderFooterIdx == -1 || renderFooterIdx < renderBoardIdx {
+		t.Fatal("renderFooter not found after renderBoard in app.js")
 	}
-	renderDetailBody := js[renderDetailIdx:renderFooterIdx]
+	renderBoardBody := js[renderBoardIdx:renderFooterIdx]
 
-	emptyViewIdx := strings.Index(renderDetailBody, "if (!views.length)")
+	emptyViewIdx := strings.Index(renderBoardBody, "if (!views.length)")
 	if emptyViewIdx == -1 {
-		t.Fatal("renderDetail missing 'if (!views.length)' check")
+		t.Fatal("renderBoard missing 'if (!views.length)' check")
 	}
-	emptyReturnIdx := strings.Index(renderDetailBody[emptyViewIdx:], "return;")
+	emptyReturnIdx := strings.Index(renderBoardBody[emptyViewIdx:], "return;")
 	if emptyReturnIdx == -1 {
-		t.Fatal("renderDetail missing return in empty view branch")
+		t.Fatal("renderBoard missing return in empty view branch")
 	}
-	emptyViewBranch := renderDetailBody[emptyViewIdx : emptyViewIdx+emptyReturnIdx]
+	emptyViewBranch := renderBoardBody[emptyViewIdx : emptyViewIdx+emptyReturnIdx]
 	if !strings.Contains(emptyViewBranch, `id="fetching-detail"`) {
-		t.Error("renderDetail empty view (!views.length) must include id=\"fetching-detail\"")
+		t.Error("renderBoard empty view (!views.length) must include id=\"fetching-detail\"")
 	}
 
-	normalViewBranch := renderDetailBody[emptyViewIdx+emptyReturnIdx:]
+	normalViewBranch := renderBoardBody[emptyViewIdx+emptyReturnIdx:]
 	if !strings.Contains(normalViewBranch, `id="fetching-detail"`) {
-		t.Error("renderDetail normal view must include id=\"fetching-detail\"")
+		t.Error("renderBoard normal view must include id=\"fetching-detail\"")
 	}
 
 	// 3. Assert renderFooter defines #fetching-footer

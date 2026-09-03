@@ -396,3 +396,33 @@ func TestThemeTokensForName(t *testing.T) {
 		t.Fatal("expected theme name")
 	}
 }
+
+func TestProjectSnapshotTrendFallsBackToRequests(t *testing.T) {
+	now := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
+	snap := core.NewUsageSnapshot("copilot", "copilot")
+	snap.Timestamp = now
+	snap.Status = core.StatusOK
+	snap.DailySeries = map[string][]core.TimePoint{
+		"requests": {
+			{Date: "2026-08-27", Value: 70},
+			{Date: "2026-08-28", Value: 82},
+			{Date: "2026-08-29", Value: 94},
+		},
+	}
+	p := WebProjector{
+		TimeWindow:    core.TimeWindow3d,
+		WarnThreshold: 0.25,
+		CritThreshold: 0.1,
+		UsageMode:     config.UsageModeRemaining,
+		TileWidth:     72,
+		DetailWidth:   80,
+		Now:           now,
+	}
+	view := p.ProjectSnapshot(snap, "Copilot")
+	if len(view.DailyCost) != 3 {
+		t.Fatalf("daily trend fallback = %d points, want 3", len(view.DailyCost))
+	}
+	if view.DailyCost[2].Value != 94 {
+		t.Fatalf("last trend point = %v, want 94", view.DailyCost[2].Value)
+	}
+}
