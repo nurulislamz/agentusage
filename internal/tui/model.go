@@ -157,6 +157,7 @@ type settingsState struct {
 	providerLinkPicker providerLinkPickerState
 	browserPicker      browserPickerState
 	boxes              boxesState
+	addAccount         addAccountModalState
 }
 
 type boxesState struct {
@@ -235,6 +236,7 @@ type Services interface {
 	SaveTimeWindow(window string) error
 	SaveProviderLink(source, target string) error
 	DeleteProviderLink(source string) error
+	SaveAccount(acct core.AccountConfig) error
 	ConnectBrowserSession(accountID, domain, cookieName, preferredBrowser string) (core.BrowserSessionInfo, error)
 	DisconnectBrowserSession(accountID string) error
 	LoadBrowserSessionInfo(accountID string) core.BrowserSessionInfo
@@ -249,8 +251,6 @@ type Services interface {
 	ListAntigravityBoxes() ([]boxes.AntigravityBox, error)
 	LoginAntigravityBox(ctx context.Context, name string, onURL func(string)) error
 }
-
-
 
 type Model struct {
 	snapshots map[string]core.UsageSnapshot

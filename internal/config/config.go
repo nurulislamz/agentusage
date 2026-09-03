@@ -359,6 +359,7 @@ func loadFrom(path string) (Config, bool, error) {
 	cfg.Dashboard.UsageMode = normalizeDashboardUsageMode(cfg.Dashboard.UsageMode)
 	cfg.Dashboard.WidgetSections = normalizeDashboardWidgetSections(cfg.Dashboard.WidgetSections)
 	cfg.Dashboard.DetailSections = normalizeDetailWidgetSections(cfg.Dashboard.DetailSections)
+	cfg.Observability = normalizeObservabilityConfig(cfg.Observability)
 
 	return cfg, salvaged, nil
 }
@@ -951,3 +952,44 @@ func SaveAccountTo(path string, acct core.AccountConfig) error {
 	})
 }
 
+func normalizeObservabilityConfig(in ObservabilityConfig) ObservabilityConfig {
+	if v := os.Getenv("AGENTUSAGE_OTEL_ENABLED"); v != "" {
+		in.Enabled = parseBoolEnv(v)
+	}
+	if ep := os.Getenv("AGENTUSAGE_OTEL_ENDPOINT"); ep != "" {
+		in.Endpoint = ep
+	} else if in.Endpoint == "" {
+		if ep := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); ep != "" {
+			in.Endpoint = ep
+		}
+	}
+	if v := os.Getenv("AGENTUSAGE_OTEL_INSECURE"); v != "" {
+		in.Insecure = parseBoolEnv(v)
+	} else if v := os.Getenv("OTEL_EXPORTER_OTLP_INSECURE"); v != "" && os.Getenv("AGENTUSAGE_OTEL_INSECURE") == "" {
+		in.Insecure = parseBoolEnv(v)
+	}
+	if sn := os.Getenv("AGENTUSAGE_OTEL_SERVICE_NAME"); sn != "" {
+		in.ServiceName = sn
+	} else if in.ServiceName == "" {
+		if sn := os.Getenv("OTEL_SERVICE_NAME"); sn != "" {
+			in.ServiceName = sn
+		}
+	}
+	return in
+}
+
+func parseBoolEnv(val string) bool {
+	v := strings.ToLower(strings.TrimSpace(val))
+	return v == "1" || v == "true" || v == "yes" || v == "on"
+}
+
+// SaveObservability persists observability settings into the config file (read-modify-write).
+func SaveObservability(obs ObservabilityConfig) error {
+	return SaveObservabilityTo(ConfigPath(), obs)
+}
+
+func SaveObservabilityTo(path string, obs ObservabilityConfig) error {
+	return modifyConfig(path, func(cfg *Config) {
+		cfg.Observability = obs
+	})
+}

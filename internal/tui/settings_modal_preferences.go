@@ -134,7 +134,7 @@ func (m Model) renderSettingsAPIKeysBody(w, h int) string {
 		}
 	}
 
-	lines := settingsBodyHeaderLines("Credential Management", fmt.Sprintf("%d/%d ready", readyCount, len(ids)))
+	lines := settingsBodyHeaderLines("Credential Management", fmt.Sprintf("%d/%d ready · a add account", readyCount, len(ids)))
 	accountW := 20
 	envW := max(10, w-accountW-18)
 	if accountW = max(10, w-envW-18); accountW < 10 {
@@ -142,9 +142,10 @@ func (m Model) renderSettingsAPIKeysBody(w, h int) string {
 	}
 	lines = append(lines, dimStyle.Render(fmt.Sprintf("    %-3s %-7s %-*s %-*s", "#", "STAT", accountW, "ACCOUNT", envW, "AUTH SOURCE")), settingsBodyRule(w))
 	if len(ids) == 0 {
-		lines = append(lines, dimStyle.Render("No providers available."))
+		lines = append(lines, dimStyle.Render("No providers available. Press a to add an account."))
 		return padToSize(strings.Join(lines, "\n"), w, h)
 	}
+
 
 	cursor := clamp(m.settings.cursor, 0, len(ids)-1)
 	start, end := listWindow(len(ids), cursor, max(1, h-len(lines)))

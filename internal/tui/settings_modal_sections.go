@@ -19,13 +19,14 @@ func (m Model) renderSettingsProvidersBody(w, h int) string {
 
 	headerLines := settingsBodyHeaderLines(
 		"Provider & Account Visibility",
-		fmt.Sprintf("%d/%d enabled · Space/Enter toggle · Shift+J/K reorder · Esc close", enabledCount, len(ids)),
+		fmt.Sprintf("%d/%d enabled · a add account · Space/Enter toggle · Shift+J/K reorder · Esc close", enabledCount, len(ids)),
 	)
 	headerLines = append(headerLines, settingsBodyRule(w))
 	if len(ids) == 0 {
-		headerLines = append(headerLines, dimStyle.Render("No accounts or providers detected."))
+		headerLines = append(headerLines, dimStyle.Render("No accounts or providers detected. Press a to add an account."))
 		return padToSize(strings.Join(headerLines, "\n"), w, h)
 	}
+
 
 	cursor := clamp(m.settings.cursor, 0, len(ids)-1)
 

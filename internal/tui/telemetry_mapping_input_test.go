@@ -40,7 +40,9 @@ func (f *fakeServices) DeleteProviderLink(source string) error {
 	f.deletedSrc = source
 	return f.deleteErr
 }
+func (f *fakeServices) SaveAccount(core.AccountConfig) error                  { return nil }
 func (f *fakeServices) ValidateAPIKey(string, string, string) (bool, string) { return true, "" }
+
 func (f *fakeServices) SaveCredential(string, string) error                  { return nil }
 func (f *fakeServices) DeleteCredential(string) error                        { return nil }
 func (f *fakeServices) InstallIntegration(integrations.ID) ([]integrations.Status, error) {

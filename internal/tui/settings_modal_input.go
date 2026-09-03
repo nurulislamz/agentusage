@@ -9,6 +9,9 @@ import (
 )
 
 func (m Model) handleSettingsModalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.settings.addAccount.active {
+		return m.handleAddAccountKey(msg)
+	}
 	if m.settings.apiKeyEditing {
 		return m.handleAPIKeyEditKey(msg)
 	}

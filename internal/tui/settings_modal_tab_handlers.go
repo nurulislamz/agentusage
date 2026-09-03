@@ -36,6 +36,9 @@ func (m Model) handleSettingsTabProvidersKey(msg tea.KeyMsg, ids []string) (Mode
 			return m, cmd, true
 		}
 		return m, nil, true
+	case "a", "A":
+		m.openAddAccountModal()
+		return m, nil, true
 	case " ", "enter":
 		if len(ids) == 0 {
 			return m, nil, true
@@ -48,6 +51,7 @@ func (m Model) handleSettingsTabProvidersKey(msg tea.KeyMsg, ids []string) (Mode
 	}
 	return m, nil, false
 }
+
 
 func (m Model) handleSettingsTabWidgetSectionsKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	switch msg.String() {
@@ -171,7 +175,11 @@ func (m Model) handleSettingsTabAPIKeysKey(msg tea.KeyMsg, ids []string) (Model,
 			m.settings.cursor++
 		}
 		return m, nil, true
+	case "a", "A":
+		m.openAddAccountModal()
+		return m, nil, true
 	case "enter":
+
 		if len(ids) == 0 {
 			return m, nil, true
 		}

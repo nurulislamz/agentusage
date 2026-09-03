@@ -39,7 +39,9 @@ func (s *mockUsageModeService) SaveDashboardHideSectionsWithNoData(hide bool) er
 func (s *mockUsageModeService) SaveTimeWindow(window string) error                  { return nil }
 func (s *mockUsageModeService) SaveProviderLink(source, target string) error        { return nil }
 func (s *mockUsageModeService) DeleteProviderLink(source string) error              { return nil }
+func (s *mockUsageModeService) SaveAccount(acct core.AccountConfig) error             { return nil }
 func (s *mockUsageModeService) ConnectBrowserSession(accountID, domain, cookieName, preferredBrowser string) (core.BrowserSessionInfo, error) {
+
 	return core.BrowserSessionInfo{}, nil
 }
 func (s *mockUsageModeService) DisconnectBrowserSession(accountID string) error { return nil }

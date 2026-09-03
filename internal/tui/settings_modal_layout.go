@@ -9,9 +9,13 @@ import (
 )
 
 func (m Model) renderSettingsModalOverlay() string {
+	if m.settings.addAccount.active {
+		return m.renderAddAccountModalOverlay()
+	}
 	if m.width < 40 || m.height < 12 {
 		return m.renderDashboard()
 	}
+
 
 	contentW := m.width - 24
 	if contentW < 68 {
@@ -148,7 +152,7 @@ func (m Model) renderSettingsModalTabs(w int) string {
 func (m Model) settingsModalHint() string {
 	switch m.settings.tab {
 	case settingsTabProviders:
-		return "Up/Down: select  ·  Shift+↑/↓ or Shift+J/K: move item  ·  Space/Enter: enable/disable  ·  Left/Right: switch tab  ·  Esc: close"
+		return "Up/Down: select  ·  a: add account  ·  Shift+↑/↓ or Shift+J/K: move item  ·  Space/Enter: enable/disable  ·  Left/Right: switch tab  ·  Esc: close"
 	case settingsTabWidgetSections:
 		return "Up/Down: select section  ·  Shift+↑/↓ or Shift+J/K: reorder  ·  Space/Enter: show/hide  ·  < >: tile/detail sub-tab  ·  h: toggle hide empty  ·  PgUp/PgDn: scroll preview  ·  Esc: close"
 	case settingsTabAPIKeys:
@@ -156,9 +160,10 @@ func (m Model) settingsModalHint() string {
 			return "Type API key  ·  Enter: validate & save  ·  Esc: cancel"
 		}
 		if m.selectedAPIKeyRowSupportsBrowserSession() {
-			return "Up/Down: select  ·  Enter: edit key  ·  c: read browser cookie  ·  b: open site  ·  x: disconnect browser  ·  d: delete key  ·  Left/Right: switch tab  ·  Esc: close"
+			return "Up/Down: select  ·  a: add account  ·  Enter: edit key  ·  c: read browser cookie  ·  b: open site  ·  x: disconnect browser  ·  d: delete key  ·  Left/Right: switch tab  ·  Esc: close"
 		}
-		return "Up/Down: select  ·  Enter: edit key  ·  d: delete key  ·  Left/Right: switch tab  ·  Esc: close"
+		return "Up/Down: select  ·  a: add account  ·  Enter: edit key  ·  d: delete key  ·  Left/Right: switch tab  ·  Esc: close"
+
 	case settingsTabTelemetry:
 		return "Up/Down: select  ·  Space/Enter: apply time window  ·  Left/Right: switch tab  ·  Esc: close"
 	case settingsTabIntegrations:

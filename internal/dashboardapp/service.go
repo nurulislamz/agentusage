@@ -94,6 +94,11 @@ func (s *Service) DeleteProviderLink(source string) error {
 	return config.DeleteProviderLink(source)
 }
 
+func (s *Service) SaveAccount(acct core.AccountConfig) error {
+	return config.SaveAccount(acct)
+}
+
+
 func (s *Service) ValidateAPIKey(accountID, providerID, apiKey string) (bool, string) {
 	var provider core.UsageProvider
 	for _, p := range providers.AllProviders() {
