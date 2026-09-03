@@ -247,69 +247,75 @@ func extractUsageRows(v any) []map[string]any {
 		}
 		return nested
 	case map[string]any:
-		if looksLikeUsageRow(value) {
-			return []map[string]any{value}
-		}
-
-		keys := []string{
-			"data", "items", "list", "rows", "records", "usage",
-			"model_usage", "modelUsage",
-			"tool_usage", "toolUsage",
-			"language_usage", "languageUsage",
-			"client_usage", "clientUsage",
-			"source_usage", "sourceUsage",
-			"provider_usage", "providerUsage",
-			"endpoint_usage", "endpointUsage",
-			"result",
-		}
-		var combined []map[string]any
-		for _, key := range keys {
-			if nested, ok := mapValue(value, key); ok {
-				rows := extractUsageRows(nested)
-				if len(rows) > 0 {
-					for _, row := range rows {
-						tagged := row
-						if firstStringFromMap(row, "__usage_bucket") == "" {
-							tagged = cloneStringAnyMap(row)
-							tagged["__usage_bucket"] = key
-						}
-						combined = append(combined, tagged)
-					}
-				}
-			}
-		}
-		if len(combined) > 0 {
-			return combined
-		}
-
-		mapKeys := core.SortedStringKeys(value)
-
-		var all []map[string]any
-		for _, key := range mapKeys {
-			nested := value[key]
-			rows := extractUsageRows(nested)
-			if len(rows) > 0 {
-				for _, row := range rows {
-					tagged := row
-					if firstStringFromMap(row, "__usage_key") == "" {
-						tagged = cloneStringAnyMap(row)
-						tagged["__usage_key"] = key
-					}
-					all = append(all, tagged)
-				}
-				continue
-			}
-			if numeric, ok := parseFloat(nested); ok {
-				all = append(all, map[string]any{
-					"requests":    numeric,
-					"__usage_key": key,
-				})
-			}
-		}
-		return all
+		return extractUsageRowsFromMap(value)
 	default:
 		return nil
 	}
+}
+
+func extractUsageRowsFromMap(value map[string]any) []map[string]any {
+	if looksLikeUsageRow(value) {
+		return []map[string]any{value}
+	}
+
+	keys := []string{
+		"data", "items", "list", "rows", "records", "usage",
+		"model_usage", "modelUsage",
+		"tool_usage", "toolUsage",
+		"language_usage", "languageUsage",
+		"client_usage", "clientUsage",
+		"source_usage", "sourceUsage",
+		"provider_usage", "providerUsage",
+		"endpoint_usage", "endpointUsage",
+		"result",
+	}
+	var combined []map[string]any
+	for _, key := range keys {
+		nested, ok := mapValue(value, key)
+		if !ok {
+			continue
+		}
+		rows := extractUsageRows(nested)
+		combined = append(combined, tagUsageRows(rows, "__usage_bucket", key)...)
+	}
+	if len(combined) > 0 {
+		return combined
+	}
+
+	mapKeys := core.SortedStringKeys(value)
+	var all []map[string]any
+	for _, key := range mapKeys {
+		nested := value[key]
+		rows := extractUsageRows(nested)
+		if len(rows) > 0 {
+			all = append(all, tagUsageRows(rows, "__usage_key", key)...)
+			continue
+		}
+		if numeric, ok := parseFloat(nested); ok {
+			all = append(all, map[string]any{
+				"requests":    numeric,
+				"__usage_key": key,
+			})
+		}
+	}
+	return all
+}
+
+func tagUsageRows(rows []map[string]any, tagKey, tagValue string) []map[string]any {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		if firstStringFromMap(row, tagKey) != "" {
+			out = append(out, row)
+			continue
+		}
+		tagged := cloneStringAnyMap(row)
+		tagged[tagKey] = tagValue
+		out = append(out, tagged)
+	}
+	return out
 }
 
 func extractLimitRows(v any) []map[string]any {
