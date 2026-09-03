@@ -264,37 +264,29 @@ func sumAnalyticsModelRequests(s UsageSnapshot) float64 {
 }
 
 func sanitizeAnalyticsMetricID(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	// Preserve non-separator runes (including non-ASCII model IDs). The ASCII-only
+	// scanner previously dropped those characters and collapsed distinct models
+	// into the same series key (e.g. "模型甲" and "模型乙" both became "unknown").
+	value := strings.ToLower(strings.TrimSpace(raw))
+	if value == "" {
 		return ""
 	}
 	var b strings.Builder
-	b.Grow(len(raw))
+	b.Grow(len(value))
 	lastUnderscore := false
-	for i := 0; i < len(raw); i++ {
-		c := raw[i]
-		switch {
-		case (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'):
-			b.WriteByte(c)
-			lastUnderscore = false
-		case c >= 'A' && c <= 'Z':
-			b.WriteByte(c + ('a' - 'A'))
-			lastUnderscore = false
-		case c == '/' || c == '-' || c == ' ' || c == '.' || c == ':' || c == '_':
+	for _, r := range value {
+		switch r {
+		case '/', '-', ' ', '.', ':', '_':
 			if !lastUnderscore && b.Len() > 0 {
 				b.WriteByte('_')
 				lastUnderscore = true
 			}
 		default:
-			if !lastUnderscore && b.Len() > 0 {
-				b.WriteByte('_')
-				lastUnderscore = true
-			}
+			b.WriteRune(r)
+			lastUnderscore = false
 		}
 	}
-	res := b.String()
-	res = strings.TrimRight(res, "_")
-	return res
+	return strings.Trim(b.String(), "_")
 }
 
 func normalizeAnalyticsDailySeries(s *UsageSnapshot) {

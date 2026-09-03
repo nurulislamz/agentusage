@@ -300,6 +300,8 @@ func planBucketHitMonthlyLimit(live livePlanUsage) bool {
 
 // EnrichSnapshots runs a live Fetch on refresh so status-line and plan usage are
 // current instead of waiting for the telemetry daemon poll cadence.
+// Live fields are overlaid onto the daemon read-model snapshot so telemetry-derived
+// collections (ModelUsage, DailySeries, composer costs) are not wiped.
 func (p *Provider) EnrichSnapshots(ctx context.Context, accounts []core.AccountConfig, snaps map[string]core.UsageSnapshot) {
 	if p == nil {
 		return
@@ -307,9 +309,10 @@ func (p *Provider) EnrichSnapshots(ctx context.Context, accounts []core.AccountC
 	shared.EnrichSnapshotsWithFetch(ctx, providerID, p.Fetch, accounts, snaps, stampLiveRefreshTime)
 }
 
-func stampLiveRefreshTime(_ core.UsageSnapshot, fresh core.UsageSnapshot) core.UsageSnapshot {
-	fresh.Timestamp = time.Now().UTC()
-	return fresh
+func stampLiveRefreshTime(base, fresh core.UsageSnapshot) core.UsageSnapshot {
+	merged := shared.OverlayLiveFetch(base, fresh)
+	merged.Timestamp = time.Now().UTC()
+	return merged
 }
 
 // HasChanged reports whether the Cursor status-line state file has been modified since the given time.

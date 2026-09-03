@@ -631,3 +631,52 @@ func TestEnrichSnapshots_FullFetchUpdatesPlanMetrics(t *testing.T) {
 		t.Fatalf("timestamp = %v, want within 5s of enrich refresh", got.Timestamp)
 	}
 }
+
+func TestEnrichSnapshots_PreservesTelemetryCollections(t *testing.T) {
+	ts := startNestedPlanUsageServer(t)
+	defer ts.Close()
+
+	snaps := map[string]core.UsageSnapshot{
+		"cursor-nurulz": {
+			ProviderID: "cursor",
+			AccountID:  "cursor-nurulz",
+			Status:     core.StatusOK,
+			Metrics: map[string]core.Metric{
+				"context_window": {
+					Used:      core.Float64Ptr(24.5),
+					Remaining: core.Float64Ptr(75.5),
+					Limit:     core.Float64Ptr(100),
+					Unit:      "%",
+				},
+			},
+			ModelUsage: []core.ModelUsageRecord{
+				{RawModelID: "gpt-5", TotalTokens: core.Float64Ptr(900)},
+			},
+			DailySeries: map[string][]core.TimePoint{
+				"cost": {{Date: "2026-04-10", Value: 1.25}},
+			},
+		},
+	}
+	New().WithClient(NewClient(ts.URL, ts.Client())).EnrichSnapshots(context.Background(), []core.AccountConfig{{
+		ID:       "cursor-nurulz",
+		Provider: "cursor",
+		Token:    "test-jwt",
+		ProviderPaths: map[string]string{
+			"state_db": filepath.Join(t.TempDir(), "missing.vscdb"),
+		},
+	}}, snaps)
+
+	got := snaps["cursor-nurulz"]
+	if metricUsed(t, got, "plan_percent_used") != 7 {
+		t.Fatalf("Included = %v, want 7 from live fetch", metricUsed(t, got, "plan_percent_used"))
+	}
+	if metricUsed(t, got, "context_window") != 24.5 {
+		t.Fatalf("context_window = %v, want preserved telemetry metric 24.5", metricUsed(t, got, "context_window"))
+	}
+	if len(got.ModelUsage) != 1 || got.ModelUsage[0].RawModelID != "gpt-5" {
+		t.Fatalf("ModelUsage = %+v, want telemetry record preserved", got.ModelUsage)
+	}
+	if len(got.DailySeries["cost"]) != 1 || got.DailySeries["cost"][0].Value != 1.25 {
+		t.Fatalf("DailySeries cost = %+v, want telemetry series preserved", got.DailySeries["cost"])
+	}
+}

@@ -186,11 +186,13 @@ func projectSnapshot(snap *core.UsageSnapshot, payload statusLinePayload) {
 
 // EnrichSnapshots runs a live Fetch on refresh so quota is immediate instead of
 // waiting for the telemetry daemon poll cadence.
+// Live quota fields are overlaid onto the daemon read-model snapshot so
+// telemetry-derived collections are preserved across web/TUI refresh.
 func (p *Provider) EnrichSnapshots(ctx context.Context, accounts []core.AccountConfig, snaps map[string]core.UsageSnapshot) {
 	if p == nil {
 		return
 	}
-	shared.EnrichSnapshotsWithFetch(ctx, providerID, p.Fetch, accounts, snaps, nil)
+	shared.EnrichSnapshotsWithFetch(ctx, providerID, p.Fetch, accounts, snaps, shared.OverlayLiveFetch)
 }
 
 func projectQuotaMetrics(snap *core.UsageSnapshot, payload statusLinePayload) {
