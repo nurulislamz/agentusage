@@ -200,6 +200,91 @@ func TestCollectorTargetedEnrichment(t *testing.T) {
 	}
 }
 
+func TestCollectorDefaultFetchTimeoutLeavesRoomToWrite(t *testing.T) {
+	c := newCollector(Options{Demo: true, RefreshSeconds: 30})
+	if c.fetchTimeout != 12*time.Second {
+		t.Fatalf("fetchTimeout = %v, want 12s so HTTP WriteTimeout can still write the body", c.fetchTimeout)
+	}
+}
+
+func TestCollectorFetchTimesOutWhenSnapshotsHang(t *testing.T) {
+	c := newCollector(Options{
+		Source:         string(export.SourceDirect),
+		RefreshSeconds: 30,
+		Now:            func() time.Time { return time.Date(2026, 9, 3, 15, 0, 0, 0, time.UTC) },
+	})
+	c.fetchTimeout = 40 * time.Millisecond
+	c.snapshotFetch = func(ctx context.Context, refresh bool, accountID string) ([]core.UsageSnapshot, string, error) {
+		time.Sleep(2 * time.Second)
+		return nil, "direct", nil
+	}
+
+	start := time.Now()
+	_, err := c.fetch(false, "")
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+	if elapsed := time.Since(start); elapsed > 400*time.Millisecond {
+		t.Fatalf("fetch took %v, want return at fetchTimeout", elapsed)
+	}
+}
+
+func TestCollectorServesCacheWhileRefreshIsStuck(t *testing.T) {
+	now := time.Date(2026, 9, 3, 15, 0, 0, 0, time.UTC)
+	c := newCollector(Options{
+		Demo:           true,
+		RefreshSeconds: 60,
+		Now:            func() time.Time { return now },
+	})
+	first, err := c.envelope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Views) == 0 {
+		t.Fatal("expected cached demo views")
+	}
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	c.demo = false
+	c.fetchTimeout = 2 * time.Second
+	c.snapshotFetch = func(ctx context.Context, refresh bool, accountID string) ([]core.UsageSnapshot, string, error) {
+		close(started)
+		<-release
+		return nil, "direct", nil
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.envelopeRefresh(true, "")
+		done <- err
+	}()
+	select {
+	case <-started:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("stuck refresh never started")
+	}
+
+	start := time.Now()
+	cached, err := c.envelope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(start); elapsed > 200*time.Millisecond {
+		t.Fatalf("cached envelope() blocked for %v while refresh was in flight", elapsed)
+	}
+	if cached.GeneratedAt != first.GeneratedAt {
+		t.Fatalf("expected cache hit, generated_at moved %v → %v", first.GeneratedAt, cached.GeneratedAt)
+	}
+
+	close(release)
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("refresh goroutine did not finish")
+	}
+}
+
 func TestCollectorFetchSnapshotsEnrichment(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

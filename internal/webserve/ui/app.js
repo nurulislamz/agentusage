@@ -243,12 +243,14 @@
     if (showFetching) {
       setRefreshing(true, { accountID: opts?.accountID, all: opts ? (opts.all || !opts.accountID) : true });
     }
+    const ctrl = new AbortController();
+    const abortTimer = setTimeout(() => ctrl.abort(), 15000);
     try {
       let qs = manual ? "?refresh=1" : "";
       if (opts && opts.accountID) {
         qs += (qs ? "&" : "?") + `account_id=${encodeURIComponent(opts.accountID)}`;
       }
-      const fetchPromise = fetch("api/v1/snapshots" + qs, { headers: headers() });
+      const fetchPromise = fetch("api/v1/snapshots" + qs, { headers: headers(), signal: ctrl.signal });
       const minDurationPromise = manual ? new Promise((r) => setTimeout(r, 350)) : Promise.resolve();
       const [res] = await Promise.all([fetchPromise, minDurationPromise]);
       if (res.status === 401) {
@@ -271,8 +273,13 @@
         $("empty-state").hidden = false;
         $("splash").hidden = true;
         $("app").hidden = true;
+        const hint = $("empty-hint");
+        if (hint && (err && (err.name === "AbortError" || String(err).includes("abort")))) {
+          hint.textContent = "Timed out loading usage data. Refresh the page, or start the telemetry daemon.";
+        }
       }
     } finally {
+      clearTimeout(abortTimer);
       loadInFlight = false;
       state.loading = false;
       if (state.views.length > 0 && $("token-modal").hidden) {

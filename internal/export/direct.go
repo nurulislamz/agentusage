@@ -117,11 +117,33 @@ func collectSnapshots(
 	}()
 
 	out := make([]core.UsageSnapshot, 0, len(accounts))
-	for r := range results {
-		out = append(out, r.snap)
+	got := make(map[string]bool, len(accounts))
+	for {
+		select {
+		case <-ctx.Done():
+			for _, acct := range accounts {
+				if got[acct.ID] {
+					continue
+				}
+				out = append(out, core.UsageSnapshot{
+					ProviderID: acct.Provider,
+					AccountID:  acct.ID,
+					Timestamp:  now().UTC(),
+					Status:     core.StatusError,
+					Message:    "export: fetch timed out",
+				})
+			}
+			sortSnapshots(out)
+			return out
+		case r, ok := <-results:
+			if !ok {
+				sortSnapshots(out)
+				return out
+			}
+			got[r.snap.AccountID] = true
+			out = append(out, r.snap)
+		}
 	}
-	sortSnapshots(out)
-	return out
 }
 
 // sortSnapshots orders by (provider_id, account_id) so the encoder produces

@@ -662,6 +662,9 @@ func TestBasePathServesUnderPrefix(t *testing.T) {
 	if !strings.Contains(js, `fetch("api/v1/snapshots`) || !strings.Contains(js, `fetch("api/v1/usage-mode"`) {
 		t.Error("app.js should fetch api/v1/* with relative URLs")
 	}
+	if !strings.Contains(js, "AbortController") || !strings.Contains(js, "signal: ctrl.signal") {
+		t.Error("app.js should abort hung snapshot fetches so the splash cannot stick forever")
+	}
 }
 
 func TestNewServerRejectsInvalidBasePath(t *testing.T) {

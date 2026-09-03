@@ -11,6 +11,9 @@ import (
 )
 
 func (c *collector) fetchSnapshots(ctx context.Context, refresh bool, accountID string) ([]core.UsageSnapshot, string, error) {
+	if c.snapshotFetch != nil {
+		return c.snapshotFetch(ctx, refresh, accountID)
+	}
 	if c.demo {
 		return demoSnapshots(c.now()), "demo", nil
 	}
