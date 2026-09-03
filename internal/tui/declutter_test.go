@@ -330,4 +330,3 @@ func TestDetailContent_FiveHourBeforeWeekly(t *testing.T) {
 		t.Fatalf("expected Five Hour Limit (pos %d) before Weekly Limit (pos %d) in command code detail", posCc5h, posCcWk)
 	}
 }
-

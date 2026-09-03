@@ -60,7 +60,6 @@ func ApplyCanonicalTelemetryViewWithOptions(
 			time.Since(totalStart).Milliseconds(), options.TimeWindow, options.Since.Format(time.RFC3339), len(snaps))
 	}()
 
-
 	dbPath = strings.TrimSpace(dbPath)
 	if dbPath == "" {
 		var err error

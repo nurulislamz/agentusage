@@ -42,4 +42,3 @@ func Tracef(format string, args ...any) {
 		observability.EmitLog(context.Background(), slog.LevelDebug, "core", "trace", msg)
 	}
 }
-

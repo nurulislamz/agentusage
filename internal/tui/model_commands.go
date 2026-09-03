@@ -11,7 +11,6 @@ import (
 	"github.com/nurulislamz/agentusage/internal/integrations"
 )
 
-
 func (m Model) persistThemeCmd(themeName string) tea.Cmd {
 	return func() tea.Msg {
 		if m.services == nil {
@@ -395,8 +394,6 @@ func (m Model) loginAntigravityBoxCmd(name string) tea.Cmd {
 		return antigravityBoxLoggedInMsg{BoxName: name, Err: err}
 	}
 }
-
-
 
 func snapshotsReady(snaps map[string]core.UsageSnapshot) bool {
 	if len(snaps) == 0 {

@@ -246,7 +246,6 @@ type Config struct {
 	Observability        ObservabilityConfig           `json:"observability,omitempty"`
 }
 
-
 // DefaultProviderLinks returns built-in telemetry provider-id to dashboard provider-id mappings.
 //
 // Telemetry sources (e.g. the OpenCode plugin) tag events with whatever provider id the

@@ -400,4 +400,3 @@ func timerWindowPriority(row WebDetailRow) int {
 
 	return 10
 }
-

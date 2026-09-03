@@ -80,11 +80,11 @@ type WidgetDataSpec struct {
 type DashboardStandardSection string
 
 const (
-	DashboardSectionHeader           DashboardStandardSection = "header"
-	DashboardSectionTopUsageProgress DashboardStandardSection = "top_usage_progress"
-	DashboardSectionModelBurn        DashboardStandardSection = "model_burn"
-	DashboardSectionClientBurn       DashboardStandardSection = "client_burn"
-	DashboardSectionProjectBreakdown DashboardStandardSection = "project_breakdown"
+	DashboardSectionHeader            DashboardStandardSection = "header"
+	DashboardSectionTopUsageProgress  DashboardStandardSection = "top_usage_progress"
+	DashboardSectionModelBurn         DashboardStandardSection = "model_burn"
+	DashboardSectionClientBurn        DashboardStandardSection = "client_burn"
+	DashboardSectionProjectBreakdown  DashboardStandardSection = "project_breakdown"
 	DashboardSectionDailyUsage        DashboardStandardSection = "daily_usage"
 	DashboardSectionProviderBurn      DashboardStandardSection = "provider_burn"
 	DashboardSectionUpstreamProviders DashboardStandardSection = "upstream_providers"
@@ -214,9 +214,9 @@ func (w DashboardWidget) IsZero() bool {
 
 func DefaultDashboardWidget() DashboardWidget {
 	return DashboardWidget{
-		DisplayStyle:        DashboardDisplayStyleDefault,
-		ResetStyle:          DashboardResetStyleDefault,
-		ColorRole:           DashboardColorRoleAuto,
+		DisplayStyle: DashboardDisplayStyleDefault,
+		ResetStyle:   DashboardResetStyleDefault,
+		ColorRole:    DashboardColorRoleAuto,
 		GaugePriority: []string{
 			"spend_limit", "plan_spend", "credits", "credit_balance",
 		},

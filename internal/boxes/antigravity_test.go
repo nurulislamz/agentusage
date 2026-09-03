@@ -123,7 +123,6 @@ func TestLoginBoxSession_SuccessWithURLAndToken(t *testing.T) {
 	mockAuthURL := "https://accounts.google.com/o/oauth2/auth?client_id=123.apps.googleusercontent.com&redirect_uri=http://localhost:8085"
 	simulatedOutput := "Starting Antigravity CLI in box login-box...\nPlease authenticate by visiting:\n" + mockAuthURL + "\nWaiting for authentication...\n"
 
-
 	var capturedURL string
 	var openedURL string
 	tokenSavedCalled := false

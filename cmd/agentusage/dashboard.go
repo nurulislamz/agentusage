@@ -95,7 +95,6 @@ func runDashboard(cfg config.Config) {
 		}
 	})
 
-
 	model.SetOnRefresh(func(req tui.RefreshRequest) uint64 {
 		return dispatcher.refresh(ctx, viewRuntime, req)
 	})

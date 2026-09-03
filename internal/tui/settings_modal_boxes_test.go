@@ -205,4 +205,3 @@ func TestSettingsModal_BoxesTab_CreateCancelAndEmptyValidation(t *testing.T) {
 		t.Errorf("expected error status when submitting empty box name")
 	}
 }
-

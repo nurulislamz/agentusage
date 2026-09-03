@@ -11,13 +11,13 @@ import (
 
 type addAccountTestServices struct {
 	fakeServices
-	savedAccount    core.AccountConfig
-	savedCredAcct   string
-	savedCredKey    string
-	validateResult  bool
-	validateErrMsg  string
-	validateCalls   int
-	browsersList    []string
+	savedAccount   core.AccountConfig
+	savedCredAcct  string
+	savedCredKey   string
+	validateResult bool
+	validateErrMsg string
+	validateCalls  int
+	browsersList   []string
 }
 
 func (s *addAccountTestServices) SaveAccount(acct core.AccountConfig) error {

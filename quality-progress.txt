@@ -1,0 +1,14 @@
+# Ralph Code Quality Cycle Ledger (10 Iterations)
+# Mode: Deep Cleanup & Cognitive Complexity Reduction
+# Style Contract: Default Baseline (Complexity <= 15, Indent <= 2, Guard Clauses, Rule of Three)
+
+- [x] [ITERATION 1] (commit 3e2a187: indent 10->2) internal/detect/opencode_auth.go (detectOpenCodeAuth: flatten 10-level nesting to <=2, extract token helpers)
+- [x] [ITERATION 2] (commit 9ed58d1: indent 9->2) internal/tui/tiles_gauge.go (tileGaugeProjectionAnnotation: flatten 9-level nesting to <=2, extract pace helper)
+- [x] [ITERATION 3] (commit c81ce40: indent 7->2) internal/core/provider.go (ResolveAPIKey: flatten 7-level nesting to <=2, decompose credential resolution)
+- [x] [ITERATION 4] (commit be1071d: indent 7->1) internal/providers/antigravity/antigravity.go (Fetch: flatten 7-level nesting, extract token resolution)
+- [x] [ITERATION 5] (commit eadf0bc: indent 7->2) internal/providers/zai/usage_extract.go (extractUsageRows: flatten 7-level nesting, extract row parser)
+- [x] [ITERATION 6] (commit a2c6343: indent 6->2) internal/detect/command_code.go (detectCommandCode: flatten 6-level nesting, extract config finder)
+- [x] [ITERATION 7] (commit 931eea3: indent 6->2) internal/providers/codex/credit_forecast.go (applyCreditForecast: flatten 6-level nesting, decompose forecast math)
+- [x] [ITERATION 8] (commit 2ec797e: indent 7->2) internal/webserve/ansihtml.go (ANSIToHTML: flatten 7-level nesting, decompose ANSI escape state machine)
+- [x] [ITERATION 9] (commit 9db1e5f: indent 6->2) internal/tui/styles.go (resolveNearLimitType: decompose 227-line conditional tree into window evaluators)
+- [x] [ITERATION 10] (commit f01e674: indent 6->2) internal/daemon/server_poll.go (pollProviders: decompose 174-line poll loop, extract single-provider worker)

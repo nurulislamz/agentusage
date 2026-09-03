@@ -233,4 +233,3 @@ func extractBoxToken(boxAuthFile string) string {
 	}
 	return ""
 }
-

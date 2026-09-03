@@ -27,7 +27,6 @@ func (m Model) renderSettingsProvidersBody(w, h int) string {
 		return padToSize(strings.Join(headerLines, "\n"), w, h)
 	}
 
-
 	cursor := clamp(m.settings.cursor, 0, len(ids)-1)
 
 	// Build all visual rows

@@ -73,7 +73,6 @@ func (m *Model) closeSettingsModal() {
 	m.settings.addAccount = addAccountModalState{}
 }
 
-
 func (m Model) settingsModalInfo() string {
 	ids := m.settingsIDs()
 	active := 0

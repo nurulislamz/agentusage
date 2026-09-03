@@ -34,7 +34,6 @@ func (m Model) View() string {
 	return m.renderDashboard()
 }
 
-
 func (m Model) renderDashboardContent(w, contentH int) string {
 	if m.mode == modeDetail {
 		return m.renderDetailPanel(w, contentH)

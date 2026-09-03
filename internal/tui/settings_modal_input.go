@@ -27,7 +27,6 @@ func (m Model) handleSettingsModalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleBrowserPickerKey(msg)
 	}
 
-
 	ids := m.settingsIDs()
 	if m.settings.tab == settingsTabAPIKeys {
 		ids = m.apiKeysTabIDs()
@@ -104,7 +103,6 @@ func (m Model) handleSettingsModalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	return m, nil
 }
-
 
 func (m *Model) moveSelectedProvider(ids []string, delta int) tea.Cmd {
 	if len(ids) == 0 || delta == 0 {
@@ -206,7 +204,6 @@ func (m *Model) resetSettingsCursorForTab() {
 		m.settings.themeCursor = clamp(ActiveThemeIndex(), 0, max(0, len(AvailableThemes())-1))
 	}
 }
-
 
 func (m Model) handleAPIKeyEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {

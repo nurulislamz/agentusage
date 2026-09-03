@@ -180,7 +180,7 @@ func TestBase_Widgets(t *testing.T) {
 	// Custom dashboard preserved
 	customDash := core.DashboardWidget{
 		ShowClientComposition: true,
-		ColorRole:              core.DashboardColorRoleTeal,
+		ColorRole:             core.DashboardColorRoleTeal,
 	}
 	bCustomDash := New(core.ProviderSpec{
 		ID:        "test",

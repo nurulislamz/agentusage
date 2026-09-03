@@ -16,7 +16,6 @@ func (m Model) renderSettingsModalOverlay() string {
 		return m.renderDashboard()
 	}
 
-
 	contentW := m.width - 24
 	if contentW < 68 {
 		contentW = 68
@@ -196,7 +195,6 @@ func (m Model) renderSettingsModalBody(w, h int) string {
 		return m.renderSettingsThemeBody(w, h)
 	}
 }
-
 
 func settingsBodyHeaderLines(title, subtitle string) []string {
 	lines := []string{

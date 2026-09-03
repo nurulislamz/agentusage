@@ -7,8 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-
-
 // Per-tab handlers extracted from handleSettingsModalKey, which used to be a
 // single 348-line function with seven nested switch blocks. Each handler
 // returns (model, cmd, handled). When handled is false the dispatcher falls
@@ -51,7 +49,6 @@ func (m Model) handleSettingsTabProvidersKey(msg tea.KeyMsg, ids []string) (Mode
 	}
 	return m, nil, false
 }
-
 
 func (m Model) handleSettingsTabWidgetSectionsKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	switch msg.String() {
@@ -391,4 +388,3 @@ func (m Model) handleSettingsTabBoxesKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) 
 	}
 	return m, nil, false
 }
-

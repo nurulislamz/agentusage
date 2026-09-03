@@ -448,4 +448,3 @@ func quotaWindowPriority(line WebUsageLine) int {
 
 	return 10
 }
-

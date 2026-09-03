@@ -130,7 +130,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m = m.requestRefreshAll()
 		return m, nil
 
-
 	case availableBrowsersLoadedMsg:
 		// Picker may have been dismissed (esc) before the scan finished —
 		// or a fresh open replaced it for a different account. In either
@@ -269,7 +268,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m = m.requestRefreshAll()
 		return m, m.loadAntigravityBoxesCmd()
-
 
 	case providerConsoleOpenedMsg:
 		if msg.Err != nil {

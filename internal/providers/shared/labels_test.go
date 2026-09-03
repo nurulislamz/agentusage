@@ -40,4 +40,3 @@ func TestCodingToolSectionOrder(t *testing.T) {
 		}
 	}
 }
-

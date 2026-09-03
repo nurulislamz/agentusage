@@ -13,7 +13,6 @@ import (
 	"github.com/samber/lo"
 )
 
-
 type tickMsg time.Time
 
 // autoRefreshMsg triggers a periodic data re-fetch.

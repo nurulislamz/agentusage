@@ -17,7 +17,6 @@ import (
 	"github.com/nurulislamz/agentusage/internal/providers"
 )
 
-
 type Service struct {
 	ctx           context.Context
 	cookieReader  browsercookies.Reader
@@ -97,7 +96,6 @@ func (s *Service) DeleteProviderLink(source string) error {
 func (s *Service) SaveAccount(acct core.AccountConfig) error {
 	return config.SaveAccount(acct)
 }
-
 
 func (s *Service) ValidateAPIKey(accountID, providerID, apiKey string) (bool, string) {
 	var provider core.UsageProvider
@@ -280,7 +278,6 @@ func (s *Service) LoginAntigravityBox(ctx context.Context, name string, onURL fu
 	return boxes.LoginBoxSession(ctx, name, opts)
 }
 
-
 // openInDefaultBrowser is the production browser-launcher. exec.Command
 // shells out to the OS-specific URL handler. Tests override via
 // SetBrowserOpener.
@@ -294,4 +291,3 @@ func openInDefaultBrowser(url string) error {
 		return exec.Command("xdg-open", url).Start()
 	}
 }
-

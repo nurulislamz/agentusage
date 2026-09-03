@@ -46,7 +46,6 @@ var (
 	sensitiveAuthPattern   = regexp.MustCompile(`(?i)(authorization)[\s:=]+(?:bearer\s+)?([^\s,;&]+)`)
 )
 
-
 func ResolveConfig(cfg Config) Config {
 	if v := os.Getenv("AGENTUSAGE_OTEL_ENABLED"); v != "" {
 		cfg.Enabled = v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
@@ -209,7 +208,6 @@ func EmitDebug(component, event, format string, args ...any) {
 	EmitLog(context.Background(), slog.LevelDebug, component, event, msg)
 }
 
-
 func RedactSensitive(s string) string {
 	if s == "" {
 		return ""
@@ -218,7 +216,6 @@ func RedactSensitive(s string) string {
 	s = sensitiveBearerPattern.ReplaceAllString(s, `$1=[REDACTED]`)
 	return sensitiveKVPattern.ReplaceAllString(s, `$1=[REDACTED]`)
 }
-
 
 func Flush(ctx context.Context) error {
 	mu.RLock()

@@ -146,7 +146,6 @@ func (m Model) renderSettingsAPIKeysBody(w, h int) string {
 		return padToSize(strings.Join(lines, "\n"), w, h)
 	}
 
-
 	cursor := clamp(m.settings.cursor, 0, len(ids)-1)
 	start, end := listWindow(len(ids), cursor, max(1, h-len(lines)))
 	for i := start; i < end; i++ {
@@ -572,4 +571,3 @@ func (m Model) renderSettingsBoxesBody(w, h int) string {
 
 	return padToSize(strings.Join(lines, "\n"), w, h)
 }
-

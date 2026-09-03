@@ -11,7 +11,6 @@ import (
 	"github.com/nurulislamz/agentusage/internal/integrations"
 )
 
-
 type fakeServices struct {
 	savedSource string
 	savedTarget string
@@ -40,11 +39,11 @@ func (f *fakeServices) DeleteProviderLink(source string) error {
 	f.deletedSrc = source
 	return f.deleteErr
 }
-func (f *fakeServices) SaveAccount(core.AccountConfig) error                  { return nil }
+func (f *fakeServices) SaveAccount(core.AccountConfig) error                 { return nil }
 func (f *fakeServices) ValidateAPIKey(string, string, string) (bool, string) { return true, "" }
 
-func (f *fakeServices) SaveCredential(string, string) error                  { return nil }
-func (f *fakeServices) DeleteCredential(string) error                        { return nil }
+func (f *fakeServices) SaveCredential(string, string) error { return nil }
+func (f *fakeServices) DeleteCredential(string) error       { return nil }
 func (f *fakeServices) InstallIntegration(integrations.ID) ([]integrations.Status, error) {
 	return nil, nil
 }
@@ -65,7 +64,6 @@ func (f *fakeServices) ListAntigravityBoxes() ([]boxes.AntigravityBox, error) {
 func (f *fakeServices) LoginAntigravityBox(context.Context, string, func(string)) error {
 	return nil
 }
-
 
 func telemetryFixtureModel() Model {
 	return Model{

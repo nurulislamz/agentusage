@@ -20,4 +20,3 @@ func CodingToolSectionOrder() []core.DashboardStandardSection {
 		core.DashboardSectionOtherData,
 	}
 }
-
