@@ -146,25 +146,8 @@ func (p *Provider) applyCreditForecast(snap *core.UsageSnapshot, accountID strin
 	// gives us the next reset, but not the current period start. When the next
 	// reset is available, use the corresponding calendar-month boundary so the
 	// rate includes usage that happened before agentUsage began observing it.
-	if resetAt, ok := snap.Resets["codex_credit_limit"]; ok {
-		if periodStart, ok := inferCreditPeriodStart(resetAt, snap.Timestamp); ok {
-			elapsed := snap.Timestamp.Sub(periodStart)
-			if elapsed > time.Minute && used > 0 {
-				rate := used / elapsed.Hours()
-				if rate > 0 {
-					remaining := limit - used
-					applyCreditForecastMetrics(snap, rate, remaining, "current-period average")
-					snap.Raw["credit_forecast_source"] = "inferred_period_start"
-					snap.Raw["credit_forecast_period_start"] = periodStart.UTC().Format(time.RFC3339)
-					if remaining <= 0 {
-						snap.Raw["credit_forecast_summary"] = fmt.Sprintf("%.2f credits/hour; 0.00 hours remaining", rate)
-					} else {
-						snap.Raw["credit_forecast_summary"] = fmt.Sprintf("%.2f credits/hour; %.2f hours remaining", rate, remaining/rate)
-					}
-					return
-				}
-			}
-		}
+	if applyInferredPeriodForecast(snap, limit, used) {
+		return
 	}
 
 	p.creditHistoryMu.Lock()
@@ -208,17 +191,43 @@ func (p *Provider) applyCreditForecast(snap *core.UsageSnapshot, accountID strin
 	if rate <= 0 {
 		return
 	}
-	applyCreditForecastMetrics(snap, rate, limit-used, "observed")
+	remaining := limit - used
+	applyCreditForecastMetrics(snap, rate, remaining, "observed")
 	snap.Raw["credit_forecast_source"] = "observed_usage"
 	snap.Raw["credit_forecast_observation_start"] = first.at.UTC().Format(time.RFC3339)
+	snap.Raw["credit_forecast_summary"] = formatCreditForecastSummary(rate, remaining)
+}
 
-	remaining := limit - used
-	if remaining <= 0 {
-		snap.Raw["credit_forecast_summary"] = fmt.Sprintf("%.2f credits/hour; 0.00 hours remaining", rate)
-		return
+func applyInferredPeriodForecast(snap *core.UsageSnapshot, limit, used float64) bool {
+	resetAt, ok := snap.Resets["codex_credit_limit"]
+	if !ok {
+		return false
 	}
-	runout := remaining / rate
-	snap.Raw["credit_forecast_summary"] = fmt.Sprintf("%.2f credits/hour; %.2f hours remaining", rate, runout)
+	periodStart, ok := inferCreditPeriodStart(resetAt, snap.Timestamp)
+	if !ok {
+		return false
+	}
+	elapsed := snap.Timestamp.Sub(periodStart)
+	if elapsed <= time.Minute || used <= 0 {
+		return false
+	}
+	rate := used / elapsed.Hours()
+	if rate <= 0 {
+		return false
+	}
+	remaining := limit - used
+	applyCreditForecastMetrics(snap, rate, remaining, "current-period average")
+	snap.Raw["credit_forecast_source"] = "inferred_period_start"
+	snap.Raw["credit_forecast_period_start"] = periodStart.UTC().Format(time.RFC3339)
+	snap.Raw["credit_forecast_summary"] = formatCreditForecastSummary(rate, remaining)
+	return true
+}
+
+func formatCreditForecastSummary(rate, remaining float64) string {
+	if remaining <= 0 {
+		return fmt.Sprintf("%.2f credits/hour; 0.00 hours remaining", rate)
+	}
+	return fmt.Sprintf("%.2f credits/hour; %.2f hours remaining", rate, remaining/rate)
 }
 
 // inferCreditPeriodStart derives the beginning of the current monthly quota
