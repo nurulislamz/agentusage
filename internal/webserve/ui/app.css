@@ -972,6 +972,51 @@ kbd, .footer kbd {
   gap: 10px;
 }
 
+.gauge-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.gauge-group-title {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lin-list .gauge-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dial-row:has(.gauge-group) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.dial-row .gauge-group-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+  justify-content: flex-start;
+}
+
+.strip-gauges .gauge-group {
+  grid-column: 1 / -1;
+}
+
+.strip-gauges .gauge-group-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px 10px;
+}
+
 .lin-gauge {
   display: flex;
   flex-direction: column;

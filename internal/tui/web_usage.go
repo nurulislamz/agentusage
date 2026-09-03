@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"math"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ type WebUsageLine struct {
 	ResetIn string   `json:"reset_in,omitempty"`
 	Tone    string   `json:"tone,omitempty"`
 	Urgent  bool     `json:"urgent,omitempty"`
+	Group   string   `json:"group,omitempty"`
 }
 
 func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, cards []WebDetailCard, now time.Time) []WebUsageLine {
@@ -33,6 +35,7 @@ func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, car
 	}
 
 	lines := make([]WebUsageLine, 0, len(card.Rows)+len(timers))
+	claimed := make(map[string]bool)
 	for _, row := range card.Rows {
 		switch row.Kind {
 		case "gauge":
@@ -43,12 +46,13 @@ func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, car
 				Hint:    row.Hint,
 				Tone:    row.Tone,
 			}
-			if i, timer := matchTimerRow(row.Label, timers); i >= 0 {
+			if i, timer := matchTimerRow(row.Label, timers, used); i >= 0 {
 				used[i] = true
 				line = applyTimerToUsageLine(line, timer)
 			} else if line.ResetIn == "" {
 				line.ResetIn = resetInFromHint(row.Hint)
 			}
+			line.Group = resolveUsageGroup(line, snap, widget, claimed)
 			lines = append(lines, line)
 		case "kv":
 			if skipUsageKV(row.Label, hasGauge) {
@@ -61,24 +65,28 @@ func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, car
 				Hint:  row.Hint,
 				Tone:  row.Tone,
 			}
-			if i, timer := matchTimerRow(row.Label+" "+row.Value, timers); i >= 0 {
+			if i, timer := matchTimerRow(row.Label+" "+row.Value, timers, used); i >= 0 {
 				used[i] = true
 				line = applyTimerToUsageLine(line, timer)
 			}
+			line.Group = resolveUsageGroup(line, snap, widget, claimed)
 			lines = append(lines, line)
 		}
 	}
 
-	for i, timer := range timers {
-		if used[i] {
-			continue
+	if !hasGauge {
+		for i, timer := range timers {
+			if used[i] {
+				continue
+			}
+			line := WebUsageLine{
+				Label: timer.Label,
+				Short: shortUsageLabel(timer.Label),
+				Tone:  timer.Tone,
+				Group: usageLineGroup(timer.Label, widget),
+			}
+			lines = append(lines, applyTimerToUsageLine(line, timer))
 		}
-		line := WebUsageLine{
-			Label: timer.Label,
-			Short: shortUsageLabel(timer.Label),
-			Tone:  timer.Tone,
-		}
-		lines = append(lines, applyTimerToUsageLine(line, timer))
 	}
 	return lines
 }
@@ -147,17 +155,77 @@ func skipUsageKV(label string, hasGauge bool) bool {
 	}
 }
 
-func matchTimerRow(label string, timers []WebDetailRow) (int, WebDetailRow) {
+func matchTimerRow(label string, timers []WebDetailRow, used []bool) (int, WebDetailRow) {
 	want := usageWindowKey(label)
 	if want == "" {
 		return -1, WebDetailRow{}
 	}
 	for i, t := range timers {
+		if i < len(used) && used[i] {
+			continue
+		}
 		if usageWindowKey(t.Label) == want {
 			return i, t
 		}
 	}
 	return -1, WebDetailRow{}
+}
+
+func usageLineGroup(label string, widget core.DashboardWidget) string {
+	lower := strings.ToLower(label)
+	for _, row := range widget.CompactRows {
+		rowLabel := strings.TrimSpace(row.Label)
+		if rowLabel == "" {
+			continue
+		}
+		if strings.Contains(lower, strings.ToLower(rowLabel)) {
+			return compactGroupTitle(rowLabel)
+		}
+	}
+	if strings.Contains(lower, "gemini") {
+		return "Gemini"
+	}
+	if strings.Contains(lower, "claude") || strings.Contains(lower, "opus") || strings.Contains(lower, "sonnet") || strings.Contains(lower, "gpt") || strings.Contains(lower, "3p") {
+		return "Claude / GPT"
+	}
+	return ""
+}
+
+func resolveUsageGroup(line WebUsageLine, snap core.UsageSnapshot, widget core.DashboardWidget, claimed map[string]bool) string {
+	if g := usageLineGroup(line.Label+" "+line.Short+" "+line.Value, widget); g != "" {
+		return g
+	}
+	if line.Percent == nil || len(widget.CompactRows) == 0 {
+		return ""
+	}
+	for _, row := range widget.CompactRows {
+		for _, key := range row.Keys {
+			if claimed[key] {
+				continue
+			}
+			m, ok := snap.Metrics[key]
+			if !ok || m.Remaining == nil {
+				continue
+			}
+			if math.Abs(*m.Remaining-*line.Percent) > 0.05 {
+				continue
+			}
+			claimed[key] = true
+			return compactGroupTitle(row.Label)
+		}
+	}
+	return ""
+}
+
+func compactGroupTitle(label string) string {
+	lower := strings.ToLower(label)
+	if strings.Contains(lower, "gemini") {
+		return "Gemini"
+	}
+	if strings.Contains(lower, "claude") || strings.Contains(lower, "opus") || strings.Contains(lower, "gpt") {
+		return "Claude / GPT"
+	}
+	return strings.TrimSpace(label)
 }
 
 func applyTimerToUsageLine(line WebUsageLine, timer WebDetailRow) WebUsageLine {

@@ -452,14 +452,12 @@
           reset_in: line.reset_in,
           urgent: line.urgent,
           tone: line.tone || toneFromPercent(pct, v),
+          group: line.group || "",
         });
         return;
       }
       const parts = String(line.value || "").split(/\s*·\s*/).map((p) => p.trim()).filter(Boolean);
       if (!parts.length) {
-        if (line.reset_in) {
-          items.push({ kind: "table", label: line.short || line.label || "Reset", value: resetCaption(line) || line.reset_in });
-        }
         return;
       }
       parts.forEach((part) => {
@@ -476,6 +474,7 @@
             reset_in: line.reset_in,
             urgent: line.urgent,
             tone: line.tone || toneFromPercent(ratio.percent, v),
+            group: line.group || "",
           });
           return;
         }
@@ -488,6 +487,7 @@
             value: part,
             amount,
             tone: line.tone || "ok",
+            group: line.group || "",
           });
           return;
         }
@@ -634,6 +634,48 @@
     </div>`;
   }
 
+  function graphGroups(items, v) {
+    const graphs = (items || []).filter((it) => it.kind !== "table");
+    if (!graphs.length) return [];
+    if ((v.provider_id || "") !== "antigravity") {
+      return [{ title: "", items: graphs }];
+    }
+    const gemini = [];
+    const claude = [];
+    graphs.forEach((it) => {
+      const text = [it.group, it.label, it.short].join(" ").toLowerCase();
+      if (/gemini/.test(text)) {
+        gemini.push(it);
+        return;
+      }
+      if (/claude|opus|sonnet|gpt|\b3p\b/.test(text)) {
+        claude.push(it);
+        return;
+      }
+    });
+    const groups = [];
+    if (gemini.length) groups.push({ title: "Gemini", items: gemini });
+    if (claude.length) groups.push({ title: "Claude / GPT", items: claude });
+    if (!groups.length) groups.push({ title: "", items: graphs });
+    return groups;
+  }
+
+  function renderGaugeGroups(groups, renderer) {
+    if (groups.length === 1 && !groups[0].title) {
+      return groups[0].items.map(renderer).join("");
+    }
+    return groups.map((g) =>
+      `<div class="gauge-group">
+        ${g.title ? `<div class="gauge-group-title">${esc(g.title)}</div>` : ""}
+        <div class="gauge-group-body">${g.items.map(renderer).join("")}</div>
+      </div>`
+    ).join("");
+  }
+
+  function tableItems(items, v) {
+    return (items || []).filter((it) => it.kind === "table");
+  }
+
   function renderLinearGauge(item, v) {
     const pct = clampPct(item.percent);
     const tone = item.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
@@ -691,10 +733,10 @@
 
   function renderBarCard(v, i) {
     const items = usageItems(v);
-    const graphs = items.filter((it) => it.kind !== "table").map((it) => renderLinearGauge(it, v)).join("");
-    const table = renderMetricTable(items.filter((it) => it.kind === "table"));
-    const stats = trendStats(v.daily_cost);
-    const hist = renderMetricTable(stats);
+    const groups = graphGroups(items, v);
+    const graphs = renderGaugeGroups(groups, (it) => renderLinearGauge(it, v));
+    const table = renderMetricTable(tableItems(items, v));
+    const hist = renderMetricTable(trendStats(v.daily_cost));
     const spark = sparkBars(v.daily_cost);
     const body = graphs || table || hist || spark
       ? `${graphs ? `<div class="lin-list">${graphs}</div>` : ""}${table}${hist || spark ? `<div class="agent-foot">${hist}${spark ? `<div class="spark-wrap" title="Usage trend">${spark}</div>` : ""}</div>` : ""}`
@@ -705,12 +747,9 @@
 
   function renderDialCard(v, i) {
     const items = usageItems(v);
-    const dials = items.filter((it) => it.kind !== "table").map((it) => renderArcGauge(it, v)).join("");
-    const table = renderMetricTable(items.filter((it) => it.kind === "table").concat(
-      (v.next_reset || stripResetPrefix(v.reset_hint || ""))
-        ? [{ label: "Next reset", value: v.next_reset || stripResetPrefix(v.reset_hint || "") }]
-        : [],
-    ));
+    const groups = graphGroups(items, v);
+    const dials = renderGaugeGroups(groups, (it) => renderArcGauge(it, v));
+    const table = renderMetricTable(tableItems(items, v));
     const hist = renderMetricTable(trendStats(v.daily_cost));
     const spark = sparkLine(v.daily_cost, 120, 32);
     const body = dials || table || hist || spark
@@ -722,8 +761,9 @@
 
   function renderStripCard(v, i) {
     const items = usageItems(v);
-    const metrics = items.filter((it) => it.kind !== "table").map((it) => renderStripGauge(it, v)).join("");
-    const table = renderMetricTable(items.filter((it) => it.kind === "table").concat(trendStats(v.daily_cost)));
+    const groups = graphGroups(items, v);
+    const metrics = renderGaugeGroups(groups, (it) => renderStripGauge(it, v));
+    const table = renderMetricTable(tableItems(items, v).concat(trendStats(v.daily_cost)));
     const spark = sparkBars(v.daily_cost, 72, 22);
     const sub = agentSubtitle(v);
     const body = metrics || table || spark

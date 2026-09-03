@@ -209,6 +209,8 @@ func TestAppJSUsageOnlyLayouts(t *testing.T) {
 		"function usageItems(",
 		"function parseRatio(",
 		"function renderMetricTable(",
+		"function graphGroups(",
+		"function renderGaugeGroups(",
 		"function cycleLayout(",
 		`case "v":`,
 		`id="footer-btn-layout"`,
@@ -223,7 +225,7 @@ func TestAppJSUsageOnlyLayouts(t *testing.T) {
 	cssW := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(cssW, cssReq)
 	css := cssW.Body.String()
-	for _, want := range []string{".board-bars", ".board-dials", ".board-strips", ".lin-track", ".dial-svg", ".strip-track", ".metric-table"} {
+	for _, want := range []string{".board-bars", ".board-dials", ".board-strips", ".lin-track", ".dial-svg", ".strip-track", ".metric-table", ".gauge-group"} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css missing %q", want)
 		}

@@ -140,6 +140,7 @@ type UsageLine struct {
 	ResetIn string   `json:"reset_in,omitempty"`
 	Tone    string   `json:"tone,omitempty"`
 	Urgent  bool     `json:"urgent,omitempty"`
+	Group   string   `json:"group,omitempty"`
 }
 
 // Options configures a Server.

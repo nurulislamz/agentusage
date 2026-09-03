@@ -256,7 +256,7 @@ func accountViewFromTUI(v tui.WebAccountView) AccountView {
 	for i, l := range v.UsageLines {
 		usage[i] = UsageLine{
 			Label: l.Label, Short: l.Short, Percent: l.Percent, Value: l.Value,
-			Hint: l.Hint, ResetIn: l.ResetIn, Tone: l.Tone, Urgent: l.Urgent,
+			Hint: l.Hint, ResetIn: l.ResetIn, Tone: l.Tone, Urgent: l.Urgent, Group: l.Group,
 		}
 	}
 	return AccountView{

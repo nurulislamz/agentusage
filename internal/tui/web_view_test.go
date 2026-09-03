@@ -426,3 +426,58 @@ func TestProjectSnapshotTrendFallsBackToRequests(t *testing.T) {
 		t.Fatalf("last trend point = %v, want 94", view.DailyCost[2].Value)
 	}
 }
+
+func TestAntigravityUsageLinesGroupGeminiAndClaude(t *testing.T) {
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	snap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		AccountID:  "antigravity-main",
+		Timestamp:  now,
+		Status:     core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"quota_gemini_5h":     {Remaining: core.Float64Ptr(80), Unit: "%", Window: "5h"},
+			"quota_gemini_weekly": {Remaining: core.Float64Ptr(60), Unit: "%", Window: "week"},
+			"quota_claude_5h":     {Remaining: core.Float64Ptr(40), Unit: "%", Window: "5h"},
+			"quota_claude_weekly": {Remaining: core.Float64Ptr(70), Unit: "%", Window: "week"},
+			"quota":               {Remaining: core.Float64Ptr(55), Unit: "%"},
+		},
+		Resets: map[string]time.Time{
+			"quota_gemini_5h":     now.Add(4 * time.Hour),
+			"quota_gemini_weekly": now.Add(6 * 24 * time.Hour),
+			"quota_claude_5h":     now.Add(50 * time.Minute),
+			"quota_claude_weekly": now.Add(5 * 24 * time.Hour),
+			"quota":               now.Add(5 * 24 * time.Hour),
+		},
+	}
+	view := WebProjector{
+		TimeWindow:    core.TimeWindow3d,
+		WarnThreshold: 0.25,
+		CritThreshold: 0.1,
+		UsageMode:     config.UsageModeRemaining,
+		TileWidth:     72,
+		DetailWidth:   80,
+		Now:           now,
+	}.ProjectSnapshot(snap, "Antigravity")
+
+	gemini, claude, resetOnly := 0, 0, 0
+	for _, line := range view.UsageLines {
+		if line.Percent == nil && line.ResetIn != "" {
+			resetOnly++
+		}
+		switch line.Group {
+		case "Gemini":
+			gemini++
+		case "Claude / GPT":
+			claude++
+		}
+	}
+	if gemini < 2 {
+		t.Fatalf("gemini grouped lines = %d, want >=2 in %#v", gemini, view.UsageLines)
+	}
+	if claude < 2 {
+		t.Fatalf("claude/gpt grouped lines = %d, want >=2 in %#v", claude, view.UsageLines)
+	}
+	if resetOnly != 0 {
+		t.Fatalf("reset-only leftover lines = %d, want 0 (shown on gauges) %#v", resetOnly, view.UsageLines)
+	}
+}
