@@ -376,9 +376,7 @@
       <span id="fetching-header" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
       <span class="spacer"></span>
       <nav class="layout-nav" aria-label="Layout view">
-        <button type="button" class="layout-btn${state.layout === "split" ? " active" : ""}" data-layout="split" title="Glanceable Submenu + Deep Inspector (Tab / l)">Split</button>
-        <button type="button" class="layout-btn${state.layout === "matrix" ? " active" : ""}" data-layout="matrix" title="Dense Roster Matrix HUD (Tab / l)">Matrix</button>
-        <button type="button" class="layout-btn${state.layout === "bento" ? " active" : ""}" data-layout="bento" title="Viewport Bento Tiles (Tab / l)">Bento</button>
+        ${LAYOUTS.map((l) => `<button type="button" class="layout-btn${state.layout === l.id ? " active" : ""}" data-layout="${esc(l.id)}" title="${esc(l.hint)}">${esc(l.label)}</button>`).join("")}
       </nav>
       <span class="header-meta">⊞ ${n} agents${filteredNote} · ${esc(meta.label)} · ${esc(meta.hint)}</span>
     `;
@@ -746,7 +744,7 @@
     if (pct == null) return "";
     const color = gaugeColor(tone);
     const hub = item.kind === "rel"
-      ? formatCompact(item.amount)
+      ? (String(item.value || "").includes("%") ? Math.round(item.amount) + "%" : formatCompact(item.amount))
       : Math.round(pct) + "%";
     return `<div class="dial ${toneClass(tone)}${item.kind === "quota" && isDepleted(pct) ? " depleted" : ""}">
       <svg viewBox="0 0 88 58" class="dial-svg" aria-hidden="true">

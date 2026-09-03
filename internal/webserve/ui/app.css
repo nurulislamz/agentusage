@@ -1000,25 +1000,62 @@ kbd, .footer kbd {
 }
 
 .board-bars {
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 6px;
+}
+
+.board-bars .agent {
+  padding: 6px 10px;
+  gap: 4px;
+}
+
+.board-bars .lin-gauge {
+  gap: 2px;
+}
+
+.board-bars .lin-track {
+  height: 5px;
+}
+
+.board-bars .lin-name {
+  font-size: var(--text-xs);
 }
 
 .board-dials {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px;
+}
+
+.board-dials .agent {
+  padding: 6px 10px;
+  gap: 4px;
+}
+
+.board-dials .dial-svg {
+  max-height: 48px;
 }
 
 .board-strips {
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 3px;
+}
+
+.board-strips .agent {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) 80px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
 }
 
 .agent {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   width: 100%;
   margin: 0;
-  padding: 12px 14px;
+  padding: 8px 12px;
   text-align: left;
   font: inherit;
   color: inherit;
@@ -1358,14 +1395,6 @@ kbd, .footer kbd {
   color: var(--teal);
 }
 
-.board-strips .agent {
-  display: grid;
-  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) 80px;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-}
 
 .strip-id {
   display: grid;
