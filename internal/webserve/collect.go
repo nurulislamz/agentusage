@@ -2,6 +2,7 @@ package webserve
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +20,7 @@ import (
 
 type collector struct {
 	mu       sync.Mutex
+	fetchMu  sync.Mutex
 	cached   Envelope
 	cachedAt time.Time
 	ttl      time.Duration
@@ -30,6 +32,9 @@ type collector struct {
 	collect  CollectFunc
 	rt       *daemon.ViewRuntime
 	enrich   func(ctx context.Context, snaps map[string]core.UsageSnapshot, accountID string)
+
+	fetchTimeout  time.Duration
+	snapshotFetch func(ctx context.Context, refresh bool, accountID string) ([]core.UsageSnapshot, string, error)
 }
 
 type collectorMeta struct {
@@ -103,7 +108,16 @@ func newCollector(opts Options) *collector {
 			defer wg.Done()
 			opencodeProv.EnrichSnapshots(enrichCtx, cachedAccounts, opencodeSnaps)
 		}()
-		wg.Wait()
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			wg.Wait()
+		}()
+		select {
+		case <-done:
+		case <-enrichCtx.Done():
+			return
+		}
 
 		for k, v := range cursorSnaps {
 			if v.ProviderID == "cursor" || strings.HasPrefix(k, "cursor") {
@@ -142,7 +156,8 @@ func newCollector(opts Options) *collector {
 			refreshSeconds: refresh,
 			catalog:        providerCatalog(),
 		},
-		collect: opts.Collect,
+		collect:      opts.Collect,
+		fetchTimeout: 12 * time.Second,
 	}
 	if c.meta.version == "" {
 		c.meta.version = strings.TrimSpace(version.Version)
@@ -169,12 +184,15 @@ func (c *collector) envelopeRefresh(refresh bool, accountID string) (Envelope, e
 		return c.decorate(env), nil
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	if env, ok := c.cachedEnvelope(refresh); ok {
+		return env, nil
+	}
 
-	now := c.now()
-	if !refresh && !c.cachedAt.IsZero() && c.ttl > 0 && now.Sub(c.cachedAt) < c.ttl {
-		return c.cached, nil
+	c.fetchMu.Lock()
+	defer c.fetchMu.Unlock()
+
+	if env, ok := c.cachedEnvelope(refresh); ok {
+		return env, nil
 	}
 
 	env, err := c.fetch(refresh, accountID)
@@ -182,23 +200,68 @@ func (c *collector) envelopeRefresh(refresh bool, accountID string) (Envelope, e
 		return Envelope{}, err
 	}
 	env = c.decorate(env)
+	c.mu.Lock()
 	c.cached = env
-	c.cachedAt = now
+	c.cachedAt = c.now()
+	c.mu.Unlock()
 	return env, nil
 }
 
+func (c *collector) cachedEnvelope(refresh bool) (Envelope, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if refresh || c.cachedAt.IsZero() || c.ttl <= 0 {
+		return Envelope{}, false
+	}
+	if c.now().Sub(c.cachedAt) >= c.ttl {
+		return Envelope{}, false
+	}
+	return c.cached, true
+}
+
 func (c *collector) fetch(refresh bool, accountID string) (Envelope, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	timeout := c.fetchTimeout
+	if timeout <= 0 {
+		timeout = 12 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	snaps, source, err := c.fetchSnapshots(ctx, refresh, accountID)
-	if err != nil {
-		return Envelope{}, err
+	type outcome struct {
+		snaps  []core.UsageSnapshot
+		source string
+		err    error
 	}
-	return Envelope{
-		Source:    source,
-		Snapshots: snaps,
-	}, nil
+	ch := make(chan outcome, 1)
+	go func() {
+		snaps, source, err := c.fetchSnapshots(ctx, refresh, accountID)
+		ch <- outcome{snaps: snaps, source: source, err: err}
+	}()
+	select {
+	case out := <-ch:
+		if out.err != nil {
+			return Envelope{}, out.err
+		}
+		return Envelope{
+			Source:    out.source,
+			Snapshots: out.snaps,
+		}, nil
+	case <-ctx.Done():
+		timer := time.NewTimer(150 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case out := <-ch:
+			if out.err != nil {
+				return Envelope{}, out.err
+			}
+			return Envelope{
+				Source:    out.source,
+				Snapshots: out.snaps,
+			}, nil
+		case <-timer.C:
+			return Envelope{}, fmt.Errorf("serve: collecting snapshots: %w", ctx.Err())
+		}
+	}
 }
 
 func (c *collector) setUsageMode(mode string) {

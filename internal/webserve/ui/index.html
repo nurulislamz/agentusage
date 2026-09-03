@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
-  <div id="app" class="shell" hidden>
+  <div id="app" class="shell layout-bars" data-layout="bars" hidden>
     <header class="header">
       <div id="header" class="header-main">
         <span id="fetching-header" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>
@@ -18,9 +18,9 @@
     </header>
     <div class="hairline" aria-hidden="true"></div>
     <div class="body">
-      <nav id="nav" class="nav" aria-label="Providers"></nav>
+      <nav id="nav" class="nav" hidden aria-hidden="true"></nav>
       <div class="vsep" aria-hidden="true"></div>
-      <main class="panel" aria-label="Detail">
+      <main class="panel" aria-label="Usage dashboard">
         <div id="panel">
           <span id="fetching-detail" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>
         </div>
@@ -44,7 +44,7 @@
     <pre class="splash-logo dim" aria-hidden="true"> ▄▀█ █▀▀ █▀▀ █▄░█ ▀█▀   █░█ █▀ ▄▀█ █▀▀ █▀▀
  █▀█ █▄█ ██▄ █░▀█ ░█░   █▄█ ▄█ █▀█ █▄█ ██▄</pre>
     <h2>No snapshots yet</h2>
-    <p>Start the telemetry daemon, configure providers, or run <code>agentusage serve --demo</code>.</p>
+    <p id="empty-hint">Start the telemetry daemon, configure providers, or run <code>agentusage serve --demo</code>.</p>
   </div>
 
   <div id="token-modal" class="modal" hidden>
@@ -55,6 +55,16 @@
       <p id="token-error" class="error" hidden></p>
       <button type="submit">Continue</button>
     </form>
+  </div>
+
+  <div id="inspect-modal" class="modal inspect-modal" hidden>
+    <div class="modal-card inspect-card" role="dialog" aria-modal="true" aria-labelledby="inspect-title">
+      <div class="inspect-header">
+        <h2 id="inspect-title" class="inspect-title">Cockpit Inspection</h2>
+        <button type="button" id="inspect-close" class="inspect-close" aria-label="Close modal">✕</button>
+      </div>
+      <div id="inspect-content" class="inspect-content"></div>
+    </div>
   </div>
 
   <div id="filter-bar" class="filter-bar" hidden>

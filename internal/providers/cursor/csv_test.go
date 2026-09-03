@@ -1,11 +1,12 @@
 package cursor
 
 import (
-	"github.com/nurulislamz/agentusage/internal/core"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func TestParseCursorCSV_V1(t *testing.T) {

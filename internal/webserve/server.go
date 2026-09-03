@@ -122,8 +122,11 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       20 * time.Second,
-		WriteTimeout:      20 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		// Must exceed collector fetchTimeout (12s) plus encode time. A matching
+		// 20s write deadline previously aborted the snapshots response just as
+		// the collector returned, which left the UI on the loading splash.
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 	errCh := make(chan error, 1)
 	go func() {

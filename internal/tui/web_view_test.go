@@ -153,6 +153,24 @@ func TestWebProjectorOpenCodeDetailCards(t *testing.T) {
 	if !view.HasGauge {
 		t.Fatal("expected has_gauge for remaining metrics including 0%")
 	}
+	if len(view.UsageLines) < 3 {
+		t.Fatalf("want >=3 usage lines for nav, got %#v", view.UsageLines)
+	}
+	foundMonthlyReset := false
+	for _, line := range view.UsageLines {
+		if strings.Contains(strings.ToLower(line.Label), "month") && line.ResetIn != "" {
+			foundMonthlyReset = true
+		}
+		if line.Percent == nil && line.ResetIn == "" && line.Value == "" {
+			t.Errorf("empty usage line: %#v", line)
+		}
+	}
+	if !foundMonthlyReset {
+		t.Fatalf("expected monthly usage line with reset_in, got %#v", view.UsageLines)
+	}
+	if view.NextReset == "" {
+		t.Fatal("expected next_reset")
+	}
 
 	usage := cardByTitle(view.DetailCards, "Usage")
 	if usage.Title == "" {
@@ -269,6 +287,29 @@ func TestWebProjectorGroupsOpenCodeAccounts(t *testing.T) {
 	}
 }
 
+func TestShortUsageLabel(t *testing.T) {
+	cases := map[string]string{
+		"Five Hour Limit Remaining": "5h",
+		"Weekly Limit Used":         "Week",
+		"Monthly Subscription":      "Month",
+		"Plan Spend":                "Plan Spend",
+	}
+	for in, want := range cases {
+		if got := shortUsageLabel(in); got != want {
+			t.Errorf("shortUsageLabel(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestResetDurationRankOrdersSoonestFirst(t *testing.T) {
+	if resetDurationRank("5h 45m") >= resetDurationRank("9 days") {
+		t.Fatal("5h 45m should rank sooner than 9 days")
+	}
+	if resetDurationRank("4h59m") >= resetDurationRank("5h45m") {
+		t.Fatal("4h59m should rank sooner than 5h45m")
+	}
+}
+
 func TestWebProjectorAuthHasNoGauge(t *testing.T) {
 	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
 	snap := core.UsageSnapshot{
@@ -353,5 +394,90 @@ func TestThemeTokensForName(t *testing.T) {
 	}
 	if tokens.Name == "" {
 		t.Fatal("expected theme name")
+	}
+}
+
+func TestProjectSnapshotTrendFallsBackToRequests(t *testing.T) {
+	now := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
+	snap := core.NewUsageSnapshot("copilot", "copilot")
+	snap.Timestamp = now
+	snap.Status = core.StatusOK
+	snap.DailySeries = map[string][]core.TimePoint{
+		"requests": {
+			{Date: "2026-08-27", Value: 70},
+			{Date: "2026-08-28", Value: 82},
+			{Date: "2026-08-29", Value: 94},
+		},
+	}
+	p := WebProjector{
+		TimeWindow:    core.TimeWindow3d,
+		WarnThreshold: 0.25,
+		CritThreshold: 0.1,
+		UsageMode:     config.UsageModeRemaining,
+		TileWidth:     72,
+		DetailWidth:   80,
+		Now:           now,
+	}
+	view := p.ProjectSnapshot(snap, "Copilot")
+	if len(view.DailyCost) != 3 {
+		t.Fatalf("daily trend fallback = %d points, want 3", len(view.DailyCost))
+	}
+	if view.DailyCost[2].Value != 94 {
+		t.Fatalf("last trend point = %v, want 94", view.DailyCost[2].Value)
+	}
+}
+
+func TestAntigravityUsageLinesGroupGeminiAndClaude(t *testing.T) {
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	snap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		AccountID:  "antigravity-main",
+		Timestamp:  now,
+		Status:     core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"quota_gemini_5h":     {Remaining: core.Float64Ptr(80), Unit: "%", Window: "5h"},
+			"quota_gemini_weekly": {Remaining: core.Float64Ptr(60), Unit: "%", Window: "week"},
+			"quota_claude_5h":     {Remaining: core.Float64Ptr(40), Unit: "%", Window: "5h"},
+			"quota_claude_weekly": {Remaining: core.Float64Ptr(70), Unit: "%", Window: "week"},
+			"quota":               {Remaining: core.Float64Ptr(55), Unit: "%"},
+		},
+		Resets: map[string]time.Time{
+			"quota_gemini_5h":     now.Add(4 * time.Hour),
+			"quota_gemini_weekly": now.Add(6 * 24 * time.Hour),
+			"quota_claude_5h":     now.Add(50 * time.Minute),
+			"quota_claude_weekly": now.Add(5 * 24 * time.Hour),
+			"quota":               now.Add(5 * 24 * time.Hour),
+		},
+	}
+	view := WebProjector{
+		TimeWindow:    core.TimeWindow3d,
+		WarnThreshold: 0.25,
+		CritThreshold: 0.1,
+		UsageMode:     config.UsageModeRemaining,
+		TileWidth:     72,
+		DetailWidth:   80,
+		Now:           now,
+	}.ProjectSnapshot(snap, "Antigravity")
+
+	gemini, claude, resetOnly := 0, 0, 0
+	for _, line := range view.UsageLines {
+		if line.Percent == nil && line.ResetIn != "" {
+			resetOnly++
+		}
+		switch line.Group {
+		case "Gemini":
+			gemini++
+		case "Claude / GPT":
+			claude++
+		}
+	}
+	if gemini < 2 {
+		t.Fatalf("gemini grouped lines = %d, want >=2 in %#v", gemini, view.UsageLines)
+	}
+	if claude < 2 {
+		t.Fatalf("claude/gpt grouped lines = %d, want >=2 in %#v", claude, view.UsageLines)
+	}
+	if resetOnly != 0 {
+		t.Fatalf("reset-only leftover lines = %d, want 0 (shown on gauges) %#v", resetOnly, view.UsageLines)
 	}
 }

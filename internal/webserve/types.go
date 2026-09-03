@@ -82,10 +82,12 @@ type AccountView struct {
 	TileLines      []string         `json:"tile_lines"`
 	DetailSections []DetailSection  `json:"detail_sections"`
 	DetailCards    []DetailCard     `json:"detail_cards,omitempty"`
+	UsageLines     []UsageLine      `json:"usage_lines,omitempty"`
 	Resets         []ResetPill      `json:"resets,omitempty"`
 	DailyCost      []core.TimePoint `json:"daily_cost,omitempty"`
 	CycleSchedule  string           `json:"cycle_schedule,omitempty"`
 	LastRefreshed  string           `json:"last_refreshed,omitempty"`
+	NextReset      string           `json:"next_reset,omitempty"`
 	HasGauge       bool             `json:"has_gauge,omitempty"`
 	HeaderTone     string           `json:"header_tone,omitempty"`
 
@@ -127,6 +129,18 @@ type ResetPill struct {
 	Label    string `json:"label"`
 	Duration string `json:"duration"`
 	Urgent   bool   `json:"urgent,omitempty"`
+}
+
+type UsageLine struct {
+	Label   string   `json:"label"`
+	Short   string   `json:"short,omitempty"`
+	Percent *float64 `json:"percent,omitempty"`
+	Value   string   `json:"value,omitempty"`
+	Hint    string   `json:"hint,omitempty"`
+	ResetIn string   `json:"reset_in,omitempty"`
+	Tone    string   `json:"tone,omitempty"`
+	Urgent  bool     `json:"urgent,omitempty"`
+	Group   string   `json:"group,omitempty"`
 }
 
 // Options configures a Server.

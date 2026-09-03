@@ -41,4 +41,7 @@ func TestSnapshotsIncludeProjectedViews(t *testing.T) {
 	if view.LastRefreshed == "" {
 		t.Fatal("expected last_refreshed on demo views")
 	}
+	if len(view.UsageLines) == 0 {
+		t.Fatal("expected usage_lines for navigator summaries")
+	}
 }

@@ -1,0 +1,29 @@
+# Ralph Loop Progress Ledger — agentUsage Views
+
+- [x] Iteration 1: Split Layout (Submenu Master-Detail & Cockpit) [bfa640c]
+  - Fixed meter percentage and adjacent label collisions (e.g. 100%Week, 58%5h)
+  - Fixed label truncation (e.g. Included clipped to Includ…)
+  - Eliminated redundant timer countdown display (5h00m in 5h00m)
+  - Added clear remaining context to cockpit subhero percentages
+
+- [x] Iteration 2: Matrix Layout (Dense Roster Matrix HUD) [52eac98]
+  - Added Quota 3 column so critical limits (e.g. OpenCode Monthly Limit 0%) are visible
+  - Conditionally rendered Trend column only when telemetry time-series exists
+  - Fixed quota label truncation in table cells
+  - Adjusted row padding to 10px 14px for balanced viewport coverage
+
+- [x] Iteration 3: Bento Grid Layout (Viewport-Fitted Modular Glance Tiles) [7560d35]
+  - Balanced 10-account grid into a symmetrical 3-row layout (2 featured + 4 + 4) with zero gaps
+  - Disambiguated duplicate quota labels (e.g. Antigravity G-Week vs C-Week)
+  - Removed empty sparkline dash placeholder (—) when no history exists
+  - Expanded #panel to fill 100% vertical viewport height
+
+- [x] Iteration 4: Gauge Wall Layouts (Bars, Dials, Strips) [a155e55]
+  - Added all 6 layouts dynamically to segmented header switcher
+  - Fixed missing % unit on secondary relative dials
+  - Widened account name column in Strips to prevent truncation (opencode-m... -> opencode-mohammed)
+  - Compacted card padding and gauge heights for zero-scroll glanceability
+
+- [x] Iteration 5: TUI & Integration Parity
+  - Verified Bubble Tea terminal split view and snapshot parity with web projector
+  - All Go test suites pass with 0 failures
