@@ -449,27 +449,22 @@
   function isUsageCard(card) {
     const id = (card.id || "").toLowerCase();
     const title = (card.title || "").toLowerCase();
-    return id === "usage" || title === "usage" || ["hero", "overview", "quota"].includes(id);
+    return id === "usage" || title === "usage";
   }
 
   function usageOnlyCards(v) {
-    const cards = v.detail_cards || [];
-    let usage = cards.filter(isUsageCard);
-    if (!usage.length) {
-      const gauged = cards.find((c) => (c.rows || []).some((r) => r.kind === "gauge"));
-      if (gauged) usage = [gauged];
+    const cards = (v.detail_cards || []).filter(isUsageCard);
+    if (cards.length) {
+      return cards.map((card) => attachResetsToUsageCard(card, v));
     }
-    if (!usage.length) {
-      const lines = usageLines(v);
-      if (!lines.length) return [];
-      usage = [{
-        id: "usage",
-        title: "Usage",
-        icon: "⚡",
-        rows: lines.map((line) => usageLineToRow(line)),
-      }];
-    }
-    return usage.map((card) => attachResetsToUsageCard(card, v));
+    const lines = usageLines(v);
+    if (!lines.length) return [];
+    return [{
+      id: "usage",
+      title: "Usage",
+      icon: "⚡",
+      rows: lines.map((line) => usageLineToRow(line)),
+    }].map((card) => attachResetsToUsageCard(card, v));
   }
 
   function usageLineToRow(line) {
@@ -496,7 +491,14 @@
 
   function attachResetsToUsageCard(card, v) {
     const lines = usageLines(v);
-    const rows = (card.rows || []).map((row) => {
+    const hasGauge = (card.rows || []).some((r) => r.kind === "gauge");
+    const rows = (card.rows || []).filter((row) => {
+      if (row.kind !== "kv") return true;
+      const lab = (row.label || "").toLowerCase();
+      if (["quota", "tokens", "activity", "spend", "spending", "subscription"].includes(lab)) return false;
+      if (hasGauge && lab === "credits") return false;
+      return true;
+    }).map((row) => {
       if (row.kind !== "gauge") return row;
       if (/reset/i.test(row.hint || "")) return row;
       const match = lines.find((l) => l.label === row.label || l.short === row.label);
