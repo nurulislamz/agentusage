@@ -1209,24 +1209,42 @@
     const panel = $("panel");
     const tiles = views.map((v, i) => {
       const sel = i === state.selected;
-      const isFeatured = (v.daily_cost && v.daily_cost.length > 5) || i === 0;
+      const isFeatured = (v.daily_cost && v.daily_cost.length > 5) || (views.length === 10 ? i < 2 : (views.length % 4 === 1 && i === 0));
       const lines = usageLines(v);
       const refreshing = isViewRefreshing(v);
       const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
       const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
-      const spark = (v.daily_cost && v.daily_cost.length > 1)
+      const hasSpark = v.daily_cost && v.daily_cost.length > 1;
+      const spark = hasSpark
         ? sparkBars(v.daily_cost, 60, 16) || sparkLine(v.daily_cost, 60, 16)
-        : `<span class="dim">—</span>`;
+        : "";
+
+      const labelCounts = {};
+      lines.forEach((l) => {
+        const k = (l.short || l.label || "").toLowerCase();
+        labelCounts[k] = (labelCounts[k] || 0) + 1;
+      });
 
       const quotaRows = lines.slice(0, 3).map((l) => {
         const pct = clampPct(l.percent);
         const tone = l.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+        const rawLab = l.short || l.label || "";
+        let displayLab = rawLab;
+        if (labelCounts[rawLab.toLowerCase()] > 1 && l.group) {
+          if (/gemini/i.test(l.group)) {
+            displayLab = "G-" + rawLab;
+          } else if (/claude|gpt|opus|sonnet/i.test(l.group)) {
+            displayLab = "C-" + rawLab;
+          } else {
+            displayLab = l.group.slice(0, 3).toUpperCase() + "-" + rawLab;
+          }
+        }
         if (pct == null) {
-          return `<div class="bento-quota-row"><span class="bento-quota-lab">${esc(l.short || l.label || "")}</span><span class="dim" style="grid-column:span 2">${esc(l.value || "—")}</span></div>`;
+          return `<div class="bento-quota-row"><span class="bento-quota-lab">${esc(displayLab)}</span><span class="dim" style="grid-column:span 2">${esc(l.value || "—")}</span></div>`;
         }
         return `
           <div class="bento-quota-row ${toneClass(tone)}">
-            <span class="bento-quota-lab">${esc(l.short || l.label || "")}</span>
+            <span class="bento-quota-lab">${esc(displayLab)}</span>
             <span class="bento-quota-bar"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>
             <span class="bento-quota-pct">${pct.toFixed(0)}%</span>
           </div>
@@ -1248,7 +1266,7 @@
           </div>
           <div class="bento-tile-foot">
             <span class="bento-reset-hint${isUrgent ? " urgent" : ""}">${esc(next ? "⏱ " + next : "—")}</span>
-            <div class="bento-spark-wrap">${spark}</div>
+            ${hasSpark ? `<div class="bento-spark-wrap">${spark}</div>` : ""}
           </div>
         </div>
       `;
