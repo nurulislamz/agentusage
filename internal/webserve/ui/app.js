@@ -2,6 +2,9 @@
   "use strict";
 
   const LAYOUTS = [
+    { id: "split", label: "Split", hint: "Glanceable Submenu + Deep Inspector" },
+    { id: "matrix", label: "Matrix", hint: "Dense Roster Matrix HUD" },
+    { id: "bento", label: "Bento", hint: "Viewport Bento Glance Tiles" },
     { id: "bars", label: "Bars", hint: "Linear gauges · OpenUsage-style cards" },
     { id: "dials", label: "Dials", hint: "Radial gauges · at-a-glance remaining" },
     { id: "strips", label: "Strips", hint: "Grafana bar-gauge wall" },
@@ -9,17 +12,39 @@
 
   function normalizeLayout(raw) {
     const id = String(raw || "").toLowerCase();
-    return LAYOUTS.some((l) => l.id === id) ? id : "bars";
+    return LAYOUTS.some((l) => l.id === id) ? id : "split";
+  }
+
+  function detectDefaultLayout() {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("layout");
+    if (q) {
+      const norm = normalizeLayout(q);
+      if (norm) return norm;
+    }
+    if (window.__DEFAULT_LAYOUT__) {
+      return normalizeLayout(window.__DEFAULT_LAYOUT__);
+    }
+    const port = String(window.location.port || "");
+    if (port === "8080") return "split";
+    if (port === "8081") return "matrix";
+    if (port === "8082") return "bento";
+    const stored = localStorage.getItem("au-serve-layout");
+    if (stored) return normalizeLayout(stored);
+    return "split";
   }
 
   const state = {
     envelope: null,
     views: [],
     selected: 0,
+    matrixExpanded: -1,
+    inspectOpen: false,
+    inspectView: null,
     filter: "",
     token: sessionStorage.getItem("au-serve-token") || "",
     themeOverride: localStorage.getItem("au-serve-theme-override") || "",
-    layout: normalizeLayout(localStorage.getItem("au-serve-layout") || "bars"),
+    layout: detectDefaultLayout(),
     loading: true,
     refreshing: false,
     refreshOpts: null,
@@ -350,8 +375,21 @@
       <span class="brand">agentUsage</span>
       <span id="fetching-header" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
       <span class="spacer"></span>
+      <nav class="layout-nav" aria-label="Layout view">
+        <button type="button" class="layout-btn${state.layout === "split" ? " active" : ""}" data-layout="split" title="Glanceable Submenu + Deep Inspector (Tab / l)">Split</button>
+        <button type="button" class="layout-btn${state.layout === "matrix" ? " active" : ""}" data-layout="matrix" title="Dense Roster Matrix HUD (Tab / l)">Matrix</button>
+        <button type="button" class="layout-btn${state.layout === "bento" ? " active" : ""}" data-layout="bento" title="Viewport Bento Tiles (Tab / l)">Bento</button>
+      </nav>
       <span class="header-meta">⊞ ${n} agents${filteredNote} · ${esc(meta.label)} · ${esc(meta.hint)}</span>
     `;
+    $("header").querySelectorAll(".layout-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.layout = btn.dataset.layout;
+        localStorage.setItem("au-serve-layout", state.layout);
+        render();
+        showToast("Layout: " + layoutMeta().label);
+      });
+    });
   }
 
   function toneFromPercent(pct, view) {
@@ -819,6 +857,416 @@
     return formatLastRefreshed(view.timestamp, view.last_refreshed || "");
   }
 
+  function renderCards(cards) {
+    if (!cards || !cards.length) return "";
+    const isUsed = (state.envelope?.usage_mode || "remaining").toLowerCase() === "used";
+    const modeWord = isUsed ? "used" : "remaining";
+    const threshPct = isUsed ? 80 : 20;
+
+    return cards.map((card) => {
+      const color = card.color || "var(--fg-2)";
+      const rows = (card.rows || []).map((row) => {
+        if (row.kind === "heading") {
+          return `<div class="heading">${esc(row.value || row.label || "")}</div>`;
+        }
+        if (row.kind === "gauge") {
+          const pct = row.percent == null ? 0 : Number(row.percent);
+          const tone = row.tone || "ok";
+          return `<div class="gauge-block ${toneClass(tone)}">
+            <div class="gauge-header">
+              <span class="gauge-label">${esc(row.label || "")}</span>
+              <span class="gauge-stat">
+                <b class="stat-val">${pct.toFixed(1)}%</b>
+                <span class="pill ${pillClass(tone)}">${esc(modeWord)}</span>
+              </span>
+            </div>
+            <div class="gauge" style="color:${gaugeColor(tone)}">
+              <i style="width:${Math.max(0, Math.min(100, pct))}%;background:currentColor"></i>
+              <span class="gauge-threshold" style="left:${threshPct}%" aria-hidden="true"></span>
+            </div>
+            <div class="caption">${row.hint ? esc(row.hint) : `${pct.toFixed(1)}% ${esc(modeWord)}`}</div>
+          </div>`;
+        }
+        if (row.kind === "timer") {
+          return `<div class="timer ${toneClass(row.tone || "ok")}">
+            <span class="dot"></span>
+            <span>${esc(row.label || "")}</span>
+            <span class="when">${esc(row.value || "")}</span>
+            <span class="hint">${esc(row.hint || "")}</span>
+          </div>`;
+        }
+        if (row.kind === "kv") {
+          return `<div class="kv"><span class="dim">${esc(row.label || "")}</span><span class="kv-val">${esc(row.value || "")}</span></div>`;
+        }
+        return `<div class="text-row">${esc(row.value || row.label || "")}</div>`;
+      }).join("");
+      return `<section class="card" style="--card:${esc(color)}"><div class="card-header"><h2>${esc(card.icon || "")} ${esc((card.title || "").toUpperCase())}</h2></div>${rows}</section>`;
+    }).join("");
+  }
+
+  function renderCockpit(v) {
+    if (!v) return "";
+    const meta = [v.provider_name || v.provider_id, v.detail].filter(Boolean).join(" · ");
+    const schedule = v.cycle_schedule || "";
+    const summary = v.summary || "";
+    const refreshed = lastRefreshedText(v);
+    const fetchVisible = state.refreshing && isViewRefreshing(v) ? "" : " hidden";
+    const spinChar = SPINNER[state.animFrame] || "⠋";
+
+    const items = usageItems(v);
+    const groups = graphGroups(items, v);
+    const gaugeCards = renderGaugeGroups(groups, (it) => renderLinearGauge(it, v));
+    const quotaSection = gaugeCards ? `<section class="card"><div class="card-header"><h2>⚡ USAGE &amp; QUOTAS</h2></div><div class="lin-list">${gaugeCards}</div></section>` : "";
+
+    const resets = (v.resets || []).filter((r) => r && r.duration);
+    let timerRows = resets.map((r) => `
+      <div class="timer ${toneClass(r.urgent ? "warn" : "ok")}">
+        <span class="dot"></span>
+        <span>${esc(r.label || "Reset")}</span>
+        <span class="when">${esc(r.target || r.duration)}</span>
+        <span class="hint">${esc(r.duration ? "in " + r.duration : "")}</span>
+      </div>
+    `).join("");
+    if (!timerRows && v.next_reset) {
+      timerRows = `<div class="timer tone-ok"><span class="dot"></span><span>Next Reset</span><span class="when">${esc(v.next_reset)}</span></div>`;
+    }
+    const timerSection = timerRows ? `<section class="card"><div class="card-header"><h2>⏱ TIMERS &amp; SCHEDULE</h2></div>${timerRows}</section>` : "";
+
+    const dailyPoints = v.daily_cost || [];
+    const stats = trendStats(dailyPoints);
+    const spark = sparkLine(dailyPoints, 180, 42) || sparkBars(dailyPoints, 180, 42);
+    let activitySection = "";
+    if (dailyPoints.length > 0 || stats.length > 0) {
+      const statsHtml = renderMetricTable(stats);
+      activitySection = `<section class="card"><div class="card-header"><h2>📈 ACTIVITY &amp; TREND</h2></div>${spark ? `<div style="padding:4px 0 8px">${spark}</div>` : ""}${statsHtml}</section>`;
+    }
+
+    let extraCards = "";
+    if (v.detail_cards && v.detail_cards.length > 0) {
+      const filtered = v.detail_cards.filter((c) => {
+        const title = String(c.title || "").toLowerCase();
+        return title !== "usage" && title !== "timers";
+      });
+      if (filtered.length > 0) {
+        extraCards = renderCards(filtered);
+      }
+    }
+
+    return `
+      <div class="hero">
+        <h1>
+          ${esc(v.status_icon || "●")} ${esc(v.account_id)}
+          <span class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span></span>
+        </h1>
+        <div class="hero-right">
+          <span>${esc(meta)}</span>
+          <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
+          <button type="button" class="footer-btn btn-cockpit-refresh" data-acc="${esc(v.account_id)}" title="Refresh account">⟳</button>
+        </div>
+      </div>
+      <div class="subhero">
+        <div>${summary ? `<strong>${esc(summary)}</strong>` : ""}${schedule ? ` · ${esc(schedule)}` : ""}</div>
+        ${refreshed ? `<div class="last-refreshed">${esc(refreshed)}</div>` : ""}
+      </div>
+      <div class="accent-line ${esc(v.header_tone || "ok")}"></div>
+      <div class="panel-cards-grid">
+        ${quotaSection}
+        ${timerSection}
+        ${activitySection}
+        ${extraCards}
+      </div>
+    `;
+  }
+
+  function openInspectModal(v) {
+    if (!v) return;
+    state.inspectOpen = true;
+    state.inspectView = v;
+    const modal = $("inspect-modal");
+    const title = $("inspect-title");
+    const content = $("inspect-content");
+    if (!modal || !content) return;
+    if (title) {
+      title.innerHTML = `${esc(v.status_icon || "●")} ${esc(v.account_id)} <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || "")}</span>`;
+    }
+    content.innerHTML = renderCockpit(v);
+    modal.hidden = false;
+
+    content.querySelectorAll(".btn-cockpit-refresh").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        load({ manual: true, accountID: btn.dataset.acc }).catch(console.error);
+      });
+    });
+  }
+
+  function closeInspectModal() {
+    state.inspectOpen = false;
+    state.inspectView = null;
+    const modal = $("inspect-modal");
+    if (modal) modal.hidden = true;
+  }
+
+  function renderSplitLayout(views, fetchHtml) {
+    const nav = $("nav");
+    const panel = $("panel");
+    if (!views.length) return;
+
+    const counts = {};
+    views.forEach((v) => { counts[v.provider_id] = (counts[v.provider_id] || 0) + 1; });
+
+    let navHtml = "";
+    let lastProvider = "";
+    views.forEach((v, i) => {
+      if (v.provider_id !== lastProvider) {
+        const active = views[state.selected]?.provider_id === v.provider_id;
+        navHtml += `<div class="group${active ? " active" : ""}" style="--p:${esc(v.accent_color || "var(--accent)")}">${esc((v.provider_id || "").toUpperCase())} (${counts[v.provider_id]})</div>`;
+        lastProvider = v.provider_id;
+      }
+      const sel = i === state.selected;
+      const refreshing = isViewRefreshing(v);
+      const next = v.next_reset || stripResetPrefix(v.reset_hint || "");
+      const lines = usageLines(v);
+      const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
+
+      const microMeters = lines.slice(0, 2).map((l) => {
+        const pct = clampPct(l.percent);
+        const tone = l.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+        if (pct == null) {
+          return `<span class="meter text"><span class="meter-lab">${esc(l.short || l.label || "")}</span><span class="meter-val">${esc(l.value || "")}</span></span>`;
+        }
+        return `<span class="meter ${toneClass(tone)}">
+          <span class="meter-lab">${esc(l.short || l.label || "")}</span>
+          <span class="mini"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>
+          <span class="meter-val">${pct.toFixed(0)}%</span>
+        </span>`;
+      }).join("");
+
+      navHtml += `
+        <button type="button" class="item nav-item${sel ? " selected" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")}">
+          <span class="rail"></span>
+          <span class="name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
+          <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
+          <div class="meters">
+            ${microMeters || `<span class="dim">${esc(v.summary || "")}</span>`}
+            <span class="next${isUrgent ? " urgent" : ""}" title="Next reset">${esc(next ? "⏱ " + next : "—")}</span>
+          </div>
+        </button>
+      `;
+    });
+
+    if (nav) {
+      nav.innerHTML = navHtml;
+      nav.querySelectorAll(".nav-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          state.selected = Number(el.dataset.idx);
+          render();
+        });
+      });
+      const selectedEl = nav.querySelector(".nav-item.selected");
+      if (selectedEl) selectedEl.scrollIntoView({ block: "nearest" });
+    }
+
+    const selectedView = views[state.selected] || views[0];
+    panel.innerHTML = `
+      ${fetchHtml}
+      ${renderCockpit(selectedView)}
+    `;
+
+    panel.querySelectorAll(".btn-cockpit-refresh").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        load({ manual: true, accountID: btn.dataset.acc }).catch(console.error);
+      });
+    });
+  }
+
+  function renderMatrixLayout(views, fetchHtml) {
+    const panel = $("panel");
+    const rows = views.map((v, i) => {
+      const sel = i === state.selected;
+      const isExp = state.matrixExpanded === i;
+      const lines = usageLines(v);
+      const refreshing = isViewRefreshing(v);
+
+      const renderQuotaCell = (l) => {
+        if (!l) return `<span class="dim">—</span>`;
+        const pct = clampPct(l.percent);
+        const tone = l.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+        if (pct == null) {
+          return `<span class="matrix-metric-wrap"><span class="matrix-metric-lab">${esc(l.short || l.label || "")}</span><span class="matrix-metric-val">${esc(l.value || "—")}</span></span>`;
+        }
+        return `
+          <div class="matrix-metric-wrap ${toneClass(tone)}">
+            <span class="matrix-metric-lab">${esc(l.short || l.label || "")}</span>
+            <span class="matrix-metric-bar"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>
+            <span class="matrix-metric-val">${pct.toFixed(0)}%</span>
+          </div>
+        `;
+      };
+
+      const q1 = renderQuotaCell(lines[0]);
+      const q2 = renderQuotaCell(lines[1]);
+      const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
+      const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
+      const spark = (v.daily_cost && v.daily_cost.length > 1)
+        ? sparkBars(v.daily_cost, 72, 18) || sparkLine(v.daily_cost, 72, 18)
+        : `<span class="dim">—</span>`;
+
+      const mainRow = `
+        <tr class="matrix-row${sel ? " selected" : ""}${isExp ? " expanded" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}" style="--p:${esc(v.accent_color || "var(--accent)")}">
+          <td>
+            <div class="matrix-app">
+              <span class="matrix-app-icon">${esc(v.status_icon || "●")}</span>
+              <div>
+                <div class="matrix-app-title">${esc(v.account_id)}</div>
+                <div class="matrix-app-sub">${esc(v.provider_id)}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span></td>
+          <td>${q1}</td>
+          <td>${q2}</td>
+          <td><span class="matrix-reset${isUrgent ? " urgent" : ""}">${esc(next ? "⏱ " + next : "—")}</span></td>
+          <td><div class="matrix-trend">${spark}</div></td>
+          <td><span class="matrix-toggle" title="Toggle details">${isExp ? "▾" : "▸"}</span></td>
+        </tr>
+      `;
+
+      const drawerRow = isExp ? `
+        <tr class="matrix-drawer-row">
+          <td colspan="7">
+            <div class="matrix-drawer">
+              ${renderCockpit(v)}
+            </div>
+          </td>
+        </tr>
+      ` : "";
+
+      return mainRow + drawerRow;
+    }).join("");
+
+    panel.innerHTML = `
+      ${fetchHtml}
+      <div class="matrix-container">
+        <table class="matrix-table" role="table" aria-label="Dense Roster Matrix">
+          <thead>
+            <tr>
+              <th scope="col">Account</th>
+              <th scope="col">Status</th>
+              <th scope="col">Quota 1</th>
+              <th scope="col">Quota 2</th>
+              <th scope="col">Next Reset</th>
+              <th scope="col">Trend</th>
+              <th scope="col" aria-label="Toggle"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    panel.querySelectorAll(".matrix-row").forEach((el) => {
+      el.addEventListener("click", () => {
+        const idx = Number(el.dataset.idx);
+        state.selected = idx;
+        state.matrixExpanded = (state.matrixExpanded === idx ? -1 : idx);
+        render();
+      });
+    });
+
+    panel.querySelectorAll(".btn-cockpit-refresh").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        load({ manual: true, accountID: btn.dataset.acc }).catch(console.error);
+      });
+    });
+  }
+
+  function renderBentoLayout(views, fetchHtml) {
+    const panel = $("panel");
+    const tiles = views.map((v, i) => {
+      const sel = i === state.selected;
+      const isFeatured = (v.daily_cost && v.daily_cost.length > 5) || i === 0;
+      const lines = usageLines(v);
+      const refreshing = isViewRefreshing(v);
+      const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
+      const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
+      const spark = (v.daily_cost && v.daily_cost.length > 1)
+        ? sparkBars(v.daily_cost, 60, 16) || sparkLine(v.daily_cost, 60, 16)
+        : `<span class="dim">—</span>`;
+
+      const quotaRows = lines.slice(0, 3).map((l) => {
+        const pct = clampPct(l.percent);
+        const tone = l.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+        if (pct == null) {
+          return `<div class="bento-quota-row"><span class="bento-quota-lab">${esc(l.short || l.label || "")}</span><span class="dim" style="grid-column:span 2">${esc(l.value || "—")}</span></div>`;
+        }
+        return `
+          <div class="bento-quota-row ${toneClass(tone)}">
+            <span class="bento-quota-lab">${esc(l.short || l.label || "")}</span>
+            <span class="bento-quota-bar"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>
+            <span class="bento-quota-pct">${pct.toFixed(0)}%</span>
+          </div>
+        `;
+      }).join("");
+
+      return `
+        <div class="bento-tile${sel ? " selected" : ""}${isFeatured ? " featured" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}" style="--p:${esc(v.accent_color || "var(--accent)")}" title="Click to inspect ${esc(v.account_id)}">
+          <div class="bento-tile-head">
+            <div class="bento-head-left">
+              <span>${esc(v.status_icon || "●")}</span>
+              <span class="bento-acc-name">${esc(v.account_id)}</span>
+              <span class="bento-provider-tag">${esc(v.provider_id)}</span>
+            </div>
+            <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
+          </div>
+          <div class="bento-tile-body">
+            ${quotaRows || `<div class="dim" style="font-size:11px">${esc(v.summary || "No active quotas")}</div>`}
+          </div>
+          <div class="bento-tile-foot">
+            <span class="bento-reset-hint${isUrgent ? " urgent" : ""}">${esc(next ? "⏱ " + next : "—")}</span>
+            <div class="bento-spark-wrap">${spark}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    panel.innerHTML = `
+      ${fetchHtml}
+      <div class="bento-grid" role="grid" aria-label="Viewport Bento Glance Tiles">
+        ${tiles}
+      </div>
+    `;
+
+    panel.querySelectorAll(".bento-tile").forEach((el) => {
+      el.addEventListener("click", () => {
+        const idx = Number(el.dataset.idx);
+        state.selected = idx;
+        openInspectModal(views[idx]);
+      });
+    });
+  }
+
+  function renderLegacyBoard(views, fetchHtml) {
+    const panel = $("panel");
+    const id = state.layout;
+    const renderer = id === "dials" ? renderDialCard : id === "strips" ? renderStripCard : renderBarCard;
+    const cards = views.map((v, i) => renderer(v, i)).join("");
+    panel.innerHTML = `
+      ${fetchHtml}
+      <div class="board board-${esc(id)}" role="list" aria-label="${esc(layoutMeta().hint)}">${cards}</div>
+    `;
+    panel.querySelectorAll(".agent").forEach((el) => {
+      el.addEventListener("click", () => {
+        state.selected = Number(el.dataset.idx);
+        render();
+      });
+    });
+  }
+
   function renderBoard() {
     const views = filteredViews();
     const panel = $("panel");
@@ -830,23 +1278,21 @@
         <span id="fetching-detail" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
         <p class="dim">${state.filter ? "No matches." : "No providers."}</p>
       `;
+      if ($("nav")) $("nav").innerHTML = "";
       return;
     }
-    const id = state.layout;
-    const renderer = id === "dials" ? renderDialCard : id === "strips" ? renderStripCard : renderBarCard;
-    const cards = views.map((v, i) => renderer(v, i)).join("");
-    panel.innerHTML = `
-      <span id="fetching-detail" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
-      <div class="board board-${esc(id)}" role="list" aria-label="${esc(layoutMeta().hint)}">${cards}</div>
-    `;
-    panel.querySelectorAll(".agent").forEach((el) => {
-      el.addEventListener("click", () => {
-        state.selected = Number(el.dataset.idx);
-        render();
-      });
-    });
-    const selectedEl = panel.querySelector(".agent.selected");
-    if (selectedEl) selectedEl.scrollIntoView({ block: "nearest" });
+
+    const fetchHtml = `<span id="fetching-detail" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>`;
+
+    if (state.layout === "split") {
+      renderSplitLayout(views, fetchHtml);
+    } else if (state.layout === "matrix") {
+      renderMatrixLayout(views, fetchHtml);
+    } else if (state.layout === "bento") {
+      renderBentoLayout(views, fetchHtml);
+    } else {
+      renderLegacyBoard(views, fetchHtml);
+    }
   }
 
   function applyLayout() {
@@ -856,6 +1302,22 @@
     state.layout = id;
     shell.dataset.layout = id;
     LAYOUTS.forEach((l) => shell.classList.toggle("layout-" + l.id, l.id === id));
+    const nav = $("nav");
+    const vsep = document.querySelector(".vsep");
+    if (id === "split") {
+      if (nav) {
+        nav.hidden = false;
+        nav.removeAttribute("aria-hidden");
+        nav.setAttribute("aria-label", "Account roster");
+      }
+      if (vsep) vsep.hidden = false;
+    } else {
+      if (nav) {
+        nav.hidden = true;
+        nav.setAttribute("aria-hidden", "true");
+      }
+      if (vsep) vsep.hidden = true;
+    }
     const panel = document.querySelector("main.panel");
     if (panel) panel.setAttribute("aria-label", layoutMeta().hint);
   }
@@ -864,6 +1326,15 @@
     const ids = LAYOUTS.map((l) => l.id);
     const idx = Math.max(0, ids.indexOf(state.layout));
     state.layout = ids[(idx + 1) % ids.length];
+    localStorage.setItem("au-serve-layout", state.layout);
+    render();
+    showToast("Layout: " + layoutMeta().label);
+  }
+
+  function cycleMainLayout() {
+    const main = ["split", "matrix", "bento"];
+    const idx = main.indexOf(state.layout);
+    state.layout = main[(idx + 1) % main.length];
     localStorage.setItem("au-serve-layout", state.layout);
     render();
     showToast("Layout: " + layoutMeta().label);
@@ -882,7 +1353,7 @@
       <button type="button" class="footer-btn" id="footer-btn-filter" title="Filter providers (/)"><kbd>/</kbd> filter</button>
       <button type="button" class="footer-btn" id="footer-btn-mode" title="Toggle usage mode (u)"><kbd>u</kbd> <span>${esc(usageModeLabel())}</span></button>
       <button type="button" class="footer-btn" id="footer-btn-refresh" title="Refresh focused account (r) / all (R)"><kbd>r</kbd> refresh</button>
-      <button type="button" class="footer-btn" id="footer-btn-layout" title="Cycle dashboard layout (v)"><kbd>v</kbd> <span>${esc(layoutMeta().label)}</span></button>
+      <button type="button" class="footer-btn" id="footer-btn-layout" title="Cycle dashboard layout (Tab / l / v)"><kbd>v</kbd> <span>${esc(layoutMeta().label)}</span></button>
       <button type="button" class="footer-btn" id="footer-btn-theme" title="Cycle theme (t)"><kbd>t</kbd> theme</button>
       <span class="grow"></span>
       <span>${esc(theme)}</span>
@@ -966,13 +1437,19 @@
     if (ev.target && typeof ev.target.matches === "function" && (ev.target.matches("input, textarea, select") || ev.target.isContentEditable)) return;
 
     const key = ev.key;
-    if (["ArrowUp", "ArrowDown", "j", "J", "k", "K", "/", "r", "R", "u", "U", "t", "T", "v", "V"].includes(key)) {
+    if (["ArrowUp", "ArrowDown", "j", "J", "k", "K", "/", "r", "R", "u", "U", "t", "T", "v", "V", "Tab", "l", "L", "Enter", " "].includes(key)) {
       if (ev.target && typeof ev.target.blur === "function" && ev.target !== document.body) {
         ev.target.blur();
       }
     }
 
     switch (key) {
+      case "Tab":
+      case "l":
+      case "L":
+        ev.preventDefault();
+        cycleMainLayout();
+        break;
       case "ArrowUp":
       case "k":
       case "K":
@@ -984,6 +1461,23 @@
       case "J":
         ev.preventDefault();
         moveSelection(1);
+        break;
+      case "Enter":
+      case " ":
+        if (state.layout === "matrix") {
+          ev.preventDefault();
+          state.matrixExpanded = (state.matrixExpanded === state.selected ? -1 : state.selected);
+          render();
+        } else if (state.layout === "bento") {
+          ev.preventDefault();
+          openInspectModal(filteredViews()[state.selected]);
+        }
+        break;
+      case "Escape":
+        if (state.inspectOpen) {
+          ev.preventDefault();
+          closeInspectModal();
+        }
         break;
       case "/":
         ev.preventDefault();
@@ -1015,6 +1509,11 @@
       default:
         break;
     }
+  });
+
+  $("inspect-close")?.addEventListener("click", closeInspectModal);
+  $("inspect-modal")?.addEventListener("click", (ev) => {
+    if (ev.target === $("inspect-modal")) closeInspectModal();
   });
 
   let refreshTimer = 0;

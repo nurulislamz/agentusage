@@ -57,6 +57,16 @@
     </form>
   </div>
 
+  <div id="inspect-modal" class="modal inspect-modal" hidden>
+    <div class="modal-card inspect-card" role="dialog" aria-modal="true" aria-labelledby="inspect-title">
+      <div class="inspect-header">
+        <h2 id="inspect-title" class="inspect-title">Cockpit Inspection</h2>
+        <button type="button" id="inspect-close" class="inspect-close" aria-label="Close modal">✕</button>
+      </div>
+      <div id="inspect-content" class="inspect-content"></div>
+    </div>
+  </div>
+
   <div id="filter-bar" class="filter-bar" hidden>
     <label for="filter-input">/</label>
     <input id="filter-input" type="text" spellcheck="false" autocomplete="off" placeholder="filter providers…">
