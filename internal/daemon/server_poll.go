@@ -63,97 +63,9 @@ func (s *Service) pollProviders(ctx context.Context) {
 		wg.Add(1)
 		go func(account core.AccountConfig) {
 			defer wg.Done()
-
-			// Honour shutdown immediately so we don't run a fresh fetch on
-			// an account when the parent ctx has already been cancelled.
-			// Without this check the per-fetch 8s timeout (below) is the
-			// only ceiling on shutdown — N goroutines × 8s on big setups.
-			select {
-			case <-ctx.Done():
-				return
-			default:
+			if snap := s.pollSingleAccount(ctx, account, modelNorm); snap != nil {
+				results <- providerResult{accountID: account.ID, snapshot: *snap}
 			}
-
-			provider, ok := s.providerByID[account.Provider]
-			if !ok {
-				results <- providerResult{
-					accountID: account.ID,
-					snapshot: core.UsageSnapshot{
-						ProviderID: account.Provider,
-						AccountID:  account.ID,
-						Timestamp:  s.now().UTC(),
-						Status:     core.StatusError,
-						Message:    fmt.Sprintf("no provider adapter registered for %q (restart/reinstall telemetry daemon if recently added)", account.Provider),
-					},
-				}
-				return
-			}
-
-			_, hasDetector := provider.(core.ChangeDetector)
-
-			// Adaptive backoff: skip providers that are in a backoff window.
-			if !s.pollScheduler.ShouldPoll(account.ID, hasDetector) {
-				s.pollStateMu.Lock()
-				state := s.pollState[account.ID]
-				s.pollStateMu.Unlock()
-				if state != nil && state.hasSnap {
-					results <- providerResult{accountID: account.ID, snapshot: state.lastSnap}
-					return
-				}
-				// No cached snapshot yet — must fetch.
-			}
-
-			// Check if provider data has changed since last fetch (optional interface).
-			if cached := s.skipUnchangedProvider(provider, account); cached != nil {
-				s.pollScheduler.RecordPoll(account.ID, false)
-				results <- providerResult{accountID: account.ID, snapshot: *cached}
-				return
-			}
-
-			fetchStart := time.Now()
-			fetchCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
-			defer cancel()
-
-			snap, fetchErr := provider.Fetch(fetchCtx, account)
-			fetchDurationMs := time.Since(fetchStart).Milliseconds()
-			if fetchErr != nil {
-				s.warnf(
-					"provider_fetch_error",
-					"provider=%s account_id=%s duration_ms=%d error=%v",
-					account.Provider, account.ID, fetchDurationMs, fetchErr,
-				)
-				snap = core.UsageSnapshot{
-					ProviderID: account.Provider,
-					AccountID:  account.ID,
-					Timestamp:  s.now().UTC(),
-					Status:     core.StatusError,
-					Message:    fetchErr.Error(),
-				}
-			} else {
-				if s.shouldLog("provider_fetch_"+account.ID, 60*time.Second) {
-					s.infof(
-						"provider_fetch_success",
-						"provider=%s account_id=%s duration_ms=%d status=%s",
-						account.Provider, account.ID, fetchDurationMs, snap.Status,
-					)
-				}
-			}
-			snap = core.NormalizeUsageSnapshotWithConfig(snap, modelNorm)
-
-			// Track whether data actually changed for adaptive backoff.
-			changed := s.pollScheduler.SnapshotChanged(account.ID, snap)
-			s.pollScheduler.RecordPoll(account.ID, changed)
-
-			// Record successful fetch for future change detection.
-			s.pollStateMu.Lock()
-			s.pollState[account.ID] = &providerPollState{
-				lastFetchAt: s.now(),
-				lastSnap:    snap,
-				hasSnap:     true,
-			}
-			s.pollStateMu.Unlock()
-
-			results <- providerResult{accountID: account.ID, snapshot: snap}
 		}(acct)
 	}
 
@@ -233,6 +145,88 @@ func (s *Service) skipUnchangedProvider(provider core.UsageProvider, acct core.A
 
 	core.Tracef("[poll] %s/%s: skipped (no change since %s)", acct.Provider, acct.ID, state.lastFetchAt.Format(time.RFC3339))
 	snap := state.lastSnap
+	return &snap
+}
+
+func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountConfig, modelNorm core.ModelNormalizationConfig) *core.UsageSnapshot {
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+	}
+
+	provider, ok := s.providerByID[account.Provider]
+	if !ok {
+		return &core.UsageSnapshot{
+			ProviderID: account.Provider,
+			AccountID:  account.ID,
+			Timestamp:  s.now().UTC(),
+			Status:     core.StatusError,
+			Message:    fmt.Sprintf("no provider adapter registered for %q (restart/reinstall telemetry daemon if recently added)", account.Provider),
+		}
+	}
+
+	_, hasDetector := provider.(core.ChangeDetector)
+
+	// Adaptive backoff: skip providers that are in a backoff window.
+	if !s.pollScheduler.ShouldPoll(account.ID, hasDetector) {
+		s.pollStateMu.Lock()
+		state := s.pollState[account.ID]
+		s.pollStateMu.Unlock()
+		if state != nil && state.hasSnap {
+			return &state.lastSnap
+		}
+	}
+
+	// Check if provider data has changed since last fetch (optional interface).
+	if cached := s.skipUnchangedProvider(provider, account); cached != nil {
+		s.pollScheduler.RecordPoll(account.ID, false)
+		return cached
+	}
+
+	fetchStart := time.Now()
+	fetchCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+
+	snap, fetchErr := provider.Fetch(fetchCtx, account)
+	fetchDurationMs := time.Since(fetchStart).Milliseconds()
+	if fetchErr != nil {
+		s.warnf(
+			"provider_fetch_error",
+			"provider=%s account_id=%s duration_ms=%d error=%v",
+			account.Provider, account.ID, fetchDurationMs, fetchErr,
+		)
+		snap = core.UsageSnapshot{
+			ProviderID: account.Provider,
+			AccountID:  account.ID,
+			Timestamp:  s.now().UTC(),
+			Status:     core.StatusError,
+			Message:    fetchErr.Error(),
+		}
+	} else {
+		if s.shouldLog("provider_fetch_"+account.ID, 60*time.Second) {
+			s.infof(
+				"provider_fetch_success",
+				"provider=%s account_id=%s duration_ms=%d status=%s",
+				account.Provider, account.ID, fetchDurationMs, snap.Status,
+			)
+		}
+	}
+	snap = core.NormalizeUsageSnapshotWithConfig(snap, modelNorm)
+
+	// Track whether data actually changed for adaptive backoff.
+	changed := s.pollScheduler.SnapshotChanged(account.ID, snap)
+	s.pollScheduler.RecordPoll(account.ID, changed)
+
+	// Record successful fetch for future change detection.
+	s.pollStateMu.Lock()
+	s.pollState[account.ID] = &providerPollState{
+		lastFetchAt: s.now(),
+		lastSnap:    snap,
+		hasSnap:     true,
+	}
+	s.pollStateMu.Unlock()
+
 	return &snap
 }
 
