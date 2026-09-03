@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -97,21 +98,10 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 
 	baseURL := strings.TrimSpace(acct.Hint("quota_endpoint", defaultQuotaEndpoint))
 	summary, err := retrieveUserQuotaSummary(ctx, accessToken, baseURL, p.Client())
-	if err != nil {
-		// One retry after forcing a box ping when the access token looks rejected.
-		if isAuthHTTPError(err) {
-			if pingErr := pingBoxForToken(ctx, acct); pingErr == nil {
-				accessToken, tokenPath, _, retryErr := ensureAccessToken(ctx, acct, p.Client())
-				if retryErr == nil {
-					summary, err = retrieveUserQuotaSummary(ctx, accessToken, baseURL, p.Client())
-					if err == nil {
-						snap.Raw["oauth_status"] = "refreshed_after_401"
-						if tokenPath != "" {
-							snap.Raw["oauth_token_file"] = tokenPath
-						}
-					}
-				}
-			}
+	if err != nil && isAuthHTTPError(err) {
+		if retriedSummary, retryErr := retryAfterAuthError(ctx, acct, baseURL, p.Client(), &snap); retryErr == nil {
+			summary = retriedSummary
+			err = nil
 		}
 	}
 	if err != nil {
@@ -149,6 +139,25 @@ func isAuthHTTPError(err error) bool {
 	}
 	msg := err.Error()
 	return strings.Contains(msg, "HTTP 401") || strings.Contains(msg, "HTTP 403")
+}
+
+func retryAfterAuthError(ctx context.Context, acct core.AccountConfig, baseURL string, client *http.Client, snap *core.UsageSnapshot) (quotaSummaryResponse, error) {
+	if pingErr := pingBoxForToken(ctx, acct); pingErr != nil {
+		return quotaSummaryResponse{}, pingErr
+	}
+	accessToken, tokenPath, _, retryErr := ensureAccessToken(ctx, acct, client)
+	if retryErr != nil {
+		return quotaSummaryResponse{}, retryErr
+	}
+	summary, err := retrieveUserQuotaSummary(ctx, accessToken, baseURL, client)
+	if err != nil {
+		return quotaSummaryResponse{}, err
+	}
+	snap.Raw["oauth_status"] = "refreshed_after_401"
+	if tokenPath != "" {
+		snap.Raw["oauth_token_file"] = tokenPath
+	}
+	return summary, nil
 }
 
 func projectSnapshot(snap *core.UsageSnapshot, payload statusLinePayload) {
