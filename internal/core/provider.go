@@ -147,68 +147,84 @@ func (c AccountConfig) ResolveAPIKey() string {
 			return v
 		}
 	}
-	// Automatic fallback for OpenCode container boxes & standard install:
 	if c.Provider == "opencode" || strings.HasPrefix(c.ID, "opencode-") {
-		home, _ := os.UserHomeDir()
-		if home != "" {
-			var candidatePaths []string
-			if strings.HasPrefix(c.ID, "opencode-") {
-				box := strings.TrimPrefix(c.ID, "opencode-")
-				candidatePaths = append(candidatePaths, filepath.Join(home, ".opencode-containers", box, "share", "auth.json"))
-			}
-			candidatePaths = append(candidatePaths,
-				filepath.Join(home, ".local", "share", "opencode", "auth.json"),
-				filepath.Join(home, ".opencode-containers", "mohammed", "share", "auth.json"),
-				filepath.Join(home, ".opencode-containers", "nurulz", "share", "auth.json"),
-			)
-			for _, p := range candidatePaths {
-				raw, err := os.ReadFile(p)
-				if err != nil {
-					continue
-				}
-				var payload map[string]struct {
-					Type string `json:"type"`
-					Key  string `json:"key"`
-				}
-				if err := json.Unmarshal(raw, &payload); err == nil {
-					for _, k := range []string{"opencode-go", "opencode"} {
-						if entry, ok := payload[k]; ok && strings.TrimSpace(entry.Key) != "" {
-							return strings.TrimSpace(entry.Key)
-						}
-					}
-				}
+		if k := resolveOpenCodeAuthKey(c.ID); k != "" {
+			return k
+		}
+	}
+	if c.Provider == "command_code" || strings.HasPrefix(c.ID, "command_code") || strings.HasPrefix(c.ID, "cmdc") {
+		if k := resolveCommandCodeAuthKey(); k != "" {
+			return k
+		}
+	}
+	return ""
+}
+
+func resolveOpenCodeAuthKey(accountID string) string {
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		return ""
+	}
+	var candidatePaths []string
+	if strings.HasPrefix(accountID, "opencode-") {
+		box := strings.TrimPrefix(accountID, "opencode-")
+		candidatePaths = append(candidatePaths, filepath.Join(home, ".opencode-containers", box, "share", "auth.json"))
+	}
+	candidatePaths = append(candidatePaths,
+		filepath.Join(home, ".local", "share", "opencode", "auth.json"),
+		filepath.Join(home, ".opencode-containers", "mohammed", "share", "auth.json"),
+		filepath.Join(home, ".opencode-containers", "nurulz", "share", "auth.json"),
+	)
+	for _, p := range candidatePaths {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var payload map[string]struct {
+			Type string `json:"type"`
+			Key  string `json:"key"`
+		}
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			continue
+		}
+		for _, k := range []string{"opencode-go", "opencode"} {
+			if entry, ok := payload[k]; ok && strings.TrimSpace(entry.Key) != "" {
+				return strings.TrimSpace(entry.Key)
 			}
 		}
 	}
-	// Fallback for Command Code:
-	if c.Provider == "command_code" || strings.HasPrefix(c.ID, "command_code") || strings.HasPrefix(c.ID, "cmdc") {
-		if envVal := os.Getenv("COMMAND_CODE_API_KEY"); strings.TrimSpace(envVal) != "" {
-			return strings.TrimSpace(envVal)
-		}
-		home, _ := os.UserHomeDir()
-		if home != "" {
-			authPath := filepath.Join(home, ".commandcode", "auth.json")
-			if raw, err := os.ReadFile(authPath); err == nil {
-				var payload map[string]any
-				if json.Unmarshal(raw, &payload) == nil {
-					if k, ok := payload["apiKey"].(string); ok && strings.TrimSpace(k) != "" {
-						return strings.TrimSpace(k)
-					} else if k, ok := payload["key"].(string); ok && strings.TrimSpace(k) != "" {
-						return strings.TrimSpace(k)
-					}
-				}
+	return ""
+}
+
+func resolveCommandCodeAuthKey() string {
+	if envVal := os.Getenv("COMMAND_CODE_API_KEY"); strings.TrimSpace(envVal) != "" {
+		return strings.TrimSpace(envVal)
+	}
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		return ""
+	}
+	authPath := filepath.Join(home, ".commandcode", "auth.json")
+	if raw, err := os.ReadFile(authPath); err == nil {
+		var payload map[string]any
+		if json.Unmarshal(raw, &payload) == nil {
+			if k, ok := payload["apiKey"].(string); ok && strings.TrimSpace(k) != "" {
+				return strings.TrimSpace(k)
 			}
-			secPath := filepath.Join(home, ".secrets", "commandcode.env")
-			if raw, err := os.ReadFile(secPath); err == nil {
-				for _, line := range strings.Split(string(raw), "\n") {
-					line = strings.TrimSpace(line)
-					if strings.HasPrefix(line, "COMMAND_CODE_API_KEY=") {
-						k := strings.TrimPrefix(line, "COMMAND_CODE_API_KEY=")
-						k = strings.Trim(k, `"' `)
-						if k != "" {
-							return k
-						}
-					}
+			if k, ok := payload["key"].(string); ok && strings.TrimSpace(k) != "" {
+				return strings.TrimSpace(k)
+			}
+		}
+	}
+	secPath := filepath.Join(home, ".secrets", "commandcode.env")
+	if raw, err := os.ReadFile(secPath); err == nil {
+		for _, line := range strings.Split(string(raw), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "COMMAND_CODE_API_KEY=") {
+				k := strings.TrimPrefix(line, "COMMAND_CODE_API_KEY=")
+				k = strings.Trim(k, `"' `)
+				if k != "" {
+					return k
 				}
 			}
 		}
