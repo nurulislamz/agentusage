@@ -394,6 +394,129 @@
     return lines;
   }
 
+  function parseRatio(s) {
+    const m = String(s || "").match(/\$?\s*([\d,.]+)\s*\/\s*\$?\s*([\d,.]+)/);
+    if (!m) return null;
+    const used = Number(m[1].replace(/,/g, ""));
+    const limit = Number(m[2].replace(/,/g, ""));
+    if (!Number.isFinite(used) || !Number.isFinite(limit) || limit <= 0) return null;
+    const usedPct = Math.max(0, Math.min(150, (used / limit) * 100));
+    const remPct = Math.max(0, Math.min(100, 100 - Math.min(100, usedPct)));
+    const money = /\$/.test(s);
+    const fmt = (n) => (money ? "$" : "") + formatCompact(n);
+    return {
+      used,
+      limit,
+      percent: usageMode() === "used" ? Math.min(100, usedPct) : remPct,
+      display: fmt(used) + " / " + fmt(limit),
+    };
+  }
+
+  function parseMagnitude(s) {
+    if (parseRatio(s)) return null;
+    const str = String(s || "");
+    const money = str.match(/\$([\d,.]+)/);
+    if (money) {
+      const n = Number(money[1].replace(/,/g, ""));
+      return Number.isFinite(n) ? n : null;
+    }
+    const m = str.replace(/,/g, "").match(/(\d+(?:\.\d+)?)\s*([KMB])?/i);
+    if (!m) return null;
+    const n = Number(m[1]);
+    if (!Number.isFinite(n)) return null;
+    const mul = { K: 1e3, M: 1e6, B: 1e9 }[(m[2] || "").toUpperCase()] || 1;
+    return n * mul;
+  }
+
+  function partShort(part, line) {
+    const lab = String(line.label || "") + " " + part;
+    if (/input/i.test(lab)) return "In";
+    if (/output/i.test(lab)) return "Out";
+    const head = String(part).replace(/[$\d].*$/, "").replace(/[:]/g, "").trim();
+    if (head) return head.charAt(0).toUpperCase() + head.slice(1);
+    return line.short || line.label || "Value";
+  }
+
+  function usageItems(v) {
+    const items = [];
+    const hasTrend = (v.daily_cost || []).length > 1;
+    (usageLines(v) || []).forEach((line) => {
+      const pct = clampPct(line.percent);
+      if (pct != null) {
+        items.push({
+          kind: "quota",
+          label: line.label,
+          short: line.short || line.label,
+          percent: pct,
+          value: line.value || "",
+          reset_in: line.reset_in,
+          urgent: line.urgent,
+          tone: line.tone || toneFromPercent(pct, v),
+        });
+        return;
+      }
+      const parts = String(line.value || "").split(/\s*·\s*/).map((p) => p.trim()).filter(Boolean);
+      if (!parts.length) {
+        if (line.reset_in) {
+          items.push({ kind: "table", label: line.short || line.label || "Reset", value: resetCaption(line) || line.reset_in });
+        }
+        return;
+      }
+      parts.forEach((part) => {
+        if (hasTrend && /^today\b/i.test(part)) return;
+        const ratio = parseRatio(part);
+        if (ratio) {
+          items.push({
+            kind: "quota",
+            label: partShort(part, line),
+            short: partShort(part, line),
+            percent: ratio.percent,
+            value: ratio.display,
+            display: ratio.display,
+            reset_in: line.reset_in,
+            urgent: line.urgent,
+            tone: line.tone || toneFromPercent(ratio.percent, v),
+          });
+          return;
+        }
+        const amount = parseMagnitude(part);
+        if (amount != null) {
+          items.push({
+            kind: "amount",
+            label: line.label || partShort(part, line),
+            short: partShort(part, line),
+            value: part,
+            amount,
+            tone: line.tone || "ok",
+          });
+          return;
+        }
+        items.push({ kind: "table", label: partShort(part, line), value: part });
+      });
+    });
+    const amounts = items.filter((i) => i.kind === "amount");
+    if (amounts.length >= 2) {
+      const max = Math.max(...amounts.map((a) => a.amount), 1e-9);
+      amounts.forEach((a) => {
+        a.kind = "rel";
+        a.percent = Math.max(0, Math.min(100, (a.amount / max) * 100));
+      });
+    } else {
+      amounts.forEach((a) => {
+        a.kind = "table";
+      });
+    }
+    return items;
+  }
+
+  function renderMetricTable(rows) {
+    if (!rows || !rows.length) return "";
+    const body = rows.map((r) =>
+      `<tr><th scope="row">${esc(r.label || "")}</th><td>${esc(r.value || "—")}</td></tr>`
+    ).join("");
+    return `<table class="metric-table"><tbody>${body}</tbody></table>`;
+  }
+
   function clampPct(n) {
     const pct = Number(n);
     if (!Number.isFinite(pct)) return null;
@@ -511,109 +634,108 @@
     </div>`;
   }
 
-  function renderLinearGauge(line, v) {
-    const pct = clampPct(line.percent);
-    const tone = lineTone(line, v);
-    if (pct == null) {
-      return `<div class="lin-stat">
-        <span class="lin-name">${esc(line.label || line.short || "")}</span>
-        <span class="lin-value">${esc(line.value || "—")}</span>
-      </div>`;
-    }
-    const depleted = isDepleted(pct);
+  function renderLinearGauge(item, v) {
+    const pct = clampPct(item.percent);
+    const tone = item.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+    if (pct == null) return "";
+    const depleted = item.kind === "quota" && isDepleted(pct);
+    const left = item.kind === "rel"
+      ? (item.value || formatCompact(item.amount))
+      : (item.display || percentCaption(pct));
+    const right = item.kind === "quota" ? resetCaption(item) : "";
     return `<div class="lin-gauge ${toneClass(tone)}${depleted ? " depleted" : ""}">
-      <div class="lin-name">${esc(line.label || line.short || "")}${depleted ? ` <span class="limit-flag">Limit reached</span>` : ""}</div>
+      <div class="lin-name">${esc(item.short || item.label || "")}${depleted ? ` <span class="limit-flag">Limit reached</span>` : ""}</div>
       <div class="lin-track"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></div>
       <div class="lin-meta">
-        <span>${esc(percentCaption(pct))}</span>
-        <span class="${line.urgent ? "urgent" : ""}">${esc(resetCaption(line))}</span>
+        <span>${esc(left)}</span>
+        <span class="${item.urgent ? "urgent" : ""}">${esc(right)}</span>
       </div>
     </div>`;
   }
 
-  function renderArcGauge(line, v) {
-    const pct = clampPct(line.percent);
-    const tone = lineTone(line, v);
-    if (pct == null) {
-      return `<div class="dial dial-stat ${toneClass(tone)}">
-        <span class="dial-num">${esc(line.value || "—")}</span>
-        <span class="dial-lab">${esc(line.short || line.label || "")}</span>
-      </div>`;
-    }
+  function renderArcGauge(item, v) {
+    const pct = clampPct(item.percent);
+    const tone = item.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+    if (pct == null) return "";
     const color = gaugeColor(tone);
-    return `<div class="dial ${toneClass(tone)}${isDepleted(pct) ? " depleted" : ""}">
+    const hub = item.kind === "rel"
+      ? formatCompact(item.amount)
+      : Math.round(pct) + "%";
+    return `<div class="dial ${toneClass(tone)}${item.kind === "quota" && isDepleted(pct) ? " depleted" : ""}">
       <svg viewBox="0 0 88 58" class="dial-svg" aria-hidden="true">
         <path class="dial-track" d="M10 48 A34 34 0 0 1 78 48" pathLength="100"/>
         <path class="dial-fill" d="M10 48 A34 34 0 0 1 78 48" pathLength="100" stroke="${color}" stroke-dasharray="${pct} 100"/>
-        <text x="44" y="44" text-anchor="middle">${Math.round(pct)}%</text>
+        <text x="44" y="44" text-anchor="middle">${esc(hub)}</text>
       </svg>
-      <span class="dial-lab">${esc(line.short || line.label || "")}</span>
-      <span class="dial-reset${line.urgent ? " urgent" : ""}">${esc(resetCaption(line) || percentCaption(pct))}</span>
+      <span class="dial-lab">${esc(item.short || item.label || "")}</span>
+      <span class="dial-reset${item.urgent ? " urgent" : ""}">${esc(item.kind === "rel" ? (item.value || "") : (resetCaption(item) || item.display || percentCaption(pct)))}</span>
     </div>`;
   }
 
-  function renderStripGauge(line, v) {
-    const pct = clampPct(line.percent);
-    const tone = lineTone(line, v);
-    if (pct == null) {
-      return `<div class="strip-metric text ${toneClass(tone)}">
-        <span class="strip-lab">${esc(line.short || line.label || "")}</span>
-        <span class="strip-val">${esc(line.value || "—")}</span>
-      </div>`;
-    }
-    return `<div class="strip-metric ${toneClass(tone)}${isDepleted(pct) ? " depleted" : ""}">
-      <span class="strip-lab">${esc(line.short || line.label || "")}</span>
+  function renderStripGauge(item, v) {
+    const pct = clampPct(item.percent);
+    const tone = item.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+    if (pct == null) return "";
+    const overlay = item.kind === "rel"
+      ? formatCompact(item.amount)
+      : (isDepleted(pct) ? "Limit" : Math.round(pct) + "%");
+    return `<div class="strip-metric ${toneClass(tone)}${item.kind === "quota" && isDepleted(pct) ? " depleted" : ""}">
+      <span class="strip-lab">${esc(item.short || item.label || "")}</span>
       <span class="strip-track">
         <i style="width:${pct}%;background:${gaugeColor(tone)}"></i>
-        <em>${esc(isDepleted(pct) ? "Limit" : Math.round(pct) + "%")}</em>
+        <em>${esc(overlay)}</em>
       </span>
-      <span class="strip-reset${line.urgent ? " urgent" : ""}">${esc(stripResetPrefix(line.reset_in || "") || "—")}</span>
+      <span class="strip-reset${item.urgent ? " urgent" : ""}">${esc(item.kind === "rel" ? (item.value || "") : (stripResetPrefix(item.reset_in || "") || item.display || "—"))}</span>
     </div>`;
   }
 
   function renderBarCard(v, i) {
-    const lines = usageLines(v);
-    const gauges = lines.map((line) => renderLinearGauge(line, v)).join("");
-    const stats = trendStats(v.daily_cost).map((s) =>
-      `<div class="hist-row"><span>${esc(s.label)}</span><span>${esc(s.value)}</span></div>`
-    ).join("");
+    const items = usageItems(v);
+    const graphs = items.filter((it) => it.kind !== "table").map((it) => renderLinearGauge(it, v)).join("");
+    const table = renderMetricTable(items.filter((it) => it.kind === "table"));
+    const stats = trendStats(v.daily_cost);
+    const hist = renderMetricTable(stats);
     const spark = sparkBars(v.daily_cost);
-    const inner = `
-      ${agentHead(v, i)}
-      <div class="lin-list">${gauges || `<p class="dim">${esc(v.message || "No usage yet")}</p>`}</div>
-      ${stats || spark ? `<div class="agent-foot">${stats ? `<div class="hist">${stats}</div>` : ""}${spark ? `<div class="spark-wrap" title="Usage trend">${spark}</div>` : ""}</div>` : ""}
-    `;
+    const body = graphs || table || hist || spark
+      ? `${graphs ? `<div class="lin-list">${graphs}</div>` : ""}${table}${hist || spark ? `<div class="agent-foot">${hist}${spark ? `<div class="spark-wrap" title="Usage trend">${spark}</div>` : ""}</div>` : ""}`
+      : renderMetricTable([{ label: "Usage", value: v.message || "No data" }]);
+    const inner = `${agentHead(v, i)}${body}`;
     return agentShell(v, i, inner);
   }
 
   function renderDialCard(v, i) {
-    const lines = usageLines(v);
-    const dials = lines.map((line) => renderArcGauge(line, v)).join("");
+    const items = usageItems(v);
+    const dials = items.filter((it) => it.kind !== "table").map((it) => renderArcGauge(it, v)).join("");
+    const table = renderMetricTable(items.filter((it) => it.kind === "table").concat(
+      (v.next_reset || stripResetPrefix(v.reset_hint || ""))
+        ? [{ label: "Next reset", value: v.next_reset || stripResetPrefix(v.reset_hint || "") }]
+        : [],
+    ));
+    const hist = renderMetricTable(trendStats(v.daily_cost));
     const spark = sparkLine(v.daily_cost, 120, 32);
-    const next = v.next_reset || stripResetPrefix(v.reset_hint || "");
-    const inner = `
-      ${agentHead(v, i)}
-      <div class="dial-row">${dials || `<p class="dim">${esc(v.message || "No usage yet")}</p>`}</div>
-      <div class="agent-foot">
-        ${next ? `<span class="next-reset">Next reset ${esc(next)}</span>` : `<span class="dim">No reset</span>`}
-        ${spark ? `<div class="spark-wrap">${spark}</div>` : ""}
-      </div>
-    `;
+    const body = dials || table || hist || spark
+      ? `${dials ? `<div class="dial-row">${dials}</div>` : ""}${table}${hist || spark ? `<div class="agent-foot">${hist}${spark ? `<div class="spark-wrap">${spark}</div>` : ""}</div>` : ""}`
+      : renderMetricTable([{ label: "Usage", value: v.message || "No data" }]);
+    const inner = `${agentHead(v, i)}${body}`;
     return agentShell(v, i, inner);
   }
 
   function renderStripCard(v, i) {
-    const lines = usageLines(v);
-    const metrics = lines.map((line) => renderStripGauge(line, v)).join("");
+    const items = usageItems(v);
+    const metrics = items.filter((it) => it.kind !== "table").map((it) => renderStripGauge(it, v)).join("");
+    const table = renderMetricTable(items.filter((it) => it.kind === "table").concat(trendStats(v.daily_cost)));
     const spark = sparkBars(v.daily_cost, 72, 22);
     const sub = agentSubtitle(v);
+    const body = metrics || table || spark
+      ? `<div class="strip-gauges">${metrics}${table}</div>`
+      : `<div class="strip-gauges">${renderMetricTable([{ label: "Usage", value: v.summary || v.message || "No data" }])}</div>`;
     const inner = `
       <div class="strip-id">
         <span class="agent-name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
         <span class="agent-plan">${esc(sub)}</span>
         <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
       </div>
-      <div class="strip-gauges">${metrics || `<span class="dim">${esc(v.summary || v.message || "")}</span>`}</div>
+      ${body}
       <div class="strip-trend">${spark || ""}</div>
     `;
     return agentShell(v, i, inner);

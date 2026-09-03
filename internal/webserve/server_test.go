@@ -206,6 +206,9 @@ func TestAppJSUsageOnlyLayouts(t *testing.T) {
 		"function renderStripCard(",
 		"function renderBoard(",
 		"function renderArcGauge(",
+		"function usageItems(",
+		"function parseRatio(",
+		"function renderMetricTable(",
 		"function cycleLayout(",
 		`case "v":`,
 		`id="footer-btn-layout"`,
@@ -220,7 +223,7 @@ func TestAppJSUsageOnlyLayouts(t *testing.T) {
 	cssW := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(cssW, cssReq)
 	css := cssW.Body.String()
-	for _, want := range []string{".board-bars", ".board-dials", ".board-strips", ".lin-track", ".dial-svg", ".strip-track"} {
+	for _, want := range []string{".board-bars", ".board-dials", ".board-strips", ".lin-track", ".dial-svg", ".strip-track", ".metric-table"} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css missing %q", want)
 		}
