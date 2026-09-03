@@ -150,7 +150,7 @@ func skipUsageKV(label string, hasGauge bool) bool {
 	switch lower {
 	case "tokens", "activity", "models", "tools", "spend", "spending":
 		return true
-	case "quota", "credits", "subscription":
+	case "quota", "credits", "subscription", "plan":
 		return hasGauge
 	default:
 		return false
@@ -177,11 +177,25 @@ func usageLineGroup(label string, widget core.DashboardWidget) string {
 	lower := strings.ToLower(label)
 	for _, row := range widget.CompactRows {
 		rowLabel := strings.TrimSpace(row.Label)
-		if rowLabel == "" {
-			continue
-		}
-		if strings.Contains(lower, strings.ToLower(rowLabel)) {
+		if rowLabel != "" && strings.Contains(lower, strings.ToLower(rowLabel)) {
 			return compactGroupTitle(rowLabel)
+		}
+		for _, key := range row.Keys {
+			if strings.Contains(lower, strings.ToLower(key)) {
+				return compactGroupTitle(row.Label)
+			}
+			if ml, ok := widget.MetricLabelOverrides[key]; ok && ml != "" {
+				mlLower := strings.ToLower(strings.TrimSpace(ml))
+				if mlLower != "" && containsWord(lower, mlLower) {
+					return compactGroupTitle(row.Label)
+				}
+			}
+			if cl, ok := widget.CompactMetricLabelOverrides[key]; ok && cl != "" {
+				clLower := strings.ToLower(strings.TrimSpace(cl))
+				if len(clLower) >= 3 && containsWord(lower, clLower) {
+					return compactGroupTitle(row.Label)
+				}
+			}
 		}
 	}
 	if strings.Contains(lower, "gemini") {
@@ -191,6 +205,19 @@ func usageLineGroup(label string, widget core.DashboardWidget) string {
 		return "Claude / GPT"
 	}
 	return ""
+}
+
+func containsWord(s, word string) bool {
+	if s == word {
+		return true
+	}
+	for _, part := range strings.Fields(s) {
+		part = strings.Trim(part, "(),:;.-_/")
+		if part == word {
+			return true
+		}
+	}
+	return false
 }
 
 func resolveUsageGroup(line WebUsageLine, snap core.UsageSnapshot, widget core.DashboardWidget, claimed map[string]bool) string {

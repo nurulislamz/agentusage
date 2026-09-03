@@ -508,6 +508,7 @@
   function usageItems(v) {
     const items = [];
     const hasTrend = (v.daily_cost || []).length > 1;
+    const isCursor = (v.provider_id || "") === "cursor";
     (usageLines(v) || []).forEach((line) => {
       const pct = clampPct(line.percent);
       if (pct != null) {
@@ -524,6 +525,7 @@
         });
         return;
       }
+      if (isCursor) return;
       const parts = String(line.value || "").split(/\s*·\s*/).map((p) => p.trim()).filter(Boolean);
       if (!parts.length) {
         return;
@@ -1140,9 +1142,25 @@
         `;
       };
 
-      const q1 = renderQuotaCell(lines[0]);
-      const q2 = renderQuotaCell(lines[1]);
-      const q3 = renderQuotaCell(lines[2]);
+      // In the matrix view, Antigravity only has 2 quotas (5h and Week); it does not have a Quota 3.
+      // Secondary model pools should not spill into Quota 3, and quota windows should not duplicate across columns.
+      let matrixLines = lines;
+      if ((v.provider_id || "") === "antigravity") {
+        const firstGroup = lines[0]?.group || "";
+        matrixLines = lines.filter((l) => (l.group || "") === firstGroup).slice(0, 2);
+      } else {
+        const seen = new Set();
+        matrixLines = lines.filter((l) => {
+          const k = (l.short || l.label || "").toLowerCase().trim();
+          if (!k || seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      }
+
+      const q1 = renderQuotaCell(matrixLines[0]);
+      const q2 = renderQuotaCell(matrixLines[1]);
+      const q3 = renderQuotaCell(matrixLines[2]);
       const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
       const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
       const spark = (v.daily_cost && v.daily_cost.length > 1)
@@ -1228,77 +1246,131 @@
     });
   }
 
+  function groupViewsByProvider(views) {
+    const groups = [];
+    const groupMap = new Map();
+    views.forEach((v, i) => {
+      const pid = v.provider_id || "other";
+      if (!groupMap.has(pid)) {
+        const grp = {
+          provider_id: pid,
+          provider_name: v.provider_name || pid,
+          accent_color: v.accent_color || "var(--accent)",
+          items: [],
+        };
+        groupMap.set(pid, grp);
+        groups.push(grp);
+      }
+      groupMap.get(pid).items.push({ view: v, index: i });
+    });
+    return groups;
+  }
+
   function renderBentoLayout(views, fetchHtml) {
     const panel = $("panel");
-    const tiles = views.map((v, i) => {
-      const sel = i === state.selected;
-      const isFeatured = (v.daily_cost && v.daily_cost.length > 5) || (views.length === 10 ? i < 2 : (views.length % 4 === 1 && i === 0));
-      const lines = usageLines(v);
-      const refreshing = isViewRefreshing(v);
-      const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
-      const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
-      const hasSpark = v.daily_cost && v.daily_cost.length > 1;
-      const spark = hasSpark
-        ? sparkBars(v.daily_cost, 60, 16) || sparkLine(v.daily_cost, 60, 16)
-        : "";
+    const groups = groupViewsByProvider(views);
 
-      const labelCounts = {};
-      lines.forEach((l) => {
-        const k = (l.short || l.label || "").toLowerCase();
-        labelCounts[k] = (labelCounts[k] || 0) + 1;
-      });
+    const groupHtml = groups.map((grp) => {
+      const tiles = grp.items.map(({ view: v, index: i }) => {
+        const sel = i === state.selected;
+        const lines = usageLines(v);
+        const refreshing = isViewRefreshing(v);
+        const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
+        const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
+        const hasSpark = v.daily_cost && v.daily_cost.length > 1;
+        const spark = hasSpark
+          ? sparkBars(v.daily_cost, 60, 16) || sparkLine(v.daily_cost, 60, 16)
+          : "";
 
-      const quotaRows = lines.slice(0, 3).map((l) => {
-        const pct = clampPct(l.percent);
-        const tone = l.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
-        const rawLab = l.short || l.label || "";
-        let displayLab = rawLab;
-        if (labelCounts[rawLab.toLowerCase()] > 1 && l.group) {
-          if (/gemini/i.test(l.group)) {
-            displayLab = "G-" + rawLab;
-          } else if (/claude|gpt|opus|sonnet/i.test(l.group)) {
-            displayLab = "C-" + rawLab;
-          } else {
-            displayLab = l.group.slice(0, 3).toUpperCase() + "-" + rawLab;
+        const labelCounts = {};
+        lines.forEach((l) => {
+          const k = (l.short || l.label || "").toLowerCase();
+          labelCounts[k] = (labelCounts[k] || 0) + 1;
+        });
+
+        const quotaRows = lines.slice(0, 3).map((l) => {
+          const pct = clampPct(l.percent);
+          const tone = l.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+          const rawLab = l.short || l.label || "";
+          let displayLab = rawLab;
+          if (labelCounts[rawLab.toLowerCase()] > 1 && l.group) {
+            if (/gemini/i.test(l.group)) {
+              displayLab = "G-" + rawLab;
+            } else if (/claude|gpt|opus|sonnet/i.test(l.group)) {
+              displayLab = "C-" + rawLab;
+            } else {
+              displayLab = l.group.slice(0, 3).toUpperCase() + "-" + rawLab;
+            }
           }
-        }
-        if (pct == null) {
-          return `<div class="bento-quota-row"><span class="bento-quota-lab">${esc(displayLab)}</span><span class="dim" style="grid-column:span 2">${esc(l.value || "—")}</span></div>`;
-        }
+          if (pct == null) {
+            return `<div class="bento-quota-row"><span class="bento-quota-lab">${esc(displayLab)}</span><span class="dim" style="grid-column:span 2">${esc(l.value || "—")}</span></div>`;
+          }
+          return `
+            <div class="bento-quota-row ${toneClass(tone)}">
+              <span class="bento-quota-lab">${esc(displayLab)}</span>
+              <span class="bento-quota-bar"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>
+              <span class="bento-quota-pct">${pct.toFixed(0)}%</span>
+            </div>
+          `;
+        }).join("");
+
         return `
-          <div class="bento-quota-row ${toneClass(tone)}">
-            <span class="bento-quota-lab">${esc(displayLab)}</span>
-            <span class="bento-quota-bar"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>
-            <span class="bento-quota-pct">${pct.toFixed(0)}%</span>
+          <div class="bento-tile${sel ? " selected" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}" style="--p:${esc(v.accent_color || "var(--accent)")}" title="Click to inspect ${esc(v.account_id)}">
+            <div class="bento-tile-head">
+              <div class="bento-head-left">
+                <span>${esc(v.status_icon || "●")}</span>
+                <span class="bento-acc-name">${esc(v.account_id)}</span>
+              </div>
+              <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
+            </div>
+            <div class="bento-tile-body">
+              ${quotaRows || `<div class="dim" style="font-size:11px">${esc(v.summary || "No active quotas")}</div>`}
+            </div>
+            <div class="bento-tile-foot">
+              <span class="bento-reset-hint${isUrgent ? " urgent" : ""}">${esc(next ? "⏱ " + next : "—")}</span>
+              ${hasSpark ? `<div class="bento-spark-wrap">${spark}</div>` : ""}
+            </div>
           </div>
         `;
       }).join("");
 
+      const anyCrit = grp.items.some(({ view }) => {
+        const s = (view.status_badge || view.status || "").toLowerCase();
+        return s.includes("limit") || s.includes("err") || s.includes("crit");
+      });
+      const anyWarn = !anyCrit && grp.items.some(({ view }) => {
+        const s = (view.status_badge || view.status || "").toLowerCase();
+        return s.includes("warn") || s.includes("auth");
+      });
+      const statusBadge = anyCrit
+        ? `<span class="pill pill-crit">ATTENTION</span>`
+        : anyWarn
+        ? `<span class="pill pill-warn">WARNING</span>`
+        : `<span class="pill pill-ok">ALL OK</span>`;
+
       return `
-        <div class="bento-tile${sel ? " selected" : ""}${isFeatured ? " featured" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}" style="--p:${esc(v.accent_color || "var(--accent)")}" title="Click to inspect ${esc(v.account_id)}">
-          <div class="bento-tile-head">
-            <div class="bento-head-left">
-              <span>${esc(v.status_icon || "●")}</span>
-              <span class="bento-acc-name">${esc(v.account_id)}</span>
-              <span class="bento-provider-tag">${esc(v.provider_id)}</span>
+        <section class="provider-group-box" style="--p:${esc(grp.accent_color)}">
+          <header class="provider-group-header">
+            <div class="provider-group-title">
+              <span class="provider-indicator" aria-hidden="true"></span>
+              <span class="provider-name">${esc(grp.provider_name.toUpperCase())}</span>
+              <span class="provider-count">${grp.items.length} ${grp.items.length === 1 ? 'AGENT' : 'AGENTS'}</span>
             </div>
-            <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
+            <div class="provider-group-meta">
+              ${statusBadge}
+            </div>
+          </header>
+          <div class="bento-tiles-grid">
+            ${tiles}
           </div>
-          <div class="bento-tile-body">
-            ${quotaRows || `<div class="dim" style="font-size:11px">${esc(v.summary || "No active quotas")}</div>`}
-          </div>
-          <div class="bento-tile-foot">
-            <span class="bento-reset-hint${isUrgent ? " urgent" : ""}">${esc(next ? "⏱ " + next : "—")}</span>
-            ${hasSpark ? `<div class="bento-spark-wrap">${spark}</div>` : ""}
-          </div>
-        </div>
+        </section>
       `;
     }).join("");
 
     panel.innerHTML = `
       ${fetchHtml}
-      <div class="bento-grid" role="grid" aria-label="Viewport Bento Glance Tiles">
-        ${tiles}
+      <div class="bento-container" role="grid" aria-label="Viewport Bento Glance Tiles">
+        ${groupHtml}
       </div>
     `;
 
@@ -1315,11 +1387,50 @@
     const panel = $("panel");
     const id = state.layout;
     const renderer = id === "dials" ? renderDialCard : id === "strips" ? renderStripCard : renderBarCard;
-    const cards = views.map((v, i) => renderer(v, i)).join("");
+    const groups = groupViewsByProvider(views);
+
+    const groupHtml = groups.map((grp) => {
+      const cards = grp.items.map(({ view: v, index: i }) => renderer(v, i)).join("");
+      const anyCrit = grp.items.some(({ view }) => {
+        const s = (view.status_badge || view.status || "").toLowerCase();
+        return s.includes("limit") || s.includes("err") || s.includes("crit");
+      });
+      const anyWarn = !anyCrit && grp.items.some(({ view }) => {
+        const s = (view.status_badge || view.status || "").toLowerCase();
+        return s.includes("warn") || s.includes("auth");
+      });
+      const statusBadge = anyCrit
+        ? `<span class="pill pill-crit">ATTENTION</span>`
+        : anyWarn
+        ? `<span class="pill pill-warn">WARNING</span>`
+        : `<span class="pill pill-ok">ALL OK</span>`;
+
+      return `
+        <section class="provider-group-box" style="--p:${esc(grp.accent_color)}">
+          <header class="provider-group-header">
+            <div class="provider-group-title">
+              <span class="provider-indicator" aria-hidden="true"></span>
+              <span class="provider-name">${esc(grp.provider_name.toUpperCase())}</span>
+              <span class="provider-count">${grp.items.length} ${grp.items.length === 1 ? 'AGENT' : 'AGENTS'}</span>
+            </div>
+            <div class="provider-group-meta">
+              ${statusBadge}
+            </div>
+          </header>
+          <div class="board-grid board-${esc(id)}">
+            ${cards}
+          </div>
+        </section>
+      `;
+    }).join("");
+
     panel.innerHTML = `
       ${fetchHtml}
-      <div class="board board-${esc(id)}" role="list" aria-label="${esc(layoutMeta().hint)}">${cards}</div>
+      <div class="board-container" role="list" aria-label="${esc(layoutMeta().hint)}">
+        ${groupHtml}
+      </div>
     `;
+
     panel.querySelectorAll(".agent").forEach((el) => {
       el.addEventListener("click", () => {
         state.selected = Number(el.dataset.idx);
@@ -1451,8 +1562,11 @@
     render();
   }
 
+  let filterBackup = "";
+
   function openFilter() {
     state.filterOpen = true;
+    filterBackup = state.filter;
     const bar = $("filter-bar");
     const input = $("filter-input");
     bar.hidden = false;
@@ -1467,6 +1581,8 @@
     if (apply) {
       state.filter = input.value;
       state.selected = 0;
+    } else {
+      state.filter = filterBackup;
     }
     state.filterOpen = false;
     bar.hidden = true;
@@ -1478,6 +1594,12 @@
     state.token = $("token-input").value.trim();
     sessionStorage.setItem("au-serve-token", state.token);
     load().catch(console.error);
+  });
+
+  $("filter-input").addEventListener("input", () => {
+    state.filter = $("filter-input").value;
+    state.selected = 0;
+    render();
   });
 
   $("filter-input").addEventListener("keydown", (ev) => {

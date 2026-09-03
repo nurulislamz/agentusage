@@ -575,3 +575,55 @@ func TestUsageLinesOrder_FiveHourFirstThenWeekly(t *testing.T) {
 		t.Fatalf("expected Claude weekly to be second in group, got %#v", claudeLines[1])
 	}
 }
+
+func TestWebProjectorCursorUsageLinesOrder(t *testing.T) {
+	now := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
+	p := WebProjector{
+		TimeWindow:    core.TimeWindow30d,
+		WarnThreshold: 0.25,
+		CritThreshold: 0.1,
+		UsageMode:     config.UsageModeRemaining,
+		TileWidth:     72,
+		DetailWidth:   80,
+		Now:           now,
+	}
+
+	snapCursor := core.UsageSnapshot{
+		ProviderID: "cursor",
+		AccountID:  "cursor-physics",
+		Timestamp:  now,
+		Status:     core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"cursor_plan_usage":      {Limit: core.Float64Ptr(100), Remaining: core.Float64Ptr(99.49), Used: core.Float64Ptr(0.51), Unit: "%", Window: "monthly"},
+			"plan_percent_used":      {Limit: core.Float64Ptr(100), Remaining: core.Float64Ptr(99.49), Used: core.Float64Ptr(0.51), Unit: "%", Window: "monthly"},
+			"plan_auto_percent_used": {Limit: core.Float64Ptr(100), Remaining: core.Float64Ptr(99.44), Used: core.Float64Ptr(0.56), Unit: "%", Window: "monthly"},
+			"plan_api_percent_used":  {Limit: core.Float64Ptr(100), Remaining: core.Float64Ptr(100), Used: core.Float64Ptr(0), Unit: "%", Window: "monthly"},
+		},
+		Resets: map[string]time.Time{
+			"cursor_plan_usage": now.Add(25 * 24 * time.Hour),
+		},
+	}
+
+	view := p.ProjectSnapshot(snapCursor, "Cursor")
+	if len(view.UsageLines) < 3 {
+		t.Fatalf("expected at least 3 usage lines, got %d: %#v", len(view.UsageLines), view.UsageLines)
+	}
+
+	// First 3 lines must be Included, Auto, API
+	if view.UsageLines[0].Short != "Included" {
+		t.Errorf("line 0 short = %q, want Included", view.UsageLines[0].Short)
+	}
+	if view.UsageLines[1].Short != "Auto" {
+		t.Errorf("line 1 short = %q, want Auto", view.UsageLines[1].Short)
+	}
+	if view.UsageLines[2].Short != "API" {
+		t.Errorf("line 2 short = %q, want API", view.UsageLines[2].Short)
+	}
+
+	// All 3 must have group "Plan"
+	for i := 0; i < 3; i++ {
+		if view.UsageLines[i].Group != "Plan" {
+			t.Errorf("line %d group = %q, want Plan", i, view.UsageLines[i].Group)
+		}
+	}
+}
