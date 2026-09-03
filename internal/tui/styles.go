@@ -762,58 +762,15 @@ func resolveNearLimitType(snap core.UsageSnapshot) string {
 
 		k := strings.ToLower(key)
 		w := strings.ToLower(met.Window)
+		windowType := classifyMetricWindowType(k, w, snap.ProviderID, hasSpecificMetrics)
 
-		var windowType string
-		if strings.Contains(k, "month") || strings.Contains(w, "month") || strings.Contains(w, "30d") || isCycleResetMonthlyKey(k) {
-			windowType = "MONTHLY"
-		} else if strings.Contains(k, "weekly") || strings.Contains(k, "week") || strings.Contains(k, "7d") || strings.Contains(w, "weekly") || strings.Contains(w, "7d") || isCycleResetWeeklyKey(k) || (k == "quota" && snap.ProviderID == "antigravity" && !hasSpecificMetrics) {
-			windowType = "WEEKLY"
-		} else if strings.Contains(k, "5h") || strings.Contains(k, "five_hour") || strings.Contains(k, "rolling") || strings.Contains(w, "5h") {
-			windowType = "5H"
-		} else if strings.Contains(k, "daily") || strings.Contains(k, "day") || strings.Contains(k, "1d") || strings.Contains(k, "24h") || strings.Contains(w, "daily") || strings.Contains(w, "1d") {
-			windowType = "DAILY"
-		}
-
-		if windowType == "MONTHLY" || windowType == "WEEKLY" {
-			isLow := false
-			if met.Remaining != nil && *met.Remaining > 0 {
-				remPct := *met.Remaining
-				if met.Limit != nil && *met.Limit > 0 {
-					remPct = (*met.Remaining / *met.Limit) * 100
-				}
-				if remPct < 5.0 {
-					isLow = true
-				}
-			} else if met.Used != nil && *met.Used >= 95.0 && *met.Used < 100.0 && met.Unit == "%" {
-				isLow = true
-			} else if met.Limit != nil && met.Used != nil && *met.Limit > 0 {
-				pct := (*met.Used / *met.Limit) * 100
-				if pct >= 95.0 && pct < 100.0 {
-					isLow = true
-				}
-			}
-			if isLow {
+		switch windowType {
+		case "MONTHLY", "WEEKLY":
+			if isMetricNearLimitLow(met, 5.0, false) {
 				lowWindows[windowType] = true
 			}
-		} else if windowType == "5H" || windowType == "DAILY" {
-			isLow := false
-			if met.Remaining != nil && *met.Remaining > 0 {
-				remPct := *met.Remaining
-				if met.Limit != nil && *met.Limit > 0 {
-					remPct = (*met.Remaining / *met.Limit) * 100
-				}
-				if remPct <= 15.0 {
-					isLow = true
-				}
-			} else if met.Used != nil && *met.Used >= 85.0 && *met.Used < 100.0 && met.Unit == "%" {
-				isLow = true
-			} else if met.Limit != nil && met.Used != nil && *met.Limit > 0 {
-				pct := (*met.Used / *met.Limit) * 100
-				if pct >= 85.0 && pct < 100.0 {
-					isLow = true
-				}
-			}
-			if isLow {
+		case "5H", "DAILY":
+			if isMetricNearLimitLow(met, 15.0, true) {
 				lowWindows[windowType] = true
 			}
 		}
@@ -909,6 +866,44 @@ func resolveNearLimitType(snap core.UsageSnapshot) string {
 	}
 
 	return ""
+}
+
+func classifyMetricWindowType(k, w, providerID string, hasSpecificMetrics bool) string {
+	if strings.Contains(k, "month") || strings.Contains(w, "month") || strings.Contains(w, "30d") || isCycleResetMonthlyKey(k) {
+		return "MONTHLY"
+	}
+	if strings.Contains(k, "weekly") || strings.Contains(k, "week") || strings.Contains(k, "7d") || strings.Contains(w, "weekly") || strings.Contains(w, "7d") || isCycleResetWeeklyKey(k) || (k == "quota" && providerID == "antigravity" && !hasSpecificMetrics) {
+		return "WEEKLY"
+	}
+	if strings.Contains(k, "5h") || strings.Contains(k, "five_hour") || strings.Contains(k, "rolling") || strings.Contains(w, "5h") {
+		return "5H"
+	}
+	if strings.Contains(k, "daily") || strings.Contains(k, "day") || strings.Contains(k, "1d") || strings.Contains(k, "24h") || strings.Contains(w, "daily") || strings.Contains(w, "1d") {
+		return "DAILY"
+	}
+	return ""
+}
+
+func isMetricNearLimitLow(met core.Metric, thresholdPct float64, inclusive bool) bool {
+	if met.Remaining != nil && *met.Remaining > 0 {
+		remPct := *met.Remaining
+		if met.Limit != nil && *met.Limit > 0 {
+			remPct = (*met.Remaining / *met.Limit) * 100
+		}
+		if inclusive {
+			return remPct <= thresholdPct
+		}
+		return remPct < thresholdPct
+	}
+	usedThreshold := 100.0 - thresholdPct
+	if met.Used != nil && *met.Used >= usedThreshold && *met.Used < 100.0 && met.Unit == "%" {
+		return true
+	}
+	if met.Limit != nil && met.Used != nil && *met.Limit > 0 {
+		pct := (*met.Used / *met.Limit) * 100
+		return pct >= usedThreshold && pct < 100.0
+	}
+	return false
 }
 
 func StatusBorderColor(s core.Status) lipgloss.Color {
