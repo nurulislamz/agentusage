@@ -1093,6 +1093,8 @@
 
   function renderMatrixLayout(views, fetchHtml) {
     const panel = $("panel");
+    const hasAnyTrends = views.some((v) => v.daily_cost && v.daily_cost.length > 1);
+
     const rows = views.map((v, i) => {
       const sel = i === state.selected;
       const isExp = state.matrixExpanded === i;
@@ -1117,11 +1119,15 @@
 
       const q1 = renderQuotaCell(lines[0]);
       const q2 = renderQuotaCell(lines[1]);
+      const q3 = renderQuotaCell(lines[2]);
       const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
       const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
       const spark = (v.daily_cost && v.daily_cost.length > 1)
         ? sparkBars(v.daily_cost, 72, 18) || sparkLine(v.daily_cost, 72, 18)
         : `<span class="dim">—</span>`;
+
+      const trendTd = hasAnyTrends ? `<td><div class="matrix-trend">${spark}</div></td>` : "";
+      const colSpan = hasAnyTrends ? 8 : 7;
 
       const mainRow = `
         <tr class="matrix-row${sel ? " selected" : ""}${isExp ? " expanded" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}" style="--p:${esc(v.accent_color || "var(--accent)")}">
@@ -1137,15 +1143,16 @@
           <td><span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span></td>
           <td>${q1}</td>
           <td>${q2}</td>
+          <td>${q3}</td>
           <td><span class="matrix-reset${isUrgent ? " urgent" : ""}">${esc(next ? "⏱ " + next : "—")}</span></td>
-          <td><div class="matrix-trend">${spark}</div></td>
+          ${trendTd}
           <td><span class="matrix-toggle" title="Toggle details">${isExp ? "▾" : "▸"}</span></td>
         </tr>
       `;
 
       const drawerRow = isExp ? `
         <tr class="matrix-drawer-row">
-          <td colspan="7">
+          <td colspan="${colSpan}">
             <div class="matrix-drawer">
               ${renderCockpit(v)}
             </div>
@@ -1155,6 +1162,8 @@
 
       return mainRow + drawerRow;
     }).join("");
+
+    const trendTh = hasAnyTrends ? `<th scope="col">Trend</th>` : "";
 
     panel.innerHTML = `
       ${fetchHtml}
@@ -1166,8 +1175,9 @@
               <th scope="col">Status</th>
               <th scope="col">Quota 1</th>
               <th scope="col">Quota 2</th>
+              <th scope="col">Quota 3</th>
               <th scope="col">Next Reset</th>
-              <th scope="col">Trend</th>
+              ${trendTh}
               <th scope="col" aria-label="Toggle"></th>
             </tr>
           </thead>

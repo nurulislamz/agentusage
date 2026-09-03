@@ -1520,7 +1520,7 @@ kbd, .footer kbd {
 }
 
 .matrix-table td {
-  padding: 7px 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   color: var(--fg);
   white-space: nowrap;
@@ -1578,9 +1578,10 @@ kbd, .footer kbd {
 .matrix-metric-lab {
   font-size: 10px;
   color: var(--muted);
-  width: 32px;
+  max-width: 58px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .matrix-metric-bar {
