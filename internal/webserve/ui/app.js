@@ -1,6 +1,17 @@
 (() => {
   "use strict";
 
+  const LAYOUTS = [
+    { id: "split", label: "Split", hint: "Navigator + usage pane" },
+    { id: "roster", label: "Roster", hint: "All apps with usage and resets" },
+    { id: "matrix", label: "Matrix", hint: "Dense usage table" },
+  ];
+
+  function normalizeLayout(raw) {
+    const id = String(raw || "").toLowerCase();
+    return LAYOUTS.some((l) => l.id === id) ? id : "split";
+  }
+
   const state = {
     envelope: null,
     views: [],
@@ -8,6 +19,7 @@
     filter: "",
     token: sessionStorage.getItem("au-serve-token") || "",
     themeOverride: localStorage.getItem("au-serve-theme-override") || "",
+    layout: normalizeLayout(localStorage.getItem("au-serve-layout") || "split"),
     loading: true,
     refreshing: false,
     refreshOpts: null,
@@ -16,6 +28,10 @@
     error: null,
     filterOpen: false,
   };
+
+  function layoutMeta(id) {
+    return LAYOUTS.find((l) => l.id === (id || state.layout)) || LAYOUTS[0];
+  }
 
   const $ = (id) => document.getElementById(id);
 
@@ -332,7 +348,7 @@
       <span id="fetching-header" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
       ${switcher}
       <span class="spacer"></span>
-      <span class="header-meta">⊞ ${n} providers${filteredNote}</span>
+      <span class="header-meta">⊞ ${n} providers${filteredNote} · ${esc(layoutMeta().label)}</span>
     `;
     const sel = $("switcher");
     if (sel) {
@@ -361,16 +377,15 @@
         last = v.provider_id;
       }
       const sel = i === state.selected;
-      const pct = v.has_gauge ? Math.max(0, Math.min(100, v.gauge_percent || 0)) : null;
-      const reset = v.reset_hint || "";
-      const summary = v.has_gauge ? (v.summary || `${pct.toFixed(2)}%`) : (v.summary || v.message || "");
       const inGroup = v.provider_id === selected.provider_id && counts[v.provider_id] > 1;
       const refreshing = isViewRefreshing(v);
+      const next = v.next_reset || stripResetPrefix(v.reset_hint || "");
       html += `<button type="button" class="item${sel ? " selected" : ""}${inGroup ? " in-group" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")}">
         <span class="rail"></span>
         <span class="name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
         <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
-        <span class="sum">${pct !== null ? `<span class="mini"><i style="width:${pct}%;background:${gaugeColor(toneFromPercent(pct, v))}"></i></span>` : ""}<span class="sum-text">${esc(summary)}</span>${reset ? `<span class="reset">${esc(reset)}</span>` : ""}</span>
+        ${renderUsageMeters(v)}
+        ${next ? `<span class="next${(v.resets || []).some((r) => r.urgent) ? " urgent" : ""}" title="Next reset">${esc(next)}</span>` : `<span class="next dim">—</span>`}
       </button>`;
     });
     $("nav").innerHTML = html;
@@ -396,6 +411,129 @@
     if (pct <= 25) return "warn";
     if (pct <= 50) return "peach";
     return "ok";
+  }
+
+  function stripResetPrefix(s) {
+    return String(s || "").replace(/^(resets?\s+in\s+|in\s+)/i, "").trim();
+  }
+
+  function usageLines(v) {
+    if (!v) return [];
+    if (v.usage_lines && v.usage_lines.length) return v.usage_lines;
+    const lines = [];
+    if (v.has_gauge) {
+      lines.push({
+        label: v.summary || "Usage",
+        short: "Usage",
+        percent: v.gauge_percent,
+        reset_in: stripResetPrefix(v.reset_hint || v.next_reset || ""),
+        tone: toneFromPercent(v.gauge_percent || 0, v),
+      });
+    } else if (v.summary) {
+      lines.push({ label: "Status", value: v.summary, tone: "dim" });
+    }
+    (v.resets || []).forEach((r) => {
+      if (!r || !r.duration) return;
+      if (lines.some((l) => stripResetPrefix(l.reset_in) === r.duration)) return;
+      lines.push({
+        label: r.label,
+        short: r.label,
+        reset_in: r.duration,
+        urgent: r.urgent,
+        tone: r.urgent ? "crit" : "ok",
+      });
+    });
+    return lines;
+  }
+
+  function isUsageCard(card) {
+    const id = (card.id || "").toLowerCase();
+    const title = (card.title || "").toLowerCase();
+    return id === "usage" || title === "usage" || ["hero", "overview", "quota"].includes(id);
+  }
+
+  function usageOnlyCards(v) {
+    const cards = v.detail_cards || [];
+    let usage = cards.filter(isUsageCard);
+    if (!usage.length) {
+      const gauged = cards.find((c) => (c.rows || []).some((r) => r.kind === "gauge"));
+      if (gauged) usage = [gauged];
+    }
+    if (!usage.length) {
+      const lines = usageLines(v);
+      if (!lines.length) return [];
+      usage = [{
+        id: "usage",
+        title: "Usage",
+        icon: "⚡",
+        rows: lines.map((line) => usageLineToRow(line)),
+      }];
+    }
+    return usage.map((card) => attachResetsToUsageCard(card, v));
+  }
+
+  function usageLineToRow(line) {
+    if (line.percent != null) {
+      return {
+        kind: "gauge",
+        label: line.label,
+        percent: line.percent,
+        hint: line.hint || (line.reset_in ? "Resets in " + line.reset_in : ""),
+        tone: line.tone || "ok",
+      };
+    }
+    if (line.reset_in) {
+      return {
+        kind: "timer",
+        label: line.label,
+        value: line.value || "",
+        hint: "in " + line.reset_in,
+        tone: line.tone || "ok",
+      };
+    }
+    return { kind: "kv", label: line.label, value: line.value || "" };
+  }
+
+  function attachResetsToUsageCard(card, v) {
+    const lines = usageLines(v);
+    const rows = (card.rows || []).map((row) => {
+      if (row.kind !== "gauge") return row;
+      if (/reset/i.test(row.hint || "")) return row;
+      const match = lines.find((l) => l.label === row.label || l.short === row.label);
+      if (match && match.reset_in) {
+        const extra = "Resets in " + match.reset_in;
+        return { ...row, hint: row.hint ? row.hint + " · " + extra : extra };
+      }
+      return row;
+    });
+    return { ...card, rows };
+  }
+
+  function renderUsageMeters(v) {
+    const lines = usageLines(v);
+    if (!lines.length) {
+      const summary = v.summary || v.message || "";
+      const reset = v.reset_hint || v.next_reset || "";
+      return `<span class="meters"><span class="meter dim"><span class="meter-val">${esc(summary)}</span>${reset ? `<span class="meter-reset">${esc(stripResetPrefix(reset))}</span>` : ""}</span></span>`;
+    }
+    const meters = lines.map((line) => {
+      const pct = line.percent == null ? null : Math.max(0, Math.min(100, Number(line.percent)));
+      const tone = line.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+      const val = pct != null ? `${pct.toFixed(0)}%` : esc(line.value || "");
+      const reset = line.reset_in
+        ? `<span class="meter-reset${line.urgent ? " urgent" : ""}">${esc(line.reset_in)}</span>`
+        : "";
+      const bar = pct != null
+        ? `<span class="mini"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>`
+        : "";
+      return `<span class="meter ${toneClass(tone)}">
+        <span class="meter-lab">${esc(line.short || line.label || "")}</span>
+        ${bar}
+        <span class="meter-val">${val}</span>
+        ${reset}
+      </span>`;
+    }).join("");
+    return `<span class="meters">${meters}</span>`;
   }
 
   function renderCards(cards) {
@@ -500,9 +638,7 @@
     const schedule = v.cycle_schedule || "";
     const summary = v.summary || "";
     const refreshed = lastRefreshedText(v);
-    const cards = v.detail_cards && v.detail_cards.length
-      ? renderCards(v.detail_cards)
-      : (v.detail_html ? `<div class="panel-cards-grid"><section class="card">${v.detail_html}</section></div>` : "");
+    const cards = renderCards(usageOnlyCards(v));
     panel.innerHTML = `
       <div class="hero">
         <h1>
@@ -520,6 +656,94 @@
     `;
   }
 
+  function renderMatrix() {
+    const views = filteredViews();
+    const panel = $("panel");
+    const fetchVisible = state.refreshing ? "" : " hidden";
+    const fetchText = esc(state.refreshText || "Fetching...");
+    const spinChar = SPINNER[state.animFrame] || "⠋";
+    if (!views.length) {
+      panel.innerHTML = `
+        <span id="fetching-detail" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
+        <p class="dim">${state.filter ? "No matches." : "No providers."}</p>
+      `;
+      return;
+    }
+    const rows = views.map((v, i) => {
+      const sel = i === state.selected;
+      const lines = usageLines(v);
+      const usage = lines.map((line) => {
+        const pct = line.percent == null ? null : Math.max(0, Math.min(100, Number(line.percent)));
+        const tone = line.tone || (pct != null ? toneFromPercent(pct, v) : "ok");
+        const val = pct != null ? `${pct.toFixed(0)}%` : esc(line.value || "—");
+        const bar = pct != null
+          ? `<span class="mini"><i style="width:${pct}%;background:${gaugeColor(tone)}"></i></span>`
+          : "";
+        return `<span class="matrix-metric ${toneClass(tone)}">
+          <span class="meter-lab">${esc(line.short || line.label || "")}</span>
+          ${bar}
+          <span class="meter-val">${val}</span>
+          ${line.reset_in ? `<span class="meter-reset${line.urgent ? " urgent" : ""}">${esc(line.reset_in)}</span>` : ""}
+        </span>`;
+      }).join("");
+      const next = v.next_reset || stripResetPrefix(v.reset_hint || "") || "—";
+      return `<button type="button" class="matrix-row${sel ? " selected" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")}">
+        <span class="matrix-app">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
+        <span class="matrix-provider">${esc(v.provider_id || "")}</span>
+        <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
+        <span class="matrix-usage">${usage || `<span class="dim">${esc(v.summary || "")}</span>`}</span>
+        <span class="matrix-reset">${esc(next)}</span>
+      </button>`;
+    }).join("");
+    panel.innerHTML = `
+      <span id="fetching-detail" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
+      <div class="matrix" role="table" aria-label="Usage matrix">
+        <div class="matrix-head" role="row">
+          <span>App</span>
+          <span>Provider</span>
+          <span>Status</span>
+          <span>Usage</span>
+          <span>Next reset</span>
+        </div>
+        ${rows}
+      </div>
+    `;
+    panel.querySelectorAll(".matrix-row").forEach((el) => {
+      el.addEventListener("click", () => {
+        state.selected = Number(el.dataset.idx);
+        render();
+      });
+    });
+    const selectedEl = panel.querySelector(".matrix-row.selected");
+    if (selectedEl) selectedEl.scrollIntoView({ block: "nearest" });
+  }
+
+  function applyLayout() {
+    const shell = $("app");
+    if (!shell) return;
+    const id = normalizeLayout(state.layout);
+    state.layout = id;
+    shell.dataset.layout = id;
+    LAYOUTS.forEach((l) => shell.classList.toggle("layout-" + l.id, l.id === id));
+    const nav = $("nav");
+    const panel = document.querySelector("main.panel");
+    if (nav) {
+      nav.setAttribute("aria-label", id === "roster" ? "Usage board" : "Providers");
+    }
+    if (panel) {
+      panel.setAttribute("aria-label", id === "matrix" ? "Usage matrix" : "Detail");
+    }
+  }
+
+  function cycleLayout() {
+    const ids = LAYOUTS.map((l) => l.id);
+    const idx = Math.max(0, ids.indexOf(state.layout));
+    state.layout = ids[(idx + 1) % ids.length];
+    localStorage.setItem("au-serve-layout", state.layout);
+    render();
+    showToast("Layout: " + layoutMeta().label);
+  }
+
   function renderFooter() {
     const sec = Math.max(5, state.envelope?.refresh_interval_seconds || 30);
     const theme = state.envelope?.theme_tokens?.name || state.envelope?.theme || "";
@@ -533,6 +757,7 @@
       <button type="button" class="footer-btn" id="footer-btn-filter" title="Filter providers (/)"><kbd>/</kbd> filter</button>
       <button type="button" class="footer-btn" id="footer-btn-mode" title="Toggle usage mode (u)"><kbd>u</kbd> <span>${esc(usageModeLabel())}</span></button>
       <button type="button" class="footer-btn" id="footer-btn-refresh" title="Refresh focused account (r) / all (R)"><kbd>r</kbd> refresh</button>
+      <button type="button" class="footer-btn" id="footer-btn-layout" title="Cycle dashboard layout (v)"><kbd>v</kbd> <span>${esc(layoutMeta().label)}</span></button>
       <button type="button" class="footer-btn" id="footer-btn-theme" title="Cycle theme (t)"><kbd>t</kbd> theme</button>
       <span class="grow"></span>
       <span>${esc(theme)}</span>
@@ -550,12 +775,20 @@
     $("footer-btn-theme")?.addEventListener("click", () => {
       cycleThemeOverride();
     });
+    $("footer-btn-layout")?.addEventListener("click", () => {
+      cycleLayout();
+    });
   }
 
   function render() {
+    applyLayout();
     renderHeader();
     renderNav();
-    renderDetail();
+    if (state.layout === "matrix") {
+      renderMatrix();
+    } else {
+      renderDetail();
+    }
     renderFooter();
   }
 
@@ -613,7 +846,7 @@
     if (ev.target && typeof ev.target.matches === "function" && (ev.target.matches("input, textarea, select") || ev.target.isContentEditable)) return;
 
     const key = ev.key;
-    if (["ArrowUp", "ArrowDown", "j", "J", "k", "K", "/", "r", "R", "u", "U", "t", "T"].includes(key)) {
+    if (["ArrowUp", "ArrowDown", "j", "J", "k", "K", "/", "r", "R", "u", "U", "t", "T", "v", "V"].includes(key)) {
       if (ev.target && typeof ev.target.blur === "function" && ev.target !== document.body) {
         ev.target.blur();
       }
@@ -653,6 +886,11 @@
       case "T":
         ev.preventDefault();
         cycleThemeOverride();
+        break;
+      case "v":
+      case "V":
+        ev.preventDefault();
+        cycleLayout();
         break;
       default:
         break;

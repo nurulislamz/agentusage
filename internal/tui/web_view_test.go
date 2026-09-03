@@ -153,6 +153,24 @@ func TestWebProjectorOpenCodeDetailCards(t *testing.T) {
 	if !view.HasGauge {
 		t.Fatal("expected has_gauge for remaining metrics including 0%")
 	}
+	if len(view.UsageLines) < 3 {
+		t.Fatalf("want >=3 usage lines for nav, got %#v", view.UsageLines)
+	}
+	foundMonthlyReset := false
+	for _, line := range view.UsageLines {
+		if strings.Contains(strings.ToLower(line.Label), "month") && line.ResetIn != "" {
+			foundMonthlyReset = true
+		}
+		if line.Percent == nil && line.ResetIn == "" && line.Value == "" {
+			t.Errorf("empty usage line: %#v", line)
+		}
+	}
+	if !foundMonthlyReset {
+		t.Fatalf("expected monthly usage line with reset_in, got %#v", view.UsageLines)
+	}
+	if view.NextReset == "" {
+		t.Fatal("expected next_reset")
+	}
 
 	usage := cardByTitle(view.DetailCards, "Usage")
 	if usage.Title == "" {
@@ -266,6 +284,29 @@ func TestWebProjectorGroupsOpenCodeAccounts(t *testing.T) {
 	}
 	if views[0].ProviderID != "opencode" || views[1].ProviderID != "opencode" {
 		t.Fatalf("expected OpenCode pair first, got %q %q", views[0].ProviderID, views[1].ProviderID)
+	}
+}
+
+func TestShortUsageLabel(t *testing.T) {
+	cases := map[string]string{
+		"Five Hour Limit Remaining": "5h",
+		"Weekly Limit Used":         "Week",
+		"Monthly Subscription":      "Month",
+		"Plan Spend":                "Plan Spend",
+	}
+	for in, want := range cases {
+		if got := shortUsageLabel(in); got != want {
+			t.Errorf("shortUsageLabel(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestResetDurationRankOrdersSoonestFirst(t *testing.T) {
+	if resetDurationRank("5h 45m") >= resetDurationRank("9 days") {
+		t.Fatal("5h 45m should rank sooner than 9 days")
+	}
+	if resetDurationRank("4h59m") >= resetDurationRank("5h45m") {
+		t.Fatal("4h59m should rank sooner than 5h45m")
 	}
 }
 

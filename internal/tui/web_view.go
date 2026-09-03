@@ -54,10 +54,12 @@ type WebAccountView struct {
 	TileLines      []string           `json:"tile_lines"`
 	DetailSections []WebDetailSection `json:"detail_sections"`
 	DetailCards    []WebDetailCard    `json:"detail_cards,omitempty"`
+	UsageLines     []WebUsageLine     `json:"usage_lines,omitempty"`
 	Resets         []WebResetPill     `json:"resets,omitempty"`
 	DailyCost      []core.TimePoint   `json:"daily_cost,omitempty"`
 	CycleSchedule  string             `json:"cycle_schedule,omitempty"`
 	LastRefreshed  string             `json:"last_refreshed,omitempty"`
+	NextReset      string             `json:"next_reset,omitempty"`
 	HasGauge       bool               `json:"has_gauge,omitempty"`
 	HeaderTone     string             `json:"header_tone,omitempty"`
 }
@@ -215,12 +217,14 @@ func (p WebProjector) ProjectSnapshot(snap core.UsageSnapshot, providerName stri
 		TileLines:      tileLines,
 		DetailSections: detailSections,
 		DetailCards:    detailCards,
+		UsageLines:     projectUsageLines(snap, widget, detailCards, now),
 		Resets:         projectResetPills(snap, widget, now),
 		CycleSchedule:  formatCycleResetSchedule(snap, now),
 		LastRefreshed:  formatLastRefreshed(snap.Timestamp, now),
 		HeaderTone:     headerTone(snap),
 		HasGauge:       di.gaugePercent >= 0,
 	}
+	view.NextReset = nextResetFromLines(view.UsageLines, view.Resets)
 	if di.gaugePercent >= 0 {
 		view.GaugePercent = di.gaugePercent
 	}

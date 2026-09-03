@@ -252,6 +252,13 @@ func accountViewFromTUI(v tui.WebAccountView) AccountView {
 		}
 		cards[i] = DetailCard{ID: c.ID, Title: c.Title, Icon: c.Icon, Color: c.Color, Rows: rows}
 	}
+	usage := make([]UsageLine, len(v.UsageLines))
+	for i, l := range v.UsageLines {
+		usage[i] = UsageLine{
+			Label: l.Label, Short: l.Short, Percent: l.Percent, Value: l.Value,
+			Hint: l.Hint, ResetIn: l.ResetIn, Tone: l.Tone, Urgent: l.Urgent,
+		}
+	}
 	return AccountView{
 		Key:            v.Key,
 		ProviderID:     v.ProviderID,
@@ -271,10 +278,12 @@ func accountViewFromTUI(v tui.WebAccountView) AccountView {
 		TileLines:      v.TileLines,
 		DetailSections: sections,
 		DetailCards:    cards,
+		UsageLines:     usage,
 		Resets:         resets,
 		DailyCost:      v.DailyCost,
 		CycleSchedule:  v.CycleSchedule,
 		LastRefreshed:  v.LastRefreshed,
+		NextReset:      v.NextReset,
 		HasGauge:       v.HasGauge,
 		HeaderTone:     v.HeaderTone,
 	}

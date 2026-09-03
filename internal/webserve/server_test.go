@@ -188,6 +188,43 @@ func TestAppJSUsageModeKeyHandler(t *testing.T) {
 	}
 }
 
+func TestAppJSUsageOnlyLayouts(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("/app.js status = %d, want 200", w.Code)
+	}
+	js := w.Body.String()
+	for _, want := range []string{
+		`id: "split"`,
+		`id: "roster"`,
+		`id: "matrix"`,
+		"function usageOnlyCards(",
+		"function renderUsageMeters(",
+		"function renderMatrix(",
+		"function cycleLayout(",
+		`case "v":`,
+		`id="footer-btn-layout"`,
+		"usage_lines",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("app.js missing %q", want)
+		}
+	}
+
+	cssReq := httptest.NewRequest(http.MethodGet, "/app.css", nil)
+	cssW := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(cssW, cssReq)
+	css := cssW.Body.String()
+	for _, want := range []string{".layout-roster", ".layout-matrix", ".meter-reset", ".matrix-row"} {
+		if !strings.Contains(css, want) {
+			t.Errorf("app.css missing %q", want)
+		}
+	}
+}
+
 func TestAppJSRefreshKeyHandlers(t *testing.T) {
 	srv := testServer(t, Options{Demo: true})
 	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
