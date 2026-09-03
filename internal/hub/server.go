@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/observability"
 )
 
 const (
@@ -62,6 +63,8 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		return fmt.Errorf("hub: listen %s: %w", s.addr, err)
 	}
 
+	observability.EmitInfo("hub", "server_start", "addr=%s auth=%t", s.addr, s.AuthEnabled())
+
 	srv := &http.Server{
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -76,6 +79,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
+		observability.EmitInfo("hub", "server_stop", "reason=context_done")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
@@ -93,6 +97,7 @@ func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) bool {
 	header := r.Header.Get("Authorization")
 	const prefix = "Bearer "
 	if !strings.HasPrefix(header, prefix) {
+		observability.EmitWarn("hub", "auth_failed", "path=%s reason=missing_bearer_token", r.URL.Path)
 		w.Header().Set("WWW-Authenticate", `Bearer realm="agentusage-hub"`)
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing bearer token"})
 		return false
@@ -101,6 +106,7 @@ func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) bool {
 	// Constant-time compare so an attacker can't enumerate the token
 	// byte-by-byte via response-timing differences.
 	if subtle.ConstantTimeCompare([]byte(got), []byte(s.authToken)) != 1 {
+		observability.EmitWarn("hub", "auth_failed", "path=%s reason=invalid_token", r.URL.Path)
 		w.Header().Set("WWW-Authenticate", `Bearer realm="agentusage-hub", error="invalid_token"`)
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid bearer token"})
 		return false
@@ -117,32 +123,46 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
 	r.Body = http.MaxBytesReader(w, r.Body, maxPushBodyBytes)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		// MaxBytesReader returns a "http: request body too large" error when
 		// the cap is exceeded; report 413 in that case, 400 otherwise.
 		if strings.Contains(err.Error(), "request body too large") {
+			observability.EmitWarn("hub", "push_rejected", "reason=body_too_large")
 			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
 			return
 		}
+		observability.EmitWarn("hub", "push_rejected", "reason=read_body_failed error=%v", err)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "read body failed"})
 		return
 	}
 	if len(strings.TrimSpace(string(body))) == 0 {
+		observability.EmitWarn("hub", "push_rejected", "reason=empty_body")
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "empty body"})
 		return
 	}
 	var env core.RemoteEnvelope
 	if err := json.Unmarshal(body, &env); err != nil {
+		observability.EmitWarn("hub", "push_rejected", "reason=invalid_json error=%v", err)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
 		return
 	}
 	if strings.TrimSpace(env.Machine) == "" {
+		observability.EmitWarn("hub", "push_rejected", "reason=missing_machine_name")
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "machine name required"})
 		return
 	}
 	s.store.Ingest(env)
+	observability.EmitInfo(
+		"hub",
+		"push_ingested",
+		"machine=%s snapshots=%d duration_ms=%d",
+		env.Machine,
+		len(env.Snapshots),
+		time.Since(start).Milliseconds(),
+	)
 	writeJSON(w, http.StatusOK, pushResponse{OK: true})
 }
 
@@ -154,7 +174,9 @@ func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
-	writeJSON(w, http.StatusOK, s.store.Snapshots())
+	snaps := s.store.Snapshots()
+	observability.EmitInfo("hub", "snapshots_read", "count=%d", len(snaps))
+	writeJSON(w, http.StatusOK, snaps)
 }
 
 // handleHealth is always unauthenticated. It leaks only the list of machine

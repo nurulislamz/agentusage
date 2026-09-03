@@ -13,16 +13,16 @@ Backlog for upcoming infrastructure and UX work.
 
 ### Tasks
 
-- [ ] **Decide scope** — logs only vs logs + traces + metrics; identify which subsystems emit first (daemon, telemetry pipeline, provider polling).
-- [ ] **Add OTel SDK dependencies** — `go.opentelemetry.io/otel`, exporters (OTLP gRPC/HTTP), optional `slog` bridge.
-- [ ] **Create `internal/observability/` package** — bootstrap/shutdown helpers, resource attributes (service name, version from `internal/version`, commit, build date).
-- [ ] **Wire CLI flags / env config** — e.g. `AGENTUSAGE_OTEL_ENDPOINT`, `AGENTUSAGE_OTEL_INSECURE`, service name override; document in README and `configs/example_settings.json` if persisted.
-- [ ] **Migrate structured logging** — bridge `StructuredLogger` to OTel logs (or `slog` + OTel handler) without breaking existing `component=` / `event=` fields.
-- [ ] **Instrument key paths** — daemon server lifecycle, provider fetch latency/errors, telemetry ingest/dedup, hub HTTP handlers.
-- [ ] **Redact sensitive data** — ensure API keys, tokens, cookies, and raw auth headers never appear in log attributes.
-- [ ] **Graceful shutdown** — flush exporters on daemon/TUI exit (signal handlers in `cmd/agentusage`).
-- [ ] **Local dev stack** — optional `docker-compose` snippet with OTel Collector + Jaeger or Grafana Tempo for validation.
-- [ ] **Tests** — unit tests for bootstrap, attribute redaction, and no-op mode when OTel is disabled.
+- [x] **Decide scope** — logs only vs logs + traces + metrics; identify which subsystems emit first (daemon, telemetry pipeline, provider polling).
+- [x] **Add OTel SDK dependencies** — `go.opentelemetry.io/otel`, exporters (OTLP gRPC/HTTP), optional `slog` bridge.
+- [x] **Create `internal/observability/` package** — bootstrap/shutdown helpers, resource attributes (service name, version from `internal/version`, commit, build date).
+- [x] **Wire CLI flags / env config** — e.g. `AGENTUSAGE_OTEL_ENDPOINT`, `AGENTUSAGE_OTEL_INSECURE`, service name override; document in README and `configs/example_settings.json` if persisted.
+- [x] **Migrate structured logging** — bridge `StructuredLogger` to OTel logs (or `slog` + OTel handler) without breaking existing `component=` / `event=` fields.
+- [x] **Instrument key paths** — daemon server lifecycle, provider fetch latency/errors, telemetry ingest/dedup, hub HTTP handlers.
+- [x] **Redact sensitive data** — ensure API keys, tokens, cookies, and raw auth headers never appear in log attributes.
+- [x] **Graceful shutdown** — flush exporters on daemon/TUI exit (signal handlers in `cmd/agentusage`).
+- [x] **Local dev stack** — optional `docker-compose` snippet with OTel Collector + Jaeger or Grafana Tempo for validation.
+- [x] **Tests** — unit tests for bootstrap, attribute redaction, and no-op mode when OTel is disabled.
 
 ---
 

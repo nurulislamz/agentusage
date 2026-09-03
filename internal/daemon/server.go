@@ -19,6 +19,7 @@ import (
 
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/exporter"
+	"github.com/nurulislamz/agentusage/internal/observability"
 	"github.com/nurulislamz/agentusage/internal/providers"
 	"github.com/nurulislamz/agentusage/internal/telemetry"
 )
@@ -117,6 +118,7 @@ func RunServer(cfg Config) error {
 
 	<-ctx.Done()
 	svc.infof("daemon_stop", "reason=signal")
+	_ = observability.Flush(context.Background())
 	return nil
 }
 
@@ -223,7 +225,11 @@ func startService(ctx context.Context, cfg Config) (*Service, error) {
 }
 
 func (s *Service) Close() error {
-	if s == nil || s.store == nil {
+	if s == nil {
+		return nil
+	}
+	_ = observability.Flush(context.Background())
+	if s.store == nil {
 		return nil
 	}
 	return s.store.Close()

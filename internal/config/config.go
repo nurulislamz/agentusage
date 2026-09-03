@@ -219,6 +219,14 @@ type TmuxAlerts struct {
 	Mode                  string  `json:"mode,omitempty"` // message|bell|both|none
 }
 
+type ObservabilityConfig struct {
+	Enabled     bool              `json:"enabled"`
+	Endpoint    string            `json:"endpoint,omitempty"`
+	Insecure    bool              `json:"insecure,omitempty"`
+	ServiceName string            `json:"service_name,omitempty"`
+	Headers     map[string]string `json:"headers,omitempty"`
+}
+
 type Config struct {
 	UI                   UIConfig                      `json:"ui"`
 	Theme                string                        `json:"theme"`
@@ -235,7 +243,9 @@ type Config struct {
 	Hub                  HubConfig                     `json:"hub,omitempty"`
 	Serve                ServeConfig                   `json:"serve,omitempty"`
 	Tmux                 TmuxConfig                    `json:"tmux,omitempty"`
+	Observability        ObservabilityConfig           `json:"observability,omitempty"`
 }
+
 
 // DefaultProviderLinks returns built-in telemetry provider-id to dashboard provider-id mappings.
 //
@@ -874,3 +884,70 @@ func SaveIntegrationStateTo(path string, id string, state IntegrationState) erro
 		cfg.Integrations[id] = state
 	})
 }
+
+// SaveAccount persists a new or updated account configuration into the config file.
+func SaveAccount(acct core.AccountConfig) error {
+	return SaveAccountTo(ConfigPath(), acct)
+}
+
+// SaveAccountTo saves an account configuration to a specific config file path.
+func SaveAccountTo(path string, acct core.AccountConfig) error {
+	accountID := strings.TrimSpace(acct.ID)
+	providerID := strings.TrimSpace(acct.Provider)
+	if accountID == "" || providerID == "" {
+		return fmt.Errorf("save account: account id and provider must be non-empty")
+	}
+
+	return modifyConfig(path, func(cfg *Config) {
+		found := false
+		for i := range cfg.Accounts {
+			if strings.TrimSpace(cfg.Accounts[i].ID) == accountID {
+				found = true
+				if providerID != "" {
+					cfg.Accounts[i].Provider = providerID
+				}
+				if acct.Auth != "" {
+					cfg.Accounts[i].Auth = acct.Auth
+				}
+				if acct.APIKeyEnv != "" {
+					cfg.Accounts[i].APIKeyEnv = acct.APIKeyEnv
+				}
+				if acct.BrowserCookie != nil {
+					cookie := *acct.BrowserCookie
+					cfg.Accounts[i].BrowserCookie = &cookie
+				}
+				break
+			}
+		}
+
+		if !found {
+			newAcct := core.AccountConfig{
+				ID:        accountID,
+				Provider:  providerID,
+				Auth:      acct.Auth,
+				APIKeyEnv: acct.APIKeyEnv,
+			}
+			if acct.BrowserCookie != nil {
+				cookie := *acct.BrowserCookie
+				newAcct.BrowserCookie = &cookie
+			}
+			cfg.Accounts = append(cfg.Accounts, newAcct)
+		}
+
+		// Ensure the account is present and enabled in Dashboard.Providers
+		provFound := false
+		for _, p := range cfg.Dashboard.Providers {
+			if p.AccountID == accountID {
+				provFound = true
+				break
+			}
+		}
+		if !provFound {
+			cfg.Dashboard.Providers = append(cfg.Dashboard.Providers, DashboardProviderConfig{
+				AccountID: accountID,
+				Enabled:   true,
+			})
+		}
+	})
+}
+

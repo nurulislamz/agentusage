@@ -189,6 +189,13 @@
   "serve": {
     "listen_addr": "127.0.0.1:8080"
   },
+  "observability": {
+    "enabled": false,
+    "endpoint": "http://localhost:4318",
+    "insecure": true,
+    "service_name": "agentusage",
+    "headers": {}
+  },
   "integrations": {
     "claude-code-hooks": {
       "installed": true,

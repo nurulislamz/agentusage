@@ -1459,3 +1459,93 @@ func TestSaveTo_PermissionsAndAtomic(t *testing.T) {
 		t.Errorf("expected only settings.json in directory, found: %v", entries)
 	}
 }
+
+func TestSaveAccountTo(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+
+	// 1. Add first account to empty config
+	acct1 := core.AccountConfig{
+		ID:        "openai-work",
+		Provider:  "openai",
+		Auth:      "api_key",
+		APIKeyEnv: "OPENAI_API_KEY",
+	}
+	if err := SaveAccountTo(path, acct1); err != nil {
+		t.Fatalf("SaveAccountTo acct1 failed: %v", err)
+	}
+
+	cfg, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom failed: %v", err)
+	}
+	if len(cfg.Accounts) != 1 {
+		t.Fatalf("expected 1 account, got %d", len(cfg.Accounts))
+	}
+	if cfg.Accounts[0].ID != "openai-work" || cfg.Accounts[0].Provider != "openai" {
+		t.Errorf("unexpected account[0]: %+v", cfg.Accounts[0])
+	}
+	if len(cfg.Dashboard.Providers) != 1 || cfg.Dashboard.Providers[0].AccountID != "openai-work" || !cfg.Dashboard.Providers[0].Enabled {
+		t.Errorf("unexpected dashboard provider: %+v", cfg.Dashboard.Providers)
+	}
+
+	// 2. Add second account with browser cookie
+	acct2 := core.AccountConfig{
+		ID:       "perplexity-session",
+		Provider: "perplexity",
+		Auth:     "browser_session",
+		BrowserCookie: &core.BrowserCookieRef{
+			Domain:     ".perplexity.ai",
+			CookieName: "__Secure-next-auth.session-token",
+		},
+	}
+	if err := SaveAccountTo(path, acct2); err != nil {
+		t.Fatalf("SaveAccountTo acct2 failed: %v", err)
+	}
+
+	cfg, err = LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom failed: %v", err)
+	}
+	if len(cfg.Accounts) != 2 {
+		t.Fatalf("expected 2 accounts, got %d", len(cfg.Accounts))
+	}
+	if cfg.Accounts[1].BrowserCookie == nil || cfg.Accounts[1].BrowserCookie.Domain != ".perplexity.ai" {
+		t.Errorf("unexpected browser cookie: %+v", cfg.Accounts[1].BrowserCookie)
+	}
+
+	// 3. Update existing account
+	acct1Updated := core.AccountConfig{
+		ID:        "openai-work",
+		Provider:  "openai",
+		Auth:      "api_key",
+		APIKeyEnv: "CUSTOM_OPENAI_KEY",
+	}
+	if err := SaveAccountTo(path, acct1Updated); err != nil {
+		t.Fatalf("SaveAccountTo update failed: %v", err)
+	}
+
+	cfg, err = LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom failed: %v", err)
+	}
+	if len(cfg.Accounts) != 2 {
+		t.Fatalf("expected 2 accounts after update, got %d", len(cfg.Accounts))
+	}
+	if cfg.Accounts[0].APIKeyEnv != "CUSTOM_OPENAI_KEY" {
+		t.Errorf("expected updated APIKeyEnv, got %q", cfg.Accounts[0].APIKeyEnv)
+	}
+}
+
+func TestSaveAccountTo_Validation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+
+	if err := SaveAccountTo(path, core.AccountConfig{ID: "", Provider: "openai"}); err == nil {
+		t.Errorf("expected error for empty account ID")
+	}
+	if err := SaveAccountTo(path, core.AccountConfig{ID: "openai", Provider: ""}); err == nil {
+		t.Errorf("expected error for empty provider ID")
+	}
+}
+

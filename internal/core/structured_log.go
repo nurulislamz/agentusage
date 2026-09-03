@@ -1,8 +1,13 @@
 package core
 
 import (
+	"context"
+	"fmt"
 	"log"
+	"log/slog"
 	"strings"
+
+	"github.com/nurulislamz/agentusage/internal/observability"
 )
 
 // StructuredLogger emits log lines in the daemon's `component=X level=Y
@@ -48,11 +53,29 @@ func (l *StructuredLogger) emit(level, event, format string, args ...any) {
 		return
 	}
 	prefix := "component=" + l.component + " level=" + level + " event=" + event
+	var msg string
 	if strings.TrimSpace(format) == "" {
 		log.Print(prefix)
-		return
+		msg = ""
+	} else {
+		msg = fmt.Sprintf(format, args...)
+		log.Printf(prefix+" "+format, args...)
 	}
-	log.Printf(prefix+" "+format, args...)
+
+	if observability.IsEnabled() {
+		var sLevel slog.Level
+		switch strings.ToLower(level) {
+		case "warn", "warning":
+			sLevel = slog.LevelWarn
+		case "error":
+			sLevel = slog.LevelError
+		case "debug":
+			sLevel = slog.LevelDebug
+		default:
+			sLevel = slog.LevelInfo
+		}
+		observability.EmitLog(context.Background(), sLevel, l.component, event, msg)
+	}
 }
 
 func alwaysTrue() bool { return true }

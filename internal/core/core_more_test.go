@@ -1,7 +1,10 @@
 package core
 
 import (
+	"context"
 	"testing"
+
+	"github.com/nurulislamz/agentusage/internal/observability"
 )
 
 func TestStructuredLogger_Methods(t *testing.T) {
@@ -25,12 +28,39 @@ func TestStructuredLogger_Methods(t *testing.T) {
 
 	verboseNil := logger.WithVerbose(nil)
 	verboseNil.Infof("default_event", "should log")
+
+	// 4. Test with observability enabled
+	observability.ResetForTesting()
+	defer observability.ResetForTesting()
+
+	_ = observability.Init(context.Background(), observability.Config{
+		Enabled:     true,
+		Endpoint:    "http://127.0.0.1:4318",
+		Insecure:    true,
+		ServiceName: "agentusage-test",
+	})
+
+	logger.Infof("otel_event", "hello otel %s", "world")
+	logger.Warnf("otel_warn", "warning otel %d", 99)
+	logger.Infof("empty_msg", "")
 }
 
 func TestTracef_And_DebugEnabled(t *testing.T) {
 	// Calling DebugEnabled and Tracef should be safe
 	_ = DebugEnabled()
 	Tracef("trace message with arg %d", 123)
+
+	// Test with observability enabled
+	observability.ResetForTesting()
+	defer observability.ResetForTesting()
+
+	_ = observability.Init(context.Background(), observability.Config{
+		Enabled:     true,
+		Endpoint:    "http://127.0.0.1:4318",
+		Insecure:    true,
+		ServiceName: "agentusage-test",
+	})
+	Tracef("trace message to otel %s", "debug")
 }
 
 func TestSystemClock_Now(t *testing.T) {
