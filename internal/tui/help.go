@@ -356,7 +356,7 @@ func (m Model) splashProgressLines() []string {
 			lines = append(lines, "  "+dim.Render("collect and cache usage data from your providers."))
 			lines = append(lines, "")
 			lines = append(lines, "  "+hint.Render("▸ Press Enter to set it up"))
-			lines = append(lines, "  "+dim.Render("  or run: agentusage telemetry daemon install"))
+			lines = append(lines, "  "+dim.Render("  or run: agentusage daemon install"))
 		}
 
 	case DaemonOutdated:
@@ -389,8 +389,8 @@ func (m Model) splashProgressLines() []string {
 			}
 		}
 		lines = append(lines, "  "+errStyle.Render("✗")+" "+errStyle.Render(msg))
-		lines = append(lines, "  "+dim.Render("Try: agentusage telemetry daemon status"))
-		lines = append(lines, "  "+dim.Render("If needed: agentusage telemetry daemon install"))
+		lines = append(lines, "  "+dim.Render("Try: agentusage daemon status"))
+		lines = append(lines, "  "+dim.Render("If needed: agentusage daemon install"))
 
 	default: // DaemonRunning or any other state.
 		if m.daemon.installDone {

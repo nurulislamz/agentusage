@@ -23,7 +23,7 @@ func ClassifyEnsureError(err error) DaemonState {
 		return DaemonState{
 			Status:      DaemonStatusNotInstalled,
 			Message:     "Background helper is not set up.",
-			InstallHint: "agentusage telemetry daemon install",
+			InstallHint: "agentusage daemon install",
 		}
 	case strings.Contains(msg, "out of date"):
 		return DaemonState{

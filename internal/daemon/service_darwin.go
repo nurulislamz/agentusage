@@ -14,7 +14,7 @@ import (
 func (m ServiceManager) Install() error {
 	if isTransientExecutablePath(m.exePath) {
 		return fmt.Errorf(
-			"refusing to install telemetry daemon service from transient executable %q (likely from `go run`); build a stable binary first, then run `./bin/agentusage telemetry daemon install`",
+			"refusing to install telemetry daemon service from transient executable %q (likely from `go run`); build a stable binary first, then run `./bin/agentusage daemon install`",
 			m.exePath,
 		)
 	}
@@ -144,7 +144,6 @@ func launchdPlist(exePath, socketPath, stdoutPath, stderrPath string, env map[st
 	<key>ProgramArguments</key>
 	<array>
 		<string>%s</string>
-		<string>telemetry</string>
 		<string>daemon</string>
 		<string>run</string>
 		<string>--socket-path</string>

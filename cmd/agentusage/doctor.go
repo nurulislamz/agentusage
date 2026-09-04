@@ -172,7 +172,7 @@ func checkDoctorDaemon(d *doctorChecker, verbose bool) {
 		if manager.IsInstalled() {
 			d.ok("Daemon Service: installed (%s)", manager.Kind)
 		} else {
-			d.info("Daemon Service: not installed")
+			d.info("Daemon Service: not installed (run 'agentusage daemon install')")
 		}
 	}
 

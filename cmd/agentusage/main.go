@@ -77,6 +77,7 @@ func newRootCommand() *cobra.Command {
 	root.AddCommand(newDetectCommand())
 	root.AddCommand(newDoctorCommand())
 	root.AddCommand(newServeCommand())
+	root.AddCommand(newDaemonCommand())
 	root.InitDefaultHelpCmd()
 
 	return root

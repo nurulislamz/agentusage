@@ -27,6 +27,7 @@ var removedCommands = []string{
 }
 
 var retainedCommands = []string{
+	"daemon",
 	"detect",
 	"doctor",
 	"get",
