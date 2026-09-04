@@ -1080,9 +1080,51 @@
       }
       const sel = i === state.selected;
       const refreshing = isViewRefreshing(v);
-      const next = v.next_reset || stripResetPrefix(v.reset_hint || "");
+      let next = v.next_reset || stripResetPrefix(v.reset_hint || "");
+      let resetTitle = "Next reset";
       const lines = usageLines(v);
       const isUrgent = (v.resets || []).some((r) => r.urgent) || lines.some((l) => l.urgent);
+
+      if ((v.provider_id || "") === "antigravity") {
+        let dur = "";
+        const geminiReset = (v.resets || []).find((r) => /gemini/i.test(r.label || "") && /week/i.test(r.label || ""));
+        if (geminiReset && geminiReset.duration) {
+          dur = stripResetPrefix(geminiReset.duration);
+        }
+        if (!dur) {
+          const geminiLine = (v.usage_lines || lines || []).find((l) => {
+            const txt = [l.label, l.short, l.group, l.id, l.key].filter(Boolean).join(" ");
+            return /gemini/i.test(txt) && (/week/i.test(txt) || /\bwk\b/i.test(txt)) && l.reset_in;
+          });
+          if (geminiLine && geminiLine.reset_in) {
+            dur = stripResetPrefix(geminiLine.reset_in);
+          }
+        }
+        if (!next && Array.isArray(v.detail_cards)) {
+          for (const card of v.detail_cards) {
+            const rows = card.rows || [];
+            const timerRow = rows.find((r) =>
+              (r.kind === "timer" || /timers?/i.test(card.title || "")) &&
+              /gemini/i.test(r.label || "") &&
+              /week/i.test(r.label || "")
+            ) || rows.find((r) =>
+              (r.kind === "timer" || /timers?/i.test(card.title || "")) &&
+              /week/i.test(r.label || "")
+            ) || rows.find((r) =>
+              r.kind === "timer"
+            );
+            if (timerRow && timerRow.value) {
+              next = timerRow.value;
+              break;
+            }
+          }
+        }
+        if (dur) {
+          resetTitle = `Gemini Weekly resets in ${dur}`;
+        } else if (next) {
+          resetTitle = `Gemini Weekly reset: ${next}`;
+        }
+      }
 
       const microMeters = lines.slice(0, 2).map((l) => {
         const pct = clampPct(l.percent);
@@ -1104,7 +1146,7 @@
           <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
           <div class="meters">
             ${microMeters || `<span class="dim">${esc(v.summary || "")}</span>`}
-            <span class="next${isUrgent ? " urgent" : ""}" title="Next reset">${esc(next ? "⏱ " + next : "—")}</span>
+            <span class="next${isUrgent ? " urgent" : ""}" title="${esc(resetTitle)}">${esc(next ? "⏱ " + next : "—")}</span>
           </div>
           <span class="mobile-chevron" aria-hidden="true">›</span>
         </button>

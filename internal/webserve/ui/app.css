@@ -460,7 +460,7 @@ code {
   display: inline-block;
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--teal);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

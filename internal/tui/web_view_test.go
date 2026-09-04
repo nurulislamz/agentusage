@@ -480,6 +480,9 @@ func TestAntigravityUsageLinesGroupGeminiAndClaude(t *testing.T) {
 	if resetOnly != 0 {
 		t.Fatalf("reset-only leftover lines = %d, want 0 (shown on gauges) %#v", resetOnly, view.UsageLines)
 	}
+	if view.NextReset != "Sep 05" {
+		t.Fatalf("antigravity NextReset = %q, want \"Sep 05\"", view.NextReset)
+	}
 }
 
 func TestUsageLinesOrder_FiveHourFirstThenWeekly(t *testing.T) {

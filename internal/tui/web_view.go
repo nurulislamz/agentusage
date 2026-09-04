@@ -225,6 +225,14 @@ func (p WebProjector) ProjectSnapshot(snap core.UsageSnapshot, providerName stri
 		HasGauge:       di.gaugePercent >= 0,
 	}
 	view.NextReset = nextResetFromLines(view.UsageLines, view.Resets)
+	if snap.ProviderID == "antigravity" {
+		for _, key := range []string{"quota_gemini_weekly", "quota_gemini_weekly_reset", "quota_gemini_7d"} {
+			if t, ok := snap.Resets[key]; ok && !t.IsZero() {
+				view.NextReset = t.Format("Jan 02")
+				break
+			}
+		}
+	}
 	if di.gaugePercent >= 0 {
 		view.GaugePercent = di.gaugePercent
 	}
