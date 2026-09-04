@@ -31,8 +31,9 @@ func main() {
 	}()
 
 	root := cobra.Command{
-		Use:   "agentusage",
-		Short: "agentUsage is a terminal dashboard for monitoring AI coding tool usage and spend.",
+		Use:     "agentusage",
+		Aliases: []string{"agu", "openusage"},
+		Short:   "agentUsage is a terminal dashboard for monitoring AI coding tool usage and spend.",
 		PersistentPreRun: func(_ *cobra.Command, _ []string) {
 			if cfg, err := config.Load(); err == nil && cfg.Observability.Enabled {
 				_ = observability.Init(context.Background(), observability.Config{
@@ -68,6 +69,8 @@ func main() {
 			fmt.Println(version.String())
 		},
 	})
+	root.AddCommand(newListCommand())
+	root.AddCommand(newGetCommand())
 	root.AddCommand(newTelemetryCommand())
 	root.AddCommand(newIntegrationsCommand())
 	root.AddCommand(newDetectCommand())
