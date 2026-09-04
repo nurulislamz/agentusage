@@ -28,6 +28,8 @@ if [ "${1:-}" = "add" ] || [ "${1:-}" = "new" ] || [ "${1:-}" = "create" ]; then
            "$PROFILE_DIR/.gemini/config/workflows" \
            "$PROFILE_DIR/.gemini/config/global_workflows" \
            "$PROFILE_DIR/.gemini/config/skills" \
+           "$PROFILE_DIR/.gemini/config/agents" \
+           "$PROFILE_DIR/.gemini/config/rules" \
            "$HOME/.local/state/openusage"
 
   # Auto-inject OpenUsage statusline telemetry hook into the box's settings
@@ -40,15 +42,16 @@ if [ "${1:-}" = "add" ] || [ "${1:-}" = "new" ] || [ "${1:-}" = "create" ]; then
 }
 JSON
 
-  # Sync global workflows and skills if available on host
-  if [ -d "$HOME/.gemini/config/workflows" ]; then
-    cp -rn "$HOME/.gemini/config/workflows"/* "$PROFILE_DIR/.gemini/config/workflows/" 2>/dev/null || true
-  fi
-  if [ -d "$HOME/.gemini/config/global_workflows" ]; then
-    cp -rn "$HOME/.gemini/config/global_workflows"/* "$PROFILE_DIR/.gemini/config/global_workflows/" 2>/dev/null || true
-  fi
-  if [ -d "$HOME/.gemini/config/skills" ]; then
-    cp -rn "$HOME/.gemini/config/skills"/* "$PROFILE_DIR/.gemini/config/skills/" 2>/dev/null || true
+  # Sync global workflows, skills, agents, and rules if available on host
+  for src in workflows global_workflows skills agents rules; do
+    if [ -d "$HOME/.gemini/config/$src" ]; then
+      mkdir -p "$PROFILE_DIR/.gemini/config/$src"
+      cp -rn "$HOME/.gemini/config/$src"/. "$PROFILE_DIR/.gemini/config/$src/" 2>/dev/null || true
+    fi
+  done
+  if [ -d "$HOME/.gemini/antigravity-cli/builtin" ]; then
+    mkdir -p "$PROFILE_DIR/.gemini/antigravity-cli/builtin"
+    cp -rn "$HOME/.gemini/antigravity-cli/builtin"/. "$PROFILE_DIR/.gemini/antigravity-cli/builtin/" 2>/dev/null || true
   fi
 
   echo "✨ Created Antigravity box '$BOX_NAME' in $PROFILE_DIR"
@@ -162,15 +165,24 @@ if 'statusLine' not in data or data.get('statusLine', {}).get('command') != 'ope
 " 2>/dev/null || true
 fi
 
-# Re-sync global skills into the box on every launch
-for src in workflows global_workflows skills; do
-  [ -d "$HOME/.gemini/config/$src" ] && \
+# Re-sync global skills, workflows, agents, and rules into the box on every launch
+for src in workflows global_workflows skills agents rules; do
+  if [ -d "$HOME/.gemini/config/$src" ]; then
+    mkdir -p "$PROFILE_DIR/.gemini/config/$src"
     cp -ru "$HOME/.gemini/config/$src"/. "$PROFILE_DIR/.gemini/config/$src/" 2>/dev/null || true
+  fi
 done
+if [ -d "$HOME/.gemini/antigravity-cli/builtin" ]; then
+  mkdir -p "$PROFILE_DIR/.gemini/antigravity-cli/builtin"
+  cp -ru "$HOME/.gemini/antigravity-cli/builtin"/. "$PROFILE_DIR/.gemini/antigravity-cli/builtin/" 2>/dev/null || true
+fi
 
-# Prefer distro bwrap: on Ubuntu 24.04+ Homebrew bwrap lacks the AppArmor
-# profile and fails with "setting up uid map: Permission denied".
-if [ -x /usr/bin/bwrap ]; then
+# Prefer an explicit BWRAP_BIN (tests), then distro bwrap: on Ubuntu 24.04+
+# Homebrew bwrap lacks the AppArmor profile and fails with
+# "setting up uid map: Permission denied".
+if [ -n "${BWRAP_BIN:-}" ] && [ -x "$BWRAP_BIN" ]; then
+  :
+elif [ -x /usr/bin/bwrap ]; then
   BWRAP_BIN=/usr/bin/bwrap
 elif BWRAP_BIN=$(command -v bwrap 2>/dev/null) && [ -n "$BWRAP_BIN" ]; then
   :
@@ -185,12 +197,22 @@ if [ ! -x "$BWRAP_BIN" ]; then
   exit 1
 fi
 
+# nvim and tmux put sockets in XDG_RUNTIME_DIR (/run/user/UID). --ro-bind / /
+# would make that path read-only and break both.
+RUNTIME_BIND=()
+if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR" ]; then
+  RUNTIME_BIND=(--bind "$XDG_RUNTIME_DIR" "$XDG_RUNTIME_DIR")
+elif [ -d "/run/user/$(id -u)" ]; then
+  RUNTIME_BIND=(--bind "/run/user/$(id -u)" "/run/user/$(id -u)")
+fi
+
 exec "$BWRAP_BIN" \
   --ro-bind / / \
-  --dev /dev \
+  --dev-bind /dev /dev \
   --proc /proc \
   --bind /tmp /tmp \
   --bind "$HOME" "$HOME" \
+  "${RUNTIME_BIND[@]}" \
   --bind "$PROFILE_DIR/.gemini" "$HOME/.gemini" \
   --bind "$HOME/.local/state/openusage" "$HOME/.local/state/openusage" \
   --setenv HOME "$HOME" \

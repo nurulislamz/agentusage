@@ -121,6 +121,18 @@ code {
   font-size: var(--text-base);
 }
 
+.empty p.empty-error {
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--danger) 35%, transparent);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  max-width: 520px;
+  word-break: break-word;
+}
+
 .empty[hidden], .splash[hidden], .modal[hidden], .shell[hidden], .filter-bar[hidden], .status-bar[hidden], .fetching[hidden] {
   display: none !important;
 }
@@ -941,6 +953,36 @@ kbd, .footer kbd {
 }
 
 .footer .grow { flex: 1; }
+
+.footer-theme-select {
+  background: var(--surface0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 2px 20px 2px 8px;
+  cursor: pointer;
+  line-height: 1.2;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%237EB8F7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  transition: color var(--motion-fast), background-color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.footer-theme-select:hover {
+  background-color: var(--surface1);
+  color: var(--fg);
+  border-color: var(--border-soft);
+}
+
+.footer-theme-select:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
 
 .filter-bar {
   position: fixed;

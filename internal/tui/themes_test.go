@@ -216,3 +216,45 @@ func TestLoadThemesReportsInvalidThemeFiles(t *testing.T) {
 		t.Fatal("expected bundled themes to remain available")
 	}
 }
+
+func TestCycleThemeBackward(t *testing.T) {
+	savedThemes, savedIdx := snapshotThemeState()
+	defer restoreThemeState(savedThemes, savedIdx)
+
+	if err := LoadThemes(t.TempDir()); err != nil {
+		t.Fatalf("LoadThemes error: %v", err)
+	}
+
+	start := ActiveTheme().Name
+	next := CycleTheme()
+	if next == start && len(AvailableThemes()) > 1 {
+		t.Fatalf("CycleTheme did not change theme: stayed %q", start)
+	}
+
+	back := CycleThemeBackward()
+	if back != start {
+		t.Fatalf("CycleThemeBackward returned %q, want original %q", back, start)
+	}
+
+	// Cycling backward from index 0 should wrap to the last theme
+	SetThemeByName(AvailableThemes()[0].Name)
+	lastTheme := AvailableThemes()[len(AvailableThemes())-1].Name
+	wrapped := CycleThemeBackward()
+	if wrapped != lastTheme {
+		t.Fatalf("CycleThemeBackward from index 0 returned %q, want last theme %q", wrapped, lastTheme)
+	}
+}
+
+func TestAvailableThemeNames(t *testing.T) {
+	names := AvailableThemeNames()
+	themes := AvailableThemes()
+	if len(names) != len(themes) {
+		t.Fatalf("AvailableThemeNames length = %d, want %d", len(names), len(themes))
+	}
+	for i, name := range names {
+		if name != themes[i].Name {
+			t.Fatalf("name[%d] = %q, want %q", i, name, themes[i].Name)
+		}
+	}
+}
+

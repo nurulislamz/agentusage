@@ -490,6 +490,38 @@ func TestThemePOSTReprojectsViews(t *testing.T) {
 	if cycledEnv.Theme == "Nord" {
 		t.Fatalf("expected theme to cycle from Nord, got %q", cycledEnv.Theme)
 	}
+
+	// Backward cycling with {"backward": true} returns back to Nord
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/theme", strings.NewReader(`{"backward":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("theme backward status = %d body %s", w.Code, w.Body.String())
+	}
+	var backEnv Envelope
+	if err := json.NewDecoder(w.Body).Decode(&backEnv); err != nil {
+		t.Fatal(err)
+	}
+	if backEnv.Theme != "Nord" {
+		t.Fatalf("expected theme to cycle back to Nord, got %q", backEnv.Theme)
+	}
+
+	// Backward cycling with query param ?direction=prev
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/theme?direction=prev", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("theme backward query status = %d body %s", w.Code, w.Body.String())
+	}
+	var backQueryEnv Envelope
+	if err := json.NewDecoder(w.Body).Decode(&backQueryEnv); err != nil {
+		t.Fatal(err)
+	}
+	if backQueryEnv.Theme == "Nord" {
+		t.Fatalf("expected theme to cycle back from Nord, got %q", backQueryEnv.Theme)
+	}
 }
 
 func TestTheme_CSRF_OriginProtection(t *testing.T) {
@@ -541,11 +573,17 @@ func TestAppJSThemeKeyHandler(t *testing.T) {
 		desc    string
 		pattern string
 	}{
-		{"theme cycle function", "async function cycleTheme()"},
+		{"theme cycle function", "async function cycleTheme"},
 		{"keydown 't' case", `case "t":`},
 		{"keydown 'T' case", `case "T":`},
 		{"theme toggle call", "cycleTheme()"},
+		{"theme toggle backward call", "cycleTheme(true)"},
 		{"footer button theme", `id="footer-btn-theme"`},
+		{"footer theme select dropdown", `id="footer-theme-select"`},
+		{"theme select change handler", `$("footer-theme-select")?.addEventListener("change"`},
+		{"relative theme API fetch", `fetch("api/v1/theme"`},
+		{"default themes list", "DEFAULT_THEMES"},
+		{"client cycle theme fallback", "cycleThemeClient"},
 		{"color-scheme dark support", `"color-scheme:dark"`},
 		{"color-scheme light support", `"color-scheme:light"`},
 		{"data-theme attribute support", `setAttribute("data-theme"`},
@@ -555,6 +593,99 @@ func TestAppJSThemeKeyHandler(t *testing.T) {
 		if !strings.Contains(body, tc.pattern) {
 			t.Errorf("/app.js missing %s (expected pattern %q)", tc.desc, tc.pattern)
 		}
+	}
+}
+
+func TestGetThemesEndpoint(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	for _, path := range []string{"/api/v1/theme", "/api/v1/themes"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s status = %d, want 200", path, w.Code)
+		}
+		var res struct {
+			Active string   `json:"active"`
+			Themes []string `json:"themes"`
+		}
+		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+			t.Fatalf("%s json decode failed: %v", path, err)
+		}
+		if res.Active == "" {
+			t.Fatalf("%s active theme is empty", path)
+		}
+		if len(res.Themes) < 10 {
+			t.Fatalf("%s themes count = %d, want at least 10", path, len(res.Themes))
+		}
+	}
+}
+
+func TestEnvelopeIncludesAvailableThemes(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/snapshots", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	var env Envelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.AvailableThemes) < 10 {
+		t.Fatalf("available_themes count = %d, want at least 10", len(env.AvailableThemes))
+	}
+}
+
+func TestNoDataReportsErrorMessageAndNoFakeData(t *testing.T) {
+	srv := testServer(t, Options{
+		Demo: false,
+		Collect: func() (Envelope, error) {
+			return Envelope{
+				Source:    "direct",
+				Snapshots: []core.UsageSnapshot{},
+			}, nil
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/snapshots", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	var env Envelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Snapshots) != 0 {
+		t.Fatalf("expected 0 snapshots (no fake data), got %d", len(env.Snapshots))
+	}
+	if len(env.Views) != 0 {
+		t.Fatalf("expected 0 views (no fake data), got %d", len(env.Views))
+	}
+	if env.Error == "" {
+		t.Fatal("expected error message in envelope when no data is available")
+	}
+	if !strings.Contains(strings.ToLower(env.Error), "no usage snapshots") {
+		t.Fatalf("expected descriptive error message, got %q", env.Error)
+	}
+}
+
+func TestEmptyStateNoFakeDataOrDemoSuggestionContract(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("/ status = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	if strings.Contains(body, "agentusage serve --demo") {
+		t.Error("index.html should not suggest running agentusage serve --demo when there is no data")
+	}
+	if !strings.Contains(body, `id="empty-error"`) {
+		t.Error("index.html missing #empty-error container for reporting errors")
 	}
 }
 

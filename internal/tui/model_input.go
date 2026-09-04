@@ -1242,6 +1242,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "t":
 			m.invalidateRenderCaches()
 			return m, m.persistThemeCmd(CycleTheme())
+		case "T":
+			m.invalidateRenderCaches()
+			return m, m.persistThemeCmd(CycleThemeBackward())
 		case "c":
 			if m.screen == screenDashboard {
 				if mdl, cmd, handled := m.toggleHideCostsOverride(); handled {

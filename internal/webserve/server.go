@@ -73,6 +73,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/snapshots", s.handleSnapshots)
 	mux.HandleFunc("/api/v1/usage-mode", s.handleUsageMode)
 	mux.HandleFunc("/api/v1/theme", s.handleTheme)
+	mux.HandleFunc("/api/v1/themes", s.handleTheme)
 	mux.HandleFunc("/api/v1/meta", s.handleMeta)
 
 	sub, err := fs.Sub(uiFS, "ui")
@@ -257,6 +258,17 @@ func (s *Server) handleUsageMode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTheme(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		if !s.checkAuth(w, r) {
+			return
+		}
+		activeName := tui.ActiveTheme().Name
+		writeJSON(w, http.StatusOK, map[string]any{
+			"active": activeName,
+			"themes": tui.AvailableThemeNames(),
+		})
+		return
+	}
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
@@ -269,15 +281,33 @@ func (s *Server) handleTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Theme string `json:"theme"`
+		Theme     string `json:"theme"`
+		Backward  bool   `json:"backward"`
+		Reverse   bool   `json:"reverse"`
+		Prev      bool   `json:"prev"`
+		Direction string `json:"direction"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
 		return
 	}
 	targetTheme := strings.TrimSpace(body.Theme)
+	isBackward := body.Backward || body.Reverse || body.Prev ||
+		strings.EqualFold(strings.TrimSpace(body.Direction), "backward") ||
+		strings.EqualFold(strings.TrimSpace(body.Direction), "prev") ||
+		r.URL.Query().Get("backward") == "1" ||
+		r.URL.Query().Get("backward") == "true" ||
+		r.URL.Query().Get("prev") == "1" ||
+		r.URL.Query().Get("prev") == "true" ||
+		strings.EqualFold(r.URL.Query().Get("direction"), "backward") ||
+		strings.EqualFold(r.URL.Query().Get("direction"), "prev")
+
 	if targetTheme == "" {
-		targetTheme = tui.CycleTheme()
+		if isBackward {
+			targetTheme = tui.CycleThemeBackward()
+		} else {
+			targetTheme = tui.CycleTheme()
+		}
 	} else {
 		_ = tui.SetThemeByName(targetTheme)
 	}
@@ -319,6 +349,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"theme":                    env.Theme,
 		"refresh_interval_seconds": env.RefreshIntervalSeconds,
 		"catalog":                  env.Catalog,
+		"available_themes":         tui.AvailableThemeNames(),
 		"auth_required":            s.AuthEnabled(),
 	})
 }

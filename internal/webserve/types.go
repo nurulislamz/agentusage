@@ -34,6 +34,8 @@ type Envelope struct {
 	UnmappedPhrase         string               `json:"unmapped_phrase,omitempty"`
 	Catalog                []CatalogEntry       `json:"catalog"`
 	ThemeTokens            ThemeTokens          `json:"theme_tokens"`
+	AvailableThemes        []string             `json:"available_themes,omitempty"`
+	Error                  string               `json:"error,omitempty"`
 	Views                  []AccountView        `json:"views"`
 	Snapshots              []core.UsageSnapshot `json:"snapshots"`
 }

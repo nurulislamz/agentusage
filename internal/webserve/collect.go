@@ -3,6 +3,7 @@ package webserve
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -59,6 +60,14 @@ func newCollector(opts Options) *collector {
 		now = func() time.Time { return time.Now().UTC() }
 	}
 	cfg := configOrDefault(opts)
+	if err := tui.LoadThemes(config.ConfigDir()); err != nil && core.DebugEnabled() {
+		log.Printf("serve: theme load: %v", err)
+	}
+	if theme := strings.TrimSpace(opts.Theme); theme != "" {
+		tui.SetThemeByName(theme)
+	} else if theme := strings.TrimSpace(cfg.Theme); theme != "" {
+		tui.SetThemeByName(theme)
+	}
 	tw := core.ParseTimeWindow(cfg.Data.TimeWindow)
 	rt := daemon.NewViewRuntime(nil, daemon.ResolveSocketPath(), core.DebugEnabled())
 	rt.SetTimeWindow(tw)
@@ -349,5 +358,9 @@ func (c *collector) decorate(env Envelope) Envelope {
 	}
 	out.ProviderCount = len(views)
 	out.UnmappedCount, out.UnmappedPhrase = tui.WebUnmappedSummary(out.Snapshots)
+	out.AvailableThemes = tui.AvailableThemeNames()
+	if len(out.Snapshots) == 0 && !c.demo && strings.TrimSpace(out.Error) == "" {
+		out.Error = "No usage snapshots found. No active provider accounts or telemetry records detected."
+	}
 	return out
 }

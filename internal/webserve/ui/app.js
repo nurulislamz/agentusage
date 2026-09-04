@@ -34,9 +34,32 @@
     return "split";
   }
 
+  const DEFAULT_THEMES = [
+    "Deep Space",
+    "Ayu Dark",
+    "Catppuccin Frappé",
+    "Catppuccin Mocha",
+    "Dracula",
+    "Everforest",
+    "Grayscale",
+    "Gruvbox",
+    "Kanagawa",
+    "Midnight Iris",
+    "Monokai",
+    "Neon Dusk",
+    "Nightfox",
+    "Nord",
+    "One Dark",
+    "Rosé Pine",
+    "Solarized Dark",
+    "Synthwave '84",
+    "Tokyo Night",
+  ];
+
   const state = {
     envelope: null,
     views: [],
+    availableThemes: DEFAULT_THEMES,
     selected: 0,
     matrixExpanded: -1,
     inspectOpen: false,
@@ -131,49 +154,74 @@
     ].join(";");
   }
 
-  async function cycleTheme() {
+  async function cycleTheme(reverse = false, themeName = "") {
     try {
-      const res = await fetch("/api/v1/theme", {
+      const body = {};
+      if (themeName) {
+        body.theme = themeName;
+      } else if (reverse) {
+        body.backward = true;
+      }
+      const res = await fetch("api/v1/theme", {
         method: "POST",
         headers: { ...headers(), "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify(body),
       });
       if (res.status === 401) {
         $("token-modal").hidden = false;
         return;
       }
-      if (!res.ok) throw new Error(`theme ${res.status}`);
+      if (!res.ok) {
+        let errMsg = `theme ${res.status}`;
+        try {
+          const data = await res.json();
+          if (data && data.error) errMsg = data.error;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       state.themeOverride = "";
       localStorage.removeItem("au-serve-theme-override");
       applyEnvelope(await res.json());
       render();
-      const themeName = state.envelope?.theme_tokens?.name || state.envelope?.theme || "Theme";
-      showToast(`Theme: ${themeName}`);
+      const current = state.envelope?.theme_tokens?.name || state.envelope?.theme || "Theme";
+      showToast(`Theme: ${current}`);
     } catch (err) {
       console.error(err);
-      cycleThemeOverride();
+      cycleThemeClient(reverse, themeName);
     }
   }
 
-  function cycleThemeOverride() {
-    const order = ["", "light"];
-    const idx = order.indexOf(state.themeOverride);
-    state.themeOverride = order[(idx + 1) % order.length];
-    if (state.themeOverride) {
-      localStorage.setItem("au-serve-theme-override", state.themeOverride);
+  function cycleThemeClient(reverse = false, themeName = "") {
+    const themes = state.availableThemes && state.availableThemes.length > 0
+      ? state.availableThemes
+      : DEFAULT_THEMES;
+    let nextTheme = themeName;
+    if (!nextTheme) {
+      const current = state.themeOverride || state.envelope?.theme_tokens?.name || state.envelope?.theme || themes[0];
+      let idx = themes.findIndex((t) => t.toLowerCase() === current.toLowerCase());
+      if (idx < 0) idx = 0;
+      const nextIdx = reverse
+        ? (idx - 1 + themes.length) % themes.length
+        : (idx + 1) % themes.length;
+      nextTheme = themes[nextIdx];
+    }
+    state.themeOverride = nextTheme;
+    localStorage.setItem("au-serve-theme-override", state.themeOverride);
+    if (state.themeOverride.toLowerCase() === "light") {
+      applyThemeTokens(null, "light");
     } else {
-      localStorage.removeItem("au-serve-theme-override");
+      applyThemeTokens(state.envelope?.theme_tokens, state.themeOverride);
     }
-    applyThemeTokens(state.envelope?.theme_tokens, state.themeOverride);
     renderFooter();
-    const label = state.themeOverride === "light"
-      ? "Light"
-      : (state.envelope?.theme_tokens?.name || state.envelope?.theme || "Default");
-    showToast(`Theme: ${label}`);
+    showToast(`Theme: ${nextTheme}`);
   }
 
-  if (state.themeOverride === "light") {
-    applyThemeTokens(null, "light");
+  if (state.themeOverride) {
+    if (state.themeOverride.toLowerCase() === "light") {
+      applyThemeTokens(null, "light");
+    } else {
+      applyThemeTokens(null, state.themeOverride);
+    }
   }
 
   function filteredViews() {
@@ -282,14 +330,38 @@
   function applyEnvelope(env) {
     state.envelope = env;
     state.views = env.views || [];
-    state.error = null;
+    if (env.available_themes && env.available_themes.length > 0) {
+      state.availableThemes = env.available_themes;
+    }
+    state.error = env.error || null;
     applyThemeTokens(state.envelope.theme_tokens, state.themeOverride);
     const visible = filteredViews();
     if (state.selected >= visible.length) {
       state.selected = Math.max(0, visible.length - 1);
     }
-    showDashboard(state.views.length > 0);
-    if ($("status-bar")) $("status-bar").hidden = true;
+    const hasData = state.views.length > 0;
+    showDashboard(hasData);
+    if (!hasData) {
+      const title = $("empty-title");
+      const errEl = $("empty-error");
+      const hint = $("empty-hint");
+      if (title) title.textContent = state.error ? "Unable to load usage data" : "No usage data found";
+      if (errEl) {
+        errEl.hidden = !state.error;
+        errEl.textContent = state.error || "";
+      }
+      if (hint) {
+        hint.textContent = "Start the telemetry daemon (agentusage telemetry daemon) or configure provider credentials in ~/.config/agentusage/settings.json.";
+      }
+    }
+    if ($("status-bar")) {
+      if (state.error && !hasData) {
+        $("status-bar").hidden = false;
+        $("status-bar").textContent = `Error: ${state.error}`;
+      } else {
+        $("status-bar").hidden = true;
+      }
+    }
   }
 
   function usageMode() {
@@ -340,23 +412,41 @@
         $("token-error").textContent = state.token ? "Invalid token" : "Token required";
         return;
       }
-      if (!res.ok) throw new Error(`snapshots ${res.status}`);
+      if (!res.ok) {
+        let errMsg = `snapshots error (${res.status})`;
+        try {
+          const body = await res.json();
+          if (body && body.error) errMsg = body.error;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       $("token-modal").hidden = true;
       applyEnvelope(await res.json());
     } catch (err) {
-      state.error = String(err);
+      state.error = String(err.message || err);
       if ($("status-bar")) {
         $("status-bar").hidden = false;
-        $("status-bar").textContent = "offline - reconnecting…";
+        $("status-bar").textContent = `Error: ${state.error}`;
       }
       if (state.views.length === 0) {
         showDashboard(false);
         $("empty-state").hidden = false;
         $("splash").hidden = true;
         $("app").hidden = true;
+        const title = $("empty-title");
+        const errEl = $("empty-error");
         const hint = $("empty-hint");
-        if (hint && (err && (err.name === "AbortError" || String(err).includes("abort")))) {
-          hint.textContent = "Timed out loading usage data. Refresh the page, or start the telemetry daemon.";
+        if (title) title.textContent = "Unable to load usage data";
+        if (errEl) {
+          errEl.hidden = false;
+          errEl.textContent = state.error;
+        }
+        if (hint) {
+          if (err && (err.name === "AbortError" || String(err).includes("abort"))) {
+            hint.textContent = "Timed out loading usage data. Refresh the page, or start the telemetry daemon.";
+          } else {
+            hint.textContent = "Start the telemetry daemon (agentusage telemetry daemon) or configure provider credentials.";
+          }
         }
       }
     } finally {
@@ -1779,9 +1869,12 @@
 
   function renderFooter() {
     const sec = Math.max(5, state.envelope?.refresh_interval_seconds || 30);
-    const theme = state.themeOverride === "light"
+    const activeTheme = state.themeOverride === "light"
       ? "Light"
-      : (state.envelope?.theme_tokens?.name || state.envelope?.theme || "");
+      : (state.envelope?.theme_tokens?.name || state.envelope?.theme || state.themeOverride || "Deep Space");
+    const themeList = state.availableThemes && state.availableThemes.length > 0
+      ? state.availableThemes
+      : DEFAULT_THEMES;
     const fetchVisible = state.refreshing ? "" : " hidden";
     const fetchText = esc(state.refreshText || "Fetching...");
     const spinChar = SPINNER[state.animFrame] || "⠋";
@@ -1809,13 +1902,15 @@
         <kbd class="kbd-hint">v</kbd>
         <span class="btn-label">${esc(layoutMeta().label)}</span>
       </button>
-      <button type="button" class="footer-btn" id="footer-btn-theme" title="Cycle theme (t)" aria-label="Toggle theme">
+      <button type="button" class="footer-btn" id="footer-btn-theme" title="Cycle theme (t forward, Shift+t or right-click back)" aria-label="Toggle theme">
         <span class="btn-icon" aria-hidden="true">☼</span>
         <kbd class="kbd-hint">t</kbd>
         <span class="btn-label">theme</span>
       </button>
       <span class="grow footer-desktop-text"></span>
-      <span class="footer-desktop-text">${esc(theme)}</span>
+      <select id="footer-theme-select" class="footer-theme-select" aria-label="Theme selector" title="Theme (pick to change, t forward, Shift+t back)">
+        ${themeList.map((t) => `<option value="${esc(t)}"${t.toLowerCase() === activeTheme.toLowerCase() ? " selected" : ""}>${esc(t)}</option>`).join("")}
+      </select>
     `;
 
     $("footer-btn-filter")?.addEventListener("click", () => {
@@ -1827,8 +1922,15 @@
     $("footer-btn-refresh")?.addEventListener("click", () => {
       load({ manual: true, accountID: filteredViews()[state.selected]?.account_id }).catch(console.error);
     });
-    $("footer-btn-theme")?.addEventListener("click", () => {
-      cycleTheme().catch(console.error);
+    $("footer-btn-theme")?.addEventListener("click", (ev) => {
+      cycleTheme(ev.shiftKey).catch(console.error);
+    });
+    $("footer-btn-theme")?.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      cycleTheme(true).catch(console.error);
+    });
+    $("footer-theme-select")?.addEventListener("change", (e) => {
+      cycleTheme(false, e.target.value).catch(console.error);
     });
     $("footer-btn-layout")?.addEventListener("click", () => {
       cycleLayout();
@@ -1971,9 +2073,12 @@
         cycleUsageMode().catch(console.error);
         break;
       case "t":
-      case "T":
         ev.preventDefault();
         cycleTheme().catch(console.error);
+        break;
+      case "T":
+        ev.preventDefault();
+        cycleTheme(true).catch(console.error);
         break;
       case "v":
       case "V":
@@ -2004,6 +2109,13 @@
     console.error(err);
     $("splash").hidden = true;
     $("empty-state").hidden = false;
+    const title = $("empty-title");
+    const errEl = $("empty-error");
+    if (title) title.textContent = "Unable to load usage data";
+    if (errEl) {
+      errEl.hidden = false;
+      errEl.textContent = String(err.message || err);
+    }
   });
 
   setInterval(() => {

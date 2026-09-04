@@ -75,7 +75,7 @@ type Theme struct {
 // AvailableThemes/ActiveTheme/ActiveThemeIndex for safe catalog access.
 //
 // Locking protocol:
-//   - Write lock (themeMu.Lock): LoadThemes, CycleTheme, SetThemeByName
+//   - Write lock (themeMu.Lock): LoadThemes, CycleTheme, CycleThemeBackward, SetThemeByName
 //   - Read lock (themeMu.RLock): AvailableThemes, ActiveTheme, ActiveThemeIndex
 //   - No lock: applyTheme (always called while write lock is held, or at init)
 var (
@@ -383,6 +383,17 @@ func AvailableThemes() []Theme {
 	return out
 }
 
+func AvailableThemeNames() []string {
+	themeMu.RLock()
+	defer themeMu.RUnlock()
+
+	out := make([]string, len(themes))
+	for i, t := range themes {
+		out[i] = t.Name
+	}
+	return out
+}
+
 func ActiveThemeIndex() int {
 	themeMu.RLock()
 	defer themeMu.RUnlock()
@@ -415,6 +426,18 @@ func CycleTheme() string {
 		return ""
 	}
 	activeThemeIdx = (activeThemeIdx + 1) % len(themes)
+	applyTheme(themes[activeThemeIdx])
+	return themes[activeThemeIdx].Name
+}
+
+func CycleThemeBackward() string {
+	themeMu.Lock()
+	defer themeMu.Unlock()
+
+	if len(themes) == 0 {
+		return ""
+	}
+	activeThemeIdx = (activeThemeIdx - 1 + len(themes)) % len(themes)
 	applyTheme(themes[activeThemeIdx])
 	return themes[activeThemeIdx].Name
 }
