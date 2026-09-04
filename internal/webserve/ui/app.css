@@ -46,6 +46,10 @@
   --motion-fast: 120ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --focus-ring: 0 0 0 1px var(--accent);
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
   color-scheme: dark;
 }
 
@@ -124,7 +128,10 @@ code {
 .shell {
   display: grid;
   grid-template-rows: auto auto 1fr auto auto;
+  min-height: 100vh;
+  min-height: 100dvh;
   height: 100vh;
+  height: 100dvh;
   max-width: 100vw;
   overflow: hidden;
   background: var(--bg);
@@ -212,6 +219,31 @@ code {
   border-radius: var(--radius-sm);
   padding: 2px;
   gap: 2px;
+}
+
+.layout-select-mobile {
+  display: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--surface0);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius-pill);
+  padding: 4px 28px 4px 12px;
+  min-height: 38px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%237EB8F7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.layout-select-mobile:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .layout-btn {
@@ -342,6 +374,12 @@ code {
   position: relative;
   transition: background-color var(--motion-fast), border-color var(--motion-fast);
   align-items: center;
+  touch-action: manipulation;
+}
+
+.mobile-chevron,
+.mobile-back-bar {
+  display: none;
 }
 
 .item:hover {
@@ -862,6 +900,15 @@ kbd, .footer kbd {
   line-height: 1.2;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
   transition: color var(--motion-fast), background-color var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast), box-shadow var(--motion-fast);
+  touch-action: manipulation;
+}
+
+.footer-btn .btn-icon {
+  display: none;
+}
+
+.footer-btn .kbd-hint {
+  display: inline-flex;
 }
 
 .footer-btn:hover {
@@ -898,6 +945,36 @@ kbd, .footer kbd {
   z-index: 40;
   font-family: var(--font-ui);
   font-size: var(--text-base);
+}
+
+.filter-icon {
+  color: var(--accent);
+  font-size: var(--text-sm);
+  display: inline-flex;
+  align-items: center;
+}
+
+.filter-close-btn {
+  background: var(--surface0);
+  border: 1px solid var(--border);
+  color: var(--fg-2);
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: var(--text-xs);
+  transition: all var(--motion-fast);
+  touch-action: manipulation;
+}
+
+.filter-close-btn:hover {
+  background: var(--surface1);
+  color: var(--fg);
 }
 
 .filter-bar label {
@@ -1532,38 +1609,6 @@ kbd, .footer kbd {
   .strip-trend { justify-self: start; }
 }
 
-@media (max-width: 600px) {
-  .header {
-    padding: 6px 10px;
-    gap: 6px;
-  }
-  .layout-btn {
-    padding: 2px 5px;
-    font-size: 10px;
-  }
-  .bento-tiles-grid,
-  .board-grid.board-bars,
-  .board-grid.board-dials {
-    grid-template-columns: 1fr;
-  }
-  .provider-group-box {
-    padding: 10px 10px 12px;
-  }
-  .shell.layout-split .body {
-    grid-template-columns: 1fr;
-  }
-  .shell.layout-split .vsep {
-    display: none !important;
-  }
-  .matrix-table {
-    min-width: 620px;
-  }
-  .matrix-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
@@ -2064,4 +2109,485 @@ kbd, .footer kbd {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+/* ==========================================================================
+   Mobile Ergonomics & Phone Accessibility (OpenDesign & WCAG 2.1 AA)
+   Targeted for mobile viewports <= 640px (iPhone, Pixel, Galaxy, etc.)
+   ========================================================================== */
+
+.mobile-sheet-handle {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  /* 1. Header Ergonomics & Safe Areas */
+  .header {
+    padding-top: max(8px, var(--sat));
+    padding-bottom: 8px;
+    padding-left: max(10px, var(--sal));
+    padding-right: max(10px, var(--sar));
+    min-height: 48px;
+    gap: 8px;
+    overflow-x: hidden;
+  }
+
+  .header-meta {
+    display: none !important;
+  }
+
+  .layout-nav {
+    display: none !important;
+  }
+
+  .layout-select-mobile {
+    display: inline-flex !important;
+  }
+
+  .brand {
+    font-size: var(--text-sm);
+  }
+
+  /* 2. Split Layout: Master-Detail Navigation on Mobile Phone */
+  .shell.layout-split .body {
+    grid-template-columns: 1fr !important;
+  }
+
+  .shell.layout-split .vsep {
+    display: none !important;
+  }
+
+  .shell.layout-split #nav {
+    padding: 6px 10px 16px;
+    max-height: none;
+    height: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .shell.layout-split .item.nav-item {
+    min-height: 52px;
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    display: grid;
+    grid-template-columns: 3px 1fr auto auto;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 3px;
+    touch-action: manipulation;
+  }
+
+  .shell.layout-split .item.nav-item:active {
+    background: var(--surface1);
+    transform: scale(0.99);
+  }
+
+  .shell.layout-split .item.nav-item .mobile-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    grid-column: 4;
+    grid-row: 1 / span 2;
+    color: var(--muted);
+    font-size: 18px;
+    font-weight: 700;
+    padding-left: 4px;
+  }
+
+  .shell.layout-split.mobile-view-detail #nav {
+    display: none !important;
+  }
+
+  .shell.layout-split.mobile-view-detail .panel {
+    display: block !important;
+    padding: 8px 12px 24px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .shell.layout-split:not(.mobile-view-detail) #nav {
+    display: flex !important;
+    width: 100% !important;
+  }
+
+  .shell.layout-split:not(.mobile-view-detail) .panel {
+    display: none !important;
+  }
+
+  .mobile-back-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    margin-bottom: 12px;
+    background: var(--surface0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .mobile-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 0;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 8px;
+    min-height: 44px;
+    border-radius: var(--radius-sm);
+    touch-action: manipulation;
+  }
+
+  .mobile-back-btn:active {
+    background: var(--surface1);
+  }
+
+  .mobile-back-acc {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--fg-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+  }
+
+  /* 3. Matrix View: Smooth Touch Scrolling & Sticky First Column */
+  .matrix-table {
+    min-width: 560px;
+    font-size: 11px;
+  }
+
+  .matrix-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    position: relative;
+    border-radius: var(--radius-md);
+  }
+
+  .matrix-table th:first-child,
+  .matrix-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--surface);
+    box-shadow: 2px 0 6px -1px rgba(0, 0, 0, 0.45);
+    max-width: 140px;
+  }
+
+  .matrix-table th:first-child {
+    background: color-mix(in srgb, var(--p, var(--accent)) 8%, var(--mantle));
+  }
+
+  .matrix-row.selected td:first-child {
+    background: var(--surface1);
+  }
+
+  .matrix-row.expanded td:first-child {
+    background: color-mix(in srgb, var(--p, var(--accent)) 12%, var(--surface1));
+  }
+
+  .matrix-row:hover td:first-child,
+  .matrix-row:active td:first-child {
+    background: var(--surface0);
+  }
+
+  .matrix-row {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .matrix-row td {
+    padding: 10px 10px;
+  }
+
+  .matrix-drawer {
+    grid-template-columns: 1fr !important;
+    padding: 10px 10px;
+    gap: 12px;
+  }
+
+  /* 4. Bento & Board Layouts: Single-Column Responsive Cards */
+  .bento-tiles-grid,
+  .bento-grid,
+  .board-grid.board-bars,
+  .board-grid.board-dials,
+  .board-grid.board-strips {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+
+  .provider-group-box {
+    padding: 10px 10px 12px;
+  }
+
+  .provider-group-header {
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+
+  .bento-tile {
+    min-height: 112px;
+    padding: 12px;
+    touch-action: manipulation;
+  }
+
+  .bento-tile:active {
+    transform: scale(0.98);
+    background: var(--surface1);
+  }
+
+  .bento-quota-row {
+    grid-template-columns: 58px minmax(0, 1fr) 40px;
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .bento-acc-name {
+    font-size: var(--text-base);
+  }
+
+  .agent {
+    min-height: 60px;
+    padding: 10px 12px;
+    touch-action: manipulation;
+  }
+
+  .agent:active {
+    transform: scale(0.98);
+    background: var(--surface1);
+  }
+
+  /* 5. Cockpit & Panel Cards on Mobile */
+  .panel {
+    padding: 10px 12px 20px;
+  }
+
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .hero h1 {
+    font-size: var(--text-lg);
+    word-break: break-word;
+  }
+
+  .hero-right {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .btn-cockpit-refresh {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .subhero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: var(--text-xs);
+  }
+
+  .panel-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+
+  .card {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .timer {
+    grid-template-columns: 10px 1fr auto;
+    gap: 8px 10px;
+    font-size: var(--text-xs);
+  }
+
+  .timer .hint {
+    grid-column: 2 / -1;
+    font-size: 11px;
+  }
+
+  .kv {
+    font-size: var(--text-xs);
+  }
+
+  /* 6. Cockpit Inspection Modal: Native Mobile Bottom Sheet */
+  .inspect-modal {
+    align-items: flex-end;
+    padding: 0;
+    backdrop-filter: blur(8px);
+  }
+
+  .inspect-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 88dvh;
+    border-radius: 16px 16px 0 0 !important;
+    border-bottom: 0 !important;
+    padding: 12px 14px max(24px, var(--sab)) !important;
+    margin: 0 !important;
+    animation: slideUpSheet 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .mobile-sheet-handle {
+    display: block !important;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface2);
+    margin: 0 auto 10px;
+  }
+
+  .inspect-header {
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+
+  .inspect-title {
+    font-size: var(--text-base);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .inspect-close {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: var(--text-base);
+    border-radius: var(--radius-sm);
+    touch-action: manipulation;
+  }
+
+  /* 7. Filter Bar: Top Docking for Mobile Keyboard */
+  .filter-bar {
+    top: max(10px, var(--sat)) !important;
+    bottom: auto !important;
+    left: 8px !important;
+    right: 8px !important;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.75);
+    z-index: 95;
+  }
+
+  .filter-bar input {
+    font-size: 16px !important; /* Prevents iOS auto-zoom on input focus */
+  }
+
+  .filter-hint {
+    display: none !important;
+  }
+
+  .filter-close-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: var(--text-base);
+  }
+
+  /* 8. Mobile Bottom Action Bar */
+  .footer {
+    padding-top: 6px;
+    padding-bottom: max(8px, var(--sab));
+    padding-left: max(8px, var(--sal));
+    padding-right: max(8px, var(--sar));
+    min-height: 58px;
+    background: var(--mantle);
+    border-top: 1px solid var(--border);
+    overflow-x: hidden;
+  }
+
+  .footer-main {
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .footer-desktop-text {
+    display: none !important;
+  }
+
+  .footer-btn {
+    flex: 1;
+    min-height: 46px;
+    min-width: 44px;
+    max-width: 76px;
+    padding: 4px 2px;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px;
+    border-radius: var(--radius-sm);
+    touch-action: manipulation;
+  }
+
+  .footer-btn .kbd-hint {
+    display: none !important;
+  }
+
+  .footer-btn .btn-icon {
+    display: inline-block !important;
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  .footer-btn .btn-label {
+    font-size: 10px;
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: capitalize;
+  }
+
+  .footer-btn:active {
+    transform: scale(0.95);
+    background: var(--surface1);
+  }
+
+  /* 9. Token Modal */
+  .modal-card {
+    width: min(380px, calc(100% - 24px));
+    padding: 16px;
+  }
+
+  .modal-card input {
+    font-size: 16px !important;
+    min-height: 44px;
+  }
+
+  .modal-card button {
+    min-height: 44px;
+  }
+}
+
+@keyframes slideUpSheet {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }

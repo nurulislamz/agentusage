@@ -45,6 +45,7 @@
     token: sessionStorage.getItem("au-serve-token") || "",
     themeOverride: localStorage.getItem("au-serve-theme-override") || "",
     layout: detectDefaultLayout(),
+    splitMobileView: "roster",
     loading: true,
     refreshing: false,
     refreshOpts: null,
@@ -375,14 +376,27 @@
       <span class="brand">agentUsage</span>
       <span id="fetching-header" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
       <span class="spacer"></span>
+      <select id="layout-select-mobile" class="layout-select-mobile" aria-label="Select layout view">
+        ${LAYOUTS.map((l) => `<option value="${esc(l.id)}"${state.layout === l.id ? " selected" : ""}>${esc(l.label)} view</option>`).join("")}
+      </select>
       <nav class="layout-nav" aria-label="Layout view">
         ${LAYOUTS.map((l) => `<button type="button" class="layout-btn${state.layout === l.id ? " active" : ""}" data-layout="${esc(l.id)}" title="${esc(l.hint)}">${esc(l.label)}</button>`).join("")}
       </nav>
       <span class="header-meta">⊞ ${n} agents${filteredNote} · ${esc(meta.label)} · ${esc(meta.hint)}</span>
     `;
+
+    $("layout-select-mobile")?.addEventListener("change", (e) => {
+      state.layout = e.target.value;
+      state.splitMobileView = "roster";
+      localStorage.setItem("au-serve-layout", state.layout);
+      render();
+      showToast("Layout: " + layoutMeta().label);
+    });
+
     $("header").querySelectorAll(".layout-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         state.layout = btn.dataset.layout;
+        state.splitMobileView = "roster";
         localStorage.setItem("au-serve-layout", state.layout);
         render();
         showToast("Layout: " + layoutMeta().label);
@@ -1045,7 +1059,13 @@
   function renderSplitLayout(views, fetchHtml) {
     const nav = $("nav");
     const panel = $("panel");
+    const app = $("app");
     if (!views.length) return;
+
+    if (app) {
+      app.classList.toggle("mobile-view-detail", state.splitMobileView === "detail");
+      app.classList.toggle("mobile-view-roster", state.splitMobileView !== "detail");
+    }
 
     const counts = {};
     views.forEach((v) => { counts[v.provider_id] = (counts[v.provider_id] || 0) + 1; });
@@ -1086,6 +1106,7 @@
             ${microMeters || `<span class="dim">${esc(v.summary || "")}</span>`}
             <span class="next${isUrgent ? " urgent" : ""}" title="Next reset">${esc(next ? "⏱ " + next : "—")}</span>
           </div>
+          <span class="mobile-chevron" aria-hidden="true">›</span>
         </button>
       `;
     });
@@ -1095,6 +1116,7 @@
       nav.querySelectorAll(".nav-item").forEach((el) => {
         el.addEventListener("click", () => {
           state.selected = Number(el.dataset.idx);
+          state.splitMobileView = "detail";
           render();
         });
       });
@@ -1103,10 +1125,25 @@
     }
 
     const selectedView = views[state.selected] || views[0];
+    const mobileBackBar = `
+      <div class="mobile-back-bar">
+        <button type="button" class="mobile-back-btn" id="mobile-back-btn" aria-label="Back to account roster">
+          <span aria-hidden="true">‹</span> Back to Accounts (${views.length})
+        </button>
+        <span class="mobile-back-acc">${esc(selectedView?.account_id || "")}</span>
+      </div>
+    `;
+
     panel.innerHTML = `
+      ${mobileBackBar}
       ${fetchHtml}
       ${renderCockpit(selectedView)}
     `;
+
+    $("mobile-back-btn")?.addEventListener("click", () => {
+      state.splitMobileView = "roster";
+      render();
+    });
 
     panel.querySelectorAll(".btn-cockpit-refresh").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -1480,7 +1517,9 @@
 
     panel.querySelectorAll(".agent").forEach((el) => {
       el.addEventListener("click", () => {
-        state.selected = Number(el.dataset.idx);
+        const idx = Number(el.dataset.idx);
+        state.selected = idx;
+        if (views[idx]) openInspectModal(views[idx]);
         render();
       });
     });
@@ -1545,6 +1584,7 @@
     const ids = LAYOUTS.map((l) => l.id);
     const idx = Math.max(0, ids.indexOf(state.layout));
     state.layout = ids[(idx + 1) % ids.length];
+    state.splitMobileView = "roster";
     localStorage.setItem("au-serve-layout", state.layout);
     render();
     showToast("Layout: " + layoutMeta().label);
@@ -1554,6 +1594,7 @@
     const main = ["split", "matrix", "bento"];
     const idx = main.indexOf(state.layout);
     state.layout = main[(idx + 1) % main.length];
+    state.splitMobileView = "roster";
     localStorage.setItem("au-serve-layout", state.layout);
     render();
     showToast("Layout: " + layoutMeta().label);
@@ -1567,15 +1608,35 @@
     const spinChar = SPINNER[state.animFrame] || "⠋";
     $("footer").innerHTML = `
       <span id="fetching-footer" class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span> <span class="fetching-text">${fetchText}</span></span>
-      <span>auto-refresh ⟳ ${sec}s</span>
-      <span><kbd>j</kbd>/<kbd>k</kbd> move</span>
-      <button type="button" class="footer-btn" id="footer-btn-filter" title="Filter providers (/)"><kbd>/</kbd> filter</button>
-      <button type="button" class="footer-btn" id="footer-btn-mode" title="Toggle usage mode (u)"><kbd>u</kbd> <span>${esc(usageModeLabel())}</span></button>
-      <button type="button" class="footer-btn" id="footer-btn-refresh" title="Refresh focused account (r) / all (R)"><kbd>r</kbd> refresh</button>
-      <button type="button" class="footer-btn" id="footer-btn-layout" title="Cycle dashboard layout (Tab / l / v)"><kbd>v</kbd> <span>${esc(layoutMeta().label)}</span></button>
-      <button type="button" class="footer-btn" id="footer-btn-theme" title="Cycle theme (t)"><kbd>t</kbd> theme</button>
-      <span class="grow"></span>
-      <span>${esc(theme)}</span>
+      <span class="footer-desktop-text">auto-refresh ⟳ ${sec}s</span>
+      <span class="footer-desktop-text"><kbd>j</kbd>/<kbd>k</kbd> move</span>
+      <button type="button" class="footer-btn" id="footer-btn-filter" title="Filter providers (/)" aria-label="Search and filter">
+        <span class="btn-icon" aria-hidden="true">🔍</span>
+        <kbd class="kbd-hint">/</kbd>
+        <span class="btn-label">filter</span>
+      </button>
+      <button type="button" class="footer-btn" id="footer-btn-mode" title="Toggle usage mode (u)" aria-label="Toggle usage mode">
+        <span class="btn-icon" aria-hidden="true">◐</span>
+        <kbd class="kbd-hint">u</kbd>
+        <span class="btn-label">${esc(usageModeLabel())}</span>
+      </button>
+      <button type="button" class="footer-btn" id="footer-btn-refresh" title="Refresh focused account (r) / all (R)" aria-label="Refresh usage data">
+        <span class="btn-icon${state.refreshing ? ' spin' : ''}" aria-hidden="true">⟳</span>
+        <kbd class="kbd-hint">r</kbd>
+        <span class="btn-label">refresh</span>
+      </button>
+      <button type="button" class="footer-btn" id="footer-btn-layout" title="Cycle dashboard layout (Tab / l / v)" aria-label="Cycle layout">
+        <span class="btn-icon" aria-hidden="true">⊞</span>
+        <kbd class="kbd-hint">v</kbd>
+        <span class="btn-label">${esc(layoutMeta().label)}</span>
+      </button>
+      <button type="button" class="footer-btn" id="footer-btn-theme" title="Cycle theme (t)" aria-label="Toggle theme">
+        <span class="btn-icon" aria-hidden="true">☼</span>
+        <kbd class="kbd-hint">t</kbd>
+        <span class="btn-label">theme</span>
+      </button>
+      <span class="grow footer-desktop-text"></span>
+      <span class="footer-desktop-text">${esc(theme)}</span>
     `;
 
     $("footer-btn-filter")?.addEventListener("click", () => {
@@ -1657,6 +1718,10 @@
       ev.preventDefault();
       closeFilter(false);
     }
+  });
+
+  $("filter-close")?.addEventListener("click", () => {
+    closeFilter(true);
   });
 
   document.addEventListener("keydown", (ev) => {
