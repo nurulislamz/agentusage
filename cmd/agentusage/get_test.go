@@ -42,7 +42,23 @@ func TestFindAccount(t *testing.T) {
 		t.Errorf("expected physics to resolve to cursor-physics, got %+v, ok=%v", acct, ok)
 	}
 
-	// 5. Unknown account
+	// 5. Antigravity agy- prefix alias (agy-nurulz -> antigravity-nurulz)
+	acct, ok = findAccount(accounts, "agy-nurulz")
+	if !ok || acct.ID != "antigravity-nurulz" {
+		t.Errorf("expected agy-nurulz to resolve to antigravity-nurulz, got %+v, ok=%v", acct, ok)
+	}
+
+	// 6. Delimiter aliases with slash (cursor/physics -> cursor-physics, agy/nurulz -> antigravity-nurulz)
+	acct, ok = findAccount(accounts, "cursor/physics")
+	if !ok || acct.ID != "cursor-physics" {
+		t.Errorf("expected cursor/physics to resolve to cursor-physics, got %+v, ok=%v", acct, ok)
+	}
+	acct, ok = findAccount(accounts, "agy/nurulz")
+	if !ok || acct.ID != "antigravity-nurulz" {
+		t.Errorf("expected agy/nurulz to resolve to antigravity-nurulz, got %+v, ok=%v", acct, ok)
+	}
+
+	// 7. Unknown account
 	_, ok = findAccount(accounts, "nonexistent-box")
 	if ok {
 		t.Error("expected nonexistent-box to return false")

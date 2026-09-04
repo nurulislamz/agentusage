@@ -215,16 +215,21 @@ func refreshAccessToken(ctx context.Context, refreshToken string, client *http.C
 }
 
 func pingBoxForToken(ctx context.Context, acct core.AccountConfig, reason ...string) error {
-	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 45*time.Second)
-		defer cancel()
-	}
-	box := boxName(acct)
 	reasonStr := "refresh"
 	if len(reason) > 0 && strings.TrimSpace(reason[0]) != "" {
 		reasonStr = reason[0]
 	}
+
+	timeout := 45 * time.Second
+	if reasonStr == "missing_token" {
+		timeout = 5 * time.Second
+	}
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+	box := boxName(acct)
 
 	var cmd *exec.Cmd
 	if box != "" {
@@ -240,9 +245,12 @@ func pingBoxForToken(ctx context.Context, acct core.AccountConfig, reason ...str
 		}
 		cmd = exec.CommandContext(ctx, bin, "-p", "ping")
 	}
+	cmd.Stdin = strings.NewReader("")
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	cmd.Env = core.EnvironWithUserLocalBin(os.Environ())
+	cmd.WaitDelay = 2 * time.Second
+	prepareProcessGroup(cmd)
 
 	start := time.Now()
 	err := cmd.Run()

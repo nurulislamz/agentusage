@@ -15,14 +15,30 @@ type snapshotDispatcher struct {
 	program *tea.Program
 	nextID  atomic.Uint64
 	enrich  func(map[string]core.UsageSnapshot)
+	sendMsg func(tea.Msg)
 }
 
 func (d *snapshotDispatcher) bind(program *tea.Program) {
 	d.program = program
+	if program != nil {
+		d.sendMsg = program.Send
+	}
 }
 
 func (d *snapshotDispatcher) dispatch(frame daemon.SnapshotFrame) {
-	d.send(frame, d.nextID.Add(1))
+	requestID := d.nextID.Add(1)
+	d.send(frame, requestID)
+	if d == nil || d.enrich == nil || len(frame.Snapshots) == 0 {
+		return
+	}
+	go func() {
+		enriched := core.DeepCloneSnapshots(frame.Snapshots)
+		d.enrich(enriched)
+		d.send(daemon.SnapshotFrame{
+			Snapshots:  enriched,
+			TimeWindow: frame.TimeWindow,
+		}, requestID)
+	}()
 }
 
 func (d *snapshotDispatcher) refresh(ctx context.Context, rt *daemon.ViewRuntime, req tui.RefreshRequest) uint64 {
@@ -58,20 +74,17 @@ func (d *snapshotDispatcher) applyEnrich(snaps map[string]core.UsageSnapshot, ac
 }
 
 func (d *snapshotDispatcher) send(frame daemon.SnapshotFrame, requestID uint64) {
-	if d == nil || d.program == nil {
+	if d == nil {
 		return
 	}
-	if len(frame.Snapshots) == 0 {
-		d.program.Send(tui.SnapshotsMsg{
-			TimeWindow: frame.TimeWindow,
-			RequestID:  requestID,
-		})
+	sendFn := d.sendMsg
+	if sendFn == nil && d.program != nil {
+		sendFn = d.program.Send
+	}
+	if sendFn == nil {
 		return
 	}
-	if d.enrich != nil {
-		d.enrich(frame.Snapshots)
-	}
-	d.program.Send(tui.SnapshotsMsg{
+	sendFn(tui.SnapshotsMsg{
 		Snapshots:  frame.Snapshots,
 		TimeWindow: frame.TimeWindow,
 		RequestID:  requestID,

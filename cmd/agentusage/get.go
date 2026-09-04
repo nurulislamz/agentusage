@@ -191,7 +191,26 @@ func findAccount(accounts []core.AccountConfig, target string) (core.AccountConf
 		}
 	}
 
-	// 3. Antigravity box hint match
+	// 3. Antigravity short-name alias: e.g. "agy-chaos" -> "antigravity-chaos"
+	if strings.HasPrefix(strings.ToLower(trimmed), "agy-") {
+		boxName := trimmed[4:]
+		for _, a := range accounts {
+			if strings.EqualFold(a.ID, "antigravity-"+boxName) {
+				return a, true
+			}
+		}
+	}
+
+	// 4. Slash or colon delimiter alias: e.g. "cursor/physics" -> "cursor-physics"
+	if strings.ContainsAny(trimmed, "/:") {
+		normalized := strings.ReplaceAll(trimmed, "/", "-")
+		normalized = strings.ReplaceAll(normalized, ":", "-")
+		if acct, ok := findAccount(accounts, normalized); ok {
+			return acct, true
+		}
+	}
+
+	// 5. Antigravity box hint match
 	for _, a := range accounts {
 		if a.Provider == "antigravity" {
 			if box := a.Hint("box_name", ""); box != "" && strings.EqualFold(box, trimmed) {
@@ -200,7 +219,7 @@ func findAccount(accounts []core.AccountConfig, target string) (core.AccountConf
 		}
 	}
 
-	// 4. Other box name match: e.g. "nurulz" matching "cursor-nurulz" or "opencode-nurulz"
+	// 6. Other box name match: e.g. "nurulz" matching "cursor-nurulz" or "opencode-nurulz"
 	for _, a := range accounts {
 		if box := a.Hint("box_name", ""); box != "" && strings.EqualFold(box, trimmed) {
 			return a, true
