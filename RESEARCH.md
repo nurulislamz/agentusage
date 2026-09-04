@@ -6,29 +6,30 @@ Project: terminal-first local dashboard for AI coding-agent / IDE / LLM API usag
 
 ## Competitors
 
-### Seeded 2026-09-04
+### Seeded 2026-09-04 (v2)
 
-agentUsage's wedge is **one local TUI/dashboard across many coding agents + API keys**, zero config. Competitors are either single-vendor (Claude-only, Cursor-only) or cloud observability for apps you instrument yourself.
+**Primary peer risk:** [OpenUsage.sh](https://openusage.sh) markets nearly the same thesis (local terminal multi-tool quotas/spend/auto-detect). Differentiate on coverage, UX, or packaging — or collide.
 
-| Product | What they do | Vs agentUsage |
-|---|---|---|
-| [ccusage](https://github.com/ryoppippi/ccusage) | Popular local CLI: daily/weekly/monthly/session reports from Claude Code, Codex, OpenCode, Goose, Copilot CLI, Gemini CLI, and more. Blocks report for Claude 5h windows. | Direct OSS peer. agentUsage differentiates on broader auto-detect (Cursor SQLite, IDE agents), richer dashboard UX, quotas/rate-limit probing. |
-| Claude Code `/usage` | Built-in session spend estimate from local tokens × list rates. | Free but session-scoped; resets on `/clear`; no multi-tool view. |
-| Anthropic Console / admin analytics | Org billing, CSV, Enterprise analytics API. | Cloud/org only; not a local multi-agent TUI. |
-| Cursor usage UI + Admin API | In-product spend; Enterprise `/teams/spend`, filtered events, analytics. | First-party Cursor only. |
-| [Cursor Spend Tracker](https://marketplace.visualstudio.com/items?itemName=helper2424.cursor-spend-tracker) | VS Code/Cursor status-bar spend via Admin API. | Cursor-team only; needs admin key. |
-| [ofershap/cursor-usage-tracker](https://github.com/ofershap/cursor-usage-tracker) | Self-hosted Cursor Enterprise spend + anomaly Slack alerts. | Team/finance tool, not local multi-provider autodetection. |
-| [Vantage](https://www.vantage.sh/) Cursor cost reports | FinOps cloud spend including Cursor. | Enterprise FinOps; not terminal-first local. |
-| [Helicone](https://www.helicone.ai/), [Langfuse](https://langfuse.com/) | LLM observability / tracing for apps you instrument. | Wrong layer for CLI agent logs (Langfuse wants spans; Claude Code emits metrics). Useful if agentUsage later exports OTel. |
-| LiteLLM proxy spend / OpenRouter dashboard | Gateway usage and credits for routed API traffic. | Covers API platforms agentUsage already tracks; not coding-agent local logs. |
-| Lineman.io (sponsors ccusage) | Team Claude Code spend visibility / optimization. | Team SaaS for Claude; not open multi-agent local. |
+| Product | Layer | What they do | Vs agentUsage |
+|---|---|---|---|
+| [OpenUsage.sh](https://openusage.sh) ([GitHub](https://github.com/janekbaraniewski/openusage)) | Local multi-tool TUI | Auto-detect agents/keys, quotas, spend, rate limits, burn rate, statusline; 35+ tools. | **Nearest twin.** Treat as #1 peer. |
+| [ccusage](https://github.com/ryoppippi/ccusage) | Local CLI reports | Daily/weekly/monthly/session/blocks from agent logs (Claude, Codex, OpenCode, Goose, Copilot CLI, Gemini, …). | Strong OSS peer on history/reports; thinner live quota dashboard. |
+| ccusage UI dashboards / claude-monitor | Local UI/TUI | HTML or live burn-rate for Claude Code. | Claude-centric niche. |
+| Cursor Spending tab + Admin API | Vendor | Plan pools, spend limits; Enterprise team spend APIs. | Cursor only. |
+| [Cursor Spend Tracker](https://marketplace.visualstudio.com/items?itemName=helper2424.cursor-spend-tracker) | Extension | Status-bar spend via Admin API. | Cursor team only. |
+| [cursor-usage-tracker](https://github.com/ofershap/cursor-usage-tracker) | Self-host team | Cursor Enterprise spend + anomaly Slack alerts. | FinOps for Cursor orgs, not local multi-provider autodetection. |
+| Claude Code `/usage` `/cost`, claude.ai Usage | Vendor | Session/plan bars, 5h blocks. | Anthropic only. |
+| OpenRouter Activity | Vendor / gateway | Credits and model cost analytics. | Hosted gateway billing. |
+| [Helicone](https://www.helicone.ai), [Langfuse](https://langfuse.com) | Cloud/proxy observability | Traces, sessions, cost for instrumented apps. | Wrong layer for raw CLI agent logs; complementary if exporting OTel later. |
+| [LiteLLM](https://docs.litellm.ai) proxy spend | Gateway | Virtual keys, budgets, admin UI. | Org gateway control, not personal agent detector. |
+| Vantage Cursor reports / Lineman.io | FinOps / team SaaS | Cloud spend or Claude team visibility. | Enterprise; not terminal-first local. |
 
-**Positioning notes**
-- Own the narrative: **one pane for every agent on the machine** (ccusage is the main OSS rival to beat on coverage + UX).
-- Cursor + Claude first-party UIs are incomplete by design — use that in marketing.
-- Don't pretend to replace Helicone/Langfuse; complementary for app builders.
+**Positioning**
+- Narrative: **one pane for every agent on the machine**.
+- Beat ccusage on live quotas/rate-limit probing + dashboard UX.
+- Explicitly differentiate from OpenUsage.sh (providers, UX, install path) — same category.
 
-Sources: github.com/ryoppippi/ccusage; ssdnodes Claude spend tools; vantage.sh Cursor costs; marketplace Cursor Spend Tracker; github.com/ofershap/cursor-usage-tracker.
+Sources: openusage.sh; github.com/ryoppippi/ccusage; Cursor/Anthropic docs; Helicone/Langfuse/LiteLLM docs.
 
 ## Open source
 
