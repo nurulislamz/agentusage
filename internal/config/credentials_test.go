@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -237,5 +238,53 @@ func TestSaveSession_PermissionsAndAtomic(t *testing.T) {
 	}
 	if len(entries) != 1 || entries[0].Name() != "credentials.json" {
 		t.Errorf("expected only credentials.json in directory, found: %v", entries)
+	}
+}
+
+func TestSaveCredentialTo_CorruptFileDoesNotWipe(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "credentials.json")
+	if err := os.WriteFile(path, []byte(`{"keys":{"keep-me":"sk-original"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Truncate mid-object so LoadCredentialsFrom fails to parse.
+	if err := os.WriteFile(path, []byte(`{"keys":{"keep-me":"sk-original","other":`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := SaveCredentialTo(path, "new-acct", "sk-new")
+	if err == nil {
+		t.Fatal("SaveCredentialTo on corrupt file: want error, got nil")
+	}
+
+	data, readErr := os.ReadFile(path)
+	if readErr != nil {
+		t.Fatalf("ReadFile: %v", readErr)
+	}
+	if string(data) == "" || !strings.Contains(string(data), "keep-me") {
+		t.Fatalf("corrupt credentials file was overwritten; contents=%q", data)
+	}
+}
+
+func TestSaveSessionTo_CorruptFileDoesNotWipe(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "credentials.json")
+	if err := os.WriteFile(path, []byte(`{"keys":{"keep-me":"sk-original"},"sessions":{`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := SaveSessionTo(path, "sess-acct", BrowserSession{
+		Domain:     "example.com",
+		CookieName: "session",
+		Value:      "cookie-value",
+	})
+	if err == nil {
+		t.Fatal("SaveSessionTo on corrupt file: want error, got nil")
+	}
+
+	data, readErr := os.ReadFile(path)
+	if readErr != nil {
+		t.Fatalf("ReadFile: %v", readErr)
+	}
+	if !strings.Contains(string(data), "keep-me") {
+		t.Fatalf("corrupt credentials file was overwritten; contents=%q", data)
 	}
 }

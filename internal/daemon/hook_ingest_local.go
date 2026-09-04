@@ -39,14 +39,10 @@ func ingestParsedHookLocally(
 		spoolDir = resolved
 	}
 
-	store, err := telemetry.OpenStore(dbPath)
-	if err != nil {
-		return HookResponse{}, fmt.Errorf("open telemetry store: %w", err)
-	}
-	defer store.Close()
-
-	pipeline := telemetry.NewPipeline(store, telemetry.NewSpool(spoolDir))
+	// Spool-only mode must not open the SQLite store: OpenStore unlinks the
+	// -shm file, which races a live daemon writer and can corrupt telemetry.db.
 	if spoolOnly {
+		pipeline := telemetry.NewPipeline(nil, telemetry.NewSpool(spoolDir))
 		enqueued, enqueueErr := pipeline.EnqueueRequests(parsed.Requests)
 		if enqueueErr != nil {
 			return HookResponse{}, fmt.Errorf("enqueue to telemetry spool: %w", enqueueErr)
@@ -54,6 +50,14 @@ func ingestParsedHookLocally(
 		resp.Enqueued = enqueued
 		return resp, nil
 	}
+
+	store, err := telemetry.OpenStore(dbPath)
+	if err != nil {
+		return HookResponse{}, fmt.Errorf("open telemetry store: %w", err)
+	}
+	defer store.Close()
+
+	pipeline := telemetry.NewPipeline(store, telemetry.NewSpool(spoolDir))
 
 	retries := make([]telemetry.IngestRequest, 0, len(parsed.Requests))
 	var firstIngestErr error

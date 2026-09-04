@@ -1,8 +1,11 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -284,6 +287,69 @@ func TestProcessHookSpool_And_Cleanup(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(hookDir, "test.json.tmp")); !os.IsNotExist(err) {
 		t.Error("expected test.json.tmp to be cleaned up")
+	}
+}
+
+func TestProcessHookSpool_KeepsFileOnIngestFailure(t *testing.T) {
+	tempDir := t.TempDir()
+	hookDir := filepath.Join(tempDir, "hooks")
+	if err := os.MkdirAll(hookDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Nil store makes ingestBatch fail for every request.
+	svc := &Service{
+		logThrottle: core.NewLogThrottle(5, time.Minute),
+	}
+
+	validPayload := []byte(`{"hook":"chat.message","timestamp":"2026-02-26T20:00:00Z","input":{"sessionID":"s1","messageID":"m1"},"output":{"usage":{"input_tokens":10,"output_tokens":5}}}`)
+	rawBytes, err := json.Marshal(rawHookFile{
+		Source:    "opencode",
+		AccountID: "work",
+		Payload:   validPayload,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hookPath := filepath.Join(hookDir, "retry-me.json")
+	if err := os.WriteFile(hookPath, rawBytes, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	svc.processHookSpool(context.Background(), hookDir)
+
+	if _, err := os.Stat(hookPath); err != nil {
+		t.Fatalf("expected failed hook spool file to be retained for retry, stat err=%v", err)
+	}
+}
+
+func TestHandleHook_MarksDataIngested(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "telemetry.db")
+	store, err := telemetry.OpenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	svc := &Service{
+		store:       store,
+		pipeline:    telemetry.NewPipeline(store, telemetry.NewSpool(filepath.Join(tempDir, "spool"))),
+		pollKick:    make(chan struct{}, 1),
+		logThrottle: core.NewLogThrottle(5, time.Minute),
+	}
+
+	validPayload := []byte(`{"hook":"chat.message","timestamp":"2026-02-26T20:00:00Z","input":{"sessionID":"sess-1","agent":"main","messageID":"turn-1","variant":"default","model":{"providerID":"openrouter","modelID":"openai/gpt-oss-20b"}},"output":{"message":{"id":"msg-1","sessionID":"sess-1","role":"assistant"},"route":{"provider_name":"DeepInfra"},"usage":{"input_tokens":12,"output_tokens":4,"total_tokens":16,"cost_usd":0.00012}}}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/hook/opencode", bytes.NewReader(validPayload))
+	w := httptest.NewRecorder()
+
+	before := time.Now()
+	svc.handleHook(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+	if !svc.ingestedSince(before) {
+		t.Fatal("handleHook did not mark data ingested after successful ingest")
 	}
 }
 
