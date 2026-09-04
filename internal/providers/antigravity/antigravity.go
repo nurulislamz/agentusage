@@ -142,7 +142,7 @@ func isAuthHTTPError(err error) bool {
 }
 
 func retryAfterAuthError(ctx context.Context, acct core.AccountConfig, baseURL string, client *http.Client, snap *core.UsageSnapshot) (quotaSummaryResponse, error) {
-	if pingErr := pingBoxForToken(ctx, acct); pingErr != nil {
+	if pingErr := pingBoxForToken(ctx, acct, "auth_401_retry"); pingErr != nil {
 		return quotaSummaryResponse{}, pingErr
 	}
 	accessToken, tokenPath, _, retryErr := ensureAccessToken(ctx, acct, client)

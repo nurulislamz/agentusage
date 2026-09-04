@@ -214,13 +214,18 @@ func refreshAccessToken(ctx context.Context, refreshToken string, client *http.C
 	return tok, nil
 }
 
-func pingBoxForToken(ctx context.Context, acct core.AccountConfig) error {
+func pingBoxForToken(ctx context.Context, acct core.AccountConfig, reason ...string) error {
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, 45*time.Second)
 		defer cancel()
 	}
 	box := boxName(acct)
+	reasonStr := "refresh"
+	if len(reason) > 0 && strings.TrimSpace(reason[0]) != "" {
+		reasonStr = reason[0]
+	}
+
 	var cmd *exec.Cmd
 	if box != "" {
 		bin := resolveCLI("agy-box")
@@ -238,7 +243,14 @@ func pingBoxForToken(ctx context.Context, acct core.AccountConfig) error {
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	cmd.Env = core.EnvironWithUserLocalBin(os.Environ())
-	if err := cmd.Run(); err != nil {
+
+	start := time.Now()
+	err := cmd.Run()
+	duration := time.Since(start)
+
+	RecordBoxPing(box, acct.ID, reasonStr, duration, err)
+
+	if err != nil {
 		if box != "" {
 			return fmt.Errorf("agy-box %s -p ping (%s): %w", box, cmd.Path, err)
 		}
@@ -287,7 +299,7 @@ func ensureAccessToken(ctx context.Context, acct core.AccountConfig, client *htt
 			return "", path, false, err
 		}
 		// Missing token file: ping the box to create one.
-		if pingErr := pingBoxForToken(ctx, acct); pingErr != nil {
+		if pingErr := pingBoxForToken(ctx, acct, "missing_token"); pingErr != nil {
 			return "", path, false, fmt.Errorf("missing oauth token and ping failed: %w", pingErr)
 		}
 		payload, err = load()
@@ -319,7 +331,13 @@ func ensureAccessToken(ctx context.Context, acct core.AccountConfig, client *htt
 		_ = refreshErr
 	}
 
-	if pingErr := pingBoxForToken(ctx, acct); pingErr != nil {
+	reasonStr := "token_expired"
+	if refreshTok == "" {
+		reasonStr = "no_refresh_token"
+	} else {
+		reasonStr = "refresh_failed"
+	}
+	if pingErr := pingBoxForToken(ctx, acct, reasonStr); pingErr != nil {
 		if refreshTok == "" {
 			return "", path, false, fmt.Errorf("no refresh token and ping failed: %w", pingErr)
 		}
