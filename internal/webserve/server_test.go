@@ -677,6 +677,7 @@ func TestNewServerRejectsInvalidBasePath(t *testing.T) {
 }
 
 func TestMetricsEndpoint(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	antigravity.ResetMetricsForTesting()
 	antigravity.RecordBoxPing("chaos", "antigravity-chaos", "missing_token", 120*time.Millisecond, nil)
 

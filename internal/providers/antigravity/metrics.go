@@ -1,6 +1,7 @@
 package antigravity
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -82,15 +83,105 @@ func RecordBoxPing(box, accountID, reason string, duration time.Duration, err er
 	}
 }
 
+func syncFromDiskLog(pings map[string]int64, durations map[string]float64, lastTimes map[string]int64, lastStatus map[string]int) {
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		return
+	}
+	logFile := filepath.Join(home, ".local", "state", "agentusage", "agy-pings.log")
+	f, err := os.Open(logFile)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) < 5 {
+			continue
+		}
+		tsStr := parts[0]
+		parsedTs, _ := time.Parse(time.RFC3339, tsStr)
+
+		var box, acct, reason, status string
+		var durationMs int64
+		for _, part := range parts[1:] {
+			if strings.HasPrefix(part, "box=") {
+				box = strings.TrimPrefix(part, "box=")
+			} else if strings.HasPrefix(part, "account=") {
+				acct = strings.TrimPrefix(part, "account=")
+			} else if strings.HasPrefix(part, "reason=") {
+				reason = strings.TrimPrefix(part, "reason=")
+			} else if strings.HasPrefix(part, "status=") {
+				status = strings.TrimPrefix(part, "status=")
+			} else if strings.HasPrefix(part, "duration_ms=") {
+				fmt.Sscanf(strings.TrimPrefix(part, "duration_ms="), "%d", &durationMs)
+			}
+		}
+		if box == "" {
+			box = "default"
+		}
+		if acct == "" {
+			acct = "antigravity"
+		}
+		if reason == "" {
+			reason = "unknown"
+		}
+		if status == "" {
+			status = "success"
+		}
+		statusVal := 0
+		if status == "success" {
+			statusVal = 1
+		}
+
+		key := fmt.Sprintf("%s|%s|%s|%s", box, acct, reason, status)
+		pings[key]++
+		durations[box] = float64(durationMs) / 1000.0
+		if parsedTs.Unix() >= lastTimes[box] {
+			lastTimes[box] = parsedTs.Unix()
+			lastStatus[box] = statusVal
+		}
+	}
+}
+
 // WritePrometheusMetrics serializes recorded agy-box metrics to w in Prometheus format.
 func WritePrometheusMetrics(w io.Writer) {
+	// Replay from persistent log to merge metrics across processes
+	pings := make(map[string]int64)
+	durations := make(map[string]float64)
+	lastTimes := make(map[string]int64)
+	lastStatuses := make(map[string]int)
+
+	syncFromDiskLog(pings, durations, lastTimes, lastStatuses)
+
 	pingMetrics.mu.RLock()
-	defer pingMetrics.mu.RUnlock()
+	// Merge in-memory metrics (takes precedence for recent live counts if file wasn't written)
+	for k, v := range pingMetrics.pingsByLabel {
+		if _, exists := pings[k]; !exists {
+			pings[k] = v
+		}
+	}
+	for b, d := range pingMetrics.durations {
+		durations[b] = d
+	}
+	for b, t := range pingMetrics.lastPingTime {
+		if t >= lastTimes[b] {
+			lastTimes[b] = t
+			lastStatuses[b] = pingMetrics.lastStatus[b]
+		}
+	}
+	pingMetrics.mu.RUnlock()
 
 	fmt.Fprintln(w, "# HELP agy_box_pings_total Total count of agy-box ping invocations")
 	fmt.Fprintln(w, "# TYPE agy_box_pings_total counter")
-	keys := make([]string, 0, len(pingMetrics.pingsByLabel))
-	for k := range pingMetrics.pingsByLabel {
+	keys := make([]string, 0, len(pings))
+	for k := range pings {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -98,25 +189,25 @@ func WritePrometheusMetrics(w io.Writer) {
 		parts := strings.Split(k, "|")
 		if len(parts) == 4 {
 			fmt.Fprintf(w, "agy_box_pings_total{box=%q,account_id=%q,reason=%q,status=%q} %d\n",
-				parts[0], parts[1], parts[2], parts[3], pingMetrics.pingsByLabel[k])
+				parts[0], parts[1], parts[2], parts[3], pings[k])
 		}
 	}
 
 	fmt.Fprintln(w, "# HELP agy_box_ping_duration_seconds Duration of last agy-box ping in seconds")
 	fmt.Fprintln(w, "# TYPE agy_box_ping_duration_seconds gauge")
-	boxes := make([]string, 0, len(pingMetrics.durations))
-	for b := range pingMetrics.durations {
+	boxes := make([]string, 0, len(durations))
+	for b := range durations {
 		boxes = append(boxes, b)
 	}
 	sort.Strings(boxes)
 	for _, b := range boxes {
-		fmt.Fprintf(w, "agy_box_ping_duration_seconds{box=%q} %.4f\n", b, pingMetrics.durations[b])
+		fmt.Fprintf(w, "agy_box_ping_duration_seconds{box=%q} %.4f\n", b, durations[b])
 	}
 
 	fmt.Fprintln(w, "# HELP agy_box_last_ping_timestamp_seconds Unix timestamp of last agy-box ping")
 	fmt.Fprintln(w, "# TYPE agy_box_last_ping_timestamp_seconds gauge")
 	for _, b := range boxes {
-		if ts, ok := pingMetrics.lastPingTime[b]; ok {
+		if ts, ok := lastTimes[b]; ok && ts > 0 {
 			fmt.Fprintf(w, "agy_box_last_ping_timestamp_seconds{box=%q} %d\n", b, ts)
 		}
 	}
@@ -124,7 +215,7 @@ func WritePrometheusMetrics(w io.Writer) {
 	fmt.Fprintln(w, "# HELP agy_box_last_ping_status Status of last agy-box ping (1=success, 0=error)")
 	fmt.Fprintln(w, "# TYPE agy_box_last_ping_status gauge")
 	for _, b := range boxes {
-		if st, ok := pingMetrics.lastStatus[b]; ok {
+		if st, ok := lastStatuses[b]; ok {
 			fmt.Fprintf(w, "agy_box_last_ping_status{box=%q} %d\n", b, st)
 		}
 	}

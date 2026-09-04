@@ -9,6 +9,8 @@ import (
 )
 
 func TestRecordBoxPing_AndWritePrometheus(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
 	ResetMetricsForTesting()
 
 	RecordBoxPing("chaos", "antigravity-chaos", "missing_token", 250*time.Millisecond, nil)
