@@ -258,6 +258,18 @@ code {
   cursor: pointer;
   transition: all var(--motion-fast);
   line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.layout-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.layout-label {
+  line-height: 1.2;
 }
 
 .layout-btn:hover {
@@ -378,7 +390,8 @@ code {
 }
 
 .mobile-chevron,
-.mobile-back-bar {
+.mobile-back-bar,
+.mobile-pager {
   display: none;
 }
 
@@ -2137,11 +2150,50 @@ kbd, .footer kbd {
   }
 
   .layout-nav {
-    display: none !important;
+    display: flex !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 6px;
+    padding: 2px 4px;
+    min-width: 0;
+    max-width: 100%;
+    background: var(--surface0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+  }
+
+  .layout-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .layout-select-mobile {
-    display: inline-flex !important;
+    display: none !important;
+  }
+
+  .layout-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 6px 12px;
+    font-size: var(--text-xs);
+    border-radius: var(--radius-pill);
+    white-space: nowrap;
+    touch-action: manipulation;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .layout-btn.active {
+    background: var(--accent);
+    color: var(--accent-on);
+    font-weight: 700;
+  }
+
+  .layout-btn .layout-icon {
+    font-size: 13px;
   }
 
   .brand {
@@ -2251,6 +2303,44 @@ kbd, .footer kbd {
     background: var(--surface1);
   }
 
+  .mobile-pager {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+    background: var(--surface1);
+    border-radius: var(--radius-pill);
+    padding: 2px 4px;
+  }
+
+  .mobile-pager-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 0;
+    color: var(--accent);
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    border-radius: var(--radius-pill);
+    touch-action: manipulation;
+  }
+
+  .mobile-pager-btn:active {
+    background: var(--surface2);
+  }
+
+  .mobile-pager-count {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--fg-2);
+    font-weight: 600;
+    padding: 0 4px;
+    user-select: none;
+  }
+
   .mobile-back-acc {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
@@ -2258,7 +2348,7 @@ kbd, .footer kbd {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 140px;
+    max-width: 120px;
   }
 
   /* 3. Matrix View: Smooth Touch Scrolling & Sticky First Column */
@@ -2305,6 +2395,16 @@ kbd, .footer kbd {
   .matrix-row {
     min-height: 44px;
     touch-action: manipulation;
+    cursor: pointer;
+    transition: background var(--motion-fast);
+  }
+
+  .matrix-row:active {
+    background: var(--surface1) !important;
+  }
+
+  .matrix-row:active td:first-child {
+    background: var(--surface1) !important;
   }
 
   .matrix-row td {
@@ -2442,6 +2542,7 @@ kbd, .footer kbd {
     border-radius: 16px 16px 0 0 !important;
     border-bottom: 0 !important;
     padding: 12px 14px max(24px, var(--sab)) !important;
+    padding-bottom: max(24px, var(--sab)) !important;
     margin: 0 !important;
     animation: slideUpSheet 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -2453,11 +2554,14 @@ kbd, .footer kbd {
     border-radius: 2px;
     background: var(--surface2);
     margin: 0 auto 10px;
+    cursor: grab;
+    touch-action: none;
   }
 
   .inspect-header {
     padding-bottom: 8px;
     margin-bottom: 4px;
+    touch-action: none;
   }
 
   .inspect-title {
