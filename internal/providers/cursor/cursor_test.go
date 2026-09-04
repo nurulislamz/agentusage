@@ -662,7 +662,8 @@ func TestEnrichSnapshots_PreservesTelemetryCollections(t *testing.T) {
 		Provider: "cursor",
 		Token:    "test-jwt",
 		ProviderPaths: map[string]string{
-			"state_db": filepath.Join(t.TempDir(), "missing.vscdb"),
+			"status_file": filepath.Join(t.TempDir(), "missing-status.json"),
+			"state_db":    filepath.Join(t.TempDir(), "missing.vscdb"),
 		},
 	}}, snaps)
 

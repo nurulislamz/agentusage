@@ -38,7 +38,20 @@ func (m Model) renderDashboardContent(w, contentH int) string {
 	if m.mode == modeDetail {
 		return m.renderDetailPanel(w, contentH)
 	}
-	return m.renderSplitPanes(w, contentH)
+	switch m.activeDashboardView() {
+	case dashboardViewMatrix:
+		return m.renderMatrixView(w, contentH)
+	case dashboardViewBento:
+		return m.renderBentoView(w, contentH)
+	case dashboardViewBars:
+		return m.renderBarsView(w, contentH)
+	case dashboardViewDials:
+		return m.renderDialsView(w, contentH)
+	case dashboardViewStrips:
+		return m.renderStripsView(w, contentH)
+	default:
+		return m.renderSplitPanes(w, contentH)
+	}
 }
 
 func (m Model) renderHeader(w int) string {
@@ -242,7 +255,7 @@ func (m Model) renderFooterStatusLine(w int) string {
 		return " " + yellowStyle.Render(msg)
 	}
 
-	return " " + dimStyle.Render("auto-refresh ⟳ "+formatDurationShort(m.refreshInterval)+" · p menu · u mode · "+refreshFooterHint()+" · ? help")
+	return " " + dimStyle.Render("auto-refresh ⟳ "+formatDurationShort(m.refreshInterval)+" · p menu · v layout · u mode · "+refreshFooterHint()+" · ? help")
 }
 
 func (m Model) hasAppUpdateNotice() bool {

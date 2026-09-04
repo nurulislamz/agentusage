@@ -290,7 +290,7 @@ func (m Model) renderListItemWithGroup(snap core.UsageSnapshot, selected bool, i
 	}
 	line1 := namePart + strings.Repeat(" ", gapLen) + rightPart
 
-	summaryLine := m.renderListSummaryRow(snap, di, w)
+	summaryLine := m.renderListSubmenuRow(snap, di, w)
 
 	sepStyle := surface1Style
 	if inActiveGroup || selected {
@@ -322,6 +322,105 @@ func (m Model) renderListItemWithGroup(snap core.UsageSnapshot, selected bool, i
 }
 
 const sidebarSummaryMinWidth = 7 // room for e.g. "93.00%"
+
+func (m Model) renderListSubmenuRow(snap core.UsageSnapshot, di providerDisplayInfo, w int) string {
+	now := m.viewNow()
+	widget := dashboardWidget(snap.ProviderID)
+	hideCosts := m.resolveHideCosts(snap)
+	cards := projectDetailCards(snap, widget, w, m.warnThreshold, m.critThreshold, m.timeWindow, hideCosts, now, m.usageMode)
+	lines := projectUsageLines(snap, widget, cards, now)
+
+	if len(lines) == 0 && di.gaugePercent >= 0 {
+		pct := di.gaugePercent
+		lines = []WebUsageLine{{
+			Label:   "Usage",
+			Short:   "Usage",
+			Percent: &pct,
+			Value:   di.summary,
+			Tone:    quotaTone(pct, m.isUsageModeUsed()),
+		}}
+	}
+
+	var quotaLines []WebUsageLine
+	for _, l := range lines {
+		if quotaWindowPriority(l) < 10 {
+			quotaLines = append(quotaLines, l)
+		}
+	}
+
+	if len(quotaLines) == 0 {
+		return m.renderListSummaryRow(snap, di, w)
+	}
+
+	var meterParts []string
+	for _, l := range quotaLines[:min(2, len(quotaLines))] {
+		lbl := l.Short
+		if lbl == "" {
+			lbl = l.Label
+		}
+		if len(lbl) > 5 {
+			lbl = lbl[:4] + "…"
+		}
+		if l.Percent != nil {
+			pct := *l.Percent
+			toneCol := toneLipglossColor(l.Tone)
+			bar := renderSubmenuMiniBar(pct, 4, toneCol)
+			pctStr := lipgloss.NewStyle().Foreground(toneCol).Bold(true).Render(fmt.Sprintf("%3.0f%%", pct))
+			meterParts = append(meterParts, fmt.Sprintf("%s %s %s", lbl, bar, pctStr))
+		} else if l.Value != "" {
+			val := l.Value
+			if len(val) > 8 {
+				val = val[:7] + "…"
+			}
+			meterParts = append(meterParts, fmt.Sprintf("%s %s", lbl, val))
+		}
+	}
+
+	if len(meterParts) == 0 {
+		return m.renderListSummaryRow(snap, di, w)
+	}
+
+	next := nextResetFromLines(lines, nil)
+	if next == "" {
+		if at, hasReset := sidebarCycleResetAt(snap); hasReset {
+			next = formatCycleResetIn(at, now)
+		}
+	}
+	var resetStr string
+	if next != "" {
+		trimmed := strings.TrimPrefix(next, "in ")
+		trimmed = strings.TrimPrefix(trimmed, "⏱ ")
+		resetStr = tileCycleResetStyle.Render("⏱ in " + trimmed)
+	}
+
+	prefix := "   "
+	availW := w - 4
+
+	if len(meterParts) == 2 && resetStr != "" {
+		cand := prefix + meterParts[0] + "  " + meterParts[1] + "  " + resetStr
+		if lipgloss.Width(cand) <= availW {
+			return cand
+		}
+	}
+	if len(meterParts) >= 1 && resetStr != "" {
+		cand := prefix + meterParts[0] + "  " + resetStr
+		if lipgloss.Width(cand) <= availW {
+			return cand
+		}
+	}
+	if len(meterParts) == 2 {
+		cand := prefix + meterParts[0] + "  " + meterParts[1]
+		if lipgloss.Width(cand) <= availW {
+			return cand
+		}
+	}
+	cand := prefix + meterParts[0]
+	if lipgloss.Width(cand) <= availW {
+		return cand
+	}
+
+	return m.renderListSummaryRow(snap, di, w)
+}
 
 func (m Model) renderListSummaryRow(snap core.UsageSnapshot, di providerDisplayInfo, w int) string {
 	now := m.viewNow()
@@ -412,8 +511,7 @@ func (m Model) renderDetailPanel(w, h int) string {
 	}
 
 	snap := m.snapshots[ids[m.cursor]]
-	activeTab := clamp(m.detailTab, 0, len(DetailTabs(snap))-1)
-	content := m.cachedDetailContent(ids[m.cursor], snap, w-2, activeTab)
+	content := m.renderCockpit(snap, w-2)
 	if m.refreshing {
 		content = lipgloss.NewStyle().Foreground(colorAccent).Bold(true).Render("  "+m.renderFetchingStatus()) + "\n" + content
 	}

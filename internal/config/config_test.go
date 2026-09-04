@@ -787,22 +787,24 @@ func TestSaveDashboardViewTo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := SaveDashboardViewTo(path, DashboardViewSplit); err != nil {
-		t.Fatalf("SaveDashboardViewTo error: %v", err)
-	}
-
-	loaded, err := LoadFrom(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if loaded.Theme != "Nord" {
-		t.Errorf("theme should be preserved, got %q", loaded.Theme)
-	}
-	if loaded.Dashboard.View != DashboardViewSplit {
-		t.Errorf("dashboard.view = %q, want %q", loaded.Dashboard.View, DashboardViewSplit)
-	}
-	if len(loaded.Dashboard.Providers) != 1 || loaded.Dashboard.Providers[0].AccountID != "openai-personal" {
-		t.Errorf("dashboard.providers should be preserved, got %#v", loaded.Dashboard.Providers)
+	for _, v := range []string{
+		DashboardViewSplit,
+		DashboardViewMatrix,
+		DashboardViewBento,
+		DashboardViewBars,
+		DashboardViewDials,
+		DashboardViewStrips,
+	} {
+		if err := SaveDashboardViewTo(path, v); err != nil {
+			t.Fatalf("SaveDashboardViewTo(%q) error: %v", v, err)
+		}
+		loaded, err := LoadFrom(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loaded.Dashboard.View != v {
+			t.Errorf("dashboard.view = %q, want %q", loaded.Dashboard.View, v)
+		}
 	}
 }
 

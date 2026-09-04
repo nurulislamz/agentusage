@@ -55,6 +55,11 @@ const (
 	DashboardViewTabs    = "tabs"
 	DashboardViewSplit   = "split"
 	DashboardViewCompare = "compare"
+	DashboardViewMatrix  = "matrix"
+	DashboardViewBento   = "bento"
+	DashboardViewBars    = "bars"
+	DashboardViewDials   = "dials"
+	DashboardViewStrips  = "strips"
 
 	UsageModeRemaining = "remaining"
 	UsageModeUsed      = "used"
@@ -534,7 +539,12 @@ func normalizeDashboardProviders(in []DashboardProviderConfig) []DashboardProvid
 }
 
 func normalizeDashboardView(view string) string {
-	return DashboardViewSplit
+	switch strings.ToLower(strings.TrimSpace(view)) {
+	case DashboardViewSplit, DashboardViewMatrix, DashboardViewBento, DashboardViewBars, DashboardViewDials, DashboardViewStrips:
+		return strings.ToLower(strings.TrimSpace(view))
+	default:
+		return DashboardViewSplit
+	}
 }
 
 func normalizeDashboardUsageMode(mode string) string {

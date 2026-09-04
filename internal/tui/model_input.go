@@ -872,13 +872,36 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.settings.tab = settingsTabProviders
 			return m, nil
 
+		case "v":
+			if m.screen == screenDashboard {
+				next := m.nextDashboardView(1)
+				m.setDashboardView(next)
+				return m, m.persistDashboardViewCmd()
+			}
+		case "V":
+			if m.screen == screenDashboard {
+				next := m.nextDashboardView(-1)
+				m.setDashboardView(next)
+				return m, m.persistDashboardViewCmd()
+			}
+
 		case "tab":
+			if m.screen == screenDashboard && m.mode != modeDetail {
+				next := m.nextDashboardView(1)
+				m.setDashboardView(next)
+				return m, m.persistDashboardViewCmd()
+			}
 			m.screen = m.nextScreen(1)
 			m.mode = modeList
 			m.detailOffset = 0
 			m.tileOffset = 0
 			return m, nil
 		case "shift+tab":
+			if m.screen == screenDashboard && m.mode != modeDetail {
+				next := m.nextDashboardView(-1)
+				m.setDashboardView(next)
+				return m, m.persistDashboardViewCmd()
+			}
 			m.screen = m.nextScreen(-1)
 			m.mode = modeList
 			m.detailOffset = 0
