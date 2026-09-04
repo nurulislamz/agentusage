@@ -30,7 +30,15 @@ func main() {
 		_ = observability.Shutdown(context.Background())
 	}()
 
-	root := cobra.Command{
+	root := newRootCommand()
+
+	if err := root.Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func newRootCommand() *cobra.Command {
+	root := &cobra.Command{
 		Use:     "agentusage",
 		Aliases: []string{"agu", "openusage"},
 		Short:   "agentUsage is a terminal dashboard for monitoring AI coding tool usage and spend.",
@@ -49,7 +57,7 @@ func main() {
 		Run: func(_ *cobra.Command, _ []string) {
 			// Loaded here rather than in main so an unreadable config only fails
 			// the dashboard. Subcommands load their own config, and the ones that
-			// do not need it (version, help, daemon install/uninstall) keep
+			// do not need it (help) keep
 			// working — including the ones you reach for to dig yourself out.
 			cfg, err := config.Load()
 			if err != nil {
@@ -62,32 +70,14 @@ func main() {
 		},
 	}
 
-	root.AddCommand(&cobra.Command{
-		Use:   "version",
-		Short: "Print version information",
-		Run: func(_ *cobra.Command, _ []string) {
-			fmt.Println(version.String())
-		},
-	})
+	root.CompletionOptions.DisableDefaultCmd = true
+
 	root.AddCommand(newListCommand())
 	root.AddCommand(newGetCommand())
-	root.AddCommand(newTelemetryCommand())
-	root.AddCommand(newIntegrationsCommand())
 	root.AddCommand(newDetectCommand())
 	root.AddCommand(newDoctorCommand())
-	root.AddCommand(newPricingCommand())
-	root.AddCommand(newExportCommand())
-	root.AddCommand(newHubCommand())
-	root.AddCommand(newHubViewCommand())
 	root.AddCommand(newServeCommand())
-	root.AddCommand(newCursorCommand())
-	root.AddCommand(newStatuslineCommand())
-	root.AddCommand(newTmuxCommand())
-	for _, c := range newReportCommands() {
-		root.AddCommand(c)
-	}
+	root.InitDefaultHelpCmd()
 
-	if err := root.Execute(); err != nil {
-		os.Exit(1)
-	}
+	return root
 }

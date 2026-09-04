@@ -172,7 +172,7 @@ func checkDoctorDaemon(d *doctorChecker, verbose bool) {
 		if manager.IsInstalled() {
 			d.ok("Daemon Service: installed (%s)", manager.Kind)
 		} else {
-			d.info("Daemon Service: not installed (run 'agentusage telemetry daemon install')")
+			d.info("Daemon Service: not installed")
 		}
 	}
 
@@ -262,7 +262,7 @@ func checkDoctorToolsAndIntegrations(d *doctorChecker, verbose bool) {
 	}
 	if len(actionableHooks) > 0 {
 		sort.Strings(actionableHooks)
-		d.info("Recommended Hooks: %s (run 'agentusage integrations install <id>')", strings.Join(actionableHooks, ", "))
+		d.info("Recommended Hooks: %s", strings.Join(actionableHooks, ", "))
 	}
 }
 
