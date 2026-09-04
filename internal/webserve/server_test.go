@@ -438,6 +438,126 @@ func TestUsageMode_CSRF_OriginProtection(t *testing.T) {
 	}
 }
 
+func TestThemePOSTReprojectsViews(t *testing.T) {
+	srv := testServer(t, Options{Demo: true, Theme: "Gruvbox"})
+	handler := srv.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/snapshots", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	var initEnv Envelope
+	if err := json.NewDecoder(w.Body).Decode(&initEnv); err != nil {
+		t.Fatal(err)
+	}
+	if initEnv.Theme != "Gruvbox" {
+		t.Fatalf("theme = %q, want Gruvbox", initEnv.Theme)
+	}
+
+	// Explicit theme switch
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/theme", strings.NewReader(`{"theme":"Nord"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("theme status = %d body %s", w.Code, w.Body.String())
+	}
+	var nordEnv Envelope
+	if err := json.NewDecoder(w.Body).Decode(&nordEnv); err != nil {
+		t.Fatal(err)
+	}
+	if nordEnv.Theme != "Nord" {
+		t.Fatalf("theme = %q, want Nord", nordEnv.Theme)
+	}
+	if nordEnv.ThemeTokens.Name != "Nord" {
+		t.Fatalf("theme_tokens.name = %q, want Nord", nordEnv.ThemeTokens.Name)
+	}
+
+	// Empty body cycles to next theme
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/theme", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("theme cycle status = %d body %s", w.Code, w.Body.String())
+	}
+	var cycledEnv Envelope
+	if err := json.NewDecoder(w.Body).Decode(&cycledEnv); err != nil {
+		t.Fatal(err)
+	}
+	if cycledEnv.Theme == "Nord" {
+		t.Fatalf("expected theme to cycle from Nord, got %q", cycledEnv.Theme)
+	}
+}
+
+func TestTheme_CSRF_OriginProtection(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	handler := srv.Handler()
+
+	// Cross-site Sec-Fetch-Site should be blocked
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/theme", strings.NewReader(`{"theme":"Nord"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for Sec-Fetch-Site: cross-site, got %d", w.Code)
+	}
+
+	// External Origin should be blocked
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/theme", strings.NewReader(`{"theme":"Nord"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://evil.com")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for Origin: http://evil.com, got %d", w.Code)
+	}
+
+	// Localhost origin should be allowed
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/theme", strings.NewReader(`{"theme":"Nord"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://localhost:8080")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for Origin: http://localhost:8080, got %d", w.Code)
+	}
+}
+
+func TestAppJSThemeKeyHandler(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("/app.js status = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+
+	checks := []struct {
+		desc    string
+		pattern string
+	}{
+		{"theme cycle function", "async function cycleTheme()"},
+		{"keydown 't' case", `case "t":`},
+		{"keydown 'T' case", `case "T":`},
+		{"theme toggle call", "cycleTheme()"},
+		{"footer button theme", `id="footer-btn-theme"`},
+		{"color-scheme dark support", `"color-scheme:dark"`},
+		{"color-scheme light support", `"color-scheme:light"`},
+		{"data-theme attribute support", `setAttribute("data-theme"`},
+	}
+
+	for _, tc := range checks {
+		if !strings.Contains(body, tc.pattern) {
+			t.Errorf("/app.js missing %s (expected pattern %q)", tc.desc, tc.pattern)
+		}
+	}
+}
+
 func TestSnapshotsWrongMethod(t *testing.T) {
 	srv := testServer(t, Options{Demo: true})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/snapshots", nil)

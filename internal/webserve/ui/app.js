@@ -64,11 +64,16 @@
   function applyThemeTokens(tokens, override) {
     const root = document.documentElement;
     if (override === "light") {
+      root.setAttribute("data-theme", "light");
+      root.style.colorScheme = "light";
+      const meta = $("meta-theme-color");
+      if (meta) meta.content = "#f4f1ea";
       root.style.cssText = [
+        "color-scheme:light",
         "--bg:#f4f1ea", "--base:#f4f1ea", "--mantle:#fffdf8", "--surface-warm:#fffdf8",
         "--surface:#ebe6dc", "--surface0:#ebe6dc", "--surface1:#ddd6c8", "--surface2:#cfc7b8",
         "--fg:#2c2823", "--text:#2c2823", "--fg-2:#6d6760", "--subtext:#6d6760",
-        "--muted:#9c958d", "--dim:#9c958d", "--accent:#7c5cbf", "--accent-on:#fffdf8",
+        "--muted:#6d6760", "--dim:#9c958d", "--accent:#7c5cbf", "--accent-on:#fffdf8",
         "--lavender:#6b5cae", "--teal:#2f8f86", "--sapphire:#2f8f86",
         "--success:#2f8f86", "--warn:#b8860b", "--danger:#c65746", "--crit:#c65746",
         "--peach:#c65746", "--border:#ddd6c8", "--border-soft:#cfc7b8",
@@ -77,8 +82,19 @@
     }
     if (!tokens || !tokens.base) {
       root.style.cssText = "";
+      root.style.colorScheme = "dark";
+      root.setAttribute("data-theme", "deep-space");
+      const meta = $("meta-theme-color");
+      if (meta) meta.content = "#0c0e16";
       return;
     }
+    root.style.colorScheme = "dark";
+    const themeName = tokens.name || "theme";
+    const themeSlug = themeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    root.setAttribute("data-theme", themeSlug);
+    const meta = $("meta-theme-color");
+    if (meta && tokens.base) meta.content = tokens.base;
+
     const map = {
       "--bg": tokens.base,
       "--base": tokens.base,
@@ -92,8 +108,8 @@
       "--text": tokens.text,
       "--fg-2": tokens.subtext,
       "--subtext": tokens.subtext,
-      "--muted": tokens.dim,
-      "--dim": tokens.dim,
+      "--muted": tokens.subtext,
+      "--dim": tokens.dim || tokens.subtext,
       "--accent": tokens.accent,
       "--accent-on": tokens.mantle || "#080a11",
       "--lavender": tokens.lavender,
@@ -107,18 +123,57 @@
       "--border": tokens.surface1,
       "--border-soft": tokens.surface2,
     };
-    root.style.cssText = Object.entries(map)
-      .filter(([, v]) => v)
-      .map(([k, v]) => `${k}:${v}`)
-      .join(";");
+    root.style.cssText = [
+      "color-scheme:dark",
+      ...Object.entries(map)
+        .filter(([, v]) => v)
+        .map(([k, v]) => `${k}:${v}`),
+    ].join(";");
+  }
+
+  async function cycleTheme() {
+    try {
+      const res = await fetch("/api/v1/theme", {
+        method: "POST",
+        headers: { ...headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (res.status === 401) {
+        $("token-modal").hidden = false;
+        return;
+      }
+      if (!res.ok) throw new Error(`theme ${res.status}`);
+      state.themeOverride = "";
+      localStorage.removeItem("au-serve-theme-override");
+      applyEnvelope(await res.json());
+      render();
+      const themeName = state.envelope?.theme_tokens?.name || state.envelope?.theme || "Theme";
+      showToast(`Theme: ${themeName}`);
+    } catch (err) {
+      console.error(err);
+      cycleThemeOverride();
+    }
   }
 
   function cycleThemeOverride() {
     const order = ["", "light"];
     const idx = order.indexOf(state.themeOverride);
     state.themeOverride = order[(idx + 1) % order.length];
-    localStorage.setItem("au-serve-theme-override", state.themeOverride);
+    if (state.themeOverride) {
+      localStorage.setItem("au-serve-theme-override", state.themeOverride);
+    } else {
+      localStorage.removeItem("au-serve-theme-override");
+    }
     applyThemeTokens(state.envelope?.theme_tokens, state.themeOverride);
+    renderFooter();
+    const label = state.themeOverride === "light"
+      ? "Light"
+      : (state.envelope?.theme_tokens?.name || state.envelope?.theme || "Default");
+    showToast(`Theme: ${label}`);
+  }
+
+  if (state.themeOverride === "light") {
+    applyThemeTokens(null, "light");
   }
 
   function filteredViews() {
@@ -1644,7 +1699,9 @@
 
   function renderFooter() {
     const sec = Math.max(5, state.envelope?.refresh_interval_seconds || 30);
-    const theme = state.envelope?.theme_tokens?.name || state.envelope?.theme || "";
+    const theme = state.themeOverride === "light"
+      ? "Light"
+      : (state.envelope?.theme_tokens?.name || state.envelope?.theme || "");
     const fetchVisible = state.refreshing ? "" : " hidden";
     const fetchText = esc(state.refreshText || "Fetching...");
     const spinChar = SPINNER[state.animFrame] || "⠋";
@@ -1691,7 +1748,7 @@
       load({ manual: true, accountID: filteredViews()[state.selected]?.account_id }).catch(console.error);
     });
     $("footer-btn-theme")?.addEventListener("click", () => {
-      cycleThemeOverride();
+      cycleTheme().catch(console.error);
     });
     $("footer-btn-layout")?.addEventListener("click", () => {
       cycleLayout();
@@ -1836,7 +1893,7 @@
       case "t":
       case "T":
         ev.preventDefault();
-        cycleThemeOverride();
+        cycleTheme().catch(console.error);
         break;
       case "v":
       case "V":
