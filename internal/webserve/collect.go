@@ -279,6 +279,25 @@ func (c *collector) setUsageMode(mode string) {
 	}
 }
 
+func (c *collector) setTheme(theme string) {
+	theme = strings.TrimSpace(theme)
+	if theme == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.meta.theme = theme
+	c.opts.Theme = theme
+	if c.opts.Config != nil {
+		cfg := *c.opts.Config
+		cfg.Theme = theme
+		c.opts.Config = &cfg
+	}
+	if c.collect == nil && !c.cachedAt.IsZero() {
+		c.cached = c.decorate(Envelope{Source: c.cached.Source, Snapshots: c.cached.Snapshots})
+	}
+}
+
 func normalizeUsageMode(mode string) string {
 	if strings.EqualFold(strings.TrimSpace(mode), config.UsageModeUsed) {
 		return config.UsageModeUsed

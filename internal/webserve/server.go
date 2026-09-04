@@ -15,6 +15,7 @@ import (
 
 	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/providers/antigravity"
+	"github.com/nurulislamz/agentusage/internal/tui"
 )
 
 // Server serves the local web dashboard and snapshot JSON API.
@@ -71,6 +72,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/metrics", s.handleMetrics)
 	mux.HandleFunc("/api/v1/snapshots", s.handleSnapshots)
 	mux.HandleFunc("/api/v1/usage-mode", s.handleUsageMode)
+	mux.HandleFunc("/api/v1/theme", s.handleTheme)
 	mux.HandleFunc("/api/v1/meta", s.handleMeta)
 
 	sub, err := fs.Sub(uiFS, "ui")
@@ -246,6 +248,49 @@ func (s *Server) handleUsageMode(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.collector.setUsageMode(mode)
+	env, err := s.collector.envelope()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, env)
+}
+
+func (s *Server) handleTheme(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	if !s.checkAuth(w, r) {
+		return
+	}
+	if !isAllowedOrigin(r) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "cross-origin request forbidden"})
+		return
+	}
+	var body struct {
+		Theme string `json:"theme"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		return
+	}
+	targetTheme := strings.TrimSpace(body.Theme)
+	if targetTheme == "" {
+		targetTheme = tui.CycleTheme()
+	} else {
+		_ = tui.SetThemeByName(targetTheme)
+	}
+	if activeName := tui.ActiveTheme().Name; activeName != "" {
+		targetTheme = activeName
+	}
+	if !s.collector.demo {
+		if err := config.SaveTheme(targetTheme); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+	}
+	s.collector.setTheme(targetTheme)
 	env, err := s.collector.envelope()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
