@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/providers/antigravity"
 )
 
 func testServer(t *testing.T, opts Options) *Server {
@@ -628,6 +629,7 @@ func TestBasePathServesUnderPrefix(t *testing.T) {
 	for _, path := range []string{
 		"/agentusage/",
 		"/agentusage/healthz",
+		"/agentusage/metrics",
 		"/agentusage/app.js",
 		"/agentusage/app.css",
 		"/agentusage/api/v1/snapshots",
@@ -671,5 +673,26 @@ func TestNewServerRejectsInvalidBasePath(t *testing.T) {
 	_, err := NewServer(Options{Demo: true, ListenAddr: "127.0.0.1:0", BasePath: "/../secret"})
 	if err == nil {
 		t.Fatal("expected invalid base path to fail")
+	}
+}
+
+func TestMetricsEndpoint(t *testing.T) {
+	antigravity.ResetMetricsForTesting()
+	antigravity.RecordBoxPing("chaos", "antigravity-chaos", "missing_token", 120*time.Millisecond, nil)
+
+	srv := testServer(t, Options{Demo: true})
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /metrics code = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "agy_box_pings_total") {
+		t.Errorf("expected agy_box_pings_total in /metrics, got: %s", body)
+	}
+	if ct := w.Header().Get("Content-Type"); !strings.Contains(ct, "text/plain") {
+		t.Errorf("Content-Type = %q, want text/plain", ct)
 	}
 }

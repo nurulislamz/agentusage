@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/providers/antigravity"
 )
 
 // Server serves the local web dashboard and snapshot JSON API.
@@ -67,6 +68,7 @@ func (s *Server) BasePath() string {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.handleHealth)
+	mux.HandleFunc("/metrics", s.handleMetrics)
 	mux.HandleFunc("/api/v1/snapshots", s.handleSnapshots)
 	mux.HandleFunc("/api/v1/usage-mode", s.handleUsageMode)
 	mux.HandleFunc("/api/v1/meta", s.handleMeta)
@@ -176,6 +178,16 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"status": "ok",
 		"source": source,
 	})
+}
+
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	antigravity.WritePrometheusMetrics(w)
 }
 
 func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
