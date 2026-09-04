@@ -108,19 +108,16 @@ build: deps ## Build the binary
 	ln -sf $(APP_NAME)$(EXE) $(BIN_DIR)/agu$(EXE)
 
 .PHONY: install
-install: build ## Install binary to ~/.local/bin and set up telemetry daemon service
+install: build ## Install binary to ~/.local/bin
 	install -d $(HOME)/.local/bin
 	install -m 755 $(BIN_DIR)/$(APP_NAME)$(EXE) $(HOME)/.local/bin/$(APP_NAME)$(EXE)
 	ln -sf $(APP_NAME)$(EXE) $(HOME)/.local/bin/agu$(EXE)
-	@$(HOME)/.local/bin/$(APP_NAME)$(EXE) telemetry daemon install
 	-@systemctl --user try-restart agentusage-serve.service >/dev/null 2>&1 || true
 
 .PHONY: uninstall
-uninstall: ## Uninstall binary from ~/.local/bin and remove telemetry daemon service
-	@if [ -x "$(HOME)/.local/bin/$(APP_NAME)$(EXE)" ]; then \
-		"$(HOME)/.local/bin/$(APP_NAME)$(EXE)" telemetry daemon uninstall 2>/dev/null || true; \
-	fi
+uninstall: ## Uninstall binary from ~/.local/bin
 	rm -f $(HOME)/.local/bin/$(APP_NAME)$(EXE) $(HOME)/.local/bin/agu$(EXE)
+
 
 
 
