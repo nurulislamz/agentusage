@@ -2,12 +2,12 @@
   "use strict";
 
   const LAYOUTS = [
-    { id: "split", label: "Split", hint: "Glanceable Submenu + Deep Inspector" },
-    { id: "matrix", label: "Matrix", hint: "Dense Roster Matrix HUD" },
-    { id: "bento", label: "Bento", hint: "Viewport Bento Glance Tiles" },
-    { id: "bars", label: "Bars", hint: "Linear gauges · OpenUsage-style cards" },
-    { id: "dials", label: "Dials", hint: "Radial gauges · at-a-glance remaining" },
-    { id: "strips", label: "Strips", hint: "Grafana bar-gauge wall" },
+    { id: "split", label: "Split", icon: "◫", hint: "Glanceable Submenu + Deep Inspector" },
+    { id: "matrix", label: "Matrix", icon: "▦", hint: "Dense Roster Matrix HUD" },
+    { id: "bento", label: "Bento", icon: "⊞", hint: "Viewport Bento Glance Tiles" },
+    { id: "bars", label: "Bars", icon: "▤", hint: "Linear gauges · OpenUsage-style cards" },
+    { id: "dials", label: "Dials", icon: "◔", hint: "Radial gauges · at-a-glance remaining" },
+    { id: "strips", label: "Strips", icon: "▥", hint: "Grafana bar-gauge wall" },
   ];
 
   function normalizeLayout(raw) {
@@ -380,7 +380,7 @@
         ${LAYOUTS.map((l) => `<option value="${esc(l.id)}"${state.layout === l.id ? " selected" : ""}>${esc(l.label)} view</option>`).join("")}
       </select>
       <nav class="layout-nav" aria-label="Layout view">
-        ${LAYOUTS.map((l) => `<button type="button" class="layout-btn${state.layout === l.id ? " active" : ""}" data-layout="${esc(l.id)}" title="${esc(l.hint)}">${esc(l.label)}</button>`).join("")}
+        ${LAYOUTS.map((l) => `<button type="button" class="layout-btn${state.layout === l.id ? " active" : ""}" data-layout="${esc(l.id)}" title="${esc(l.hint)}"><span class="layout-icon">${l.icon}</span> <span class="layout-label">${esc(l.label)}</span></button>`).join("")}
       </nav>
       <span class="header-meta">⊞ ${n} agents${filteredNote} · ${esc(meta.label)} · ${esc(meta.hint)}</span>
     `;
@@ -1027,6 +1027,56 @@
     `;
   }
 
+  function bindInspectSheetGesture() {
+    const modal = $("inspect-modal");
+    const card = modal?.querySelector(".inspect-card");
+    const handle = modal?.querySelector(".mobile-sheet-handle");
+    const header = modal?.querySelector(".inspect-header");
+    if (!card || modal.dataset.gestureBound) return;
+    modal.dataset.gestureBound = "true";
+
+    let startY = 0;
+    let currentY = 0;
+    let isDragging = false;
+
+    const targets = [handle, header].filter(Boolean);
+    targets.forEach((target) => {
+      target.addEventListener("touchstart", (e) => {
+        if (!e.touches || e.touches.length === 0) return;
+        startY = e.touches[0].clientY;
+        currentY = startY;
+        isDragging = true;
+        card.style.transition = "none";
+      }, { passive: true });
+
+      target.addEventListener("touchmove", (e) => {
+        if (!isDragging || !e.touches || e.touches.length === 0) return;
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+        if (deltaY > 0) {
+          card.style.transform = `translateY(${deltaY}px)`;
+        }
+      }, { passive: true });
+
+      target.addEventListener("touchend", () => {
+        if (!isDragging) return;
+        isDragging = false;
+        const deltaY = currentY - startY;
+        card.style.transition = "";
+        card.style.transform = "";
+        if (deltaY > 60) {
+          closeInspectModal();
+        }
+      });
+
+      target.addEventListener("touchcancel", () => {
+        isDragging = false;
+        card.style.transition = "";
+        card.style.transform = "";
+      });
+    });
+  }
+
   function openInspectModal(v) {
     if (!v) return;
     state.inspectOpen = true;
@@ -1039,6 +1089,12 @@
       title.innerHTML = `${esc(v.status_icon || "●")} ${esc(v.account_id)} <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || "")}</span>`;
     }
     content.innerHTML = renderCockpit(v);
+    const card = modal.querySelector(".inspect-card");
+    if (card) {
+      card.style.transform = "";
+      card.style.transition = "";
+    }
+    bindInspectSheetGesture();
     modal.hidden = false;
 
     content.querySelectorAll(".btn-cockpit-refresh").forEach((btn) => {
@@ -1053,7 +1109,14 @@
     state.inspectOpen = false;
     state.inspectView = null;
     const modal = $("inspect-modal");
-    if (modal) modal.hidden = true;
+    if (modal) {
+      modal.hidden = true;
+      const card = modal.querySelector(".inspect-card");
+      if (card) {
+        card.style.transform = "";
+        card.style.transition = "";
+      }
+    }
   }
 
   function renderSplitLayout(views, fetchHtml) {
@@ -1169,9 +1232,12 @@
     const selectedView = views[state.selected] || views[0];
     const mobileBackBar = `
       <div class="mobile-back-bar">
-        <button type="button" class="mobile-back-btn" id="mobile-back-btn" aria-label="Back to account roster">
-          <span aria-hidden="true">‹</span> Back to Accounts (${views.length})
-        </button>
+        <button type="button" class="mobile-back-btn" id="mobile-back-btn" aria-label="Back to account roster"><span aria-hidden="true">‹</span> Back</button>
+        <div class="mobile-pager" role="navigation" aria-label="Account navigation">
+          <button type="button" class="mobile-pager-btn" id="mobile-prev-btn" aria-label="Previous account">‹</button>
+          <span class="mobile-pager-count">${state.selected + 1} / ${views.length}</span>
+          <button type="button" class="mobile-pager-btn" id="mobile-next-btn" aria-label="Next account">›</button>
+        </div>
         <span class="mobile-back-acc">${esc(selectedView?.account_id || "")}</span>
       </div>
     `;
@@ -1184,6 +1250,16 @@
 
     $("mobile-back-btn")?.addEventListener("click", () => {
       state.splitMobileView = "roster";
+      render();
+    });
+
+    $("mobile-prev-btn")?.addEventListener("click", () => {
+      state.selected = (state.selected - 1 + views.length) % views.length;
+      render();
+    });
+
+    $("mobile-next-btn")?.addEventListener("click", () => {
+      state.selected = (state.selected + 1) % views.length;
       render();
     });
 
@@ -1359,8 +1435,12 @@
       el.addEventListener("click", () => {
         const idx = Number(el.dataset.idx);
         state.selected = idx;
-        state.matrixExpanded = (state.matrixExpanded === idx ? -1 : idx);
-        render();
+        if (window.innerWidth <= 640) {
+          openInspectModal(views[idx]);
+        } else {
+          state.matrixExpanded = (state.matrixExpanded === idx ? -1 : idx);
+          render();
+        }
       });
     });
 
