@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/nurulislamz/agentusage/internal/core"
 )
 
@@ -550,6 +551,29 @@ func (m Model) handleMouseScroll(scroll, mouseX int) Model {
 	}
 	if m.mode == modeList {
 		ids := m.filteredIDs()
+		if len(ids) == 0 {
+			return m
+		}
+
+		if m.activeDashboardView() != dashboardViewSplit {
+			step := 1
+			if m.activeDashboardView() == dashboardViewBento {
+				tileW := 36
+				if m.width < 40 {
+					tileW = max(28, m.width-4)
+				}
+				step = max(1, (m.width-2)/(tileW+2))
+			}
+			if scroll < 0 {
+				m.cursor = clamp(m.cursor-step, 0, len(ids)-1)
+			} else if scroll > 0 {
+				m.cursor = clamp(m.cursor+step, 0, len(ids)-1)
+			}
+			m.detailOffset = 0
+			m.invalidateRenderCaches()
+			return m
+		}
+
 		leftW := m.width / 3
 		if leftW < minLeftWidth {
 			leftW = minLeftWidth
@@ -626,7 +650,7 @@ func (m Model) handleMouseLeftClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 	// Check if click is on footer
 	if msg.Y >= m.height-footerLines {
-		return m, nil
+		return m.handleFooterClick(msg)
 	}
 
 	if m.screen != screenDashboard {
@@ -656,31 +680,339 @@ func (m Model) handleMouseLeftClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	leftW := m.width / 3
-	if leftW < minLeftWidth {
-		leftW = minLeftWidth
-	}
-	if leftW > maxLeftWidth {
-		leftW = maxLeftWidth
-	}
-	if leftW > m.width-34 {
-		leftW = m.width - 34
-	}
-	if leftW < 10 {
-		leftW = m.width / 2
-	}
+	var clickedIdx int = -1
+	switch m.activeDashboardView() {
+	case dashboardViewMatrix:
+		clickedIdx = m.matrixHitTest(clickContentY, contentH, ids)
+	case dashboardViewBento:
+		clickedIdx = m.bentoHitTest(msg.X, clickContentY, contentH, ids)
+	case dashboardViewBars, dashboardViewDials, dashboardViewStrips:
+		clickedIdx = m.boardHitTest(clickContentY, contentH, ids)
+	default: // dashboardViewSplit
+		leftW := m.width / 3
+		if leftW < minLeftWidth {
+			leftW = minLeftWidth
+		}
+		if leftW > maxLeftWidth {
+			leftW = maxLeftWidth
+		}
+		if leftW > m.width-34 {
+			leftW = m.width - 34
+		}
+		if leftW < 10 {
+			leftW = m.width / 2
+		}
 
-	if msg.X <= leftW {
-		// Clicked in the left navigator list -> select item without entering full detail view
-		clickedIdx := m.splitListHitTest(leftW, contentH, clickContentY, ids)
-		if clickedIdx >= 0 && clickedIdx < len(ids) {
-			m.cursor = clickedIdx
-			m.detailOffset = 0
-			m.detailTab = 0
-			m.tileOffset = 0
-			m.invalidateRenderCaches()
+		if msg.X <= leftW {
+			// Clicked in the left navigator list -> select item without entering full detail view
+			clickedIdx = m.splitListHitTest(leftW, contentH, clickContentY, ids)
 		}
 	}
+
+	if clickedIdx >= 0 && clickedIdx < len(ids) {
+		m.cursor = clickedIdx
+		m.detailOffset = 0
+		m.detailTab = 0
+		m.tileOffset = 0
+		m.invalidateRenderCaches()
+	}
+	return m, nil
+}
+
+func (m Model) matrixHitTest(clickContentY, h int, ids []string) int {
+	if len(ids) == 0 {
+		return -1
+	}
+	type itemPos struct {
+		globalIdx int
+		line      int
+	}
+	var items []itemPos
+	cursorLine := 0
+	currentLine := 0
+
+	groups := m.groupIDsByProvider(ids)
+	for _, grp := range groups {
+		headerLine := currentLine
+		currentLine++ // ◈ PROVIDER (N agents) ALL OK
+		currentLine++ // Table header: ACCOUNT STATUS QUOTA 1 ...
+		for rowIdx := range grp.accountIDs {
+			globalIdx := grp.indices[rowIdx]
+			if globalIdx == m.cursor {
+				cursorLine = currentLine
+			}
+			items = append(items, itemPos{globalIdx: globalIdx, line: currentLine})
+			if rowIdx == 0 {
+				items = append(items, itemPos{globalIdx: globalIdx, line: headerLine})
+			}
+			currentLine++
+		}
+		currentLine++ // Empty line between provider groups
+	}
+
+	totalLines := currentLine
+	start := 0
+	if totalLines > h && h > 0 {
+		start = cursorLine - (h / 2)
+		if start < 0 {
+			start = 0
+		}
+		if start+h > totalLines {
+			start = totalLines - h
+			if start < 0 {
+				start = 0
+			}
+		}
+	}
+
+	targetLine := start + clickContentY
+	for _, it := range items {
+		if it.line == targetLine {
+			return it.globalIdx
+		}
+	}
+	return -1
+}
+
+func (m Model) bentoHitTest(clickX, clickContentY, h int, ids []string) int {
+	if len(ids) == 0 {
+		return -1
+	}
+	tileW := 36
+	if m.width < 40 {
+		tileW = max(28, m.width-4)
+	}
+	cols := max(1, (m.width-2)/(tileW+2))
+
+	groups := m.groupIDsByProvider(ids)
+
+	type bentoBox struct {
+		globalIdx  int
+		minY, maxY int
+		minX, maxX int
+	}
+	var boxes []bentoBox
+	currentY := 0
+	cursorLine := 0
+
+	for _, grp := range groups {
+		headerY := currentY
+		currentY++ // Header line
+
+		for i := 0; i < len(grp.accountIDs); i += cols {
+			end := min(i+cols, len(grp.accountIDs))
+			rowAccountIDs := grp.accountIDs[i:end]
+			rowIndices := grp.indices[i:end]
+			cardH := 8 // 5 content + 2 border + 1 margin
+
+			for colIdx := range rowAccountIDs {
+				globalIdx := rowIndices[colIdx]
+				if globalIdx == m.cursor {
+					cursorLine = currentY
+				}
+				xStart := colIdx * (tileW + 2)
+				boxes = append(boxes, bentoBox{
+					globalIdx: globalIdx,
+					minY:      currentY,
+					maxY:      currentY + cardH,
+					minX:      xStart,
+					maxX:      xStart + tileW + 2,
+				})
+				if colIdx == 0 && i == 0 {
+					boxes = append(boxes, bentoBox{
+						globalIdx: globalIdx,
+						minY:      headerY,
+						maxY:      headerY + 1,
+						minX:      0,
+						maxX:      m.width,
+					})
+				}
+			}
+			currentY += cardH
+		}
+		currentY++ // Empty line
+	}
+
+	totalLines := currentY
+	start := 0
+	if totalLines > h && h > 0 {
+		start = cursorLine - (h / 3)
+		if start < 0 {
+			start = 0
+		}
+		if start+h > totalLines {
+			start = totalLines - h
+			if start < 0 {
+				start = 0
+			}
+		}
+	}
+
+	targetY := start + clickContentY
+	for _, b := range boxes {
+		if targetY >= b.minY && targetY < b.maxY {
+			if cols == 1 || (clickX >= b.minX && clickX < b.maxX) {
+				return b.globalIdx
+			}
+		}
+	}
+	return -1
+}
+
+func (m Model) boardHitTest(clickContentY, h int, ids []string) int {
+	if len(ids) == 0 {
+		return -1
+	}
+	groups := m.groupIDsByProvider(ids)
+	view := m.activeDashboardView()
+	now := m.viewNow()
+	cardW := clamp(m.width-4, 30, 90)
+
+	type cardBox struct {
+		globalIdx  int
+		minY, maxY int
+	}
+	var boxes []cardBox
+	currentY := 0
+	cursorLine := 0
+
+	for _, grp := range groups {
+		headerY := currentY
+		currentY++ // Header line
+
+		for rowIdx, id := range grp.accountIDs {
+			globalIdx := grp.indices[rowIdx]
+			snap := m.snapshots[id]
+			if globalIdx == m.cursor {
+				cursorLine = currentY
+			}
+
+			cardH := 8
+			switch view {
+			case dashboardViewBars:
+				rendered := m.renderBarCard(snap, false, cardW, now)
+				cardH = strings.Count(rendered, "\n") + 1
+			case dashboardViewDials:
+				rendered := m.renderDialCard(snap, false, cardW, now)
+				cardH = strings.Count(rendered, "\n") + 1
+			case dashboardViewStrips:
+				rendered := m.renderStripRow(snap, false, cardW, now)
+				cardH = strings.Count(rendered, "\n") + 1
+			}
+
+			boxes = append(boxes, cardBox{
+				globalIdx: globalIdx,
+				minY:      currentY,
+				maxY:      currentY + cardH,
+			})
+			if rowIdx == 0 {
+				boxes = append(boxes, cardBox{
+					globalIdx: globalIdx,
+					minY:      headerY,
+					maxY:      headerY + 1,
+				})
+			}
+			currentY += cardH
+		}
+		currentY++ // Empty line
+	}
+
+	totalLines := currentY
+	start := 0
+	if totalLines > h && h > 0 {
+		start = cursorLine - (h / 3)
+		if start < 0 {
+			start = 0
+		}
+		if start+h > totalLines {
+			start = totalLines - h
+			if start < 0 {
+				start = 0
+			}
+		}
+	}
+
+	targetY := start + clickContentY
+	for _, b := range boxes {
+		if targetY >= b.minY && targetY < b.maxY {
+			return b.globalIdx
+		}
+	}
+	return -1
+}
+
+func (m Model) handleFooterClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if msg.Y != m.height-1 {
+		return m, nil
+	}
+	plain := ansi.Strip(m.renderFooterStatusLine(m.width))
+	if len(plain) == 0 {
+		return m, nil
+	}
+
+	x := msg.X
+
+	inToken := func(token string, leftPad, rightPad int) bool {
+		idx := strings.Index(plain, token)
+		if idx < 0 {
+			return false
+		}
+		start := idx - leftPad
+		if start < 0 {
+			start = 0
+		}
+		end := idx + len(token) + rightPad
+		return x >= start && x <= end
+	}
+
+	// 1. Check "back" (Esc back)
+	if inToken("back", 4, 2) {
+		if m.mode == modeDetail {
+			m = m.exitDetailMode()
+			return m, nil
+		}
+	}
+
+	// 2. Check "menu" (p menu)
+	if inToken("menu", 3, 2) {
+		m.openSettingsModal()
+		m.settings.tab = settingsTabProviders
+		return m, nil
+	}
+
+	// 3. Check "layout" (v layout)
+	if inToken("layout", 3, 2) {
+		if m.screen == screenDashboard {
+			next := m.nextDashboardView(1)
+			m.setDashboardView(next)
+			return m, m.persistDashboardViewCmd()
+		}
+	}
+
+	// 4. Check "mode" (u mode)
+	if inToken("mode", 3, 2) {
+		if m.screen == screenDashboard {
+			m.toggleUsageMode()
+			return m, m.persistDashboardUsageModeCmd()
+		}
+	}
+
+	// 5. Check "refresh all" (R refresh all) - must check before "refresh"
+	if inToken("refresh all", 3, 2) {
+		return m.triggerRefreshAll()
+	}
+
+	// 6. Check "refresh" (r refresh)
+	if inToken("refresh", 3, 2) {
+		return m.triggerRefreshFocused()
+	}
+
+	// 7. Check "help" (? help)
+	if inToken("help", 3, 2) {
+		m.showHelp = !m.showHelp
+		return m, nil
+	}
+
 	return m, nil
 }
 
@@ -1091,21 +1423,61 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.tileOffset = 0
 		}
 	case "pgdown", "ctrl+d":
-		m.detailOffset += m.detailPageStep()
-	case "pgup", "ctrl+u":
-		m.detailOffset -= m.detailPageStep()
-		if m.detailOffset < 0 {
+		if m.activeDashboardView() != dashboardViewSplit {
+			m.cursor = clamp(m.cursor+pageStep, 0, len(ids)-1)
 			m.detailOffset = 0
+		} else {
+			m.detailOffset += m.detailPageStep()
+		}
+	case "pgup", "ctrl+u":
+		if m.activeDashboardView() != dashboardViewSplit {
+			m.cursor = clamp(m.cursor-pageStep, 0, len(ids)-1)
+			m.detailOffset = 0
+		} else {
+			m.detailOffset -= m.detailPageStep()
+			if m.detailOffset < 0 {
+				m.detailOffset = 0
+			}
 		}
 	case "home", "g":
-		m.detailOffset = 0
+		if m.activeDashboardView() != dashboardViewSplit {
+			m.cursor = 0
+			m.detailOffset = 0
+		} else {
+			m.detailOffset = 0
+		}
 	case "end", "G":
-		m.detailOffset = 9999
+		if m.activeDashboardView() != dashboardViewSplit {
+			if len(ids) > 0 {
+				m.cursor = len(ids) - 1
+			}
+			m.detailOffset = 0
+		} else {
+			m.detailOffset = 9999
+		}
 	case "ctrl+o":
 		if id := m.selectedTileID(ids); id != "" {
 			m.expandedModelMixTiles[id] = !m.expandedModelMixTiles[id]
 		}
-	case "enter", "right", "l":
+	case "left", "h":
+		if m.activeDashboardView() == dashboardViewBento {
+			if m.cursor > 0 {
+				m.cursor--
+				m.tileOffset = 0
+				m.detailOffset = 0
+			}
+		}
+	case "right", "l":
+		if m.activeDashboardView() == dashboardViewBento {
+			if m.cursor < len(ids)-1 {
+				m.cursor++
+				m.tileOffset = 0
+				m.detailOffset = 0
+			}
+		} else {
+			m = m.enterDetailMode()
+		}
+	case "enter":
 		m = m.enterDetailMode()
 	case "/":
 		m.filter.active = true
@@ -1210,25 +1582,19 @@ func (m Model) detailSectionStarts() []int {
 	}
 
 	width := m.width - 2
-	if width < 30 {
-		width = 30
+	if width < 20 {
+		width = 20
 	}
-	sections := buildDetailSections(snap, dashboardWidget(snap.ProviderID), width, m.warnThreshold, m.critThreshold, m.timeWindow, m.resolveHideCosts(snap), m.viewNow())
-	if len(sections) == 0 {
-		return nil
-	}
-
-	line := 3 // compact detail header lines
-	starts := make([]int, 0, len(sections))
-	for _, sec := range sections {
-		if len(sec.lines) == 0 {
-			continue
-		}
-		line++ // blank line before each card
-		starts = append(starts, line)
-		line += len(sec.lines) + 2 // top border + body + bottom border
-	}
-	return starts
+	return CockpitSectionStarts(
+		snap,
+		m.viewNow(),
+		width,
+		m.warnThreshold,
+		m.critThreshold,
+		m.timeWindow,
+		m.resolveHideCosts(snap),
+		m.usageMode,
+	)
 }
 
 func (m Model) detailPageStep() int {

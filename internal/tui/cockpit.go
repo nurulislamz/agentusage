@@ -253,6 +253,96 @@ func RenderCockpit(
 	return strings.Join(sections, "\n\n")
 }
 
+// CockpitSectionStarts returns the line numbers where each card in the cockpit begins.
+func CockpitSectionStarts(
+	snap core.UsageSnapshot,
+	now time.Time,
+	w int,
+	warnThresh, critThresh float64,
+	timeWindow core.TimeWindow,
+	hideCosts bool,
+	usageMode string,
+) []int {
+	if w < 20 {
+		w = 20
+	}
+	widget := dashboardWidget(snap.ProviderID)
+	di := computeDisplayInfo(snap, widget, hideCosts, usageMode)
+	cards := projectDetailCards(snap, widget, w, warnThresh, critThresh, timeWindow, hideCosts, now, usageMode)
+	lines := projectUsageLines(snap, widget, cards, now)
+	if len(lines) == 0 && di.gaugePercent >= 0 {
+		pct := di.gaugePercent
+		lines = []WebUsageLine{{
+			Label:   "Usage",
+			Short:   "Usage",
+			Percent: &pct,
+			Value:   di.summary,
+			Tone:    quotaTone(pct, usageMode == config.UsageModeUsed),
+		}}
+	}
+
+	var starts []int
+	currentLine := 4 // Section 1 (Usage & Quotas) starts at line 4 (after hero, subhero, hairline, and blank line)
+	starts = append(starts, currentLine)
+
+	// Calculate height of Usage & Quotas card
+	quotaHeight := 2 // title + hairline
+	if len(lines) > 0 {
+		currentGroup := ""
+		for _, l := range lines {
+			if l.Group != "" && l.Group != currentGroup {
+				currentGroup = l.Group
+				quotaHeight++
+			}
+			quotaHeight++
+		}
+	} else {
+		quotaHeight++
+	}
+	currentLine += quotaHeight + 2 // + card height + 2 newlines for section separation
+	starts = append(starts, currentLine)
+
+	// Calculate height of Timers & Schedule card
+	timers := projectTimerRows(snap, widget, now)
+	timerHeight := 2 // title + hairline
+	if len(timers) > 0 {
+		timerHeight += len(timers)
+	} else {
+		timerHeight++
+	}
+	currentLine += timerHeight + 2
+
+	// Calculate height of Activity & Trend card if present
+	dailyPoints := firstDailySeries(snap, "cost", "analytics_cost", "tokens", "requests")
+	if len(dailyPoints) > 0 {
+		starts = append(starts, currentLine)
+		actHeight := 3 // title + hairline + stats
+		currentLine += actHeight + 2
+	}
+
+	// Any extra cards
+	for _, c := range cards {
+		idLower := strings.ToLower(c.ID)
+		titleLower := strings.ToLower(c.Title)
+		if isCockpitBuiltinSection(idLower, titleLower) {
+			continue
+		}
+		var validRows int
+		for _, r := range c.Rows {
+			if r.Kind == "heading" || r.Label != "" || r.Value != "" {
+				validRows++
+			}
+		}
+		if validRows > 0 {
+			starts = append(starts, currentLine)
+			cardHeight := 2 + validRows
+			currentLine += cardHeight + 2
+		}
+	}
+
+	return starts
+}
+
 func isCockpitBuiltinSection(id, title string) bool {
 	switch id {
 	case "usage", "timers", "activity", "hero", "overview", "quota", "trends":

@@ -1,0 +1,19 @@
+# MAGI Ralph Loop Progress Ledger: TUI Interactions, Scrolling & Button Functionality
+
+## Phase 1: Test Authoring (TDD Red-Phase First) [COMPLETED]
+- [x] [TEST-BUTTONS] Unit & behavior tests for all header and footer clickable buttons (menu, layout, mode, refresh, help, detail back)
+- [x] [TEST-SCROLL-VIEWS] Unit & behavior tests for scrolling in all 6 dashboard views (Split, Matrix, Bento, Bars, Dials, Strips) with keys (j/k, PgUp/PgDn, Home/End) and mouse wheel
+- [x] [TEST-CLICK-VIEWS] Unit & behavior tests for clicking items/cards/rows to select across all 6 views and Bento 2D arrow navigation
+- [x] [TEST-COCKPIT-NAV] Unit & behavior tests for Cockpit detail section jumping (Tab/Shift+Tab, Left/Right) and smooth vertical scrolling
+- [x] [TEST-SETTINGS-MODAL] Unit & behavior tests for settings modal clicking and scrolling
+
+## Phase 2: Implementation & Fixes (Green Phase) [COMPLETED]
+- [x] [FIX-BUTTONS] Implement footer and header click hit-testing and button dispatch
+- [x] [FIX-SCROLL-VIEWS] Implement proper scrolling (mouse wheel + PgUp/PgDn + Home/End) for all dashboard views
+- [x] [FIX-CLICK-VIEWS] Implement hit-testing for clicking rows/cards in Matrix, Bento, Bars, Dials, Strips, and 2D arrow keys for Bento
+- [x] [FIX-COCKPIT-NAV] Align Cockpit section starts with rendered sections for Tab/Shift+Tab navigation
+- [x] [FIX-SETTINGS-MODAL] Enhance settings modal mouse click hit-testing for items and toggles
+
+## Verification Gate [PASSED]
+- [x] [VERIFY-SCREENSHOTS] Capture visual verification screenshots of before/after for all fixed interactions
+- [x] [VERIFY-CI] Full `go test ./...`, `make vet`, `make test` pass with race detector
