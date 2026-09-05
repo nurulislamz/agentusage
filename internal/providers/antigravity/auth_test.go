@@ -4,13 +4,15 @@ package antigravity
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -151,28 +153,21 @@ func TestLoadOAuthToken_And_WriteOAuthToken(t *testing.T) {
 	dir := t.TempDir()
 	tokenPath := filepath.Join(dir, "token-test")
 
-	payload := oauthTokenFilePayload{
-		AuthMethod: "oauth",
-		Token: oauthToken{
-			AccessToken:  "secret-access-token",
-			RefreshToken: "secret-refresh-token",
-			TokenType:    "Bearer",
-			Expiry:       "2030-01-01T00:00:00Z",
-		},
-	}
-
-	// Write token atomically
-	if err := writeOAuthToken(tokenPath, payload); err != nil {
-		t.Fatalf("writeOAuthToken() error = %v", err)
-	}
-
-	// Check file permissions (0600)
-	info, err := os.Stat(tokenPath)
-	if err != nil {
-		t.Fatalf("os.Stat() error = %v", err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Errorf("file mode = %v, want 0600", info.Mode().Perm())
+	// Write raw JSON with extra unknown fields
+	rawInitial := `{
+  "auth_method": "oauth",
+  "project_id": "test-sentinel-project",
+  "token": {
+    "access_token": "secret-access-token",
+    "refresh_token": "secret-refresh-token",
+    "token_type": "Bearer",
+    "expiry": "2030-01-01T00:00:00Z",
+    "extra_token_field": "keep-me-safe"
+  },
+  "custom_metadata": 12345
+}`
+	if err := os.WriteFile(tokenPath, []byte(rawInitial), 0o600); err != nil {
+		t.Fatalf("WriteFile error = %v", err)
 	}
 
 	// Load token
@@ -187,6 +182,48 @@ func TestLoadOAuthToken_And_WriteOAuthToken(t *testing.T) {
 		t.Errorf("RefreshToken = %q, want 'secret-refresh-token'", loaded.Token.RefreshToken)
 	}
 
+	// Update token fields and write back
+	loaded.Token.AccessToken = "rotated-access-token"
+	loaded.Token.Expiry = "2031-01-01T00:00:00Z"
+	if err := writeOAuthToken(tokenPath, loaded); err != nil {
+		t.Fatalf("writeOAuthToken() error = %v", err)
+	}
+
+	// Check file permissions (0600)
+	info, err := os.Stat(tokenPath)
+	if err != nil {
+		t.Fatalf("os.Stat() error = %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Errorf("file mode = %v, want 0600", info.Mode().Perm())
+	}
+
+	// Verify unknown fields were preserved on disk
+	content, err := os.ReadFile(tokenPath)
+	if err != nil {
+		t.Fatalf("ReadFile error = %v", err)
+	}
+	var rawMap map[string]any
+	if err := json.Unmarshal(content, &rawMap); err != nil {
+		t.Fatalf("unmarshal disk json: %v", err)
+	}
+	if rawMap["project_id"] != "test-sentinel-project" {
+		t.Errorf("project_id not preserved, got %v", rawMap["project_id"])
+	}
+	tokenMap, ok := rawMap["token"].(map[string]any)
+	if !ok {
+		t.Fatalf("token is not map: %v", rawMap["token"])
+	}
+	if tokenMap["access_token"] != "rotated-access-token" {
+		t.Errorf("access_token not updated, got %v", tokenMap["access_token"])
+	}
+	if tokenMap["extra_token_field"] != "keep-me-safe" {
+		t.Errorf("extra_token_field inside token not preserved, got %v", tokenMap["extra_token_field"])
+	}
+	if tokenMap["refresh_token"] != "secret-refresh-token" {
+		t.Errorf("refresh_token not preserved, got %v", tokenMap["refresh_token"])
+	}
+
 	// Load non-existent file
 	if _, err := loadOAuthToken(filepath.Join(dir, "nonexistent")); err == nil {
 		t.Error("expected error loading non-existent token file")
@@ -199,9 +236,9 @@ func TestLoadOAuthToken_And_WriteOAuthToken(t *testing.T) {
 		t.Error("expected error loading malformed token file")
 	}
 
-	// Write to non-existent parent directory
-	if err := writeOAuthToken(filepath.Join(dir, "no-such-dir", "token"), payload); err == nil {
-		t.Error("expected error writing token to non-existent directory")
+	// Write to invalid path
+	if err := writeOAuthToken(filepath.Join(dir, "bad\x00path"), loaded); err == nil {
+		t.Error("expected error writing to invalid path")
 	}
 }
 
@@ -254,7 +291,7 @@ func TestTokenExpired_Matrix(t *testing.T) {
 		t.Error("past token should be expired")
 	}
 
-	// 7. Unparseable expiry string should return false (optimistic non-expiration)
+	// 7. Unparseable expiry string should return false
 	tokBadDate := oauthToken{
 		AccessToken: "valid",
 		Expiry:      "not-a-date",
@@ -268,30 +305,28 @@ func TestOAuthClientCredentials(t *testing.T) {
 	// Neither set
 	t.Setenv(oauthClientIDEnv, "")
 	t.Setenv(oauthClientSecretEnv, "")
+	t.Setenv(oauthClientIDEnvAlias, "")
+	t.Setenv(oauthClientSecretEnvAlias, "")
 	if _, _, ok := oauthClientCredentials(); ok {
 		t.Error("expected false when envs unset")
 	}
 
-	// Only client ID
-	t.Setenv(oauthClientIDEnv, "my-client-id")
-	t.Setenv(oauthClientSecretEnv, "")
-	if _, _, ok := oauthClientCredentials(); ok {
-		t.Error("expected false when secret unset")
-	}
-
-	// Only client Secret
-	t.Setenv(oauthClientIDEnv, "")
-	t.Setenv(oauthClientSecretEnv, "my-secret")
-	if _, _, ok := oauthClientCredentials(); ok {
-		t.Error("expected false when client ID unset")
-	}
-
-	// Both set
+	// Primary env vars
 	t.Setenv(oauthClientIDEnv, "my-client-id")
 	t.Setenv(oauthClientSecretEnv, "my-secret")
 	id, secret, ok := oauthClientCredentials()
 	if !ok || id != "my-client-id" || secret != "my-secret" {
 		t.Errorf("oauthClientCredentials() = (%q, %q, %v), want (my-client-id, my-secret, true)", id, secret, ok)
+	}
+
+	// Aliases fallback
+	t.Setenv(oauthClientIDEnv, "")
+	t.Setenv(oauthClientSecretEnv, "")
+	t.Setenv(oauthClientIDEnvAlias, "alias-client-id")
+	t.Setenv(oauthClientSecretEnvAlias, "alias-secret")
+	id, secret, ok = oauthClientCredentials()
+	if !ok || id != "alias-client-id" || secret != "alias-secret" {
+		t.Errorf("oauthClientCredentials() with aliases = (%q, %q, %v), want (alias-client-id, alias-secret, true)", id, secret, ok)
 	}
 }
 
@@ -299,6 +334,8 @@ func TestRefreshAccessToken_Branches(t *testing.T) {
 	// 1. Credentials not configured
 	t.Setenv(oauthClientIDEnv, "")
 	t.Setenv(oauthClientSecretEnv, "")
+	t.Setenv(oauthClientIDEnvAlias, "")
+	t.Setenv(oauthClientSecretEnvAlias, "")
 	if _, err := refreshAccessToken(context.Background(), "refresh-tok", nil); err == nil {
 		t.Error("expected error when credentials not configured")
 	}
@@ -326,25 +363,22 @@ func TestRefreshAccessToken_Branches(t *testing.T) {
 	}))
 	defer refreshServer.Close()
 
-	// 3. Error response from server
-	errServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "invalid grant", http.StatusBadRequest)
+	// 3. Error response (400 invalid_grant)
+	invalidGrantServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error": "invalid_grant", "error_description": "Token has been expired or revoked."}`))
 	}))
-	defer errServer.Close()
+	defer invalidGrantServer.Close()
 
-	// 4. Malformed JSON response
-	badJSONServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{invalid-json`))
+	// 4. Server error 500
+	server500Attempts := int32(0)
+	server500 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&server500Attempts, 1)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}))
-	defer badJSONServer.Close()
+	defer server500.Close()
 
-	// 5. Empty access token response
-	emptyTokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"access_token": "", "expires_in": 3600}`))
-	}))
-	defer emptyTokenServer.Close()
-
-	// Test helper that redirects tokenEndpoint
+	// Helper to point tokenEndpoint to test server
 	testRefreshWithClient := func(serverURL string) (oauthToken, error) {
 		customClient := &http.Client{
 			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -365,22 +399,24 @@ func TestRefreshAccessToken_Branches(t *testing.T) {
 		t.Errorf("refreshed token = %+v, want valid new tokens", tok)
 	}
 
-	// HTTP error case
-	_, err = testRefreshWithClient(errServer.URL)
-	if err == nil || !strings.Contains(err.Error(), "token refresh HTTP 400") {
-		t.Errorf("expected HTTP 400 error, got %v", err)
+	// Invalid grant case (non-retryable AuthError)
+	_, err = testRefreshWithClient(invalidGrantServer.URL)
+	if err == nil {
+		t.Fatal("expected error on invalid_grant")
+	}
+	var authErr *AuthError
+	if !errors.As(err, &authErr) || !strings.Contains(err.Error(), "invalid_grant") {
+		t.Errorf("expected AuthError with invalid_grant, got %v", err)
 	}
 
-	// Bad JSON case
-	_, err = testRefreshWithClient(badJSONServer.URL)
-	if err == nil || !strings.Contains(err.Error(), "parse token refresh response") {
-		t.Errorf("expected parse error, got %v", err)
+	// Server error 500 case (retryable, bounded backoff)
+	atomic.StoreInt32(&server500Attempts, 0)
+	_, err = testRefreshWithClient(server500.URL)
+	if err == nil {
+		t.Fatal("expected error on 500")
 	}
-
-	// Empty access token case
-	_, err = testRefreshWithClient(emptyTokenServer.URL)
-	if err == nil || !strings.Contains(err.Error(), "empty access_token") {
-		t.Errorf("expected empty access_token error, got %v", err)
+	if attempts := atomic.LoadInt32(&server500Attempts); attempts != 2 {
+		t.Errorf("500 retry attempts = %d, want 2", attempts)
 	}
 }
 
@@ -391,20 +427,8 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func TestEnsureAccessToken_Flows(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
 	configDir := t.TempDir()
 	tokenPath := filepath.Join(configDir, oauthTokenFile)
-
-	// Mock agy CLI
-	binDir := filepath.Join(home, ".local", "bin")
-	_ = os.MkdirAll(binDir, 0o755)
-	mockAgy := filepath.Join(binDir, "agy")
-	mockScript := fmt.Sprintf("#!/bin/sh\ncat << 'EOF' > %q\n{\n  \"token\": {\n    \"access_token\": \"ping-access-token\",\n    \"expiry\": \"2030-01-01T00:00:00Z\"\n  }\n}\nEOF\nexit 0\n", tokenPath)
-	if err := os.WriteFile(mockAgy, []byte(mockScript), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
 
 	// 1. Missing token file path
 	if _, _, _, err := ensureAccessToken(context.Background(), core.AccountConfig{ID: "invalid"}, nil); err == nil {
@@ -428,38 +452,42 @@ func TestEnsureAccessToken_Flows(t *testing.T) {
 		t.Errorf("path = %q, want %q", path, tokenPath)
 	}
 
-	// 3. Missing token file: triggers pingBoxForToken and reloads
+	// 3. Missing token file returns AuthError (no subprocess)
 	_ = os.Remove(tokenPath)
-	tok, _, refreshed, err = ensureAccessToken(context.Background(), acct, nil)
-	if err != nil {
-		t.Fatalf("ensureAccessToken() after ping error = %v", err)
+	_, _, _, err = ensureAccessToken(context.Background(), acct, nil)
+	if err == nil {
+		t.Fatal("expected error on missing token file")
 	}
-	if tok != "ping-access-token" || !refreshed {
-		t.Errorf("ensureAccessToken() = (%q, %v), want (ping-access-token, true)", tok, refreshed)
+	var aErr *AuthError
+	if !errors.As(err, &aErr) || !strings.Contains(err.Error(), "missing") {
+		t.Errorf("expected missing file error, got %v", err)
 	}
 
-	// 4. Missing token file with ping failure
-	_ = os.Remove(tokenPath)
-	acctFail := core.AccountConfig{
-		ID:            "antigravity",
-		Binary:        "/no/such/agy",
-		ProviderPaths: map[string]string{"config_dir": configDir},
-	}
-	if _, _, _, err := ensureAccessToken(context.Background(), acctFail, nil); err == nil {
-		t.Error("expected error when ping fails on missing token file")
-	}
-
-	// 5. Expired token without refresh token: triggers pingBoxForToken
+	// 4. Expired token without refresh token returns AuthError (no subprocess)
 	writeTestToken(t, tokenPath, "expired-token", "2020-01-01T00:00:00Z", "")
-	tok, _, refreshed, err = ensureAccessToken(context.Background(), acct, nil)
-	if err != nil {
-		t.Fatalf("ensureAccessToken() expired error = %v", err)
+	_, _, _, err = ensureAccessToken(context.Background(), acct, nil)
+	if err == nil {
+		t.Fatal("expected error on expired token without refresh token")
 	}
-	if tok != "ping-access-token" || !refreshed {
-		t.Errorf("ensureAccessToken() expired = (%q, %v), want (ping-access-token, true)", tok, refreshed)
+	if !strings.Contains(err.Error(), "no refresh token") {
+		t.Errorf("expected no refresh token error, got %v", err)
 	}
 
-	// 6. Expired token with refresh token and OAuth credentials
+	// 5. Expired token with refresh token but unconfigured client credentials returns AuthError
+	t.Setenv(oauthClientIDEnv, "")
+	t.Setenv(oauthClientSecretEnv, "")
+	t.Setenv(oauthClientIDEnvAlias, "")
+	t.Setenv(oauthClientSecretEnvAlias, "")
+	writeTestToken(t, tokenPath, "expired-token", "2020-01-01T00:00:00Z", "my-refresh-token")
+	_, _, _, err = ensureAccessToken(context.Background(), acct, nil)
+	if err == nil {
+		t.Fatal("expected error when client unconfigured")
+	}
+	if !strings.Contains(err.Error(), "oauth client not configured") {
+		t.Errorf("expected unconfigured error, got %v", err)
+	}
+
+	// 6. Expired token with refresh token and configured client credentials: refreshed via HTTP
 	t.Setenv(oauthClientIDEnv, "client-id")
 	t.Setenv(oauthClientSecretEnv, "client-secret")
 	writeTestToken(t, tokenPath, "expired-token", "2020-01-01T00:00:00Z", "my-refresh-token")
@@ -467,9 +495,9 @@ func TestEnsureAccessToken_Flows(t *testing.T) {
 	refreshMockClient := &http.Client{
 		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			rec := httptest.NewRecorder()
+			// Response omits refresh_token to test preservation of existing refresh token!
 			_, _ = rec.WriteString(`{
 				"access_token": "refreshed-via-oauth",
-				"refresh_token": "new-refresh-token",
 				"expires_in": 3600
 			}`)
 			return rec.Result(), nil
@@ -483,187 +511,180 @@ func TestEnsureAccessToken_Flows(t *testing.T) {
 		t.Errorf("ensureAccessToken() oauth = (%q, %v), want (refreshed-via-oauth, true)", tok, refreshed)
 	}
 
-	// 7. Expired token with refresh token where OAuth refresh fails -> falls back to ping
-	writeTestToken(t, tokenPath, "expired-token", "2020-01-01T00:00:00Z", "my-refresh-token")
-	refreshFailClient := &http.Client{
+	// Verify existing refresh token was preserved when refresh response omitted it
+	loaded, err := loadOAuthToken(tokenPath)
+	if err != nil {
+		t.Fatalf("load token error: %v", err)
+	}
+	if loaded.Token.RefreshToken != "my-refresh-token" {
+		t.Errorf("refresh token not preserved: %q", loaded.Token.RefreshToken)
+	}
+
+	// 7. Force refresh even when token is not expired (e.g. after 401 retry)
+	writeTestToken(t, tokenPath, "future-token", "2035-01-01T00:00:00Z", "my-refresh-token")
+	forceMockClient := &http.Client{
 		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			rec := httptest.NewRecorder()
-			http.Error(rec, "invalid_grant", http.StatusBadRequest)
+			_, _ = rec.WriteString(`{
+				"access_token": "forced-renewed-token",
+				"expires_in": 3600
+			}`)
 			return rec.Result(), nil
 		}),
 	}
-	tok, _, refreshed, err = ensureAccessToken(context.Background(), acct, refreshFailClient)
+	tok, _, refreshed, err = ensureAccessToken(context.Background(), acct, forceMockClient, true)
 	if err != nil {
-		t.Fatalf("ensureAccessToken() oauth fail fallback error = %v", err)
+		t.Fatalf("forced ensureAccessToken error: %v", err)
 	}
-	if tok != "ping-access-token" || !refreshed {
-		t.Errorf("ensureAccessToken() oauth fail fallback = (%q, %v), want (ping-access-token, true)", tok, refreshed)
+	if tok != "forced-renewed-token" || !refreshed {
+		t.Errorf("forced token = (%q, %v), want (forced-renewed-token, true)", tok, refreshed)
 	}
+}
 
-	// 8. Expired token where ping fails with refresh token
+func TestEnsureAccessToken_LockAndExternalUpdate(t *testing.T) {
+	t.Setenv(oauthClientIDEnv, "client-id")
+	t.Setenv(oauthClientSecretEnv, "client-secret")
+	configDir := t.TempDir()
+	tokenPath := filepath.Join(configDir, oauthTokenFile)
 	writeTestToken(t, tokenPath, "expired-token", "2020-01-01T00:00:00Z", "my-refresh-token")
-	if _, _, _, err := ensureAccessToken(context.Background(), acctFail, refreshFailClient); err == nil {
-		t.Error("expected error when both refresh and ping fail")
+
+	acct := core.AccountConfig{
+		ID:            "antigravity",
+		ProviderPaths: map[string]string{"config_dir": configDir},
 	}
 
-	// 9. Existing token file is unreadable/corrupted (non-exist error)
-	_ = os.WriteFile(tokenPath, []byte("broken json"), 0o600)
-	if _, _, _, err := ensureAccessToken(context.Background(), acct, nil); err == nil {
-		t.Error("expected error when existing token file is corrupted")
-	}
-}
-
-func TestTruncate(t *testing.T) {
-	if got := truncate("short", 10); got != "short" {
-		t.Errorf("truncate(short, 10) = %q, want 'short'", got)
-	}
-	if got := truncate("exact", 5); got != "exact" {
-		t.Errorf("truncate(exact, 5) = %q, want 'exact'", got)
-	}
-	if got := truncate("longer-string", 6); got != "longer…" {
-		t.Errorf("truncate(longer-string, 6) = %q, want 'longer…'", got)
-	}
-}
-
-func TestResolveCLI_Branches(t *testing.T) {
-	// Empty name returns empty string
-	if got := resolveCLI(""); got != "" {
-		t.Errorf("resolveCLI('') = %q, want empty string", got)
+	refreshCalls := int32(0)
+	client := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			atomic.AddInt32(&refreshCalls, 1)
+			time.Sleep(50 * time.Millisecond)
+			rec := httptest.NewRecorder()
+			_, _ = rec.WriteString(`{"access_token": "refreshed-tok", "expires_in": 3600}`)
+			return rec.Result(), nil
+		}),
 	}
 
-	// Absolute path returns as-is
-	if got := resolveCLI("/usr/bin/agy"); got != "/usr/bin/agy" {
-		t.Errorf("resolveCLI(abs) = %q, want /usr/bin/agy", got)
-	}
-
-	// Non-existent command returns name as-is
-	if got := resolveCLI("definitely-nonexistent-command-xyz"); got != "definitely-nonexistent-command-xyz" {
-		t.Errorf("resolveCLI(nonexistent) = %q, want name", got)
-	}
-}
-
-func TestResolveCLI_FindsHomeLocalBinWhenNotOnPATH(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("PATH", t.TempDir())
-
-	binDir := filepath.Join(home, ".local", "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	want := filepath.Join(binDir, "agy-box")
-	if err := os.WriteFile(want, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	got := resolveCLI("agy-box")
-	if got != want {
-		t.Fatalf("resolveCLI() = %q, want %q", got, want)
-	}
-}
-
-func TestPingBoxForToken_DefaultAgy(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	binDir := filepath.Join(home, ".local", "bin")
-	_ = os.MkdirAll(binDir, 0o755)
-
-	script := filepath.Join(binDir, "agy")
-	contents := "#!/bin/sh\n" +
-		"test \"$1\" = -p || exit 2\n" +
-		"test \"$2\" = ping || exit 3\n" +
-		"exit 0\n"
-	if err := os.WriteFile(script, []byte(contents), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", binDir)
-
-	err := pingBoxForToken(context.Background(), core.AccountConfig{
-		ID: "antigravity",
-	})
-	if err != nil {
-		t.Fatalf("pingBoxForToken() default agy = %v", err)
-	}
-}
-
-func TestPingBoxForToken_FindsAgyBoxOffPATH(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("PATH", filepath.Join(t.TempDir(), "missing"))
-
-	binDir := filepath.Join(home, ".local", "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	script := filepath.Join(binDir, "agy-box")
-	contents := "#!/bin/sh\n" +
-		"test \"$1\" = chaos || exit 2\n" +
-		"test \"$2\" = -p || exit 3\n" +
-		"test \"$3\" = ping || exit 4\n" +
-		"exit 0\n"
-	if err := os.WriteFile(script, []byte(contents), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	err := pingBoxForToken(context.Background(), core.AccountConfig{
-		ID: "antigravity-chaos",
-		RuntimeHints: map[string]string{
-			"box_name": "chaos",
-		},
-	})
-	if err != nil {
-		t.Fatalf("pingBoxForToken() = %v", err)
-	}
-}
-
-func TestPingBoxForToken_MissingBinaryIsError(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("PATH", filepath.Join(t.TempDir(), "missing"))
-
-	err := pingBoxForToken(context.Background(), core.AccountConfig{
-		ID: "antigravity-chaos",
-		RuntimeHints: map[string]string{
-			"box_name": "chaos",
-		},
-	})
-	if err == nil {
-		t.Fatal("expected ping error when agy-box is missing")
-	}
-}
-
-func TestAuth_ConcurrencyUnderRace(t *testing.T) {
-	dir := t.TempDir()
-	tokenPath := filepath.Join(dir, "token-concurrent")
-	payload := oauthTokenFilePayload{
-		Token: oauthToken{
-			AccessToken:  "concurrent-token",
-			RefreshToken: "concurrent-refresh",
-			TokenType:    "Bearer",
-			Expiry:       "2030-01-01T00:00:00Z",
-		},
-	}
-	if err := writeOAuthToken(tokenPath, payload); err != nil {
-		t.Fatal(err)
-	}
-
+	// Run concurrent ensureAccessToken calls on the same file
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	tokens := make([]string, 5)
+	for i := 0; i < 5; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			loaded, err := loadOAuthToken(tokenPath)
+			tok, _, _, err := ensureAccessToken(context.Background(), acct, client)
 			if err != nil {
-				t.Errorf("loadOAuthToken() concurrent error = %v", err)
+				t.Errorf("concurrent ensureAccessToken error: %v", err)
 				return
 			}
-			if loaded.Token.AccessToken != "concurrent-token" {
-				t.Errorf("loaded token = %q", loaded.Token.AccessToken)
-			}
-			if tokenExpired(loaded.Token, time.Now().UTC()) {
-				t.Error("expected non-expired token")
-			}
+			tokens[idx] = tok
 		}(i)
 	}
 	wg.Wait()
+
+	// Only 1 refresh call should have been made due to path locking and re-reading
+	if calls := atomic.LoadInt32(&refreshCalls); calls != 1 {
+		t.Errorf("expected 1 refresh call for concurrent callers, got %d", calls)
+	}
+	for _, tok := range tokens {
+		if tok != "refreshed-tok" {
+			t.Errorf("got token %q, want refreshed-tok", tok)
+		}
+	}
+}
+
+func TestNoAgyOrAgyBoxInvocation(t *testing.T) {
+	// Put a sentinel executable in PATH named 'agy' and 'agy-box' that fails immediately if invoked
+	fakeBin := t.TempDir()
+	t.Setenv("PATH", fakeBin+":"+os.Getenv("PATH"))
+
+	sentinelFile := filepath.Join(fakeBin, "sentinel-triggered")
+	trapScript := "#!/bin/sh\ntouch " + sentinelFile + "\nexit 99\n"
+
+	for _, name := range []string{"agy", "agy-box"} {
+		p := filepath.Join(fakeBin, name)
+		if err := os.WriteFile(p, []byte(trapScript), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	configDir := t.TempDir()
+	tokenPath := filepath.Join(configDir, oauthTokenFile)
+	acct := core.AccountConfig{
+		ID:            "antigravity-test",
+		Provider:      "antigravity",
+		ProviderPaths: map[string]string{"config_dir": configDir},
+	}
+
+	provider := New()
+
+	// Scenario 1: Missing token file
+	snap, _ := provider.Fetch(context.Background(), acct)
+	if snap.Status != core.StatusAuth {
+		t.Errorf("scenario 1 status = %q, want auth", snap.Status)
+	}
+
+	// Scenario 2: Corrupted token file
+	_ = os.WriteFile(tokenPath, []byte("bad-json"), 0o600)
+	snap, _ = provider.Fetch(context.Background(), acct)
+	if snap.Status != core.StatusAuth {
+		t.Errorf("scenario 2 status = %q, want auth", snap.Status)
+	}
+
+	// Scenario 3: Expired token without refresh token
+	writeTestToken(t, tokenPath, "expired", "2020-01-01T00:00:00Z", "")
+	snap, _ = provider.Fetch(context.Background(), acct)
+	if snap.Status != core.StatusAuth {
+		t.Errorf("scenario 3 status = %q, want auth", snap.Status)
+	}
+
+	// Scenario 4: Quota 401 error
+	t.Setenv(oauthClientIDEnv, "cid")
+	t.Setenv(oauthClientSecretEnv, "csecret")
+	writeTestToken(t, tokenPath, "valid-but-rejected", "2030-01-01T00:00:00Z", "my-refresh-token")
+
+	mockTransport := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		rec := httptest.NewRecorder()
+		if strings.Contains(req.URL.Path, "token") {
+			_, _ = rec.WriteString(`{"access_token": "new-token", "expires_in": 3600}`)
+		} else {
+			// Quota endpoint returns 401 Unauthorized
+			http.Error(rec, "unauthorized", http.StatusUnauthorized)
+		}
+		return rec.Result(), nil
+	})
+	provider.HTTPClient = &http.Client{Transport: mockTransport}
+	snap, _ = provider.Fetch(context.Background(), acct)
+	if snap.Status != core.StatusAuth {
+		t.Errorf("scenario 4 status = %q, want auth", snap.Status)
+	}
+
+	// Scenario 5: Quota 403 error
+	mock403Transport := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		rec := httptest.NewRecorder()
+		http.Error(rec, "forbidden", http.StatusForbidden)
+		return rec.Result(), nil
+	})
+	provider.HTTPClient = &http.Client{Transport: mock403Transport}
+	snap, _ = provider.Fetch(context.Background(), acct)
+	if snap.Status != core.StatusAuth {
+		t.Errorf("scenario 5 status = %q, want auth", snap.Status)
+	}
+
+	// Scenario 6: Quota 429 rate limit
+	mock429Transport := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		rec := httptest.NewRecorder()
+		rec.Header().Set("Retry-After", "60")
+		http.Error(rec, "rate limit", http.StatusTooManyRequests)
+		return rec.Result(), nil
+	})
+	provider.HTTPClient = &http.Client{Transport: mock429Transport}
+	snap, _ = provider.Fetch(context.Background(), acct)
+	if snap.Status != core.StatusLimited {
+		t.Errorf("scenario 6 status = %q, want limited", snap.Status)
+	}
+
+	// Assert sentinel file was NEVER created
+	if _, err := os.Stat(sentinelFile); err == nil {
+		t.Fatal("CRITICAL: agy or agy-box sentinel executable was invoked during auth scenarios!")
+	}
 }

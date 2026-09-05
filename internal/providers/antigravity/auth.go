@@ -3,14 +3,15 @@ package antigravity
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nurulislamz/agentusage/internal/core"
@@ -20,15 +21,38 @@ const (
 	tokenEndpoint   = "https://oauth2.googleapis.com/token"
 	oauthTokenFile  = "antigravity-oauth-token"
 	tokenExpirySkew = 60 * time.Second
-	// Optional OAuth client for token refresh. When unset, expired tokens are
-	// renewed by pinging the box (`agy-box <name> -p ping`) instead.
-	oauthClientIDEnv     = "OPENUSAGE_ANTIGRAVITY_CLIENT_ID"
-	oauthClientSecretEnv = "OPENUSAGE_ANTIGRAVITY_CLIENT_SECRET"
+
+	oauthClientIDEnv          = "OPENUSAGE_ANTIGRAVITY_CLIENT_ID"
+	oauthClientSecretEnv      = "OPENUSAGE_ANTIGRAVITY_CLIENT_SECRET"
+	oauthClientIDEnvAlias     = "ANTIGRAVITY_CLIENT_ID"
+	oauthClientSecretEnvAlias = "ANTIGRAVITY_CLIENT_SECRET"
 )
 
+// AuthError represents an authentication condition requiring user action (non-retryable).
+type AuthError struct {
+	Reason     string
+	StatusCode int
+	Message    string
+}
+
+func (e *AuthError) Error() string {
+	return e.Message
+}
+
+// RefreshTransientError represents a temporary, retryable error during token renewal.
+type RefreshTransientError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *RefreshTransientError) Error() string {
+	return e.Message
+}
+
 type oauthTokenFilePayload struct {
-	AuthMethod string     `json:"auth_method,omitempty"`
-	Token      oauthToken `json:"token"`
+	rawTop   map[string]json.RawMessage
+	rawToken map[string]json.RawMessage
+	Token    oauthToken `json:"token"`
 }
 
 type oauthToken struct {
@@ -36,6 +60,39 @@ type oauthToken struct {
 	RefreshToken string `json:"refresh_token,omitempty"`
 	TokenType    string `json:"token_type,omitempty"`
 	Expiry       string `json:"expiry,omitempty"`
+}
+
+var (
+	pathLocksMu sync.Mutex
+	pathLocks   = make(map[string]*sync.Mutex)
+)
+
+func getPathMutex(canonicalPath string) *sync.Mutex {
+	pathLocksMu.Lock()
+	defer pathLocksMu.Unlock()
+	m, ok := pathLocks[canonicalPath]
+	if !ok {
+		m = &sync.Mutex{}
+		pathLocks[canonicalPath] = m
+	}
+	return m
+}
+
+func lockTokenFile(path string) (func(), error) {
+	canonical := filepath.Clean(path)
+	memLock := getPathMutex(canonical)
+	memLock.Lock()
+
+	flockUnlock, err := lockCredentialFile(canonical)
+	if err != nil {
+		memLock.Unlock()
+		return nil, err
+	}
+
+	return func() {
+		flockUnlock()
+		memLock.Unlock()
+	}, nil
 }
 
 func configDir(acct core.AccountConfig) string {
@@ -85,7 +142,6 @@ func boxName(acct core.AccountConfig) string {
 	if dir == "" {
 		return ""
 	}
-	// ~/.agy-containers/<box>/.gemini/antigravity-cli
 	parts := strings.Split(filepath.ToSlash(dir), "/")
 	for i := 0; i+3 < len(parts); i++ {
 		if parts[i] == ".agy-containers" {
@@ -100,25 +156,109 @@ func loadOAuthToken(path string) (oauthTokenFilePayload, error) {
 	if err != nil {
 		return oauthTokenFilePayload{}, err
 	}
-	var payload oauthTokenFilePayload
-	if err := json.Unmarshal(data, &payload); err != nil {
+	var rawTop map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawTop); err != nil {
 		return oauthTokenFilePayload{}, fmt.Errorf("parse oauth token file: %w", err)
 	}
-	return payload, nil
+	if rawTop == nil {
+		return oauthTokenFilePayload{}, fmt.Errorf("empty oauth token file")
+	}
+
+	var rawToken map[string]json.RawMessage
+	var tok oauthToken
+	tokenData, ok := rawTop["token"]
+	if !ok {
+		tokenData, ok = rawTop["Token"]
+	}
+	if ok {
+		if err := json.Unmarshal(tokenData, &rawToken); err != nil {
+			return oauthTokenFilePayload{}, fmt.Errorf("parse token field: %w", err)
+		}
+		if err := json.Unmarshal(tokenData, &tok); err != nil {
+			return oauthTokenFilePayload{}, fmt.Errorf("parse token details: %w", err)
+		}
+	} else {
+		// Fallback for flat token JSON structure
+		if err := json.Unmarshal(data, &tok); err == nil && tok.AccessToken != "" {
+			_ = json.Unmarshal(data, &rawToken)
+		} else {
+			return oauthTokenFilePayload{}, fmt.Errorf("missing token in oauth token file")
+		}
+	}
+	if rawToken == nil {
+		rawToken = make(map[string]json.RawMessage)
+	}
+
+	return oauthTokenFilePayload{
+		rawTop:   rawTop,
+		rawToken: rawToken,
+		Token:    tok,
+	}, nil
 }
 
 func writeOAuthToken(path string, payload oauthTokenFilePayload) error {
-	data, err := json.MarshalIndent(payload, "", "  ")
+	if payload.rawTop == nil {
+		payload.rawTop = make(map[string]json.RawMessage)
+	}
+	if payload.rawToken == nil {
+		payload.rawToken = make(map[string]json.RawMessage)
+	}
+
+	// Preserve unknown fields inside token object while updating known token fields
+	accessBytes, err := json.Marshal(payload.Token.AccessToken)
+	if err != nil {
+		return err
+	}
+	payload.rawToken["access_token"] = accessBytes
+
+	if payload.Token.RefreshToken != "" {
+		refreshBytes, err := json.Marshal(payload.Token.RefreshToken)
+		if err != nil {
+			return err
+		}
+		payload.rawToken["refresh_token"] = refreshBytes
+	}
+
+	if payload.Token.TokenType != "" {
+		typeBytes, err := json.Marshal(payload.Token.TokenType)
+		if err != nil {
+			return err
+		}
+		payload.rawToken["token_type"] = typeBytes
+	}
+
+	if payload.Token.Expiry != "" {
+		expiryBytes, err := json.Marshal(payload.Token.Expiry)
+		if err != nil {
+			return err
+		}
+		payload.rawToken["expiry"] = expiryBytes
+	}
+
+	marshaledToken, err := json.Marshal(payload.rawToken)
+	if err != nil {
+		return err
+	}
+	payload.rawTop["token"] = marshaledToken
+
+	data, err := json.MarshalIndent(payload.rawTop, "", "  ")
 	if err != nil {
 		return err
 	}
 	data = append(data, '\n')
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".antigravity-oauth-*.tmp")
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+
+	tmp, err := os.CreateTemp(dir, ".antigravity-oauth-*.tmp")
 	if err != nil {
 		return err
 	}
 	tmpPath := tmp.Name()
 	defer func() { _ = os.Remove(tmpPath) }()
+
 	if err := tmp.Chmod(0o600); err != nil {
 		_ = tmp.Close()
 		return err
@@ -154,7 +294,13 @@ func tokenExpired(tok oauthToken, now time.Time) bool {
 
 func oauthClientCredentials() (clientID, clientSecret string, ok bool) {
 	clientID = strings.TrimSpace(os.Getenv(oauthClientIDEnv))
+	if clientID == "" {
+		clientID = strings.TrimSpace(os.Getenv(oauthClientIDEnvAlias))
+	}
 	clientSecret = strings.TrimSpace(os.Getenv(oauthClientSecretEnv))
+	if clientSecret == "" {
+		clientSecret = strings.TrimSpace(os.Getenv(oauthClientSecretEnvAlias))
+	}
 	if clientID == "" || clientSecret == "" {
 		return "", "", false
 	}
@@ -164,11 +310,51 @@ func oauthClientCredentials() (clientID, clientSecret string, ok bool) {
 func refreshAccessToken(ctx context.Context, refreshToken string, client *http.Client) (oauthToken, error) {
 	clientID, clientSecret, ok := oauthClientCredentials()
 	if !ok {
-		return oauthToken{}, fmt.Errorf("oauth client not configured (%s / %s)", oauthClientIDEnv, oauthClientSecretEnv)
+		return oauthToken{}, &AuthError{
+			Reason:  "unconfigured_client",
+			Message: fmt.Sprintf("oauth client not configured (%s / %s)", oauthClientIDEnv, oauthClientSecretEnv),
+		}
 	}
+	return refreshAccessTokenWithBackoff(ctx, refreshToken, client, clientID, clientSecret)
+}
+
+func refreshAccessTokenWithBackoff(ctx context.Context, refreshToken string, client *http.Client, clientID, clientSecret string) (oauthToken, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
+
+	var lastErr error
+	maxAttempts := 2
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return oauthToken{}, err
+		}
+
+		tok, err := doTokenRefreshRequest(ctx, refreshToken, client, clientID, clientSecret)
+		if err == nil {
+			return tok, nil
+		}
+
+		var authErr *AuthError
+		if errors.As(err, &authErr) {
+			// Non-retryable auth error
+			return oauthToken{}, err
+		}
+
+		lastErr = err
+		if attempt < maxAttempts {
+			select {
+			case <-time.After(100 * time.Millisecond):
+			case <-ctx.Done():
+				return oauthToken{}, ctx.Err()
+			}
+		}
+	}
+
+	return oauthToken{}, lastErr
+}
+
+func doTokenRefreshRequest(ctx context.Context, refreshToken string, client *http.Client, clientID, clientSecret string) (oauthToken, error) {
 	form := url.Values{
 		"client_id":     {clientID},
 		"client_secret": {clientSecret},
@@ -183,12 +369,34 @@ func refreshAccessToken(ctx context.Context, refreshToken string, client *http.C
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return oauthToken{}, err
+		return oauthToken{}, &RefreshTransientError{
+			Message: fmt.Sprintf("token endpoint network error: %v", err),
+		}
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
+
 	if resp.StatusCode != http.StatusOK {
-		return oauthToken{}, fmt.Errorf("token refresh HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
+		if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusUnauthorized {
+			var errPayload struct {
+				Error            string `json:"error"`
+				ErrorDescription string `json:"error_description"`
+			}
+			_ = json.Unmarshal(body, &errPayload)
+			reason := errPayload.Error
+			if reason == "" {
+				reason = "invalid_grant"
+			}
+			return oauthToken{}, &AuthError{
+				Reason:     reason,
+				StatusCode: resp.StatusCode,
+				Message:    fmt.Sprintf("token refresh rejected (HTTP %d: %s)", resp.StatusCode, reason),
+			}
+		}
+		return oauthToken{}, &RefreshTransientError{
+			StatusCode: resp.StatusCode,
+			Message:    fmt.Sprintf("token refresh HTTP %d: %s", resp.StatusCode, truncate(string(body), 100)),
+		}
 	}
 
 	var decoded struct {
@@ -214,151 +422,94 @@ func refreshAccessToken(ctx context.Context, refreshToken string, client *http.C
 	return tok, nil
 }
 
-func pingBoxForToken(ctx context.Context, acct core.AccountConfig, reason ...string) error {
-	reasonStr := "refresh"
-	if len(reason) > 0 && strings.TrimSpace(reason[0]) != "" {
-		reasonStr = reason[0]
-	}
-
-	timeout := 45 * time.Second
-	if reasonStr == "missing_token" {
-		timeout = 5 * time.Second
-	}
-	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	box := boxName(acct)
-
-	var cmd *exec.Cmd
-	if box != "" {
-		bin := resolveCLI("agy-box")
-		cmd = exec.CommandContext(ctx, bin, box, "-p", "ping")
-	} else {
-		bin := strings.TrimSpace(acct.Binary)
-		if bin == "" {
-			bin = "agy"
-		}
-		if !filepath.IsAbs(bin) {
-			bin = resolveCLI(bin)
-		}
-		cmd = exec.CommandContext(ctx, bin, "-p", "ping")
-	}
-	cmd.Stdin = strings.NewReader("")
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
-	cmd.Env = core.EnvironWithUserLocalBin(os.Environ())
-	cmd.WaitDelay = 2 * time.Second
-	prepareProcessGroup(cmd)
-
-	start := time.Now()
-	err := cmd.Run()
-	duration := time.Since(start)
-
-	RecordBoxPing(box, acct.ID, reasonStr, duration, err)
-
-	if err != nil {
-		if box != "" {
-			return fmt.Errorf("agy-box %s -p ping (%s): %w", box, cmd.Path, err)
-		}
-		return fmt.Errorf("%s -p ping: %w", cmd.Path, err)
-	}
-	return nil
-}
-
-// resolveCLI returns an absolute path for a box CLI when PATH (typical of
-// systemd user units) does not include ~/.local/bin.
-func resolveCLI(name string) string {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return name
-	}
-	if filepath.IsAbs(name) {
-		return name
-	}
-	if path, err := exec.LookPath(name); err == nil && strings.TrimSpace(path) != "" {
-		return path
-	}
-	if dir := core.UserLocalBinDir(); dir != "" {
-		candidate := filepath.Join(dir, name)
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-			return candidate
-		}
-	}
-	return name
-}
-
-// ensureAccessToken returns a usable access token, refreshing or pinging the
-// box when needed. refreshed reports whether the on-disk token file changed.
-func ensureAccessToken(ctx context.Context, acct core.AccountConfig, client *http.Client) (accessToken string, path string, refreshed bool, err error) {
+// ensureAccessToken returns a usable access token, refreshing directly over HTTP when expired.
+// If forceRefresh is true, a token renewal is forced even if the local expiry is in the future.
+func ensureAccessToken(ctx context.Context, acct core.AccountConfig, client *http.Client, forceRefresh ...bool) (accessToken string, path string, refreshed bool, err error) {
+	force := len(forceRefresh) > 0 && forceRefresh[0]
 	path = tokenFilePath(acct)
 	if path == "" {
-		return "", "", false, fmt.Errorf("oauth token path unavailable (set config_dir)")
+		return "", "", false, &AuthError{
+			Reason:  "no_path",
+			Message: "oauth token path unavailable (set config_dir)",
+		}
 	}
 
-	load := func() (oauthTokenFilePayload, error) {
-		return loadOAuthToken(path)
-	}
-
-	payload, err := load()
+	payload, err := loadOAuthToken(path)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return "", path, false, err
+		if os.IsNotExist(err) {
+			return "", path, false, &AuthError{
+				Reason:  "missing_file",
+				Message: fmt.Sprintf("oauth token file missing: %s", path),
+			}
 		}
-		// Missing token file: ping the box to create one.
-		if pingErr := pingBoxForToken(ctx, acct, "missing_token"); pingErr != nil {
-			return "", path, false, fmt.Errorf("missing oauth token and ping failed: %w", pingErr)
+		return "", path, false, &AuthError{
+			Reason:  "invalid_json",
+			Message: fmt.Sprintf("parse oauth token file: %v", err),
 		}
-		payload, err = load()
-		if err != nil {
-			return "", path, false, fmt.Errorf("oauth token still missing after ping: %w", err)
-		}
-		refreshed = true
 	}
 
 	now := time.Now().UTC()
-	if !tokenExpired(payload.Token, now) {
-		return payload.Token.AccessToken, path, refreshed, nil
+	if !force && !tokenExpired(payload.Token, now) {
+		return payload.Token.AccessToken, path, false, nil
+	}
+
+	// Token expired or forced: coordinate per canonical path
+	unlock, lockErr := lockTokenFile(path)
+	if lockErr != nil {
+		return "", path, false, fmt.Errorf("lock token file: %w", lockErr)
+	}
+	defer unlock()
+
+	// Re-read under lock in case another caller or process already refreshed it
+	reloaded, err := loadOAuthToken(path)
+	if err == nil {
+		if !force && !tokenExpired(reloaded.Token, time.Now().UTC()) {
+			return reloaded.Token.AccessToken, path, false, nil
+		}
+		if force && reloaded.Token.AccessToken != payload.Token.AccessToken && !tokenExpired(reloaded.Token, time.Now().UTC()) {
+			return reloaded.Token.AccessToken, path, true, nil
+		}
+		payload = reloaded
 	}
 
 	refreshTok := strings.TrimSpace(payload.Token.RefreshToken)
-	if refreshTok != "" {
-		tok, refreshErr := refreshAccessToken(ctx, refreshTok, client)
-		if refreshErr == nil {
-			if tok.RefreshToken == "" {
-				tok.RefreshToken = refreshTok
-			}
-			payload.Token = tok
-			if writeErr := writeOAuthToken(path, payload); writeErr != nil {
-				return "", path, false, fmt.Errorf("persist refreshed token: %w", writeErr)
-			}
-			return tok.AccessToken, path, true, nil
+	if refreshTok == "" {
+		return "", path, false, &AuthError{
+			Reason:  "no_refresh_token",
+			Message: "token expired and no refresh token available; please sign in",
 		}
-		// Fall through to ping when refresh fails.
-		_ = refreshErr
 	}
 
-	reasonStr := "token_expired"
-	if refreshTok == "" {
-		reasonStr = "no_refresh_token"
-	} else {
-		reasonStr = "refresh_failed"
-	}
-	if pingErr := pingBoxForToken(ctx, acct, reasonStr); pingErr != nil {
-		if refreshTok == "" {
-			return "", path, false, fmt.Errorf("no refresh token and ping failed: %w", pingErr)
+	clientID, clientSecret, ok := oauthClientCredentials()
+	if !ok {
+		return "", path, false, &AuthError{
+			Reason:  "unconfigured_client",
+			Message: fmt.Sprintf("oauth client not configured (%s / %s); please configure credentials or sign in", oauthClientIDEnv, oauthClientSecretEnv),
 		}
-		return "", path, false, fmt.Errorf("token refresh failed and ping failed: %w", pingErr)
 	}
-	payload, err = load()
-	if err != nil {
-		return "", path, false, fmt.Errorf("oauth token unreadable after ping: %w", err)
+
+	newTok, refreshErr := refreshAccessTokenWithBackoff(ctx, refreshTok, client, clientID, clientSecret)
+	if refreshErr != nil {
+		return "", path, false, refreshErr
 	}
-	if tokenExpired(payload.Token, time.Now().UTC()) && strings.TrimSpace(payload.Token.AccessToken) == "" {
-		return "", path, false, fmt.Errorf("oauth token still unusable after ping")
+
+	if newTok.RefreshToken == "" {
+		newTok.RefreshToken = refreshTok
 	}
-	return payload.Token.AccessToken, path, true, nil
+	payload.Token = newTok
+
+	// Detect if an external process updated the file with a valid token while we refreshed
+	if curPayload, curErr := loadOAuthToken(path); curErr == nil {
+		if curPayload.Token.AccessToken != reloaded.Token.AccessToken && !tokenExpired(curPayload.Token, time.Now().UTC()) {
+			return curPayload.Token.AccessToken, path, true, nil
+		}
+	}
+
+	if writeErr := writeOAuthToken(path, payload); writeErr != nil {
+		return "", path, false, fmt.Errorf("persist refreshed token: %w", writeErr)
+	}
+
+	return newTok.AccessToken, path, true, nil
 }
 
 func truncate(s string, n int) string {

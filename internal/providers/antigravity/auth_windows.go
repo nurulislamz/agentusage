@@ -2,6 +2,6 @@
 
 package antigravity
 
-import "os/exec"
-
-func prepareProcessGroup(cmd *exec.Cmd) {}
+func lockCredentialFile(path string) (func(), error) {
+	return func() {}, nil
+}

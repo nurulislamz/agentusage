@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -15,6 +16,35 @@ const (
 	defaultQuotaEndpoint = "https://daily-cloudcode-pa.googleapis.com/v1internal"
 	quotaUserAgent       = "antigravity"
 )
+
+// APIError represents a typed HTTP error returned by the Antigravity quota API.
+type APIError struct {
+	StatusCode int
+	Message    string
+	RetryAfter time.Duration
+}
+
+func (e *APIError) Error() string {
+	if e.Message != "" {
+		return fmt.Sprintf("retrieveUserQuotaSummary HTTP %d: %s", e.StatusCode, e.Message)
+	}
+	return fmt.Sprintf("retrieveUserQuotaSummary HTTP %d", e.StatusCode)
+}
+
+// IsUnauthorized reports whether the error is HTTP 401 Unauthorized.
+func (e *APIError) IsUnauthorized() bool {
+	return e != nil && e.StatusCode == http.StatusUnauthorized
+}
+
+// IsForbidden reports whether the error is HTTP 403 Forbidden.
+func (e *APIError) IsForbidden() bool {
+	return e != nil && e.StatusCode == http.StatusForbidden
+}
+
+// IsRateLimited reports whether the error is HTTP 429 Too Many Requests.
+func (e *APIError) IsRateLimited() bool {
+	return e != nil && e.StatusCode == http.StatusTooManyRequests
+}
 
 type quotaSummaryResponse struct {
 	Groups      []quotaGroup `json:"groups"`
@@ -60,7 +90,17 @@ func retrieveUserQuotaSummary(ctx context.Context, accessToken, baseURL string, 
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return quotaSummaryResponse{}, fmt.Errorf("retrieveUserQuotaSummary HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
+		var retryAfter time.Duration
+		if raStr := resp.Header.Get("Retry-After"); raStr != "" {
+			if secs, err := strconv.Atoi(raStr); err == nil && secs > 0 {
+				retryAfter = time.Duration(secs) * time.Second
+			}
+		}
+		return quotaSummaryResponse{}, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    truncate(string(body), 200),
+			RetryAfter: retryAfter,
+		}
 	}
 
 	var decoded quotaSummaryResponse
@@ -70,15 +110,15 @@ func retrieveUserQuotaSummary(ctx context.Context, accessToken, baseURL string, 
 	return decoded, nil
 }
 
-func quotaMapFromSummary(summary quotaSummaryResponse) map[string]statusLineQuota {
-	out := make(map[string]statusLineQuota)
+func quotaMapFromSummary(summary quotaSummaryResponse) map[string]quotaBucketState {
+	out := make(map[string]quotaBucketState)
 	for _, group := range summary.Groups {
 		for _, bucket := range group.Buckets {
 			id := strings.TrimSpace(bucket.BucketID)
 			if id == "" {
 				continue
 			}
-			out[id] = statusLineQuota{
+			out[id] = quotaBucketState{
 				RemainingFraction: bucket.RemainingFraction,
 				ResetTime:         strings.TrimSpace(bucket.ResetTime),
 			}

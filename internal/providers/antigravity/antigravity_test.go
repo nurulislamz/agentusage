@@ -2,13 +2,11 @@ package antigravity
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -288,6 +286,9 @@ func TestFetch_APIAuth401Error_RetrySucceeds(t *testing.T) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		if r.Header.Get("Authorization") != "Bearer refreshed-token" {
+			t.Errorf("expected bearer refreshed-token, got %s", r.Header.Get("Authorization"))
+		}
 		_, _ = w.Write([]byte(`{
 			"groups":[{"buckets":[
 				{"bucketId":"gemini-5h","remainingFraction":0.8,"resetTime":"2030-01-01T00:00:00Z"}
@@ -296,28 +297,27 @@ func TestFetch_APIAuth401Error_RetrySucceeds(t *testing.T) {
 	}))
 	defer quotaServer.Close()
 
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Setenv(oauthClientIDEnv, "cid")
+	t.Setenv(oauthClientSecretEnv, "csec")
+
 	configDir := t.TempDir()
 	tokenPath := filepath.Join(configDir, oauthTokenFile)
-	writeTestToken(t, tokenPath, "initial-token", "2030-01-01T00:00:00Z", "")
-
-	// Create a mock agy binary that updates the token file on ping
-	binDir := filepath.Join(home, ".local", "bin")
-	_ = os.MkdirAll(binDir, 0o755)
-	mockAgy := filepath.Join(binDir, "agy")
-	mockScript := fmt.Sprintf("#!/bin/sh\ncat << 'EOF' > %q\n{\n  \"token\": {\n    \"access_token\": \"refreshed-token\",\n    \"expiry\": \"2030-01-01T00:00:00Z\"\n  }\n}\nEOF\nexit 0\n", tokenPath)
-	if err := os.WriteFile(mockAgy, []byte(mockScript), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
+	writeTestToken(t, tokenPath, "initial-token", "2030-01-01T00:00:00Z", "my-refresh-token")
 
 	p := New()
-	p.HTTPClient = quotaServer.Client()
+	p.HTTPClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "token") {
+				rec := httptest.NewRecorder()
+				_, _ = rec.WriteString(`{"access_token": "refreshed-token", "expires_in": 3600}`)
+				return rec.Result(), nil
+			}
+			return quotaServer.Client().Transport.RoundTrip(req)
+		}),
+	}
 	snap, err := p.Fetch(context.Background(), core.AccountConfig{
 		ID:       "antigravity",
 		Provider: "antigravity",
-		Binary:   mockAgy,
 		ProviderPaths: map[string]string{
 			"config_dir": configDir,
 		},
@@ -342,15 +342,27 @@ func TestFetch_APIAuth401Error_RetryFails(t *testing.T) {
 	}))
 	defer quotaServer.Close()
 
+	t.Setenv(oauthClientIDEnv, "cid")
+	t.Setenv(oauthClientSecretEnv, "csec")
+
 	configDir := t.TempDir()
-	writeTestToken(t, filepath.Join(configDir, oauthTokenFile), "rejected-token", "2030-01-01T00:00:00Z", "")
+	tokenPath := filepath.Join(configDir, oauthTokenFile)
+	writeTestToken(t, tokenPath, "rejected-token", "2030-01-01T00:00:00Z", "my-refresh-token")
 
 	p := New()
-	p.HTTPClient = quotaServer.Client()
+	p.HTTPClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "token") {
+				rec := httptest.NewRecorder()
+				_, _ = rec.WriteString(`{"access_token": "second-rejected-token", "expires_in": 3600}`)
+				return rec.Result(), nil
+			}
+			return quotaServer.Client().Transport.RoundTrip(req)
+		}),
+	}
 	snap, err := p.Fetch(context.Background(), core.AccountConfig{
 		ID:       "antigravity",
 		Provider: "antigravity",
-		Binary:   "/no/such/agy-binary",
 		ProviderPaths: map[string]string{
 			"config_dir": configDir,
 		},
@@ -369,42 +381,138 @@ func TestFetch_APIAuth401Error_RetryFails(t *testing.T) {
 	}
 }
 
-func TestIsAuthHTTPError(t *testing.T) {
-	if isAuthHTTPError(nil) {
-		t.Error("nil error should not be auth HTTP error")
+func TestFetch_APIAuth403Error_NoRefresh(t *testing.T) {
+	quotaServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+	}))
+	defer quotaServer.Close()
+
+	tokenRefreshed := false
+	p := New()
+	p.HTTPClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "token") {
+				tokenRefreshed = true
+			}
+			return quotaServer.Client().Transport.RoundTrip(req)
+		}),
 	}
-	if !isAuthHTTPError(errors.New("retrieveUserQuotaSummary HTTP 401: Unauthorized")) {
-		t.Error("HTTP 401 should be auth error")
+
+	configDir := t.TempDir()
+	tokenPath := filepath.Join(configDir, oauthTokenFile)
+	writeTestToken(t, tokenPath, "valid-token", "2030-01-01T00:00:00Z", "refresh-token")
+
+	snap, err := p.Fetch(context.Background(), core.AccountConfig{
+		ID:       "antigravity",
+		Provider: "antigravity",
+		ProviderPaths: map[string]string{
+			"config_dir": configDir,
+		},
+		RuntimeHints: map[string]string{
+			"quota_endpoint": quotaServer.URL + "/v1internal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch() error = %v", err)
 	}
-	if !isAuthHTTPError(errors.New("retrieveUserQuotaSummary HTTP 403: Forbidden")) {
-		t.Error("HTTP 403 should be auth error")
+	if snap.Status != core.StatusAuth {
+		t.Errorf("status = %q, want auth", snap.Status)
 	}
-	if isAuthHTTPError(errors.New("retrieveUserQuotaSummary HTTP 500: Server Error")) {
-		t.Error("HTTP 500 should not be auth error")
+	if tokenRefreshed {
+		t.Error("403 error must not trigger token refresh")
 	}
-	if isAuthHTTPError(errors.New("network connection reset")) {
-		t.Error("network error should not be auth error")
+}
+
+func TestFetch_API429RateLimit_NoRefresh(t *testing.T) {
+	quotaServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "45")
+		http.Error(w, "too many requests", http.StatusTooManyRequests)
+	}))
+	defer quotaServer.Close()
+
+	tokenRefreshed := false
+	p := New()
+	p.HTTPClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "token") {
+				tokenRefreshed = true
+			}
+			return quotaServer.Client().Transport.RoundTrip(req)
+		}),
+	}
+
+	configDir := t.TempDir()
+	tokenPath := filepath.Join(configDir, oauthTokenFile)
+	writeTestToken(t, tokenPath, "valid-token", "2030-01-01T00:00:00Z", "refresh-token")
+
+	snap, err := p.Fetch(context.Background(), core.AccountConfig{
+		ID:       "antigravity",
+		Provider: "antigravity",
+		ProviderPaths: map[string]string{
+			"config_dir": configDir,
+		},
+		RuntimeHints: map[string]string{
+			"quota_endpoint": quotaServer.URL + "/v1internal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch() error = %v", err)
+	}
+	if snap.Status != core.StatusLimited {
+		t.Errorf("status = %q, want limited", snap.Status)
+	}
+	if snap.Diagnostics["retry_after"] != "45s" {
+		t.Errorf("retry_after = %q, want 45s", snap.Diagnostics["retry_after"])
+	}
+	if tokenRefreshed {
+		t.Error("429 error must not trigger token refresh")
+	}
+}
+
+func TestAPIError_Classification(t *testing.T) {
+	err401 := &APIError{StatusCode: 401}
+	if !err401.IsUnauthorized() {
+		t.Error("401 should be unauthorized")
+	}
+	if err401.IsForbidden() || err401.IsRateLimited() {
+		t.Error("401 should not be forbidden or rate limited")
+	}
+
+	err403 := &APIError{StatusCode: 403}
+	if !err403.IsForbidden() {
+		t.Error("403 should be forbidden")
+	}
+	if err403.IsUnauthorized() || err403.IsRateLimited() {
+		t.Error("403 should not be unauthorized or rate limited")
+	}
+
+	err429 := &APIError{StatusCode: 429, RetryAfter: 30 * time.Second}
+	if !err429.IsRateLimited() {
+		t.Error("429 should be rate limited")
+	}
+	if err429.IsUnauthorized() || err429.IsForbidden() {
+		t.Error("429 should not be unauthorized or forbidden")
 	}
 }
 
 func TestProjectSnapshot_AttributesAndEdgeCases(t *testing.T) {
 	// Nil snapshot should be safe no-op
-	projectSnapshot(nil, statusLinePayload{})
+	projectSnapshot(nil, quotaPayload{})
 
 	var snap core.UsageSnapshot
 	snap.Attributes = make(map[string]string)
 	snap.Metrics = make(map[string]core.Metric)
 	snap.Resets = make(map[string]time.Time)
 
-	payload := statusLinePayload{
+	payload := quotaPayload{
 		Product:  "antigravity-pro",
 		PlanTier: "enterprise",
 		Email:    "developer@example.com",
-		Model: statusLineModel{
+		Model: quotaModel{
 			ID:          "gemini-2.5-flash",
 			DisplayName: "Gemini 2.5 Flash",
 		},
-		Quota: map[string]statusLineQuota{
+		Quota: map[string]quotaBucketState{
 			"gemini_5h": {
 				RemainingFraction: core.Float64Ptr(0.75),
 			},
@@ -438,11 +546,11 @@ func TestProjectSnapshot_AttributesAndEdgeCases(t *testing.T) {
 	snap2.Metrics = make(map[string]core.Metric)
 	snap2.Resets = make(map[string]time.Time)
 
-	payload2 := statusLinePayload{
-		Model: statusLineModel{
+	payload2 := quotaPayload{
+		Model: quotaModel{
 			ID: "claude-3-7-sonnet",
 		},
-		Quota: map[string]statusLineQuota{
+		Quota: map[string]quotaBucketState{
 			"claude_5h": {
 				RemainingFraction: core.Float64Ptr(0.9),
 			},
@@ -456,9 +564,9 @@ func TestProjectSnapshot_AttributesAndEdgeCases(t *testing.T) {
 
 func TestProjectQuotaMetrics_AdvancesPastReset(t *testing.T) {
 	past := time.Now().UTC().Add(-10 * time.Minute)
-	payload := statusLinePayload{
+	payload := quotaPayload{
 		ReceivedAt: past.Add(-5 * time.Minute),
-		Quota: map[string]statusLineQuota{
+		Quota: map[string]quotaBucketState{
 			"gemini-weekly": {
 				RemainingFraction: core.Float64Ptr(0),
 				ResetTime:         past.Format(time.RFC3339Nano),
@@ -492,8 +600,8 @@ func TestProjectQuotaMetrics_AdvancesPastReset(t *testing.T) {
 
 func TestProjectQuotaMetrics_SynthesisAndAliasing(t *testing.T) {
 	// Synthesize 5h from weekly when 5h is missing
-	payload := statusLinePayload{
-		Quota: map[string]statusLineQuota{
+	payload := quotaPayload{
+		Quota: map[string]quotaBucketState{
 			"gemini_weekly": {
 				RemainingFraction: core.Float64Ptr(0.85),
 				ResetTime:         "2030-01-01T00:00:00Z",
@@ -532,8 +640,8 @@ func TestProjectQuotaMetrics_SynthesisAndAliasing(t *testing.T) {
 	snap2.Metrics = make(map[string]core.Metric)
 	snap2.Resets = make(map[string]time.Time)
 
-	payload2 := statusLinePayload{
-		Quota: map[string]statusLineQuota{
+	payload2 := quotaPayload{
+		Quota: map[string]quotaBucketState{
 			"3p_5h": {
 				RemainingFraction: core.Float64Ptr(0.44),
 				ResetTime:         "2030-01-01T00:00:00Z",
@@ -555,9 +663,9 @@ func TestProjectQuotaMetrics_SynthesisAndAliasing(t *testing.T) {
 
 func TestProjectQuotaMetrics_ActivePoolSelection(t *testing.T) {
 	// Active pool Claude selects Claude worst over Gemini
-	payload := statusLinePayload{
-		Model: statusLineModel{DisplayName: "Claude 3.7 Sonnet"},
-		Quota: map[string]statusLineQuota{
+	payload := quotaPayload{
+		Model: quotaModel{DisplayName: "Claude 3.7 Sonnet"},
+		Quota: map[string]quotaBucketState{
 			"gemini_5h": {RemainingFraction: core.Float64Ptr(0.1)},
 			"claude_5h": {RemainingFraction: core.Float64Ptr(0.8)},
 		},
@@ -598,7 +706,7 @@ func TestProjectQuotaMetrics_ActivePoolSelection(t *testing.T) {
 		Metrics: make(map[string]core.Metric),
 		Resets:  make(map[string]time.Time),
 	}
-	projectQuotaMetrics(&snapEmpty, statusLinePayload{})
+	projectQuotaMetrics(&snapEmpty, quotaPayload{})
 	if _, ok := snapEmpty.Metrics["quota"]; ok {
 		t.Error("expected no overall quota metric for empty payload")
 	}
@@ -609,13 +717,13 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		name       string
 		model      string
 		snapAttr   string
-		quotas     map[string]statusLineQuota
+		quotas     map[string]quotaBucketState
 		wantStatus core.Status
 	}{
 		{
 			name:  "gemini model - exhausted (0%)",
 			model: "gemini-2.5-pro",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"gemini_5h": {RemainingFraction: core.Float64Ptr(0.0)},
 			},
 			wantStatus: core.StatusLimited,
@@ -623,7 +731,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "gemini model - near limit (10%)",
 			model: "gemini-2.5-pro",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"gemini_5h": {RemainingFraction: core.Float64Ptr(0.10)},
 			},
 			wantStatus: core.StatusNearLimit,
@@ -631,7 +739,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "gemini model - ok (50%)",
 			model: "gemini-2.5-pro",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"gemini_5h": {RemainingFraction: core.Float64Ptr(0.50)},
 			},
 			wantStatus: core.StatusOK,
@@ -639,7 +747,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "claude model - exhausted",
 			model: "claude-3-7-sonnet",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"claude_5h": {RemainingFraction: core.Float64Ptr(0.0)},
 			},
 			wantStatus: core.StatusLimited,
@@ -647,7 +755,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "claude model - near limit",
 			model: "claude-3-7-sonnet",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"claude_5h": {RemainingFraction: core.Float64Ptr(0.14)},
 			},
 			wantStatus: core.StatusNearLimit,
@@ -655,7 +763,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "claude model - ok",
 			model: "claude-3-7-sonnet",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"claude_5h": {RemainingFraction: core.Float64Ptr(0.90)},
 			},
 			wantStatus: core.StatusOK,
@@ -663,7 +771,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "no model specified - both exhausted -> Limited",
 			model: "",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"gemini_5h": {RemainingFraction: core.Float64Ptr(0.0)},
 				"claude_5h": {RemainingFraction: core.Float64Ptr(0.0)},
 			},
@@ -672,7 +780,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "no model specified - both near limit -> NearLimit",
 			model: "",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"gemini_5h": {RemainingFraction: core.Float64Ptr(0.10)},
 				"claude_5h": {RemainingFraction: core.Float64Ptr(0.12)},
 			},
@@ -681,7 +789,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "no model specified - one 0 and other near limit -> NearLimit",
 			model: "",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"gemini_5h": {RemainingFraction: core.Float64Ptr(0.0)},
 				"claude_5h": {RemainingFraction: core.Float64Ptr(0.10)},
 			},
@@ -690,7 +798,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "no model specified - reverse one 0 and other near limit -> NearLimit",
 			model: "",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"gemini_5h": {RemainingFraction: core.Float64Ptr(0.10)},
 				"claude_5h": {RemainingFraction: core.Float64Ptr(0.0)},
 			},
@@ -699,7 +807,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "no model specified - one 0 and other healthy -> OK",
 			model: "",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"gemini_5h": {RemainingFraction: core.Float64Ptr(0.0)},
 				"claude_5h": {RemainingFraction: core.Float64Ptr(0.80)},
 			},
@@ -708,7 +816,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "generic pool only - exhausted -> Limited",
 			model: "",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"custom_pool": {RemainingFraction: core.Float64Ptr(0.0)},
 			},
 			wantStatus: core.StatusLimited,
@@ -716,7 +824,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "generic pool only - near limit -> NearLimit",
 			model: "",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"custom_pool": {RemainingFraction: core.Float64Ptr(0.08)},
 			},
 			wantStatus: core.StatusNearLimit,
@@ -724,7 +832,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:  "generic pool only - healthy -> OK",
 			model: "",
-			quotas: map[string]statusLineQuota{
+			quotas: map[string]quotaBucketState{
 				"custom_pool": {RemainingFraction: core.Float64Ptr(0.75)},
 			},
 			wantStatus: core.StatusOK,
@@ -732,7 +840,7 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 		{
 			name:       "empty quota -> OK",
 			model:      "",
-			quotas:     map[string]statusLineQuota{},
+			quotas:     map[string]quotaBucketState{},
 			wantStatus: core.StatusOK,
 		},
 	}
@@ -745,8 +853,8 @@ func TestStatusFromQuota_ComprehensiveMatrix(t *testing.T) {
 			if tc.snapAttr != "" {
 				snap.Attributes["model"] = tc.snapAttr
 			}
-			payload := statusLinePayload{
-				Model: statusLineModel{DisplayName: tc.model},
+			payload := quotaPayload{
+				Model: quotaModel{DisplayName: tc.model},
 				Quota: tc.quotas,
 			}
 			got := statusFromQuota(snap, payload)
@@ -770,13 +878,13 @@ func TestWorstQuotaFraction_AndClamp(t *testing.T) {
 	}
 
 	// Empty payload
-	if _, ok := worstQuotaFraction(statusLinePayload{}); ok {
+	if _, ok := worstQuotaFraction(quotaPayload{}); ok {
 		t.Error("worstQuotaFraction should be false for empty payload")
 	}
 
 	// Payload with all nil or disabled
-	payload := statusLinePayload{
-		Quota: map[string]statusLineQuota{
+	payload := quotaPayload{
+		Quota: map[string]quotaBucketState{
 			"q1": {RemainingFraction: nil},
 			"q2": {RemainingFraction: core.Float64Ptr(0.2), Disabled: true},
 		},
@@ -786,8 +894,8 @@ func TestWorstQuotaFraction_AndClamp(t *testing.T) {
 	}
 
 	// Payload with valid items
-	payload.Quota["q3"] = statusLineQuota{RemainingFraction: core.Float64Ptr(0.35)}
-	payload.Quota["q4"] = statusLineQuota{RemainingFraction: core.Float64Ptr(0.85)}
+	payload.Quota["q3"] = quotaBucketState{RemainingFraction: core.Float64Ptr(0.35)}
+	payload.Quota["q4"] = quotaBucketState{RemainingFraction: core.Float64Ptr(0.85)}
 	if worst, ok := worstQuotaFraction(payload); !ok || math.Abs(worst-0.35) > 0.001 {
 		t.Errorf("worstQuotaFraction = (%v, %v), want (0.35, true)", worst, ok)
 	}
@@ -816,33 +924,33 @@ func TestQuotaResetTime_Parsing(t *testing.T) {
 	receivedAt := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 
 	// RFC3339Nano
-	qNano := statusLineQuota{ResetTime: "2026-08-31T17:00:00.123456789Z"}
+	qNano := quotaBucketState{ResetTime: "2026-08-31T17:00:00.123456789Z"}
 	if got := quotaResetTime(qNano, receivedAt); got.IsZero() || got.Nanosecond() != 123456789 {
 		t.Errorf("quotaResetTime RFC3339Nano = %v", got)
 	}
 
 	// RFC3339
-	qRFC := statusLineQuota{ResetTime: "2026-08-31T17:00:00Z"}
+	qRFC := quotaBucketState{ResetTime: "2026-08-31T17:00:00Z"}
 	if got := quotaResetTime(qRFC, receivedAt); got.IsZero() || got.Hour() != 17 {
 		t.Errorf("quotaResetTime RFC3339 = %v", got)
 	}
 
 	// ResetInSeconds fallback
 	sec := int64(3600)
-	qSec := statusLineQuota{ResetInSeconds: &sec}
+	qSec := quotaBucketState{ResetInSeconds: &sec}
 	wantSec := receivedAt.Add(time.Hour)
 	if got := quotaResetTime(qSec, receivedAt); !got.Equal(wantSec) {
 		t.Errorf("quotaResetTime ResetInSeconds = %v, want %v", got, wantSec)
 	}
 
 	// Empty ResetTime and nil ResetInSeconds
-	qEmpty := statusLineQuota{}
+	qEmpty := quotaBucketState{}
 	if got := quotaResetTime(qEmpty, receivedAt); !got.IsZero() {
 		t.Errorf("quotaResetTime empty = %v, want zero time", got)
 	}
 
 	// Invalid ResetTime format and nil ResetInSeconds
-	qInvalid := statusLineQuota{ResetTime: "invalid-time-format"}
+	qInvalid := quotaBucketState{ResetTime: "invalid-time-format"}
 	if got := quotaResetTime(qInvalid, receivedAt); !got.IsZero() {
 		t.Errorf("quotaResetTime invalid = %v, want zero time", got)
 	}
@@ -850,12 +958,12 @@ func TestQuotaResetTime_Parsing(t *testing.T) {
 
 func TestPayloadReceivedAt(t *testing.T) {
 	customTime := time.Date(2026, 8, 31, 10, 0, 0, 0, time.UTC)
-	pCustom := statusLinePayload{ReceivedAt: customTime}
+	pCustom := quotaPayload{ReceivedAt: customTime}
 	if got := payloadReceivedAt(pCustom); !got.Equal(customTime) {
 		t.Errorf("payloadReceivedAt(custom) = %v, want %v", got, customTime)
 	}
 
-	pZero := statusLinePayload{}
+	pZero := quotaPayload{}
 	if got := payloadReceivedAt(pZero); got.IsZero() || time.Since(got) > time.Minute {
 		t.Errorf("payloadReceivedAt(zero) = %v, expected recent time", got)
 	}
@@ -1057,11 +1165,7 @@ func writeTestToken(t *testing.T, path, access, expiry, refresh string) {
 			Expiry:       expiry,
 		},
 	}
-	data, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	if err := writeOAuthToken(path, payload); err != nil {
 		t.Fatal(err)
 	}
 }
