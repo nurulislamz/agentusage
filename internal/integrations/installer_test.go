@@ -118,8 +118,8 @@ func TestInstallCodex(t *testing.T) {
 		}
 	} else {
 		// Windows: the agentusage binary is registered directly with the
-		// telemetry hook subcommand instead of a script file.
-		if !strings.Contains(configStr, "telemetry") || !strings.Contains(configStr, "hook") || !strings.Contains(configStr, "codex") {
+		// daemon hook subcommand instead of a script file.
+		if !strings.Contains(configStr, "daemon") || !strings.Contains(configStr, "hook") || !strings.Contains(configStr, "codex") {
 			t.Fatalf("config missing binary notify registration: %s", configStr)
 		}
 	}

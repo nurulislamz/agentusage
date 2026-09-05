@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -68,21 +67,12 @@ func runDashboard(cfg config.Config) {
 		enrich: func(snaps map[string]core.UsageSnapshot) {
 			enrichCtx, enrichCancel := context.WithTimeout(ctx, 8*time.Second)
 			defer enrichCancel()
-			var wg sync.WaitGroup
-			wg.Add(3)
-			go func() {
-				defer wg.Done()
-				cursorProv.EnrichSnapshots(enrichCtx, cachedAccounts, snaps)
-			}()
-			go func() {
-				defer wg.Done()
-				antigravityProv.EnrichSnapshots(enrichCtx, cachedAccounts, snaps)
-			}()
-			go func() {
-				defer wg.Done()
-				opencodeProv.EnrichSnapshots(enrichCtx, cachedAccounts, snaps)
-			}()
-			wg.Wait()
+			// Sequential: each EnrichSnapshots already parallelizes per-account
+			// Fetch, then writes snaps[id]. Concurrent EnrichSnapshots on the
+			// same map races (fatal: concurrent map writes) even on different keys.
+			cursorProv.EnrichSnapshots(enrichCtx, cachedAccounts, snaps)
+			antigravityProv.EnrichSnapshots(enrichCtx, cachedAccounts, snaps)
+			opencodeProv.EnrichSnapshots(enrichCtx, cachedAccounts, snaps)
 		},
 	}
 

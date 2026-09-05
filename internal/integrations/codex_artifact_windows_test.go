@@ -11,8 +11,8 @@ func TestCodexNotifyTOMLWindowsUsesLiteralStrings(t *testing.T) {
 	exe := `C:\Users\someone\AppData\Local\agentusage\agentusage.exe`
 	got := codexNotifyTOML(exe)
 
-	// Must register the binary directly with the telemetry hook subcommand.
-	want := "notify = ['" + exe + "', 'telemetry', 'hook', 'codex']"
+	// Must register the binary directly with the daemon hook subcommand.
+	want := "notify = ['" + exe + "', 'daemon', 'hook', 'codex']"
 	if got != want {
 		t.Fatalf("codexNotifyTOML = %q, want %q", got, want)
 	}
@@ -28,6 +28,12 @@ func TestCodexNotifyTOMLWindowsUsesLiteralStrings(t *testing.T) {
 	// And the detector must recognize this registration as configured.
 	if !codexConfigured(got + "\n") {
 		t.Fatalf("codexConfigured did not recognize the Windows notify registration: %q", got)
+	}
+
+	// Legacy telemetry hook registrations from older installs must still count.
+	legacy := "notify = ['" + exe + "', 'telemetry', 'hook', 'codex']"
+	if !codexConfigured(legacy + "\n") {
+		t.Fatalf("codexConfigured did not recognize legacy telemetry hook registration: %q", legacy)
 	}
 }
 
