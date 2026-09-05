@@ -114,13 +114,21 @@ func (m Model) renderMatrixView(w, h int) string {
 			statusCol := StatusColor(effStatus)
 			statusIco := StatusIcon(effStatus)
 			ico := lipgloss.NewStyle().Foreground(statusCol).Render(statusIco)
+			act := ResolveRecentActivity(snap, now)
+			maxAccLen := 16
+			if act.ActiveRecently {
+				maxAccLen = 14
+			}
 			accName := snap.AccountID
-			if len(accName) > 16 {
-				accName = accName[:15] + "…"
+			if len(accName) > maxAccLen {
+				accName = accName[:maxAccLen-1] + "…"
 			}
 			accStyled := lipgloss.NewStyle().Foreground(colorText).Render(accName)
 			if selected {
 				accStyled = lipgloss.NewStyle().Bold(true).Foreground(pColor).Render(accName)
+			}
+			if act.ActiveRecently {
+				accStyled += " " + RenderActivityDot()
 			}
 			accCol := padRight(fmt.Sprintf("%s %s", ico, accStyled), 20)
 

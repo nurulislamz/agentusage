@@ -1,4 +1,6 @@
-# agentUsage User Flow Diagrams (Functional Guide)
+# agentUsage User Flow Diagrams
+
+> **2026-09-05 proposal:** [Section 1.1](#11-proposed-simplified-usage-flow) shows the simplified target experience. The remaining detailed flows and the quick-reference table are archived reference material awaiting implementation; they do not describe the proposed command surface. [Implementation plan and agent handoff](superpowers/plans/2026-09-05-usage-simplification.md).
 
 > [!NOTE]
 > Looking for deep architectural details, internal Go packages, socket handlers, mutex locks, and SQLite schema mechanics? See [Command Flow Architecture & Swimlane Diagrams](COMMAND_FLOW_DIAGRAMS.md). This document focuses exclusively on the **functional user experience**—what each feature does, how it behaves, what keystrokes or flags you use, and what outputs you see.
@@ -11,7 +13,7 @@ Pre-rendered SVG diagrams are embedded for direct viewing in GitHub, VS Code, an
 
 ---
 
-## Quick Reference: Feature Flow Index
+## Archived Reference: Feature Flow Index
 
 | Category | Command / Feature | What It Does |
 |---|---|---|
@@ -40,14 +42,13 @@ The primary interface of `agentUsage` is a full-screen, high-performance termina
 
 ---
 
-### 1.1 `agentusage` (Launch Interactive Terminal Dashboard)
+### 1.1 Proposed simplified usage flow
 
-#### What does it do?
-Launches the full-screen Bubble Tea terminal interface in your terminal's alternate screen (`AltScreen`). It displays active AI coding providers, color-coded rate limit gauges, current token consumption, estimated spend in USD, 5-hour rolling limits, and countdown timers until rate limits reset.
+**Planned behavior, not yet implemented.** This is the target for the [usage simplification implementation plan](superpowers/plans/2026-09-05-usage-simplification.md).
 
-#### Functional Sequence Diagram
+Sign in with your provider tool, open agentUsage, and see usage. Saved credentials supply access to quota APIs; Antigravity renews access directly when its refresh token and OAuth client configuration are available. Other providers keep their supported login methods. Local usage history remains available where APIs do not supply token/spend detail.
 
-![User Flow: Launch Terminal Dashboard](diagrams/user_01_dashboard_launch.svg)
+![Proposed user flow: Open and view usage](diagrams/user_01_dashboard_launch.svg)
 
 <details>
 <summary>View Diagram Source</summary>
@@ -55,73 +56,69 @@ Launches the full-screen Bubble Tea terminal interface in your terminal's altern
 ```plantuml
 @startuml
 autonumber
-skinparam BoxPadding 15
-skinparam ParticipantPadding 15
-
-box "User & Terminal" #F1F5F9
-    actor User as "Developer"
-    participant TTY as "Terminal Screen (TTY)"
+skinparam sequenceMessageAlign center
+skinparam backgroundColor #FFFFFF
+box "Developer" #F1F5F9
+    actor User
 end box
-
-box "agentUsage TUI" #DBEAFE
-    participant App as "agentUsage App"
+box "Usage display" #DBEAFE
+    participant App as "agentUsage\nTerminal / Web / get"
 end box
-
-box "Telemetry & Providers" #FEF3C7
-    participant Daemon as "Telemetry Daemon\n(or Direct Fallback)"
-    participant Providers as "AI Providers\n(OpenAI, Claude, Cursor...)"
+box "Existing provider login" #FEF3C7
+    participant Login as "Saved account login"
+    participant API as "Provider usage API"
 end box
-
-User -> App : Run "agentusage" (or "agu")
+User -> Login : Sign in once with the provider tool
+User -> App : Open agentusage
 activate App
-
-App -> TTY : Enter AltScreen & enable mouse motion
-activate TTY
-TTY --> User : Blank AltScreen canvas initialized
-
-App -> Daemon : Request latest usage snapshots (/v1/snapshots)
-activate Daemon
-
-alt Daemon is running
-    Daemon --> App : Instant cached snapshot frame
-else Daemon offline
-    Daemon -> Providers : Poll active provider APIs concurrently
-    activate Providers
-    Providers --> Daemon : Usage quotas & reset times
-    deactivate Providers
-    Daemon --> App : Fallback snapshot frame
+App --> User : Show available accounts and cached usage\nwith last updated time
+note over App
+  Connect or start the local helper automatically.
+  No status-line setup or agent prompt.
+end note
+App -> Login : Read account credentials
+alt Access token is valid
+    Login --> App : Ready to read usage
+else Antigravity token needs renewal and refresh is configured
+    Login -> API : Renew login using refresh token
+    API --> Login : New access token
+    Login --> App : Ready to read usage
+else Login is missing or renewal is unavailable
+    Login --> App : Sign-in required for this account
+    App --> User : Show how to sign in; keep other accounts updating
 end
-deactivate Daemon
-
-App -> TTY : Render live dashboard cards, gauges & countdowns (30 FPS)
-TTY --> User : Full interactive terminal dashboard displayed
-
-loop Background Refresh Loop (default 30s)
-    App -> Daemon : Fetch updated metrics
-    Daemon --> App : Fresh snapshots
-    App -> TTY : Repaint gauges & countdown timers
+opt Account has usable credentials
+    App -> API : Request current usage through the shared helper
+    alt Usage available
+        API --> App : Remaining quota and reset time
+        App --> User : Updated usage and optional history
+    else Rate limited or temporarily offline
+        API --> App : Retry later
+        App --> User : Last known usage with age and error\nNo invented zero values
+    end
 end
-
-User -> TTY : Press "q" or Ctrl+C
-TTY -> App : Signal exit
-App -> TTY : Exit AltScreen & restore cursor
-deactivate TTY
-App --> User : Clean shell exit (code 0)
+loop Automatic update or user refresh
+    User -> App : View usage or press refresh
+    App -> App : Read the shared result; coalesce due refreshes
+    App --> User : Same usage in terminal, web and get
+end
+User -> App : Close the view
+App --> User : Return to work
 deactivate App
 @enduml
 ```
 
 </details>
 
-#### How it functions:
-1. You execute `agentusage` (or `agu`) in your terminal shell.
-2. The application enters the terminal alternate screen buffer, preserving your existing shell scrollback history.
-3. It loads your configuration from `~/.config/agentusage/settings.json` and active credentials.
-4. It connects to the local telemetry daemon over its Unix domain socket for instantaneous cached snapshots. If the daemon is not running, it gracefully queries active provider APIs directly.
-5. The terminal renders your active providers as visual cards featuring percentage progress bars, token counts, dollar spend, and reset countdowns.
-6. The dashboard updates automatically every 30 seconds (or on pressing `r` for manual refresh). Pressing `q` or `Ctrl+C` immediately exits and returns you to your shell.
+The default launch connects to or starts a shared helper. No status-line installation, box wake-up, agent prompt, or manual daemon installation is part of viewing usage. The UI shows when data was last updated; missing login, expired credentials, temporary API failures and rate limits affect the relevant account without hiding other accounts.
+
+Daily actions are open the dashboard, refresh, choose an account/window, and close. `get`, `list`, `serve`, and `doctor` remain available for scripts, browsers and troubleshooting. Daemon administration is advanced; legacy `detect` remains a compatibility alias. See the plan for exact output compatibility and migration rules.
 
 ---
+
+## Archived detailed flows pending implementation
+
+Sections 1.2–5 below retain the previous functional reference while implementation is pending. They are not acceptance criteria for the new flow, and command/key descriptions must be reconciled with the implementation before release. The plan's task T5 owns that reconciliation and the corresponding SVG updates.
 
 ### 1.2 Dashboard View Layout Switching (`1`–`5` / View Navigation)
 

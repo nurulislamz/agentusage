@@ -182,15 +182,22 @@ func (m Model) renderBentoTile(snap core.UsageSnapshot, selected bool, tileW int
 	}
 
 	// Header line
+	act := ResolveRecentActivity(snap, now)
 	ico := lipgloss.NewStyle().Foreground(statusCol).Render(statusIco)
 	name := snap.AccountID
 	maxName := tileW - 14
+	if act.ActiveRecently {
+		maxName -= 2
+	}
 	if len(name) > maxName && maxName > 3 {
 		name = name[:maxName-1] + "…"
 	}
 	nameStyled := lipgloss.NewStyle().Bold(true).Foreground(colorText).Render(name)
 	if selected {
 		nameStyled = lipgloss.NewStyle().Bold(true).Foreground(pColor).Render(name)
+	}
+	if act.ActiveRecently {
+		nameStyled += " " + RenderActivityDot()
 	}
 	leftHead := fmt.Sprintf("%s %s", ico, nameStyled)
 	badge := SnapshotStatusBadge(snap)

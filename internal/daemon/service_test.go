@@ -119,6 +119,8 @@ func TestIsTransientExecutablePath(t *testing.T) {
 		{"", true},
 		{"   ", true},
 		{"/tmp/go-build1234/exe/main", true},
+		{"/home/user/.cache/go-build/e9/something/agentusage", true},
+		{"/home/user/.cache/go-build/agentusage", true},
 		{"/usr/local/bin/agentusage", false},
 		{"/home/user/bin/agentusage", false},
 	}
@@ -129,6 +131,40 @@ func TestIsTransientExecutablePath(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveStableExecutable(t *testing.T) {
+	t.Run("returns non-transient path unchanged", func(t *testing.T) {
+		got := ResolveStableExecutable("/usr/local/bin/agentusage")
+		if got != "/usr/local/bin/agentusage" {
+			t.Errorf("got %q, want /usr/local/bin/agentusage", got)
+		}
+	})
+
+	t.Run("resolves local bin/agentusage when current path is transient", func(t *testing.T) {
+		transientPath := "/tmp/go-build1234/exe/agentusage"
+		got := ResolveStableExecutable(transientPath)
+		if isTransientExecutablePath(got) {
+			t.Errorf("expected ResolveStableExecutable to resolve stable path, got transient %q", got)
+		}
+		if !strings.HasSuffix(got, "agentusage") && !strings.HasSuffix(got, "agentusage.exe") {
+			t.Errorf("expected resolved path to end with agentusage, got %q", got)
+		}
+	})
+}
+
+func TestNewServiceManagerWithExecutable(t *testing.T) {
+	mgr, err := NewServiceManagerWithExecutable("/tmp/test.sock", "/usr/local/bin/agentusage")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mgr.exePath != "/usr/local/bin/agentusage" {
+		t.Errorf("got exePath %q, want /usr/local/bin/agentusage", mgr.exePath)
+	}
+	if mgr.socketPath != "/tmp/test.sock" {
+		t.Errorf("got socketPath %q, want /tmp/test.sock", mgr.socketPath)
+	}
+}
+
 
 func TestParseLSOFFirstRecord(t *testing.T) {
 	out := "p4321\nckooky\nn/tmp/agentusage.sock\n"

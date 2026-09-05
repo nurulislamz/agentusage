@@ -104,8 +104,19 @@ func runDashboard(cfg config.Config) {
 	})
 
 	model.SetOnInstallDaemon(func() error {
-		if err := daemon.InstallService(strings.TrimSpace(socketPath)); err != nil {
-			return err
+		targetSocket := strings.TrimSpace(socketPath)
+		exePath, err := os.Executable()
+		if err == nil {
+			exePath = resolveExecutableForInstall(exePath)
+		}
+		var installErr error
+		if exePath != "" && !daemon.IsTransientExecutablePath(exePath) {
+			installErr = daemon.InstallServiceWithExecutable(targetSocket, exePath)
+		} else {
+			installErr = daemon.InstallService(targetSocket)
+		}
+		if installErr != nil {
+			return installErr
 		}
 		viewRuntime.ResetEnsureThrottle()
 		return nil
@@ -226,3 +237,16 @@ func mapDaemonState(s daemon.DaemonState) tui.DaemonStatusMsg {
 		InstallHint: s.InstallHint,
 	}
 }
+
+func resolveExecutableForInstall(currentExe string) string {
+	if daemon.IsTransientExecutablePath(currentExe) {
+		if stable := daemon.ResolveStableExecutable(currentExe); !daemon.IsTransientExecutablePath(stable) {
+			return stable
+		}
+		if built, bErr := daemon.BuildStableBinary(); bErr == nil && !daemon.IsTransientExecutablePath(built) {
+			return built
+		}
+	}
+	return currentExe
+}
+

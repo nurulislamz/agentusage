@@ -120,6 +120,12 @@ func buildCodexDemoSnapshot(now time.Time) core.UsageSnapshot {
 			"rate_limit_code_review_primary":   now.Add(7 * 24 * time.Hour),
 			"rate_limit_code_review_secondary": now.Add(7 * 24 * time.Hour),
 		},
+		Attributes: map[string]string{
+			"plan_type":           "team",
+			"cli_version":         "0.105.0",
+			"last_active_at":      now.Add(-6 * time.Minute).Format(time.RFC3339),
+			"recent_activity_pct": "18.0",
+		},
 		Raw: map[string]string{
 			"account_email":  "anon.codex.user@example.invalid",
 			"account_id":     "anon-codex-team-01",

@@ -345,7 +345,7 @@ func (m Model) handleDaemonInstallResultMsg(msg daemonInstallResultMsg) (tea.Mod
 		m.daemon.installDone = true
 		m.daemon.status = DaemonStarting
 	}
-	return m, nil
+	return m, m.restartTickIfNeeded()
 }
 
 func (m Model) handleSnapshotsMsg(msg SnapshotsMsg) (tea.Model, tea.Cmd) {
@@ -492,8 +492,11 @@ func (m Model) handleSplashKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
+	case "p":
+		m.openSettingsModal()
+		return m, nil
 	case "enter":
-		if (m.daemon.status == DaemonNotInstalled || m.daemon.status == DaemonOutdated) && !m.daemon.installing {
+		if (m.daemon.status == DaemonNotInstalled || m.daemon.status == DaemonOutdated || m.daemon.status == DaemonError) && !m.daemon.installing {
 			m.daemon.installing = true
 			m.daemon.message = "Setting up background helper..."
 			return m, m.installDaemonCmd()
@@ -512,6 +515,12 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.settings.show {
 		return m.handleSettingsMouse(msg)
+	}
+	if !m.hasData && len(m.snapshots) == 0 {
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			return m.handleSplashKey(tea.KeyMsg{Type: tea.KeyEnter})
+		}
+		return m, nil
 	}
 	if m.filter.active || m.analyticsFilter.active {
 		return m, nil

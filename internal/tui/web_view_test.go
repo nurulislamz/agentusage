@@ -630,3 +630,29 @@ func TestWebProjectorCursorUsageLinesOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestWebProjectorRecentActivity(t *testing.T) {
+	now := time.Date(2026, 9, 5, 15, 0, 0, 0, time.UTC)
+	snap := core.NewUsageSnapshot("claude_code", "claude-code")
+	snap.Timestamp = now
+	snap.Status = core.StatusOK
+	snap.Attributes["last_active_at"] = now.Add(-18 * time.Minute).Format(time.RFC3339)
+	snap.Attributes["recent_activity_pct"] = "3.2"
+
+	p := WebProjector{
+		TimeWindow: core.TimeWindow3d,
+		Now:        now,
+	}
+	view := p.ProjectSnapshot(snap, "Claude Code")
+
+	if !view.RecentlyActive {
+		t.Errorf("expected RecentlyActive to be true")
+	}
+	if view.RecentActivityTimeAgo != "18m ago" {
+		t.Errorf("expected RecentActivityTimeAgo '18m ago', got %q", view.RecentActivityTimeAgo)
+	}
+	if view.RecentActivityPercent == nil || *view.RecentActivityPercent != 3.2 {
+		t.Errorf("expected RecentActivityPercent 3.2, got %v", view.RecentActivityPercent)
+	}
+}
+

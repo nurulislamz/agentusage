@@ -103,11 +103,15 @@ func (m Model) renderBarCard(snap core.UsageSnapshot, selected bool, cardW int, 
 	}
 
 	// Head
+	act := ResolveRecentActivity(snap, now)
 	ico := lipgloss.NewStyle().Foreground(statusCol).Render(statusIco)
 	name := snap.AccountID
 	nameStyled := lipgloss.NewStyle().Bold(true).Foreground(colorText).Render(name)
 	if selected {
 		nameStyled = lipgloss.NewStyle().Bold(true).Foreground(pColor).Render(name)
+	}
+	if act.ActiveRecently {
+		nameStyled += " " + RenderActivityDot()
 	}
 	leftHead := fmt.Sprintf("%s %s", ico, nameStyled)
 	badge := SnapshotStatusBadge(snap)
@@ -246,11 +250,15 @@ func (m Model) renderDialCard(snap core.UsageSnapshot, selected bool, cardW int,
 	}
 
 	// Head
+	act := ResolveRecentActivity(snap, now)
 	ico := lipgloss.NewStyle().Foreground(statusCol).Render(statusIco)
 	name := snap.AccountID
 	nameStyled := lipgloss.NewStyle().Bold(true).Foreground(colorText).Render(name)
 	if selected {
 		nameStyled = lipgloss.NewStyle().Bold(true).Foreground(pColor).Render(name)
+	}
+	if act.ActiveRecently {
+		nameStyled += " " + RenderActivityDot()
 	}
 	leftHead := fmt.Sprintf("%s %s", ico, nameStyled)
 	badge := SnapshotStatusBadge(snap)
@@ -374,11 +382,15 @@ func (m Model) renderStripRow(snap core.UsageSnapshot, selected bool, stripW int
 	}
 
 	// Line 1: ID header
+	act := ResolveRecentActivity(snap, now)
 	ico := lipgloss.NewStyle().Foreground(statusCol).Render(statusIco)
 	name := snap.AccountID
 	nameStyled := lipgloss.NewStyle().Bold(true).Foreground(colorText).Render(name)
 	if selected {
 		nameStyled = lipgloss.NewStyle().Bold(true).Foreground(pColor).Render(name)
+	}
+	if act.ActiveRecently {
+		nameStyled += " " + RenderActivityDot()
 	}
 	leftPart := fmt.Sprintf("%s %s", ico, nameStyled)
 	badge := SnapshotStatusBadge(snap)

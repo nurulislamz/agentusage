@@ -202,8 +202,10 @@ func buildCursorDemoSnapshot(now time.Time) core.UsageSnapshot {
 			"plan_percent_used": time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC),
 		},
 		Attributes: map[string]string{
-			"plan_tier": "Pro",
-			"ondemand":  "disabled",
+			"plan_tier":           "Pro",
+			"ondemand":            "disabled",
+			"last_active_at":      now.Add(-34 * time.Minute).Format(time.RFC3339),
+			"recent_activity_pct": "8.0",
 		},
 		Raw: map[string]string{
 			"account_email":       "demo.user@acme-corp.dev",

@@ -310,6 +310,9 @@ func applyUsageViewToSnapshot(snap *core.UsageSnapshot, agg *telemetryUsageAgg, 
 	snap.SetAttribute("telemetry_view", "canonical")
 	snap.SetAttribute("telemetry_source_of_truth", "canonical_usage_events")
 	snap.SetAttribute("telemetry_last_event_at", agg.LastOccurred)
+	if strings.TrimSpace(agg.LastOccurred) != "" {
+		snap.SetAttribute("last_active_at", agg.LastOccurred)
+	}
 	if strings.TrimSpace(agg.Scope) != "" {
 		snap.SetAttribute("telemetry_scope", agg.Scope)
 	}

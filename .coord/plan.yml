@@ -1,0 +1,172 @@
+{
+  "schema_version": 2,
+  "round": 1,
+  "goal": "Simplify usage collection and user commands without status-line dependencies",
+  "created_at": "2026-09-05T00:00:00+01:00",
+  "execution_mode": "planning_only_no_autonomous_spawn",
+  "tasks": [
+    {
+      "id": "T1",
+      "role": "delegated-executor",
+      "slug": "antigravity-auth",
+      "description": "Direct Antigravity auth and API projection",
+      "depends_on": [],
+      "packet": ".ai/task_001_antigravity-auth.md",
+      "files_in_scope": [
+        "internal/providers/antigravity/**"
+      ],
+      "files_out_of_scope": [
+        "all paths outside files_in_scope"
+      ],
+      "success_criteria": [
+        "Run `CGO_ENABLED=1 go test -race ./internal/providers/antigravity`; expect PASS. A sentinel executable named `agy`/`agy-box` must never be invoked by any auth scenario."
+      ]
+    },
+    {
+      "id": "T2",
+      "role": "delegated-executor",
+      "slug": "shared-runtime",
+      "description": "One daemon polling and lifecycle path",
+      "depends_on": [
+        "T1"
+      ],
+      "packet": ".ai/task_002_shared-runtime.md",
+      "files_in_scope": [
+        "internal/daemon/runtime.go",
+        "internal/daemon/process.go",
+        "internal/daemon/server_poll.go",
+        "internal/daemon/server_http.go",
+        "internal/daemon/server_read_model.go",
+        "internal/daemon/poll_scheduler.go",
+        "internal/daemon/types.go",
+        "internal/daemon/accounts.go",
+        "internal/daemon/service.go",
+        "internal/daemon/runtime_broadcast_test.go",
+        "internal/daemon/process_test.go",
+        "internal/daemon/poll_scheduler_test.go",
+        "internal/daemon/accounts_test.go",
+        "internal/daemon/server_test.go"
+      ],
+      "files_out_of_scope": [
+        "all paths outside files_in_scope"
+      ],
+      "success_criteria": [
+        "Run `CGO_ENABLED=1 go test -race ./internal/daemon ./internal/telemetry`; expect PASS. Test missing-service lifecycle with fakes, not by installing/uninstalling the developer's service."
+      ]
+    },
+    {
+      "id": "T3",
+      "role": "delegated-executor",
+      "slug": "legacy-cleanup",
+      "description": "Remove status-line coupling and prepare migration",
+      "depends_on": [],
+      "packet": ".ai/task_003_legacy-cleanup.md",
+      "files_in_scope": [
+        "internal/integrations/**",
+        "internal/detect/**",
+        "internal/daemon/server_watch.go",
+        "internal/daemon/poll_kick_test.go",
+        "internal/daemon/server_more_test.go",
+        "internal/daemon/change_detection_test.go",
+        "scripts/boxes/agy-box",
+        "scripts/boxes/agent-box",
+        "scripts/box_test.sh"
+      ],
+      "files_out_of_scope": [
+        "all paths outside files_in_scope"
+      ],
+      "success_criteria": [
+        "Run `CGO_ENABLED=1 go test -race ./internal/integrations ./internal/detect ./internal/daemon` and `bash -n scripts/boxes/agy-box scripts/boxes/agent-box`. Add shell fixture coverage to `scripts/box_test.sh`, then run `bash scripts/box_test.sh` using fake tools and temporary HOME."
+      ]
+    },
+    {
+      "id": "T4",
+      "role": "delegated-executor",
+      "slug": "shared-clients",
+      "description": "Make every presentation consume shared usage",
+      "depends_on": [
+        "T2",
+        "T3"
+      ],
+      "packet": ".ai/task_004_shared-clients.md",
+      "files_in_scope": [
+        "cmd/agentusage/get.go",
+        "cmd/agentusage/get_test.go",
+        "cmd/agentusage/dashboard.go",
+        "cmd/agentusage/dashboard_update_test.go",
+        "cmd/agentusage/snapshot_dispatcher.go",
+        "cmd/agentusage/snapshot_dispatcher_test.go",
+        "internal/webserve/collect.go",
+        "internal/webserve/*test.go",
+        "internal/daemon/runtime.go",
+        "internal/daemon/runtime_broadcast_test.go",
+        "internal/providers/antigravity/antigravity.go",
+        "internal/providers/claude_code/claude_code.go",
+        "internal/providers/claude_code/usage_api_oauth_test.go"
+      ],
+      "files_out_of_scope": [
+        "all paths outside files_in_scope"
+      ],
+      "success_criteria": [
+        "Run `CGO_ENABLED=1 go test -race ./cmd/agentusage ./internal/webserve ./internal/tui ./internal/daemon ./internal/providers/claude_code ./internal/providers/antigravity ./internal/tmux`; expect PASS. Verify multiple views no longer multiply fake upstream request counts."
+      ]
+    },
+    {
+      "id": "T5",
+      "role": "delegated-executor",
+      "slug": "commands-docs",
+      "description": "Smaller command help, migration UX and documentation",
+      "depends_on": [
+        "T4"
+      ],
+      "packet": ".ai/task_005_commands-docs.md",
+      "files_in_scope": [
+        "cmd/agentusage/main.go",
+        "cmd/agentusage/main_test.go",
+        "cmd/agentusage/doctor.go",
+        "cmd/agentusage/doctor_test.go",
+        "cmd/agentusage/detect.go",
+        "cmd/agentusage/detect_test.go",
+        "cmd/agentusage/daemon.go",
+        "cmd/agentusage/user_flow_diagram_test.go",
+        "cmd/agentusage/command_flow_diagrams_test.go",
+        "internal/tui/model_input.go",
+        "internal/tui/model_panels.go",
+        "internal/tui/help.go",
+        "internal/tui/model_install_test.go",
+        "README.md",
+        "RUNBOOK.md",
+        "docs/TELEMETRY_INTEGRATIONS.md",
+        "docs/user-flow-diagram.md",
+        "docs/COMMAND_FLOW_DIAGRAMS.md",
+        "docs/diagrams/*.svg"
+      ],
+      "files_out_of_scope": [
+        "all paths outside files_in_scope"
+      ],
+      "success_criteria": [
+        "Run `CGO_ENABLED=1 go test -race ./cmd/agentusage ./internal/integrations ./internal/tui` and compile/render changed PlantUML diagrams. Verify `--help`, `get --help`, `doctor --help`, and legacy `detect` output using temporary config roots."
+      ]
+    },
+    {
+      "id": "T6",
+      "role": "reviewer",
+      "slug": "acceptance",
+      "description": "Independent acceptance review",
+      "depends_on": [
+        "T5"
+      ],
+      "packet": ".ai/task_006_acceptance.md",
+      "files_in_scope": [],
+      "files_out_of_scope": [
+        "**/*"
+      ],
+      "success_criteria": [
+        "Run `CGO_ENABLED=1 go build ./cmd/agentusage`, `make test`, `make vet`, and `make lint`. Report lint skipped if the binary is unavailable; do not call that a lint pass.",
+        "Exercise a fake-provider end-to-end sequence: cold launch without managed service, automatic helper start, valid/expired/revoked login, two clients refreshing, quota 429, offline cached display, account switch, helper reconnect, clean UI exit.",
+        "Verify zero coding-agent process launches, no quota dependency on status-line files/hooks, no secret-bearing diagnostics, and no duplicate upstream fetches for one overlapping refresh generation.",
+        "Report PASS / CONDITIONAL PASS / FAIL with exact evidence and unresolved limitations. A conditional result is not permission to ship. Deployment, real-account migration and external BXO edits are separate execution decisions."
+      ]
+    }
+  ]
+}

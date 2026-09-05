@@ -2,6 +2,7 @@ package codex
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -18,6 +19,9 @@ func (p *Provider) readLatestSession(sessionsDir string, snap *core.UsageSnapsho
 	}
 
 	snap.Raw["latest_session_file"] = filepath.Base(latestFile)
+	if fi, statErr := os.Stat(latestFile); statErr == nil {
+		snap.SetAttribute("last_active_at", fi.ModTime().Format(time.RFC3339))
+	}
 
 	lastPayload, err := findLastTokenCount(latestFile)
 	if err != nil {

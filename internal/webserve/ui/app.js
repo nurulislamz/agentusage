@@ -856,8 +856,9 @@
 
   function agentHead(v, i) {
     const sub = agentSubtitle(v);
+    const recentDot = v.recently_active ? ` <span class="activity-dot" title="Active recently${v.recent_activity_time_ago ? " (" + esc(v.recent_activity_time_ago) + ")" : ""}">●</span>` : "";
     return `<div class="agent-head">
-      <span class="agent-name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
+      <span class="agent-name">${esc(v.status_icon || "●")} ${esc(v.account_id)}${recentDot}</span>
       <span class="agent-plan">${esc(sub)}</span>
       <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
     </div>`;
@@ -998,9 +999,10 @@
     const body = metrics || table || spark
       ? `<div class="strip-gauges">${metrics}${table}</div>`
       : `<div class="strip-gauges">${renderMetricTable([{ label: "Usage", value: v.summary || v.message || "No data" }])}</div>`;
+    const recentDot = v.recently_active ? ` <span class="activity-dot" title="Active recently${v.recent_activity_time_ago ? " (" + esc(v.recent_activity_time_ago) + ")" : ""}">●</span>` : "";
     const inner = `
       <div class="strip-id">
-        <span class="agent-name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
+        <span class="agent-name">${esc(v.status_icon || "●")} ${esc(v.account_id)}${recentDot}</span>
         <span class="agent-plan">${esc(sub)}</span>
         <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
       </div>
@@ -1141,15 +1143,42 @@
       }
     }
 
+    let recentSection = "";
+    if (v.recently_active) {
+      const timeAgo = v.recent_activity_time_ago || "recently";
+      const pct = typeof v.recent_activity_percent === "number" ? v.recent_activity_percent : null;
+      const pctText = pct !== null ? `${pct.toFixed(1)}%` : "";
+      const barWidth = pct !== null ? Math.min(100, Math.max(pct > 0 ? 3 : 0, pct)) : 0;
+      const barHtml = pct !== null
+        ? `<div class="recent-bar-wrap">
+             <div class="recent-bar-track"><i style="width:${barWidth}%;"></i></div>
+             <span class="recent-pct">${esc(pctText)}</span>
+           </div>`
+        : "";
+      recentSection = `
+        <section class="card card-recent-activity">
+          <div class="card-header">
+            <h2><span class="activity-dot">●</span> RECENT ACTIVITY</h2>
+          </div>
+          <div class="recent-activity-body">
+            <span class="recent-time">Active ${esc(timeAgo)}</span>
+            ${barHtml}
+          </div>
+        </section>
+      `;
+    }
+
     let summaryDisplay = summary;
     if (summaryDisplay && /^\d+(\.\d+)?%$/.test(summaryDisplay.trim())) {
       summaryDisplay = `${summaryDisplay.trim()} remaining`;
     }
 
+    const recentDot = v.recently_active ? ` <span class="activity-dot" title="Active recently">●</span>` : "";
+
     return `
       <div class="hero">
         <h1>
-          ${esc(v.status_icon || "●")} ${esc(v.account_id)}
+          ${esc(v.status_icon || "●")} ${esc(v.account_id)}${recentDot}
           <span class="fetching"${fetchVisible}><span class="spin" aria-hidden="true">${spinChar}</span></span>
         </h1>
         <div class="hero-right">
@@ -1164,6 +1193,7 @@
       </div>
       <div class="accent-line ${esc(v.header_tone || "ok")}"></div>
       <div class="panel-cards-grid">
+        ${recentSection}
         ${quotaSection}
         ${timerSection}
         ${activitySection}
@@ -1231,7 +1261,8 @@
     const content = $("inspect-content");
     if (!modal || !content) return;
     if (title) {
-      title.innerHTML = `${esc(v.status_icon || "●")} ${esc(v.account_id)} <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || "")}</span>`;
+      const recentDot = v.recently_active ? ` <span class="activity-dot">●</span>` : "";
+      title.innerHTML = `${esc(v.status_icon || "●")} ${esc(v.account_id)}${recentDot} <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || "")}</span>`;
     }
     content.innerHTML = renderCockpit(v);
     const card = modal.querySelector(".inspect-card");
@@ -1347,10 +1378,11 @@
         </span>`;
       }).join("");
 
+      const recentDot = v.recently_active ? ` <span class="activity-dot" title="Active recently">●</span>` : "";
       navHtml += `
         <button type="button" class="item nav-item${sel ? " selected" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}"${sel ? ` aria-current="true"` : ""} style="--p:${esc(v.accent_color || "var(--accent)")}">
           <span class="rail"></span>
-          <span class="name">${esc(v.status_icon || "●")} ${esc(v.account_id)}</span>
+          <span class="name">${esc(v.status_icon || "●")} ${esc(v.account_id)}${recentDot}</span>
           <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
           <div class="meters">
             ${microMeters || `<span class="dim">${esc(v.summary || "")}</span>`}
@@ -1500,13 +1532,14 @@
 
         const trendTd = hasAnyTrends ? `<td><div class="matrix-trend">${spark}</div></td>` : "";
 
+        const recentDot = v.recently_active ? ` <span class="activity-dot" title="Active recently">●</span>` : "";
         const mainRow = `
           <tr class="matrix-row${sel ? " selected" : ""}${isExp ? " expanded" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}" style="--p:${esc(v.accent_color || grp.accent_color)}">
             <td>
               <div class="matrix-app">
                 <span class="matrix-app-icon">${esc(v.status_icon || "●")}</span>
                 <div>
-                  <div class="matrix-app-title">${esc(v.account_id)}</div>
+                  <div class="matrix-app-title">${esc(v.account_id)}${recentDot}</div>
                 </div>
               </div>
             </td>
@@ -1665,12 +1698,13 @@
           `;
         }).join("");
 
+        const recentDot = v.recently_active ? ` <span class="activity-dot" title="Active recently">●</span>` : "";
         return `
           <div class="bento-tile${sel ? " selected" : ""}${refreshing ? " refreshing" : ""}" data-idx="${i}" style="--p:${esc(v.accent_color || "var(--accent)")}" title="Click to inspect ${esc(v.account_id)}">
             <div class="bento-tile-head">
               <div class="bento-head-left">
                 <span>${esc(v.status_icon || "●")}</span>
-                <span class="bento-acc-name">${esc(v.account_id)}</span>
+                <span class="bento-acc-name">${esc(v.account_id)}${recentDot}</span>
               </div>
               <span class="pill ${pillClass(v.status_badge)}">${esc(v.status_badge || v.status || "")}</span>
             </div>

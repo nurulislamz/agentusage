@@ -60,8 +60,11 @@ type WebAccountView struct {
 	CycleSchedule  string             `json:"cycle_schedule,omitempty"`
 	LastRefreshed  string             `json:"last_refreshed,omitempty"`
 	NextReset      string             `json:"next_reset,omitempty"`
-	HasGauge       bool               `json:"has_gauge,omitempty"`
-	HeaderTone     string             `json:"header_tone,omitempty"`
+	HasGauge              bool               `json:"has_gauge,omitempty"`
+	HeaderTone            string             `json:"header_tone,omitempty"`
+	RecentlyActive        bool               `json:"recently_active,omitempty"`
+	RecentActivityTimeAgo string             `json:"recent_activity_time_ago,omitempty"`
+	RecentActivityPercent *float64           `json:"recent_activity_percent,omitempty"`
 }
 
 type WebDetailSection struct {
@@ -235,6 +238,15 @@ func (p WebProjector) ProjectSnapshot(snap core.UsageSnapshot, providerName stri
 	}
 	if di.gaugePercent >= 0 {
 		view.GaugePercent = di.gaugePercent
+	}
+	act := ResolveRecentActivity(snap, now)
+	view.RecentlyActive = act.ActiveRecently
+	if act.ActiveRecently {
+		view.RecentActivityTimeAgo = act.TimeAgo
+		if act.HasPercent {
+			pct := act.Percent
+			view.RecentActivityPercent = &pct
+		}
 	}
 	ensureUsageLines(&view, m.usageMode)
 	view.DailyCost = firstDailySeries(snap, "cost", "analytics_cost", "tokens", "requests")

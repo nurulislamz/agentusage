@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nurulislamz/agentusage/internal/appupdate"
+	"github.com/nurulislamz/agentusage/internal/daemon"
 	"github.com/nurulislamz/agentusage/internal/tui"
 )
 
@@ -115,3 +116,22 @@ func TestRunStartupUpdateCheckLogsErrorOnlyInDebug(t *testing.T) {
 		t.Fatalf("expected debug log line, got %q", buf.String())
 	}
 }
+
+func TestResolveExecutableForInstall(t *testing.T) {
+	t.Run("preserves stable executable", func(t *testing.T) {
+		stable := "/usr/local/bin/agentusage"
+		got := resolveExecutableForInstall(stable)
+		if got != stable {
+			t.Errorf("got %q, want %q", got, stable)
+		}
+	})
+
+	t.Run("resolves transient executable to stable path", func(t *testing.T) {
+		transient := "/tmp/go-build123/exe/agentusage"
+		got := resolveExecutableForInstall(transient)
+		if daemon.IsTransientExecutablePath(got) {
+			t.Errorf("expected stable executable path, got transient %q", got)
+		}
+	})
+}
+

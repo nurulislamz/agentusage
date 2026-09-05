@@ -50,7 +50,11 @@ func demoClaude(now time.Time) core.UsageSnapshot {
 		"sessions_today":      {Used: f64(12), Unit: "sessions", Window: "today"},
 		"messages_today":      {Used: f64(184), Unit: "messages", Window: "today"},
 	}
-	snap.Attributes = map[string]string{"plan_type": "max_5"}
+	snap.Attributes = map[string]string{
+		"plan_type":           "max_5",
+		"last_active_at":      now.Add(-12 * time.Minute).Format(time.RFC3339),
+		"recent_activity_pct": "2.5",
+	}
 	snap.ModelUsage = []core.ModelUsageRecord{
 		{RawModelID: "claude-opus-4-6", Canonical: "claude-opus-4-6", CanonicalFamily: "claude", CostUSD: f64(31.20), InputTokens: f64(820000), OutputTokens: f64(210000), Window: "today", Confidence: 1},
 		{RawModelID: "claude-sonnet-4-6", Canonical: "claude-sonnet-4-6", CanonicalFamily: "claude", CostUSD: f64(8.40), InputTokens: f64(310000), OutputTokens: f64(82000), Window: "today", Confidence: 1},
@@ -80,7 +84,11 @@ func demoCursor(now time.Time) core.UsageSnapshot {
 		"billing_input_tokens":  {Used: f64(597100), Unit: "tokens", Window: "month"},
 		"billing_output_tokens": {Used: f64(320100), Unit: "tokens", Window: "month"},
 	}
-	snap.Attributes = map[string]string{"plan_type": "pro"}
+	snap.Attributes = map[string]string{
+		"plan_type":           "pro",
+		"last_active_at":      now.Add(-34 * time.Minute).Format(time.RFC3339),
+		"recent_activity_pct": "8.0",
+	}
 	snap.ModelUsage = []core.ModelUsageRecord{
 		{RawModelID: "claude-4.6-opus", Canonical: "claude-opus-4.6", CostUSD: f64(39.28), Window: "month", Confidence: 0.9},
 		{RawModelID: "gpt-5-mini", Canonical: "gpt-5-mini", CostUSD: f64(2.12), Window: "month", Confidence: 0.9},
@@ -147,6 +155,10 @@ func demoCodex(now time.Time) core.UsageSnapshot {
 	snap.DailySeries = map[string][]core.TimePoint{
 		"cost": demoSeries(now, 6.2, 8.1, 5.4, 9.8, 7.6, 10.2, 11.40),
 	}
+	snap.Attributes = map[string]string{
+		"last_active_at":      now.Add(-6 * time.Minute).Format(time.RFC3339),
+		"recent_activity_pct": "18.0",
+	}
 	return snap
 }
 
@@ -185,8 +197,10 @@ func demoOpenCode(now time.Time) core.UsageSnapshot {
 		"monthly_usage_pct": now.Add(18*24*time.Hour + 6*time.Hour),
 	}
 	snap.Attributes = map[string]string{
-		"subscription_plan": "Pro",
-		"auth_scope":        "zen+console",
+		"subscription_plan":   "Pro",
+		"auth_scope":          "zen+console",
+		"last_active_at":      now.Add(-48 * time.Minute).Format(time.RFC3339),
+		"recent_activity_pct": "1.5",
 	}
 	return snap
 }

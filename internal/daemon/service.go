@@ -110,6 +110,10 @@ func NewServiceManager(socketPath string) (ServiceManager, error) {
 	if err != nil {
 		return ServiceManager{}, fmt.Errorf("resolve executable path: %w", err)
 	}
+	return NewServiceManagerWithExecutable(socketPath, exePath)
+}
+
+func NewServiceManagerWithExecutable(socketPath, exePath string) (ServiceManager, error) {
 	stateDir, err := telemetry.DefaultStateDir()
 	if err != nil {
 		return ServiceManager{}, err
@@ -117,7 +121,7 @@ func NewServiceManager(socketPath string) (ServiceManager, error) {
 
 	manager := ServiceManager{
 		Kind:       runtime.GOOS,
-		exePath:    exePath,
+		exePath:    strings.TrimSpace(exePath),
 		socketPath: strings.TrimSpace(socketPath),
 		stateDir:   stateDir,
 	}
@@ -181,6 +185,17 @@ func RunCommand(name string, args ...string) (string, error) {
 
 func InstallService(socketPath string) error {
 	manager, err := NewServiceManager(socketPath)
+	if err != nil {
+		return err
+	}
+	if !manager.IsSupported() {
+		return fmt.Errorf("daemon service install is unsupported on %s", runtime.GOOS)
+	}
+	return manager.Install()
+}
+
+func InstallServiceWithExecutable(socketPath, exePath string) error {
+	manager, err := NewServiceManagerWithExecutable(socketPath, exePath)
 	if err != nil {
 		return err
 	}
@@ -396,14 +411,14 @@ func isTransientExecutablePath(path string) bool {
 		return true
 	}
 	normalized := filepath.ToSlash(strings.ToLower(filepath.Clean(p)))
-	if strings.Contains(normalized, "/go-build") && strings.Contains(normalized, "/exe/") {
+	if strings.Contains(normalized, "/go-build") || strings.Contains(normalized, "/.cache/go-build") {
 		return true
 	}
 	tmpRoot := filepath.ToSlash(strings.ToLower(filepath.Clean(os.TempDir())))
-	if tmpRoot == "" || tmpRoot == "." {
-		return false
+	if tmpRoot != "" && tmpRoot != "." && strings.HasPrefix(normalized, tmpRoot) {
+		return true
 	}
-	return strings.HasPrefix(normalized, tmpRoot+"/go-build")
+	return false
 }
 
 func parseLSOFFirstRecord(out string) string {
@@ -447,3 +462,85 @@ func parseLSOFFirstRecord(out string) string {
 	}
 	return strings.TrimSpace(strings.Join(parts, " "))
 }
+
+// ResolveStableExecutable attempts to find a non-transient binary path if the current
+// executable is running from a build cache or temporary directory.
+func ResolveStableExecutable(currentExe string) string {
+	if !isTransientExecutablePath(currentExe) {
+		return currentExe
+	}
+
+	binName := "agentusage"
+	if runtime.GOOS == "windows" {
+		binName = "agentusage.exe"
+	}
+
+	// 1. Check relative to current working directory
+	candidates := []string{
+		filepath.Join("bin", binName),
+		filepath.Join("..", "bin", binName),
+	}
+
+	// 2. Check ~/.local/bin/agentusage
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		candidates = append(candidates, filepath.Join(home, ".local", "bin", binName))
+	}
+
+	for _, cand := range candidates {
+		abs, err := filepath.Abs(cand)
+		if err == nil {
+			if fi, err := os.Stat(abs); err == nil && !fi.IsDir() && !isTransientExecutablePath(abs) {
+				return abs
+			}
+		}
+	}
+
+	// 3. Check system PATH
+	if p, err := exec.LookPath(binName); err == nil {
+		if abs, err := filepath.Abs(p); err == nil && !isTransientExecutablePath(abs) {
+			return abs
+		}
+	}
+
+	return currentExe
+}
+
+// IsTransientExecutablePath reports whether the path appears to be a temporary
+// or transient binary from `go run` or `go test`.
+func IsTransientExecutablePath(path string) bool {
+	return isTransientExecutablePath(path)
+}
+
+// BuildStableBinary builds a binary into the local bin/ directory using go build.
+func BuildStableBinary() (string, error) {
+	return buildStableBinary()
+}
+
+func buildStableBinary() (string, error) {
+	goExe, err := exec.LookPath("go")
+	if err != nil {
+		return "", err
+	}
+	workDir := "."
+	if _, err := os.Stat("go.mod"); err != nil {
+		if _, err := os.Stat("../go.mod"); err == nil {
+			workDir = ".."
+		} else {
+			return "", fmt.Errorf("cannot locate go.mod: %w", err)
+		}
+	}
+	binDir := filepath.Join(workDir, "bin")
+	_ = os.MkdirAll(binDir, 0o755)
+	binName := "agentusage"
+	if runtime.GOOS == "windows" {
+		binName = "agentusage.exe"
+	}
+	outPath := filepath.Join(binDir, binName)
+	cmd := exec.Command(goExe, "build", "-o", outPath, "./cmd/agentusage")
+	cmd.Dir = workDir
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+	return filepath.Abs(outPath)
+}
+

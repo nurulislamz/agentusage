@@ -372,15 +372,23 @@ func (m Model) renderTile(snap core.UsageSnapshot, selected, modelMixExpanded bo
 	}
 	rightW := lipgloss.Width(rightPart)
 
+	act := ResolveRecentActivity(snap, m.viewNow())
 	name := snap.AccountID
 	maxName := innerW - rightW - 4
+	if act.ActiveRecently {
+		maxName -= 2
+	}
 	if maxName < 5 {
 		maxName = 5
 	}
 	if len(name) > maxName {
 		name = name[:maxName-1] + "…"
 	}
-	hdrLeft := fmt.Sprintf("%s %s", iconStr, nameStyle.Render(name))
+	nameRendered := nameStyle.Render(name)
+	if act.ActiveRecently {
+		nameRendered += " " + RenderActivityDot()
+	}
+	hdrLeft := fmt.Sprintf("%s %s", iconStr, nameRendered)
 	gap := innerW - lipgloss.Width(hdrLeft) - rightW
 	if gap < 1 {
 		gap = 1

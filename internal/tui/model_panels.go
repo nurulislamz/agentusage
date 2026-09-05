@@ -274,8 +274,12 @@ func (m Model) renderListItemWithGroup(snap core.UsageSnapshot, selected bool, i
 	rightPart := badge
 	rightW := lipgloss.Width(rightPart)
 
+	act := ResolveRecentActivity(snap, m.viewNow())
 	name := snap.AccountID
 	maxName := w - rightW - 6
+	if act.ActiveRecently {
+		maxName -= 2
+	}
 	if maxName < 5 {
 		maxName = 5
 	}
@@ -283,7 +287,11 @@ func (m Model) renderListItemWithGroup(snap core.UsageSnapshot, selected bool, i
 		name = name[:maxName-1] + "…"
 	}
 
-	namePart := fmt.Sprintf(" %s %s", iconStr, nameStyle.Render(name))
+	nameRendered := nameStyle.Render(name)
+	if act.ActiveRecently {
+		nameRendered += " " + RenderActivityDot()
+	}
+	namePart := fmt.Sprintf(" %s %s", iconStr, nameRendered)
 	gapLen := w - lipgloss.Width(namePart) - rightW - 1
 	if gapLen < 1 {
 		gapLen = 1

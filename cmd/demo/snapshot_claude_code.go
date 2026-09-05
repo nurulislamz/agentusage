@@ -203,9 +203,11 @@ func buildClaudeCodeDemoSnapshot(now time.Time) core.UsageSnapshot {
 			"usage_seven_day": now.Add(3*24*time.Hour + 11*time.Hour),
 		},
 		Attributes: map[string]string{
-			"account_email": "demo.user@example.test",
-			"plan_type":     "max_5",
-			"auth_type":     "api_key",
+			"account_email":       "demo.user@example.test",
+			"plan_type":           "max_5",
+			"auth_type":           "api_key",
+			"last_active_at":      now.Add(-12 * time.Minute).Format(time.RFC3339),
+			"recent_activity_pct": "2.5",
 		},
 		Raw: map[string]string{
 			"account_email":      "demo.user@example.test",

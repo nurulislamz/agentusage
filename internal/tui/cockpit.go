@@ -44,9 +44,14 @@ func RenderCockpit(
 	widget := dashboardWidget(snap.ProviderID)
 	di := computeDisplayInfo(snap, widget, hideCosts, usageMode)
 
+	act := ResolveRecentActivity(snap, now)
+
 	// 1. Hero: status icon + account_id (left) ... provider_name · detail + status badge pill (right)
 	iconStr := lipgloss.NewStyle().Foreground(statusCol).Render(statusIco)
 	nameStr := lipgloss.NewStyle().Bold(true).Foreground(colorText).Render(snap.AccountID)
+	if act.ActiveRecently {
+		nameStr += " " + RenderActivityDot()
+	}
 	heroLeft := fmt.Sprintf("%s %s", iconStr, nameStr)
 
 	metaParts := []string{snap.ProviderID}
@@ -93,6 +98,15 @@ func RenderCockpit(
 
 	var sections []string
 	sections = append(sections, heroLine, subheroLine, hairline)
+
+	// 3.5 Recent Activity card (when active within the last hour)
+	if act.ActiveRecently {
+		var actLines []string
+		actLines = append(actLines, lipgloss.NewStyle().Bold(true).Foreground(colorGreen).Render("● RECENT ACTIVITY"))
+		actLines = append(actLines, surface1Style.Render(strings.Repeat("─", w)))
+		actLines = append(actLines, "  "+RenderRecentActivityLine(act, clamp(w/4, 8, 16)))
+		sections = append(sections, strings.Join(actLines, "\n"))
+	}
 
 	// 4. '⚡ USAGE & QUOTAS' card
 	cards := projectDetailCards(snap, widget, w, warnThresh, critThresh, timeWindow, hideCosts, now, usageMode)
@@ -282,7 +296,14 @@ func CockpitSectionStarts(
 	}
 
 	var starts []int
-	currentLine := 4 // Section 1 (Usage & Quotas) starts at line 4 (after hero, subhero, hairline, and blank line)
+	currentLine := 4 // First card starts at line 4 (after hero, subhero, hairline, and blank line)
+
+	act := ResolveRecentActivity(snap, now)
+	if act.ActiveRecently {
+		starts = append(starts, currentLine)
+		currentLine += 3 + 2 // title + hairline + activity line = 3, + 2 blank lines for section separation
+	}
+
 	starts = append(starts, currentLine)
 
 	// Calculate height of Usage & Quotas card

@@ -389,8 +389,14 @@ func (m Model) splashProgressLines() []string {
 			}
 		}
 		lines = append(lines, "  "+errStyle.Render("✗")+" "+errStyle.Render(msg))
-		lines = append(lines, "  "+dim.Render("Try: agentusage daemon status"))
-		lines = append(lines, "  "+dim.Render("If needed: agentusage daemon install"))
+		if m.daemon.installing {
+			lines = append(lines, spin("Setting up background helper..."))
+		} else {
+			lines = append(lines, "")
+			lines = append(lines, "  "+hint.Render("▸ Press Enter to retry setup"))
+			lines = append(lines, "  "+dim.Render("  or run: agentusage daemon status"))
+			lines = append(lines, "  "+dim.Render("  or run: agentusage daemon install"))
+		}
 
 	default: // DaemonRunning or any other state.
 		if m.daemon.installDone {
