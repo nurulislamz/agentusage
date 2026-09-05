@@ -54,7 +54,7 @@ func (m Model) renderBarsView(w, h int) string {
 	var lines []string
 	groups := m.groupIDsByProvider(ids)
 	cardW := clamp(w-4, 30, 90)
-	cursorLineIdx := 0
+	cursorStart, cursorEnd := 0, 0
 
 	for _, grp := range groups {
 		pColor := providerThemeColor(grp.providerID)
@@ -65,16 +65,19 @@ func (m Model) renderBarsView(w, h int) string {
 			globalIdx := grp.indices[rowIdx]
 			snap := m.snapshots[id]
 			selected := (globalIdx == m.cursor)
+			card := m.renderBarCard(snap, selected, cardW, now)
+			cardLines := strings.Split(card, "\n")
 			if selected {
-				cursorLineIdx = len(lines)
+				cursorStart = len(lines)
+				cursorEnd = cursorStart + len(cardLines)
 			}
 
-			lines = append(lines, m.renderBarCard(snap, selected, cardW, now))
+			lines = append(lines, cardLines...)
 		}
 		lines = append(lines, "")
 	}
 
-	return m.scrollBoardLines(lines, cursorLineIdx, w, h)
+	return m.scrollBoardLines(lines, cursorStart, cursorEnd, w, h)
 }
 
 func (m Model) renderBarCard(snap core.UsageSnapshot, selected bool, cardW int, now time.Time) string {
@@ -194,7 +197,7 @@ func (m Model) renderDialsView(w, h int) string {
 	var lines []string
 	groups := m.groupIDsByProvider(ids)
 	cardW := clamp(w-4, 30, 90)
-	cursorLineIdx := 0
+	cursorStart, cursorEnd := 0, 0
 
 	for _, grp := range groups {
 		pColor := providerThemeColor(grp.providerID)
@@ -205,16 +208,19 @@ func (m Model) renderDialsView(w, h int) string {
 			globalIdx := grp.indices[rowIdx]
 			snap := m.snapshots[id]
 			selected := (globalIdx == m.cursor)
+			card := m.renderDialCard(snap, selected, cardW, now)
+			cardLines := strings.Split(card, "\n")
 			if selected {
-				cursorLineIdx = len(lines)
+				cursorStart = len(lines)
+				cursorEnd = cursorStart + len(cardLines)
 			}
 
-			lines = append(lines, m.renderDialCard(snap, selected, cardW, now))
+			lines = append(lines, cardLines...)
 		}
 		lines = append(lines, "")
 	}
 
-	return m.scrollBoardLines(lines, cursorLineIdx, w, h)
+	return m.scrollBoardLines(lines, cursorStart, cursorEnd, w, h)
 }
 
 func (m Model) renderDialCard(snap core.UsageSnapshot, selected bool, cardW int, now time.Time) string {
@@ -319,7 +325,7 @@ func (m Model) renderStripsView(w, h int) string {
 	var lines []string
 	groups := m.groupIDsByProvider(ids)
 	stripW := clamp(w-4, 30, 110)
-	cursorLineIdx := 0
+	cursorStart, cursorEnd := 0, 0
 
 	for _, grp := range groups {
 		pColor := providerThemeColor(grp.providerID)
@@ -330,16 +336,19 @@ func (m Model) renderStripsView(w, h int) string {
 			globalIdx := grp.indices[rowIdx]
 			snap := m.snapshots[id]
 			selected := (globalIdx == m.cursor)
+			card := m.renderStripRow(snap, selected, stripW, now)
+			cardLines := strings.Split(card, "\n")
 			if selected {
-				cursorLineIdx = len(lines)
+				cursorStart = len(lines)
+				cursorEnd = cursorStart + len(cardLines)
 			}
 
-			lines = append(lines, m.renderStripRow(snap, selected, stripW, now))
+			lines = append(lines, cardLines...)
 		}
 		lines = append(lines, "")
 	}
 
-	return m.scrollBoardLines(lines, cursorLineIdx, w, h)
+	return m.scrollBoardLines(lines, cursorStart, cursorEnd, w, h)
 }
 
 func (m Model) renderStripRow(snap core.UsageSnapshot, selected bool, stripW int, now time.Time) string {
@@ -475,7 +484,7 @@ func (m Model) renderBoardGroupHeader(grp gaugeBoardGroup, pColor lipgloss.Color
 	return fmt.Sprintf(" %s %s  %s", headerTitle, agentCount, statusBadge)
 }
 
-func (m Model) scrollBoardLines(lines []string, cursorLineIdx, w, h int) string {
+func (m Model) scrollBoardLines(lines []string, cursorStart, cursorEnd, w, h int) string {
 	totalLines := len(lines)
 	if h <= 0 {
 		return strings.Join(lines, "\n")
@@ -484,7 +493,15 @@ func (m Model) scrollBoardLines(lines []string, cursorLineIdx, w, h int) string 
 		return padToSize(strings.Join(lines, "\n"), w, h)
 	}
 
-	start := cursorLineIdx - (h / 3)
+	cardH := cursorEnd - cursorStart
+	start := cursorStart - 2
+	if cardH < h {
+		if cursorEnd >= start+h {
+			start = cursorEnd - h + 2
+		}
+	} else {
+		start = cursorStart
+	}
 	if start < 0 {
 		start = 0
 	}

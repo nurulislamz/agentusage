@@ -61,7 +61,7 @@ func (m Model) renderBentoView(w, h int) string {
 	}
 	cols := max(1, (w-2)/(tileW+2))
 
-	cursorLineIdx := 0
+	cursorStart, cursorEnd := 0, 0
 
 	for _, grp := range groups {
 		pColor := providerThemeColor(grp.providerID)
@@ -91,9 +91,6 @@ func (m Model) renderBentoView(w, h int) string {
 			globalIdx := grp.indices[rowIdx]
 			snap := m.snapshots[id]
 			selected := (globalIdx == m.cursor)
-			if selected {
-				cursorLineIdx = len(lines) + (rowIdx/cols)*7
-			}
 
 			tileBlocks = append(tileBlocks, m.renderBentoTile(snap, selected, tileW, now))
 		}
@@ -103,7 +100,22 @@ func (m Model) renderBentoView(w, h int) string {
 			end := min(i+cols, len(tileBlocks))
 			rowTiles := tileBlocks[i:end]
 			rowJoined := lipgloss.JoinHorizontal(lipgloss.Top, rowTiles...)
-			lines = append(lines, rowJoined)
+			rowLines := strings.Split(rowJoined, "\n")
+
+			rowContainsSelected := false
+			for colIdx := i; colIdx < end; colIdx++ {
+				if grp.indices[colIdx] == m.cursor {
+					rowContainsSelected = true
+					break
+				}
+			}
+
+			if rowContainsSelected {
+				cursorStart = len(lines)
+				cursorEnd = cursorStart + len(rowLines)
+			}
+
+			lines = append(lines, rowLines...)
 		}
 		lines = append(lines, "")
 	}
@@ -116,7 +128,15 @@ func (m Model) renderBentoView(w, h int) string {
 		return padToSize(strings.Join(lines, "\n"), w, h)
 	}
 
-	start := cursorLineIdx - (h / 3)
+	tileH := cursorEnd - cursorStart
+	start := cursorStart - 2
+	if tileH < h {
+		if cursorEnd >= start+h {
+			start = cursorEnd - h + 2
+		}
+	} else {
+		start = cursorStart
+	}
 	if start < 0 {
 		start = 0
 	}

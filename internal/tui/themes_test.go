@@ -257,4 +257,3 @@ func TestAvailableThemeNames(t *testing.T) {
 		}
 	}
 }
-

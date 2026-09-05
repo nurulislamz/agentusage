@@ -710,6 +710,10 @@ func (m Model) handleMouseLeftClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if clickedIdx >= 0 && clickedIdx < len(ids) {
+		if m.activeDashboardView() != dashboardViewSplit && clickedIdx == m.cursor {
+			// In non-split views, clicking the already selected card/row enters detail mode
+			return m.enterDetailMode(), nil
+		}
 		m.cursor = clickedIdx
 		m.detailOffset = 0
 		m.detailTab = 0
@@ -1057,38 +1061,64 @@ func (m Model) handleSettingsMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
-		scroll := -m.mouseScrollStep()
-		if m.settings.tab == settingsTabWidgetSections {
-			m.settings.previewOffset += scroll
-			if m.settings.previewOffset < 0 {
-				m.settings.previewOffset = 0
-			}
-		} else {
-			m.settings.bodyOffset += scroll
-			if m.settings.bodyOffset < 0 {
-				m.settings.bodyOffset = 0
-			}
-		}
-		return m, nil
+		return m.handleSettingsWheel(-1, msg.X, msg.Y)
 	case tea.MouseButtonWheelDown:
-		scroll := m.mouseScrollStep()
-		if m.settings.tab == settingsTabWidgetSections {
-			m.settings.previewOffset += scroll
-			if m.settings.previewOffset < 0 {
-				m.settings.previewOffset = 0
-			}
-		} else {
-			m.settings.bodyOffset += scroll
-			if m.settings.bodyOffset < 0 {
-				m.settings.bodyOffset = 0
-			}
-		}
-		return m, nil
+		return m.handleSettingsWheel(1, msg.X, msg.Y)
 	case tea.MouseButtonLeft:
 		return m.handleSettingsLeftClick(msg)
 	default:
 		return m, nil
 	}
+}
+
+func (m Model) handleSettingsWheel(dir int, mouseX, mouseY int) (tea.Model, tea.Cmd) {
+	switch m.settings.tab {
+	case settingsTabProviders:
+		ids := m.settingsIDs()
+		if len(ids) > 0 {
+			m.settings.cursor = clamp(m.settings.cursor+dir, 0, len(ids)-1)
+		}
+	case settingsTabTheme:
+		themes := AvailableThemes()
+		if len(themes) > 0 {
+			m.settings.themeCursor = clamp(m.settings.themeCursor+dir, 0, len(themes)-1)
+		}
+	case settingsTabAPIKeys:
+		ids := m.apiKeysTabIDs()
+		if len(ids) > 0 {
+			m.settings.cursor = clamp(m.settings.cursor+dir, 0, len(ids)-1)
+		}
+	case settingsTabWidgetSections:
+		if m.width > 0 && mouseX > 0 && mouseX < m.width/2 {
+			entries := m.activeSectionEntryCount()
+			if entries > 0 {
+				m.settings.sectionRowCursor = clamp(m.settings.sectionRowCursor+dir, 0, entries-1)
+			}
+		} else {
+			scroll := m.mouseScrollStep() * dir
+			m.settings.previewOffset += scroll
+			if m.settings.previewOffset < 0 {
+				m.settings.previewOffset = 0
+			}
+		}
+	case settingsTabIntegrations:
+		statuses := m.settings.integrationStatus
+		if len(statuses) > 0 {
+			m.settings.cursor = clamp(m.settings.cursor+dir, 0, len(statuses)-1)
+		}
+	case settingsTabBoxes:
+		boxes := m.settings.boxes.boxes
+		if len(boxes) > 0 {
+			m.settings.boxes.cursor = clamp(m.settings.boxes.cursor+dir, 0, len(boxes)-1)
+		}
+	case settingsTabTelemetry:
+		scroll := m.mouseScrollStep() * dir
+		m.settings.bodyOffset += scroll
+		if m.settings.bodyOffset < 0 {
+			m.settings.bodyOffset = 0
+		}
+	}
+	return m, nil
 }
 
 func (m Model) handleSettingsLeftClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -1119,7 +1149,7 @@ func (m Model) handleSettingsLeftClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	panelW := contentW + 2
-	panelH := contentH + 8
+	panelH := contentH + 9
 	if m.settings.status != "" {
 		panelH++
 	}
@@ -1165,6 +1195,201 @@ func (m Model) handleSettingsLeftClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					m.settings.previewOffset = 0
 					return m, nil
 				}
+			}
+		}
+		return m, nil
+	}
+
+	// Check if clicked inside body area
+	bodyStartY := modalStartY + 5
+	relY := msg.Y - bodyStartY
+	if relY >= 0 && relY < contentH {
+		relX := msg.X - (modalStartX + 2)
+		return m.handleSettingsBodyLeftClick(relX, relY, panelInnerW, contentH)
+	}
+
+	return m, nil
+}
+
+func (m Model) handleSettingsBodyLeftClick(relX, relY, panelInnerW, contentH int) (tea.Model, tea.Cmd) {
+	switch m.settings.tab {
+	case settingsTabProviders:
+		ids := m.settingsIDs()
+		if len(ids) == 0 {
+			return m, nil
+		}
+		if relY == 1 {
+			m.openAddAccountModal()
+			return m, nil
+		}
+		if relY < 4 {
+			return m, nil
+		}
+		cursor := clamp(m.settings.cursor, 0, len(ids)-1)
+
+		// Rebuild item lines mapping to determine clicked account index
+		var itemIndices []int
+		prevProvider := ""
+		cursorLineIdx := 0
+		for i, id := range ids {
+			providerID := m.accountProviders[id]
+			if snap, ok := m.snapshots[id]; ok && snap.ProviderID != "" {
+				providerID = snap.ProviderID
+			}
+			if providerID == "" {
+				providerID = "other"
+			}
+			if providerID != prevProvider {
+				if len(itemIndices) > 0 {
+					itemIndices = append(itemIndices, -1) // blank spacer
+				}
+				itemIndices = append(itemIndices, -1) // group header
+				prevProvider = providerID
+			}
+			if i == cursor {
+				cursorLineIdx = len(itemIndices)
+			}
+			itemIndices = append(itemIndices, i)
+		}
+
+		availableH := contentH - 4
+		if availableH < 3 {
+			availableH = 3
+		}
+		start := 0
+		if len(itemIndices) > availableH {
+			contentCap := max(1, availableH-2)
+			start = max(0, cursorLineIdx-contentCap/2)
+			if start+contentCap > len(itemIndices) {
+				start = max(0, len(itemIndices)-contentCap)
+			}
+		}
+
+		clickLine := relY - 4
+		if start > 0 {
+			clickLine--
+		}
+		targetLine := start + clickLine
+		if targetLine >= 0 && targetLine < len(itemIndices) {
+			idx := itemIndices[targetLine]
+			if idx >= 0 && idx < len(ids) {
+				m.settings.cursor = idx
+				id := ids[idx]
+				m.providerEnabled[id] = !m.isProviderEnabled(id)
+				m.rebuildSortedIDs()
+				m.settings.status = "saving settings..."
+				return m, m.persistDashboardPrefsCmd()
+			}
+		}
+
+	case settingsTabTheme:
+		themes := AvailableThemes()
+		if len(themes) == 0 {
+			return m, nil
+		}
+		if relY >= 5 {
+			cursor := clamp(m.settings.themeCursor, 0, len(themes)-1)
+			start, end := listWindow(len(themes), cursor, max(1, contentH-5))
+			targetIdx := start + (relY - 5)
+			if targetIdx >= start && targetIdx < end && targetIdx < len(themes) {
+				m.settings.themeCursor = targetIdx
+				name := themes[targetIdx].Name
+				if SetThemeByName(name) {
+					m.invalidateRenderCaches()
+					m.settings.status = "saving theme..."
+					return m, m.persistThemeCmd(name)
+				}
+			}
+		}
+
+	case settingsTabAPIKeys:
+		ids := m.apiKeysTabIDs()
+		if len(ids) == 0 {
+			return m, nil
+		}
+		if relY == 1 {
+			m.openAddAccountModal()
+			return m, nil
+		}
+		if relY >= 5 {
+			cursor := clamp(m.settings.cursor, 0, len(ids)-1)
+			start, end := listWindow(len(ids), cursor, max(1, contentH-5))
+			targetIdx := start + (relY - 5)
+			if targetIdx >= start && targetIdx < end && targetIdx < len(ids) {
+				m.settings.cursor = targetIdx
+				id := ids[targetIdx]
+				providerID := providerForAccountID(id, m.accountProviders)
+				if supportsBrowserSessionProvider(providerID) {
+					return m.startBrowserSessionConnect(id, providerID)
+				}
+				m.settings.apiKeyEditing = true
+				m.settings.apiKeyEditAccountID = id
+				m.settings.apiKeyInput = ""
+				m.settings.apiKeyStatus = ""
+				return m, nil
+			}
+		}
+
+	case settingsTabWidgetSections:
+		if relY == 0 {
+			m.settings.sectionSubTab = 1 - m.settings.sectionSubTab
+			m.settings.sectionRowCursor = 0
+			m.settings.previewOffset = 0
+			return m, nil
+		}
+		entriesCount := len(m.widgetSectionEntries())
+		if m.settings.sectionSubTab == 1 {
+			entriesCount = len(m.detailWidgetSectionEntries())
+		}
+		if relY >= 4 && entriesCount > 0 {
+			start, end := listWindow(entriesCount, m.settings.sectionRowCursor, max(1, contentH-5))
+			targetIdx := start + (relY - 4)
+			if targetIdx >= start && targetIdx < end && targetIdx < entriesCount {
+				m.settings.sectionRowCursor = targetIdx
+				cmd := m.toggleSelectedActiveSection()
+				return m, cmd
+			}
+		}
+
+	case settingsTabIntegrations:
+		statuses := m.settings.integrationStatus
+		if len(statuses) == 0 {
+			return m, nil
+		}
+		if relY >= 3 {
+			cursor := clamp(m.settings.cursor, 0, len(statuses)-1)
+			start, end := listWindow(len(statuses), cursor, max(1, contentH-7))
+			targetIdx := start + (relY-3)/2
+			if targetIdx >= start && targetIdx < end && targetIdx < len(statuses) {
+				m.settings.cursor = targetIdx
+				next, cmd, _ := m.handleSettingsTabIntegrationsKey(tea.KeyMsg{Type: tea.KeyEnter})
+				return next, cmd
+			}
+		}
+
+	case settingsTabBoxes:
+		boxes := m.settings.boxes.boxes
+		if len(boxes) > 0 && relY >= 4 {
+			cursor := clamp(m.settings.boxes.cursor, 0, len(boxes)-1)
+			start, end := listWindow(len(boxes), cursor, max(1, contentH-6))
+			targetIdx := start + (relY - 4)
+			if targetIdx >= start && targetIdx < end && targetIdx < len(boxes) {
+				m.settings.boxes.cursor = targetIdx
+				next, cmd, _ := m.handleSettingsTabBoxesKey(tea.KeyMsg{Type: tea.KeyEnter})
+				return next, cmd
+			}
+		}
+
+	case settingsTabTelemetry:
+		rows := m.telemetryRows()
+		if len(rows) > 0 && relY >= 3 {
+			cursor := m.telemetryRowCursor()
+			start, end := listWindow(len(rows), cursor, max(1, contentH-4))
+			targetIdx := start + (relY - 3)
+			if targetIdx >= start && targetIdx < end && targetIdx < len(rows) {
+				m.settings.cursor = targetIdx
+				next, cmd, _ := m.activateTelemetryRow(rows)
+				return next, cmd
 			}
 		}
 	}
