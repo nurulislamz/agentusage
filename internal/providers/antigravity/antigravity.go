@@ -4,6 +4,7 @@ package antigravity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -79,15 +80,22 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 		snap.SetAttribute("model", model)
 	}
 
-	accessToken, tokenPath, tokenRefreshed, err := ensureAccessToken(ctx, acct, p.Client())
+	accessToken, tokenPath, tokenRefreshed, err := ensureAccessToken(ctx, acct, p.Client(), false)
 	if tokenPath != "" {
 		snap.Raw["oauth_token_file"] = tokenPath
 	}
 	if err != nil {
-		snap.Status = core.StatusAuth
-		snap.Message = "Antigravity OAuth token unavailable"
-		snap.SetDiagnostic("auth_error", err.Error())
-		snap.SetDiagnostic("setup", "Sign in with agy / agy-box so antigravity-oauth-token exists")
+		var authErr *AuthError
+		if errors.As(err, &authErr) {
+			snap.Status = core.StatusAuth
+			snap.Message = "Antigravity OAuth token unavailable"
+			snap.SetDiagnostic("auth_error", authErr.Message)
+			snap.SetDiagnostic("setup", "Sign in to Antigravity so antigravity-oauth-token exists")
+		} else {
+			snap.Status = core.StatusError
+			snap.Message = "Antigravity token renewal failed"
+			snap.SetDiagnostic("auth_error", err.Error())
+		}
 		return snap, nil
 	}
 	if tokenRefreshed {
@@ -98,25 +106,48 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 
 	baseURL := strings.TrimSpace(acct.Hint("quota_endpoint", defaultQuotaEndpoint))
 	summary, err := retrieveUserQuotaSummary(ctx, accessToken, baseURL, p.Client())
-	if err != nil && isAuthHTTPError(err) {
-		if retriedSummary, retryErr := retryAfterAuthError(ctx, acct, baseURL, p.Client(), &snap); retryErr == nil {
-			summary = retriedSummary
-			err = nil
+	if err != nil {
+		var apiErr *APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.IsUnauthorized() {
+				// Quota 401: force refresh even if stored expiry is in the future; retry quota once.
+				retriedSummary, retryErr := retryAfterAuth401(ctx, acct, baseURL, p.Client(), &snap)
+				if retryErr == nil {
+					summary = retriedSummary
+					err = nil
+				} else {
+					snap.Status = core.StatusAuth
+					snap.Message = "Antigravity quota API rejected credentials"
+					snap.SetDiagnostic("quota_api_error", "HTTP 401: unauthorized on retry")
+					return snap, nil
+				}
+			} else if apiErr.IsForbidden() {
+				// Quota 403: classify as authorization failure without repeatedly refreshing.
+				snap.Status = core.StatusAuth
+				snap.Message = "Antigravity quota API rejected credentials"
+				snap.SetDiagnostic("quota_api_error", "HTTP 403: forbidden")
+				return snap, nil
+			} else if apiErr.IsRateLimited() {
+				// Quota 429: StatusLimited, respect retry timing; no token refresh.
+				snap.Status = core.StatusLimited
+				snap.Message = "Antigravity quota API rate limited"
+				if apiErr.RetryAfter > 0 {
+					snap.SetDiagnostic("retry_after", apiErr.RetryAfter.String())
+				}
+				snap.SetDiagnostic("quota_api_error", "HTTP 429: rate limited")
+				return snap, nil
+			}
 		}
 	}
+
 	if err != nil {
-		if isAuthHTTPError(err) {
-			snap.Status = core.StatusAuth
-			snap.Message = "Antigravity quota API rejected credentials"
-		} else {
-			snap.Status = core.StatusError
-			snap.Message = "Antigravity quota API request failed"
-		}
+		snap.Status = core.StatusError
+		snap.Message = "Antigravity quota API request failed"
 		snap.SetDiagnostic("quota_api_error", err.Error())
 		return snap, nil
 	}
 
-	payload := statusLinePayload{
+	payload := quotaPayload{
 		Quota:      quotaMapFromSummary(summary),
 		ReceivedAt: time.Now().UTC(),
 		Product:    "antigravity",
@@ -133,23 +164,12 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 	return snap, nil
 }
 
-func isAuthHTTPError(err error) bool {
-	if err == nil {
-		return false
+func retryAfterAuth401(ctx context.Context, acct core.AccountConfig, baseURL string, client *http.Client, snap *core.UsageSnapshot) (quotaSummaryResponse, error) {
+	newAccessToken, tokenPath, _, refreshErr := ensureAccessToken(ctx, acct, client, true)
+	if refreshErr != nil {
+		return quotaSummaryResponse{}, refreshErr
 	}
-	msg := err.Error()
-	return strings.Contains(msg, "HTTP 401") || strings.Contains(msg, "HTTP 403")
-}
-
-func retryAfterAuthError(ctx context.Context, acct core.AccountConfig, baseURL string, client *http.Client, snap *core.UsageSnapshot) (quotaSummaryResponse, error) {
-	if pingErr := pingBoxForToken(ctx, acct, "auth_401_retry"); pingErr != nil {
-		return quotaSummaryResponse{}, pingErr
-	}
-	accessToken, tokenPath, _, retryErr := ensureAccessToken(ctx, acct, client)
-	if retryErr != nil {
-		return quotaSummaryResponse{}, retryErr
-	}
-	summary, err := retrieveUserQuotaSummary(ctx, accessToken, baseURL, client)
+	summary, err := retrieveUserQuotaSummary(ctx, newAccessToken, baseURL, client)
 	if err != nil {
 		return quotaSummaryResponse{}, err
 	}
@@ -160,7 +180,7 @@ func retryAfterAuthError(ctx context.Context, acct core.AccountConfig, baseURL s
 	return summary, nil
 }
 
-func projectSnapshot(snap *core.UsageSnapshot, payload statusLinePayload) {
+func projectSnapshot(snap *core.UsageSnapshot, payload quotaPayload) {
 	if snap == nil {
 		return
 	}
@@ -204,7 +224,7 @@ func (p *Provider) EnrichSnapshots(ctx context.Context, accounts []core.AccountC
 	shared.EnrichSnapshotsWithFetch(ctx, providerID, p.Fetch, accounts, snaps, shared.OverlayLiveFetch)
 }
 
-func projectQuotaMetrics(snap *core.UsageSnapshot, payload statusLinePayload) {
+func projectQuotaMetrics(snap *core.UsageSnapshot, payload quotaPayload) {
 	keys := make([]string, 0, len(payload.Quota))
 	for key := range payload.Quota {
 		keys = append(keys, key)
@@ -394,7 +414,7 @@ func projectQuotaMetrics(snap *core.UsageSnapshot, payload statusLinePayload) {
 	}
 }
 
-func getPoolRemainingFraction(payload statusLinePayload, poolKeywords ...string) (float64, bool) {
+func getPoolRemainingFraction(payload quotaPayload, poolKeywords ...string) (float64, bool) {
 	worst := 1.0
 	found := false
 	for name, quota := range payload.Quota {
@@ -421,7 +441,7 @@ func getPoolRemainingFraction(payload statusLinePayload, poolKeywords ...string)
 	return worst, found
 }
 
-func statusFromQuota(snap *core.UsageSnapshot, payload statusLinePayload) core.Status {
+func statusFromQuota(snap *core.UsageSnapshot, payload quotaPayload) core.Status {
 	model := ""
 	if snap != nil {
 		model = strings.ToLower(snap.Attributes["model"])
@@ -486,7 +506,7 @@ func statusFromQuota(snap *core.UsageSnapshot, payload statusLinePayload) core.S
 	return core.StatusOK
 }
 
-func worstQuotaFraction(payload statusLinePayload) (float64, bool) {
+func worstQuotaFraction(payload quotaPayload) (float64, bool) {
 	worst := 1.0
 	found := false
 	for _, quota := range payload.Quota {
@@ -502,14 +522,14 @@ func worstQuotaFraction(payload statusLinePayload) (float64, bool) {
 	return worst, found
 }
 
-func payloadReceivedAt(payload statusLinePayload) time.Time {
+func payloadReceivedAt(payload quotaPayload) time.Time {
 	if !payload.ReceivedAt.IsZero() {
 		return payload.ReceivedAt.UTC()
 	}
 	return time.Now().UTC()
 }
 
-func quotaResetTime(quota statusLineQuota, receivedAt time.Time) time.Time {
+func quotaResetTime(quota quotaBucketState, receivedAt time.Time) time.Time {
 	if reset := strings.TrimSpace(quota.ResetTime); reset != "" {
 		if parsed, err := time.Parse(time.RFC3339Nano, reset); err == nil {
 			return parsed.UTC()
