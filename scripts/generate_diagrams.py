@@ -10,7 +10,10 @@ import sys
 import urllib.request
 import zlib
 
-DOC_PATH = "docs/COMMAND_FLOW_DIAGRAMS.md"
+DOC_PATHS = [
+    "docs/COMMAND_FLOW_DIAGRAMS.md",
+    "docs/user-flow-diagram.md",
+]
 DIAGRAMS_DIR = "docs/diagrams"
 PLANTUML_JAR = os.environ.get("PLANTUML_JAR", "/tmp/plantuml.jar")
 
@@ -86,20 +89,24 @@ def extract_diagrams(doc_text: str):
 
 def main():
     check_only = "--check" in sys.argv
+    cli_files = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
+    target_docs = cli_files if cli_files else DOC_PATHS
 
-    if not os.path.exists(DOC_PATH):
-        print(f"Error: {DOC_PATH} not found")
-        sys.exit(1)
+    matches = []
+    for doc in target_docs:
+        if not os.path.exists(doc):
+            print(f"Warning: {doc} not found, skipping.")
+            continue
+        with open(doc, "r", encoding="utf-8") as f:
+            doc_text = f.read()
+        doc_matches = extract_diagrams(doc_text)
+        print(f"Found {len(doc_matches)} PlantUML diagrams in {doc}")
+        matches.extend(doc_matches)
 
-    with open(DOC_PATH, "r", encoding="utf-8") as f:
-        doc_text = f.read()
-
-    matches = extract_diagrams(doc_text)
     if not matches:
-        print(f"Error: No diagrams found in {DOC_PATH}")
+        print(f"Error: No diagrams found across target docs: {target_docs}")
         sys.exit(1)
 
-    print(f"Found {len(matches)} PlantUML diagrams in {DOC_PATH}")
     os.makedirs(DIAGRAMS_DIR, exist_ok=True)
 
     jar_path = ensure_plantuml_jar() if not check_only else ""
