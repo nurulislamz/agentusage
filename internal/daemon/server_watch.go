@@ -62,14 +62,6 @@ func (s *Service) runWatchLoop(ctx context.Context) {
 				continue
 			}
 
-			// Antigravity status-line writes need a full Fetch poll so
-			// limit_snapshot gauges update. RequestPoll already coalesces.
-			if isAntigravityStatusFile(event.Name) {
-				s.RequestPoll()
-				core.Tracef("[watch] antigravity status change: %s op=%s → poll kick", event.Name, event.Op)
-				continue
-			}
-
 			if debounceTimer != nil {
 				debounceTimer.Stop()
 			}
@@ -88,19 +80,6 @@ func (s *Service) runWatchLoop(ctx context.Context) {
 			}
 		}
 	}
-}
-
-// isAntigravityStatusFile reports whether path is an OpenUsage Antigravity
-// status-line state file (default or per-account variants).
-func isAntigravityStatusFile(path string) bool {
-	base := strings.ToLower(filepath.Base(strings.TrimSpace(path)))
-	if !strings.HasSuffix(base, ".json") {
-		return false
-	}
-	if strings.HasPrefix(base, ".") {
-		return false // ignore atomic write temps like .antigravity-status-*.tmp
-	}
-	return strings.HasPrefix(base, "antigravity") && strings.Contains(base, "status")
 }
 
 // collectWatchDirs returns the set of directories to watch for changes.

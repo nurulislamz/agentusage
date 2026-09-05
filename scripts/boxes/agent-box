@@ -31,16 +31,6 @@ if [ "${1:-}" = "add" ] || [ "${1:-}" = "new" ] || [ "${1:-}" = "create" ]; then
            "$HOME/.config/Cursor" \
            "$HOME/.local/state/openusage"
 
-  # Auto-inject OpenUsage statusline telemetry hook into the box's cli-config
-  CLI_CONFIG="$PROFILE_DIR/.cursor/cli-config.json"
-  cat << 'JSON' > "$CLI_CONFIG"
-{
-  "statusLine": {
-    "type": "command",
-    "command": "openusage cursor statusline"
-  }
-}
-JSON
 
   echo "✨ Created Cursor box '$BOX_NAME' in $PROFILE_DIR"
   echo "Launch with: $CMD $BOX_NAME"
@@ -136,36 +126,13 @@ mkdir -p "$PROFILE_DIR/.cursor" \
          "$HOME/.config/Cursor" \
          "$HOME/.local/state/openusage"
 
-# Auto-inject OpenUsage statusline telemetry hook into the box's cli-config
-CLI_CONFIG="$PROFILE_DIR/.cursor/cli-config.json"
-if [ ! -f "$CLI_CONFIG" ]; then
-  cat << 'JSON' > "$CLI_CONFIG"
-{
-  "statusLine": {
-    "type": "command",
-    "command": "openusage cursor statusline"
-  }
-}
-JSON
-else
-  python3 -c "
-import json
-try:
-    with open('$CLI_CONFIG', 'r') as f:
-        data = json.load(f)
-except Exception:
-    data = {}
-sl = data.get('statusLine', {})
-if not isinstance(sl, dict) or sl.get('command') != 'openusage cursor statusline':
-    data['statusLine'] = {'type': 'command', 'command': 'openusage cursor statusline'}
-    with open('$CLI_CONFIG', 'w') as f:
-        json.dump(data, f, indent=2)
-" 2>/dev/null || true
-fi
 
-# Prefer distro bwrap: on Ubuntu 24.04+ Homebrew bwrap lacks the AppArmor
-# profile and fails with "setting up uid map: Permission denied".
-if [ -x /usr/bin/bwrap ]; then
+# Prefer an explicit BWRAP_BIN (tests), then distro bwrap: on Ubuntu 24.04+
+# Homebrew bwrap lacks the AppArmor profile and fails with
+# "setting up uid map: Permission denied".
+if [ -n "${BWRAP_BIN:-}" ] && [ -x "$BWRAP_BIN" ]; then
+  :
+elif [ -x /usr/bin/bwrap ]; then
   BWRAP_BIN=/usr/bin/bwrap
 elif BWRAP_BIN=$(command -v bwrap 2>/dev/null) && [ -n "$BWRAP_BIN" ]; then
   :

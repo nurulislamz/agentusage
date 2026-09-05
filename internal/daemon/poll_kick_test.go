@@ -50,26 +50,6 @@ func TestRequestPoll_NilSafe(t *testing.T) {
 	(&Service{}).RequestPoll()
 }
 
-func TestIsAntigravityStatusFile(t *testing.T) {
-	cases := []struct {
-		name string
-		want bool
-	}{
-		{"antigravity-status.json", true},
-		{"antigravity-mohammed-status.json", true},
-		{"/tmp/antigravity-nurulz-status.json", true},
-		{".antigravity-status-abc.tmp", false},
-		{"telemetry.db", false},
-		{"antigravity-status.json.bak", false},
-		{"other-status.json", false},
-	}
-	for _, tc := range cases {
-		if got := isAntigravityStatusFile(tc.name); got != tc.want {
-			t.Errorf("isAntigravityStatusFile(%q)=%v want %v", tc.name, got, tc.want)
-		}
-	}
-}
-
 func TestRequestPoll_DoesNotBlock(t *testing.T) {
 	s := &Service{pollKick: make(chan struct{}, 1)}
 	done := make(chan struct{})

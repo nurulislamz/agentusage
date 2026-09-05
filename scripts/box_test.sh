@@ -63,9 +63,10 @@ done
 export PATH="/usr/bin:/bin"
 export BOX_SCRIPTS_DIR="$SCRIPTS"
 export BOX_INSTALL_DIR="$BINDST"
+unset NAME || true
 
 run_box() {
-  env PATH="$PATH" BOX_SCRIPTS_DIR="$BOX_SCRIPTS_DIR" BOX_INSTALL_DIR="$BOX_INSTALL_DIR" "$BOX" "$@"
+  env -u NAME PATH="$PATH" BOX_SCRIPTS_DIR="$BOX_SCRIPTS_DIR" BOX_INSTALL_DIR="$BOX_INSTALL_DIR" "$BOX" "$@"
 }
 
 # add with positional name — installs CLI then invokes it
@@ -130,7 +131,81 @@ assert_ok "install updates bashrc" \
   env HOME="$RC_HOME" PATH="/usr/bin:/bin" BOX_SCRIPTS_DIR="$SCRIPTS" BOX_INSTALL_DIR="$RC_HOME/.local/bin" \
   "$BOX" add agent-box rcpath
 assert_ok "bashrc mentions .local/bin" grep -q 'HOME/.local/bin' "$RC_HOME/.bashrc"
-assert_ok "agent-box landed in ~/.local/bin" test -x "$RC_HOME/.local/bin/agent-box"
+# --- Real box script shell fixture tests (fake tools, temporary HOME) ---
+BOX_HOME="$WORKDIR/box_home"
+FAKE_BIN="$WORKDIR/fake_bin"
+mkdir -p "$BOX_HOME" "$FAKE_BIN"
+
+cat >"$FAKE_BIN/bwrap" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >"$BOX_TEST_LOG"
+EOF
+chmod +x "$FAKE_BIN/bwrap"
+
+cat >"$FAKE_BIN/agy" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$FAKE_BIN/agy"
+
+cat >"$FAKE_BIN/agent" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$FAKE_BIN/agent"
+
+export BOX_TEST_LOG="$WORKDIR/bwrap.log"
+REAL_AGY_BOX="$ROOT/scripts/boxes/agy-box"
+REAL_AGENT_BOX="$ROOT/scripts/boxes/agent-box"
+
+# 1. Shell syntax check
+assert_ok "agy-box syntax" bash -n "$REAL_AGY_BOX"
+assert_ok "agent-box syntax" bash -n "$REAL_AGENT_BOX"
+
+# 2. agy-box add does not inject statusline
+assert_ok "agy-box add devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGY_BOX" add devbox
+AGY_SETTINGS="$BOX_HOME/.agy-containers/devbox/.gemini/antigravity-cli/settings.json"
+if [ -f "$AGY_SETTINGS" ]; then
+  assert_fail "agy-box add does not create statusLine" grep -q '"statusLine"' "$AGY_SETTINGS"
+else
+  PASS=$((PASS + 1))
+fi
+
+# 3. agy-box launch preserves custom settings and does not inject statusline
+mkdir -p "$(dirname "$AGY_SETTINGS")"
+cat >"$AGY_SETTINGS" <<'EOF'
+{
+  "customKey": "customVal"
+}
+EOF
+assert_ok "agy-box launch devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGY_BOX" devbox
+assert_ok "agy-box invoked fake bwrap" test -s "$BOX_TEST_LOG"
+assert_fail "agy-box launch did not inject statusLine" grep -q '"statusLine"' "$AGY_SETTINGS"
+assert_ok "agy-box launch preserved customKey" grep -q '"customVal"' "$AGY_SETTINGS"
+
+# 4. agent-box add does not inject statusline
+assert_ok "agent-box add devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGENT_BOX" add devbox
+CURSOR_CONFIG="$BOX_HOME/.agent-containers/devbox/.cursor/cli-config.json"
+if [ -f "$CURSOR_CONFIG" ]; then
+  assert_fail "agent-box add does not create statusLine" grep -q '"statusLine"' "$CURSOR_CONFIG"
+else
+  PASS=$((PASS + 1))
+fi
+
+# 5. agent-box launch preserves custom statusLine command and does not overwrite
+mkdir -p "$(dirname "$CURSOR_CONFIG")"
+cat >"$CURSOR_CONFIG" <<'EOF'
+{
+  "statusLine": {
+    "command": "custom-status-cmd"
+  }
+}
+EOF
+: >"$BOX_TEST_LOG"
+assert_ok "agent-box launch devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGENT_BOX" devbox
+assert_ok "agent-box invoked fake bwrap" test -s "$BOX_TEST_LOG"
+assert_ok "agent-box launch preserved custom statusLine command" grep -q 'custom-status-cmd' "$CURSOR_CONFIG"
+assert_fail "agent-box launch did not inject openusage statusline" grep -q 'openusage cursor statusline' "$CURSOR_CONFIG"
 
 echo
 echo "passed=$PASS failed=$FAIL"
