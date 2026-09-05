@@ -8,7 +8,7 @@ import "strings"
 // execs the notify array directly (no shell), so a .sh script has no
 // interpreter. Instead of writing a script, we register the agentusage binary
 // directly in the notify array; Codex appends the event JSON as the next argv
-// element, yielding `agentusage telemetry hook codex <payload>`. An empty
+// element, yielding `agentusage daemon hook codex <payload>`. An empty
 // Template/Basename signals the installer to write no artifact file.
 func codexArtifact() artifactSpec {
 	return artifactSpec{
@@ -31,7 +31,7 @@ func codexTargetFile(dirs Dirs) (path string, writesArtifact bool) {
 // preserved verbatim. The trailing elements turn the binary into the full hook
 // command; Codex appends the event JSON as the next argv element.
 func codexNotifyTOML(exePath string) string {
-	parts := []string{exePath, "telemetry", "hook", "codex"}
+	parts := []string{exePath, "daemon", "hook", "codex"}
 	quoted := make([]string, 0, len(parts))
 	for _, p := range parts {
 		quoted = append(quoted, "'"+p+"'")
@@ -41,10 +41,10 @@ func codexNotifyTOML(exePath string) string {
 
 // codexConfigured reports whether the Codex config registers the agentusage
 // notify hook on Windows: a notify line that invokes the binary with the
-// `telemetry hook codex` subcommand.
+// `daemon hook codex` subcommand (or the legacy `telemetry hook` form).
 func codexConfigured(content string) bool {
-	return strings.Contains(content, "notify") &&
-		strings.Contains(content, "telemetry") &&
-		strings.Contains(content, "hook") &&
-		strings.Contains(content, "codex")
+	if !strings.Contains(content, "notify") || !strings.Contains(content, "hook") || !strings.Contains(content, "codex") {
+		return false
+	}
+	return strings.Contains(content, "daemon") || strings.Contains(content, "telemetry")
 }

@@ -20,10 +20,14 @@ var removedCommands = []string{
 	"pricing",
 	"session",
 	"statusline",
-	"telemetry",
 	"tmux",
 	"version",
 	"weekly",
+}
+
+// hiddenCompatCommands remain registered (Hidden) so already-installed hooks keep working.
+var hiddenCompatCommands = []string{
+	"telemetry",
 }
 
 var retainedCommands = []string{
@@ -67,9 +71,27 @@ func TestRootCommands_RetainedCommandsPresent(t *testing.T) {
 		}
 	}
 
-	if len(commandNames) != len(retainedCommands) {
-		t.Errorf("expected exactly %d commands (%v), got %d (%v)",
-			len(retainedCommands), retainedCommands, len(commandNames), commandNames)
+	for _, compat := range hiddenCompatCommands {
+		cmd, _, err := root.Find([]string{compat})
+		if err != nil || cmd == nil || cmd.Name() != compat {
+			t.Errorf("expected hidden compat command %q to be registered, err=%v", compat, err)
+			continue
+		}
+		if !cmd.Hidden {
+			t.Errorf("expected compat command %q to be Hidden", compat)
+		}
+	}
+
+	wantVisible := len(retainedCommands)
+	visible := 0
+	for _, c := range commands {
+		if !c.Hidden {
+			visible++
+		}
+	}
+	if visible != wantVisible {
+		t.Errorf("expected exactly %d visible commands (%v), got %d visible among %v",
+			wantVisible, retainedCommands, visible, commandNames)
 	}
 }
 
@@ -122,6 +144,15 @@ func TestRootCommands_HelpOutputDoesNotContainRemovedCommands(t *testing.T) {
 			fields := strings.Fields(line)
 			if len(fields) > 0 && fields[0] == removed {
 				t.Errorf("removed command %q found in Available Commands section: %q", removed, line)
+			}
+		}
+	}
+
+	for _, compat := range hiddenCompatCommands {
+		for _, line := range strings.Split(availSection, "\n") {
+			fields := strings.Fields(line)
+			if len(fields) > 0 && fields[0] == compat {
+				t.Errorf("hidden compat command %q found in Available Commands section: %q", compat, line)
 			}
 		}
 	}

@@ -37,6 +37,8 @@ func TestApplyEnrich_ScopesToAccount(t *testing.T) {
 
 func TestSnapshotDispatcher_DispatchSendsImmediatelyAndEnrichesAsync(t *testing.T) {
 	msgCh := make(chan tui.SnapshotsMsg, 10)
+	enrichStarted := make(chan struct{})
+	enrichContinue := make(chan struct{})
 	enrichDone := make(chan struct{})
 
 	d := &snapshotDispatcher{
@@ -46,6 +48,8 @@ func TestSnapshotDispatcher_DispatchSendsImmediatelyAndEnrichesAsync(t *testing.
 			}
 		},
 		enrich: func(snaps map[string]core.UsageSnapshot) {
+			close(enrichStarted)
+			<-enrichContinue
 			for id := range snaps {
 				snap := snaps[id]
 				snap.Message = "enriched"
@@ -65,27 +69,47 @@ func TestSnapshotDispatcher_DispatchSendsImmediatelyAndEnrichesAsync(t *testing.
 	d.dispatch(frame)
 
 	// First message must arrive immediately with base snapshots
+	var firstMsg tui.SnapshotsMsg
 	select {
-	case msg := <-msgCh:
-		if msg.Snapshots["test-1"].Message != "base" {
-			t.Fatalf("initial dispatch message = %q, want base", msg.Snapshots["test-1"].Message)
+	case firstMsg = <-msgCh:
+		if firstMsg.Snapshots["test-1"].Message != "base" {
+			t.Fatalf("initial dispatch message = %q, want base", firstMsg.Snapshots["test-1"].Message)
 		}
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timed out waiting for immediate dispatch message")
 	}
 
-	// Wait for enrich to finish
+	select {
+	case <-enrichStarted:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for enrich to start")
+	}
+
+	// Mutate the original frame map and the already-sent message map the way the
+	// TUI does (write Diagnostics). Neither must race with or corrupt enrich.
+	frame.Snapshots["test-1"] = core.UsageSnapshot{ProviderID: "test", AccountID: "test-1", Message: "mutated-source"}
+	{
+		snap := firstMsg.Snapshots["test-1"]
+		snap.EnsureMaps()
+		snap.Diagnostics["display_branch"] = "test"
+		firstMsg.Snapshots["test-1"] = snap
+	}
+	close(enrichContinue)
+
 	select {
 	case <-enrichDone:
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for enrich to complete")
 	}
 
-	// Second message must arrive with enriched snapshots
+	// Second message must arrive with enriched snapshots from an independent clone
 	select {
 	case msg := <-msgCh:
 		if msg.Snapshots["test-1"].Message != "enriched" {
 			t.Fatalf("enriched dispatch message = %q, want enriched", msg.Snapshots["test-1"].Message)
+		}
+		if firstMsg.Snapshots["test-1"].Message != "base" {
+			t.Fatalf("first message mutated after send: %q", firstMsg.Snapshots["test-1"].Message)
 		}
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timed out waiting for enriched dispatch message")

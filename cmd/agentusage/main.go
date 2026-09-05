@@ -78,6 +78,9 @@ func newRootCommand() *cobra.Command {
 	root.AddCommand(newDoctorCommand())
 	root.AddCommand(newServeCommand())
 	root.AddCommand(newDaemonCommand())
+	// Hidden alias: Windows Claude/Codex hooks installed before the CLI rename
+	// still invoke `agentusage telemetry hook ...`.
+	root.AddCommand(newLegacyTelemetryCommand())
 	root.InitDefaultHelpCmd()
 
 	return root

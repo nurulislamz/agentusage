@@ -27,12 +27,19 @@ func (d *snapshotDispatcher) bind(program *tea.Program) {
 
 func (d *snapshotDispatcher) dispatch(frame daemon.SnapshotFrame) {
 	requestID := d.nextID.Add(1)
-	d.send(frame, requestID)
-	if d == nil || d.enrich == nil || len(frame.Snapshots) == 0 {
+	// Clone before send so the TUI never shares a map with the enrich goroutine
+	// (TUI may write Diagnostics while DeepClone/enrich iterates or writes).
+	base := core.DeepCloneSnapshots(frame.Snapshots)
+	d.send(daemon.SnapshotFrame{
+		Snapshots:  base,
+		TimeWindow: frame.TimeWindow,
+	}, requestID)
+	if d == nil || d.enrich == nil || len(base) == 0 {
 		return
 	}
 	go func() {
-		enriched := core.DeepCloneSnapshots(frame.Snapshots)
+		// Second clone: enrich mutates the map; keep the already-sent base intact.
+		enriched := core.DeepCloneSnapshots(base)
 		d.enrich(enriched)
 		d.send(daemon.SnapshotFrame{
 			Snapshots:  enriched,

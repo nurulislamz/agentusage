@@ -110,6 +110,18 @@ func newDaemonCommand() *cobra.Command {
 	return cmd
 }
 
+// newLegacyTelemetryCommand keeps `agentusage telemetry hook ...` working for
+// already-installed Windows Claude/Codex integrations after the CLI rename.
+func newLegacyTelemetryCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:    "telemetry",
+		Short:  "Deprecated alias for daemon hook (hidden compatibility)",
+		Hidden: true,
+	}
+	cmd.AddCommand(newDaemonHookCommand())
+	return cmd
+}
+
 func addDaemonRunFlags(
 	cmd *cobra.Command,
 	dbPath *string,
