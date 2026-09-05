@@ -55,27 +55,6 @@ func TestSnapshotResetPassed(t *testing.T) {
 	}
 }
 
-func TestIsAntigravityStatusFile_EdgeCases(t *testing.T) {
-	cases := []struct {
-		path string
-		want bool
-	}{
-		{"antigravity-status.json", true},
-		{"antigravity_work_status.json", true},
-		{"/path/to/antigravity.status.json", true},
-		{".antigravity-status.tmp", false},
-		{"antigravity.txt", false},
-		{"claude-status.json", false},
-		{"", false},
-	}
-
-	for _, tc := range cases {
-		if got := isAntigravityStatusFile(tc.path); got != tc.want {
-			t.Errorf("isAntigravityStatusFile(%q) = %v, want %v", tc.path, got, tc.want)
-		}
-	}
-}
-
 func TestCollectWatchDirs(t *testing.T) {
 	dirs := collectWatchDirs()
 	// Should return slice of existing directories without panicking
@@ -487,8 +466,8 @@ func TestRunWatchLoop_LiveEvents(t *testing.T) {
 	go svc.runWatchLoop(ctx)
 
 	time.Sleep(30 * time.Millisecond)
-	// Write antigravity status file
-	testStatus := filepath.Join(stateDir, "antigravity_status.json")
+	// Write state file
+	testStatus := filepath.Join(stateDir, "test_state.json")
 	_ = os.WriteFile(testStatus, []byte("{}"), 0644)
 	defer os.Remove(testStatus)
 

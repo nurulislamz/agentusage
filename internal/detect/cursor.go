@@ -35,7 +35,6 @@ func detectCursor(result *Result) {
 			}
 			boxName := entry.Name()
 			boxConfigDir := filepath.Join(containersDir, boxName, ".cursor")
-			boxStatusFile := filepath.Join(home, ".local", "state", "agentusage", fmt.Sprintf("cursor-%s-status.json", boxName))
 
 			acct := core.AccountConfig{
 				ID:           fmt.Sprintf("cursor-%s", boxName),
@@ -45,7 +44,6 @@ func detectCursor(result *Result) {
 				RuntimeHints: make(map[string]string),
 			}
 			acct.SetHint("config_dir", boxConfigDir)
-			acct.SetHint("status_file", boxStatusFile)
 			acct.SetHint("auth_file", filepath.Join(containersDir, boxName, ".config", "cursor", "auth.json"))
 			addAccount(result, acct)
 			hasBoxes = true
@@ -57,19 +55,20 @@ func detectCursor(result *Result) {
 	if configDir == "" {
 		configDir = filepath.Join(home, ".cursor")
 	}
-	defaultStatusFile := filepath.Join(home, ".local", "state", "agentusage", "cursor-status.json")
 
-	if !dirExists(configDir) && bin == "" && !fileExists(defaultStatusFile) {
+	if !dirExists(configDir) && bin == "" {
 		return
 	}
 
-	log.Printf("[detect] Found Cursor at %s", bin)
-	result.Tools = append(result.Tools, DetectedTool{
-		Name:       "Cursor CLI",
-		BinaryPath: bin,
-		ConfigDir:  configDir,
-		Type:       "cli",
-	})
+	if bin != "" {
+		log.Printf("[detect] Found Cursor at %s", bin)
+		result.Tools = append(result.Tools, DetectedTool{
+			Name:       "Cursor CLI",
+			BinaryPath: bin,
+			ConfigDir:  configDir,
+			Type:       "cli",
+		})
+	}
 
 	if !hasBoxes {
 		acct := core.AccountConfig{
@@ -80,7 +79,6 @@ func detectCursor(result *Result) {
 			RuntimeHints: make(map[string]string),
 		}
 		acct.SetHint("config_dir", configDir)
-		acct.SetHint("status_file", defaultStatusFile)
 		acct.SetHint("auth_file", filepath.Join(home, ".config", "cursor", "auth.json"))
 		addAccount(result, acct)
 	}

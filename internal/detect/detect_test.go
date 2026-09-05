@@ -638,3 +638,131 @@ func TestDetectGHCopilot_SkipsWhenNoBinaries(t *testing.T) {
 		t.Errorf("expected 0 accounts, got %d", len(result.Accounts))
 	}
 }
+
+func TestDetectAntigravity_StaleStatusFileOnly_NotDetected(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("ANTIGRAVITY_CONFIG_DIR", "")
+
+	// Only stale status file exists
+	staleStatusDir := filepath.Join(home, ".local", "state", "agentusage")
+	if err := os.MkdirAll(staleStatusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(staleStatusDir, "antigravity-status.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var result Result
+	detectAntigravity(&result)
+
+	if len(result.Accounts) != 0 {
+		t.Errorf("expected 0 accounts from stale status file only, got %d", len(result.Accounts))
+	}
+	if len(result.Tools) != 0 {
+		t.Errorf("expected 0 tools, got %d", len(result.Tools))
+	}
+}
+
+func TestDetectAntigravity_ConfigDirAndMultipleBoxes_NoStatusFileHint(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("ANTIGRAVITY_CONFIG_DIR", "")
+
+	// Host config dir
+	hostConfig := filepath.Join(home, ".gemini", "antigravity-cli")
+	if err := os.MkdirAll(hostConfig, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Two container box profiles
+	box1 := filepath.Join(home, ".agy-containers", "profile-alpha", ".gemini", "antigravity-cli")
+	box2 := filepath.Join(home, ".agy-containers", "profile-beta", ".gemini", "antigravity-cli")
+	if err := os.MkdirAll(box1, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(box2, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var result Result
+	detectAntigravity(&result)
+
+	if len(result.Accounts) != 3 {
+		t.Fatalf("expected 3 accounts (host + 2 boxes), got %d: %+v", len(result.Accounts), result.Accounts)
+	}
+
+	for _, acct := range result.Accounts {
+		if hint, exists := acct.RuntimeHints["status_file"]; exists {
+			t.Errorf("account %s should not emit status_file hint, got %s", acct.ID, hint)
+		}
+	}
+}
+
+func TestDetectCursor_StaleStatusFileOnly_NotDetected(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("CURSOR_CONFIG_DIR", "")
+
+	// Only stale status file exists
+	staleStatusDir := filepath.Join(home, ".local", "state", "agentusage")
+	if err := os.MkdirAll(staleStatusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(staleStatusDir, "cursor-status.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var result Result
+	detectCursor(&result)
+
+	if len(result.Accounts) != 0 {
+		t.Errorf("expected 0 accounts from stale status file only, got %d", len(result.Accounts))
+	}
+	if len(result.Tools) != 0 {
+		t.Errorf("expected 0 tools, got %d", len(result.Tools))
+	}
+}
+
+func TestDetectCursor_ConfigDirAndMultipleBoxes_NoStatusFileHint(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
+	t.Setenv("CURSOR_CONFIG_DIR", "")
+
+	// Host config dir
+	hostConfig := filepath.Join(home, ".cursor")
+	if err := os.MkdirAll(hostConfig, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Container box profiles in both container directory variants
+	box1 := filepath.Join(home, ".agent-containers", "devbox", ".cursor")
+	box2 := filepath.Join(home, ".cursor-containers", "testbox", ".cursor")
+	if err := os.MkdirAll(box1, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(box2, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var result Result
+	detectCursor(&result)
+
+	if len(result.Accounts) != 2 {
+		t.Fatalf("expected 2 box accounts, got %d: %+v", len(result.Accounts), result.Accounts)
+	}
+
+	for _, acct := range result.Accounts {
+		if hint, exists := acct.RuntimeHints["status_file"]; exists {
+			t.Errorf("account %s should not emit status_file hint, got %s", acct.ID, hint)
+		}
+	}
+}

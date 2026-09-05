@@ -32,15 +32,6 @@ if [ "${1:-}" = "add" ] || [ "${1:-}" = "new" ] || [ "${1:-}" = "create" ]; then
            "$PROFILE_DIR/.gemini/config/rules" \
            "$HOME/.local/state/openusage"
 
-  # Auto-inject OpenUsage statusline telemetry hook into the box's settings
-  SETTINGS_FILE="$PROFILE_DIR/.gemini/antigravity-cli/settings.json"
-  cat << 'JSON' > "$SETTINGS_FILE"
-{
-  "statusLine": {
-    "command": "openusage antigravity statusline"
-  }
-}
-JSON
 
   # Sync global workflows, skills, agents, and rules if available on host
   for src in workflows global_workflows skills agents rules; do
@@ -140,30 +131,6 @@ fi
 
 mkdir -p "$PROFILE_DIR/.gemini/antigravity-cli" "$HOME/.local/state/openusage"
 
-# Auto-inject OpenUsage statusline telemetry hook into the box's settings
-SETTINGS_FILE="$PROFILE_DIR/.gemini/antigravity-cli/settings.json"
-if [ ! -f "$SETTINGS_FILE" ]; then
-  cat << 'JSON' > "$SETTINGS_FILE"
-{
-  "statusLine": {
-    "command": "openusage antigravity statusline"
-  }
-}
-JSON
-else
-  python3 -c "
-import json
-try:
-    with open('$SETTINGS_FILE', 'r') as f:
-        data = json.load(f)
-except Exception:
-    data = {}
-if 'statusLine' not in data or data.get('statusLine', {}).get('command') != 'openusage antigravity statusline':
-    data['statusLine'] = {'command': 'openusage antigravity statusline'}
-    with open('$SETTINGS_FILE', 'w') as f:
-        json.dump(data, f, indent=2)
-" 2>/dev/null || true
-fi
 
 # Re-sync global skills, workflows, agents, and rules into the box on every launch
 for src in workflows global_workflows skills agents rules; do
