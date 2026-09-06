@@ -85,6 +85,19 @@ func openReadOnlyDB(path string) (*sql.DB, error) {
 	return db, nil
 }
 
+// IsDatabaseCorruptError reports whether an error from SQLite indicates
+// on-disk database corruption (malformed B-tree, corrupt header/freelist, etc.).
+func IsDatabaseCorruptError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "malformed") ||
+		strings.Contains(msg, "corrupt") ||
+		strings.Contains(msg, "not a database") ||
+		strings.Contains(msg, "file is encrypted")
+}
+
 // quickIntegrityCheck runs PRAGMA quick_check(1) which examines the first
 // page of each B-tree. It catches the most common corruption patterns
 // (duplicate page refs, free-list errors) in O(tables) time rather than the
@@ -97,6 +110,9 @@ func quickIntegrityCheck(db *sql.DB) (corrupt bool, detail string) {
 	defer cancel()
 	var result string
 	if err := db.QueryRowContext(ctx, `PRAGMA quick_check(1);`).Scan(&result); err != nil {
+		if IsDatabaseCorruptError(err) {
+			return true, err.Error()
+		}
 		// Transient errors (timeout, context cancellation) should not be
 		// treated as corruption — only a definitive non-"ok" result is.
 		return false, fmt.Sprintf("quick_check query error (not corruption): %v", err)

@@ -62,7 +62,25 @@ func OpenStore(path string) (*Store, error) {
 	// referenced via its inode and that process is unaffected.
 	_ = os.Remove(path + "-shm")
 
+	recoverCorrupt := func(detail string) (*sql.DB, error) {
+		backupPath := path + ".corrupt." + time.Now().Format("20060102T150405")
+		log.Printf("telemetry: database corrupt (%s), backing up to %s and starting fresh", detail, backupPath)
+		if err := os.Rename(path, backupPath); err != nil {
+			return nil, fmt.Errorf("telemetry: backup corrupt DB: %w", err)
+		}
+		_ = os.Remove(path + "-wal")
+		_ = os.Remove(path + "-shm")
+		freshDB, err := openAndConfigureDB(path)
+		if err != nil {
+			return nil, fmt.Errorf("telemetry: opening fresh DB after corruption: %w", err)
+		}
+		return freshDB, nil
+	}
+
 	db, err := openAndConfigureDB(path)
+	if err != nil && IsDatabaseCorruptError(err) {
+		db, err = recoverCorrupt(err.Error())
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -72,16 +90,9 @@ func OpenStore(path string) (*Store, error) {
 	// fully recover), back it up and start fresh rather than serving bad data.
 	if corrupt, detail := quickIntegrityCheck(db); corrupt {
 		_ = db.Close()
-		backupPath := path + ".corrupt." + time.Now().Format("20060102T150405")
-		log.Printf("telemetry: database corrupt (%s), backing up to %s and starting fresh", detail, backupPath)
-		if err := os.Rename(path, backupPath); err != nil {
-			return nil, fmt.Errorf("telemetry: backup corrupt DB: %w", err)
-		}
-		_ = os.Remove(path + "-wal")
-		_ = os.Remove(path + "-shm")
-		db, err = openAndConfigureDB(path)
+		db, err = recoverCorrupt(detail)
 		if err != nil {
-			return nil, fmt.Errorf("telemetry: opening fresh DB after corruption: %w", err)
+			return nil, err
 		}
 	}
 

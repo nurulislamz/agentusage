@@ -141,3 +141,49 @@ func TestOpenStore_RecoverFromCorruptDB(t *testing.T) {
 		t.Errorf("fresh DB should be queryable: %v", err)
 	}
 }
+
+func TestOpenStore_RecoverFromHeaderCorruption(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "telemetry.db")
+
+	// Create a valid DB first.
+	store, err := OpenStore(dbPath)
+	if err != nil {
+		t.Fatalf("initial OpenStore: %v", err)
+	}
+	store.Close()
+
+	// Corrupt the DB header (offset 0). This causes openAndConfigureDB
+	// to fail with PRAGMA journal_mode WAL ("database disk image is malformed" / "file is not a database").
+	f, err := os.OpenFile(dbPath, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatalf("open for corruption: %v", err)
+	}
+	garbage := make([]byte, 100)
+	for i := range garbage {
+		garbage[i] = 0xAA
+	}
+	if _, err := f.WriteAt(garbage, 0); err != nil {
+		f.Close()
+		t.Fatalf("write corruption: %v", err)
+	}
+	f.Close()
+
+	// OpenStore should detect the corruption on open, back up, and create a fresh DB.
+	store2, err := OpenStore(dbPath)
+	if err != nil {
+		t.Fatalf("OpenStore after header corruption: %v", err)
+	}
+	defer store2.Close()
+
+	// The corrupt backup should exist.
+	entries, _ := filepath.Glob(filepath.Join(dir, "telemetry.db.corrupt.*"))
+	if len(entries) == 0 {
+		t.Error("expected a .corrupt backup file to be created")
+	}
+
+	// The new DB should be functional.
+	if _, err := store2.db.Exec(`SELECT COUNT(*) FROM usage_events`); err != nil {
+		t.Errorf("fresh DB should be queryable: %v", err)
+	}
+}
