@@ -72,12 +72,38 @@ func newRootCommand() *cobra.Command {
 
 	root.CompletionOptions.DisableDefaultCmd = true
 
-	root.AddCommand(newListCommand())
-	root.AddCommand(newGetCommand())
+	root.AddGroup(
+		&cobra.Group{
+			ID:    "everyday",
+			Title: "Everyday Commands:",
+		},
+		&cobra.Group{
+			ID:    "admin",
+			Title: "Advanced Service Administration:",
+		},
+	)
+
+	listCmd := newListCommand()
+	listCmd.GroupID = "everyday"
+	root.AddCommand(listCmd)
+
+	getCmd := newGetCommand()
+	getCmd.GroupID = "everyday"
+	root.AddCommand(getCmd)
+
+	doctorCmd := newDoctorCommand()
+	doctorCmd.GroupID = "everyday"
+	root.AddCommand(doctorCmd)
+
+	serveCmd := newServeCommand()
+	serveCmd.GroupID = "everyday"
+	root.AddCommand(serveCmd)
+
+	daemonCmd := newDaemonCommand()
+	daemonCmd.GroupID = "admin"
+	root.AddCommand(daemonCmd)
+
 	root.AddCommand(newDetectCommand())
-	root.AddCommand(newDoctorCommand())
-	root.AddCommand(newServeCommand())
-	root.AddCommand(newDaemonCommand())
 	root.InitDefaultHelpCmd()
 
 	return root

@@ -78,9 +78,10 @@ func newDaemonCommand() *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "daemon",
-		Short: "Manage the background telemetry daemon",
-		Long:  "Start the telemetry daemon. Use subcommands to install, uninstall, check status, or send hooks.",
+		Use:     "daemon",
+		GroupID: "admin",
+		Short:   "Manage the background telemetry daemon",
+		Long:    "Start the telemetry daemon. Use subcommands to install, uninstall, check status, or send hooks.",
 		Example: strings.Join([]string{
 			"  agentusage daemon",
 			"  agentusage daemon run",

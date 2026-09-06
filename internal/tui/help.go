@@ -356,7 +356,7 @@ func (m Model) splashProgressLines() []string {
 			lines = append(lines, "  "+dim.Render("collect and cache usage data from your providers."))
 			lines = append(lines, "")
 			lines = append(lines, "  "+hint.Render("▸ Press Enter to set it up"))
-			lines = append(lines, "  "+dim.Render("  or run: agentusage daemon install"))
+			lines = append(lines, "  "+dim.Render("  Sign in with your provider tool, open agentUsage, and refresh."))
 		}
 
 	case DaemonOutdated:

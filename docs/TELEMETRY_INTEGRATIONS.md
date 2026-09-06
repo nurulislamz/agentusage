@@ -11,37 +11,27 @@ Antigravity quota is polled directly by the Antigravity provider (OAuth token +
 
 All streams emit normalized telemetry events into the same SQLite store:
 
-- `~/.local/state/openusage/telemetry.db`
+- `~/.local/state/agentusage/telemetry.db`
 
-When the OpenUsage app is running, background collection and canonical telemetry read-model updates are automatic.
-You do not need to run `openusage telemetry collect` manually for normal operation.
-OpenUsage does not auto-create synthetic providers from telemetry. Unmapped telemetry provider IDs are flagged for explicit user action.
+When the agentUsage app is running, background collection and canonical telemetry read-model updates are automatic.
+You do not need to run manual collection commands for normal operation.
+agentUsage does not auto-create synthetic providers from telemetry. Unmapped telemetry provider IDs are flagged for explicit user action.
 
-## Installing Integrations
+## Managing Integrations
 
-All integration hook/plugin definitions are embedded in the `openusage` binary.
-Use the built-in CLI to install, upgrade, or uninstall them:
+All integration hook/plugin definitions are embedded in the `agentusage` binary.
+You can view status, install, and update integrations directly from the terminal UI:
+
+1. Open `agentusage`.
+2. Press `,` (or `Shift+S`) to open the Settings modal.
+3. Navigate to the **Integrations** tab to view detected tools and install/update hooks.
+
+Hooks can also ingest events directly via the background daemon:
 
 ```bash
-# List detected integrations and their status
-openusage integrations list
-
-# List all integrations, including ones for tools not detected on this machine
-openusage integrations list --all
-
-# Install an integration by ID
-openusage integrations install claude_code
-openusage integrations install codex
-openusage integrations install opencode
-
-# Upgrade an integration to the latest embedded version
-openusage integrations upgrade claude_code
-
-# Upgrade all outdated integrations at once
-openusage integrations upgrade --all
-
-# Uninstall an integration (removes hook and unregisters from tool config)
-openusage integrations uninstall claude_code
+agentusage daemon hook claude_code < /tmp/turn.json
+agentusage daemon hook codex '{"type":"agent-turn-complete"}'
+agentusage daemon hook opencode < /tmp/opencode-hook.json
 ```
 
 The daemon also prints a hint at startup when it detects tools with missing integrations.
@@ -50,17 +40,17 @@ The daemon also prints a hint at startup when it detects tools with missing inte
 
 ### OpenCode (Plugin)
 
-- `~/.config/opencode/plugins/openusage-telemetry.ts`
+- `~/.config/opencode/plugins/agentusage-telemetry.ts`
 - plugin entry in `~/.config/opencode/opencode.json`
 
 ### Codex (Notify Hook)
 
-- `~/.config/openusage/hooks/codex-notify.sh`
-- `notify = ["~/.config/openusage/hooks/codex-notify.sh"]` in `~/.codex/config.toml`
+- `~/.config/agentusage/hooks/codex-notify.sh`
+- `notify = ["~/.config/agentusage/hooks/codex-notify.sh"]` in `~/.codex/config.toml`
 
 ### Claude Code (Command Hooks)
 
-- `~/.config/openusage/hooks/claude-hook.sh`
+- `~/.config/agentusage/hooks/claude-hook.sh`
 - command hooks in `~/.claude/settings.json` for:
   - `Stop`
   - `SubagentStop`
@@ -68,16 +58,17 @@ The daemon also prints a hint at startup when it detects tools with missing inte
 
 ### Antigravity CLI (API poll)
 
-- OpenUsage reads `antigravity-oauth-token` under each box config dir
+- agentUsage reads `antigravity-oauth-token` under each box config dir
   (`~/.agy-containers/<box>/.gemini/antigravity-cli/` or `~/.gemini/antigravity-cli/`).
 - The daemon polls `https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary`
   with `User-Agent: antigravity`.
-- Expired tokens are refreshed via OAuth when a refresh token is present; otherwise
-  OpenUsage runs `agy-box <box> -p ping` (or `agy -p ping`) to renew credentials.
+- Expired access tokens renew directly over HTTP when refresh credentials and client configuration are present.
+  agentUsage never executes `agy`, `agy-box`, or any background prompt to refresh credentials. When refresh
+  is unavailable, an actionable sign-in notice is presented for the affected account while other accounts continue updating.
 
 ## Provider Linking (Explicit Control)
 
-Telemetry events are tagged with whatever `provider_id` the source tool uses. When that id doesn't match any configured account, openusage attempts a link via `telemetry.provider_links`, then falls back to flagging the source as unmapped.
+Telemetry events are tagged with whatever `provider_id` the source tool uses. When that id doesn't match any configured account, agentUsage attempts a link via `telemetry.provider_links`, then falls back to flagging the source as unmapped.
 
 ### Built-in defaults
 
@@ -93,7 +84,7 @@ Identity links (e.g. `openai` → `openai`) are intentionally not enumerated —
 
 ### User overrides
 
-Add custom or override entries in `~/.config/openusage/settings.json`:
+Add custom or override entries in `~/.config/agentusage/settings.json`:
 
 ```json
 {
@@ -112,7 +103,7 @@ User entries take precedence over defaults. The daemon picks up changes on the n
 
 Open the TUI Settings modal (`s`), navigate to **6 TELEM**. Unmapped telemetry sources are listed below the time-window picker, each with a category badge:
 
-- `[no account configured]` — no openusage account exists for this source.
+- `[no account configured]` — no agentUsage account exists for this source.
 - `[suggested: <id>]` — a configured provider id whose name overlaps with the source. Press `m` to open a picker pre-selecting the suggestion.
 - `[mapped → <id>, target not configured]` — a link points to an id that has no account. Resolve by changing the link target or creating the missing account.
 
@@ -136,44 +127,44 @@ When at least one source is unmapped, every snapshot picks up two diagnostic key
 
 ## Optional runtime env vars (all integrations)
 
-- `OPENUSAGE_TELEMETRY_ENABLED=true|false`
-- `OPENUSAGE_BIN=/absolute/path/to/openusage`
-- `OPENUSAGE_TELEMETRY_ACCOUNT_ID=<logical account override>`
-- `OPENUSAGE_TELEMETRY_DB_PATH=/path/to/telemetry.db`
-- `OPENUSAGE_TELEMETRY_SPOOL_DIR=/path/to/spool`
-- `OPENUSAGE_TELEMETRY_SPOOL_ONLY=true|false`
-- `OPENUSAGE_TELEMETRY_VERBOSE=true|false`
+- `AGENTUSAGE_TELEMETRY_ENABLED=true|false`
+- `AGENTUSAGE_BIN=/absolute/path/to/agentusage`
+- `AGENTUSAGE_TELEMETRY_ACCOUNT_ID=<logical account override>`
+- `AGENTUSAGE_TELEMETRY_DB_PATH=/path/to/telemetry.db`
+- `AGENTUSAGE_TELEMETRY_SPOOL_DIR=/path/to/spool`
+- `AGENTUSAGE_TELEMETRY_SPOOL_ONLY=true|false`
+- `AGENTUSAGE_TELEMETRY_VERBOSE=true|false`
 
 ## Verify Ingestion
 
 OpenCode:
 
 ```bash
-sqlite3 ~/.local/state/openusage/telemetry.db "select r.source_system, r.source_channel, e.event_type, count(*) from usage_events e join usage_raw_events r on r.raw_event_id=e.raw_event_id where r.source_system='opencode' group by 1,2,3 order by 1,2,3;"
+sqlite3 ~/.local/state/agentusage/telemetry.db "select r.source_system, r.source_channel, e.event_type, count(*) from usage_events e join usage_raw_events r on r.raw_event_id=e.raw_event_id where r.source_system='opencode' group by 1,2,3 order by 1,2,3;"
 ```
 
 Codex:
 
 ```bash
-sqlite3 ~/.local/state/openusage/telemetry.db "select r.source_system, r.source_channel, e.event_type, count(*) from usage_events e join usage_raw_events r on r.raw_event_id=e.raw_event_id where r.source_system='codex' group by 1,2,3 order by 1,2,3;"
+sqlite3 ~/.local/state/agentusage/telemetry.db "select r.source_system, r.source_channel, e.event_type, count(*) from usage_events e join usage_raw_events r on r.raw_event_id=e.raw_event_id where r.source_system='codex' group by 1,2,3 order by 1,2,3;"
 ```
 
 Claude Code:
 
 ```bash
-sqlite3 ~/.local/state/openusage/telemetry.db "select r.source_system, r.source_channel, e.event_type, count(*) from usage_events e join usage_raw_events r on r.raw_event_id=e.raw_event_id where r.source_system='claude_code' group by 1,2,3 order by 1,2,3;"
+sqlite3 ~/.local/state/agentusage/telemetry.db "select r.source_system, r.source_channel, e.event_type, count(*) from usage_events e join usage_raw_events r on r.raw_event_id=e.raw_event_id where r.source_system='claude_code' group by 1,2,3 order by 1,2,3;"
 ```
 
 Antigravity:
 
 ```bash
-sqlite3 ~/.local/state/openusage/telemetry.db "select r.source_system, r.source_channel, e.event_type, count(*) from usage_events e join usage_raw_events r on r.raw_event_id=e.raw_event_id where r.source_system='antigravity' group by 1,2,3 order by 1,2,3;"
+sqlite3 ~/.local/state/agentusage/telemetry.db "select r.source_system, r.source_channel, e.event_type, count(*) from usage_events e join usage_raw_events r on r.raw_event_id=e.raw_event_id where r.source_system='antigravity' group by 1,2,3 order by 1,2,3;"
 ```
 
 Inspect latest canonical metrics:
 
 ```bash
-sqlite3 ~/.local/state/openusage/telemetry.db <<'SQL'
+sqlite3 ~/.local/state/agentusage/telemetry.db <<'SQL'
 select
   e.occurred_at,
   r.source_system,

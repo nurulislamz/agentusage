@@ -17,7 +17,7 @@ agentUsage is a terminal-first local dashboard for monitoring AI coding tool usa
   - [Chapter 1: Interactive Terminal Dashboard (`agentusage`)](#chapter-1-interactive-terminal-dashboard-agentusage)
   - [Chapter 2: Query Provider Quota & Usage (`agentusage get`)](#chapter-2-query-provider-quota--usage-agentusage-get)
   - [Chapter 3: Account & Provider Discovery (`agentusage list`)](#chapter-3-account--provider-discovery-agentusage-list)
-  - [Chapter 4: Workstation Credential Auto-Detection (`agentusage detect`)](#chapter-4-workstation-credential-auto-detection-agentusage-detect)
+  - [Chapter 4: Workstation Credential Auto-Detection (`agentusage doctor --detect` / `agentusage detect`)](#chapter-4-workstation-credential-auto-detection-agentusage-detect)
   - [Chapter 5: System & Environment Diagnostics (`agentusage doctor`)](#chapter-5-system--environment-diagnostics-agentusage-doctor)
   - [Chapter 6: Web Dashboard Server (`agentusage serve`)](#chapter-6-web-dashboard-server-agentusage-serve)
   - [Chapter 7: Background Telemetry Daemon (`agentusage daemon`)](#chapter-7-background-telemetry-daemon-agentusage-daemon)
@@ -85,9 +85,8 @@ sequenceDiagram
         participant Theme as tui.LoadThemes()
     end
 
-    box rgb(220, 252, 231) Core & Enrichers
+    box rgb(220, 252, 231) Core & UI
         participant Disp as snapshotDispatcher
-        participant Enrich as Provider Enrichers<br/>(Cursor, AGY, OpenCode)
         participant Tea as tea.Program (Model)
     end
 
@@ -110,7 +109,7 @@ sequenceDiagram
     Dash->>Theme: tui.LoadThemes() & SetThemeByName()
     Dash->>Tea: tui.NewModel(thresholds, accounts, timeWindow)
     Dash->>ViewRT: daemon.NewViewRuntime(socketPath)
-    Dash->>Disp: Init snapshotDispatcher(enrichCallback)
+    Dash->>Disp: Init snapshotDispatcher(nil)
 
     par Background Update Check
         Dash-)Update: runStartupUpdateCheck()
@@ -124,22 +123,16 @@ sequenceDiagram
     and Broadcaster Periodic Loop
         Dash-)Bcast: StartBroadcaster(ctx, viewRuntime, interval)
         loop Every Refresh Interval
-            Bcast->>+ViewRT: ReadWithFallbackForWindow(ctx, timeWindow)
+            Bcast->>+ViewRT: ReadForWindow(ctx, timeWindow)
             alt Daemon Online
                 ViewRT->>+Sock: HTTP GET /v1/snapshots
                 Sock-->>-ViewRT: Return SnapshotFrame
-            else Daemon Offline / Unreachable
-                ViewRT->>ViewRT: Direct Provider Poll Fallback
+            else Daemon Offline / Reconnecting
+                ViewRT->>ViewRT: Return cached SnapshotFrame with status
             end
             ViewRT-->>-Bcast: SnapshotFrame
             Bcast->>Disp: dispatch(frame)
-            Disp->>Tea: program.Send(SnapshotsMsg [raw])
-            
-            par Asynchronous Local Tool Enrichment
-                Disp-)Enrich: EnrichSnapshots(cachedAccounts, snaps)
-                Enrich-->>Disp: Mutated enriched snapshots
-                Disp->>Tea: program.Send(SnapshotsMsg [enriched])
-            end
+            Disp->>Tea: program.Send(SnapshotsMsg)
 
             opt Exporter Active
                 Bcast->>Exporter: exp.Ingest(snapshots)
@@ -325,9 +318,12 @@ sequenceDiagram
 
 ---
 
-### Chapter 4: Workstation Credential Auto-Detection (`agentusage detect`)
+<a id="chapter-4-workstation-credential-auto-detection-agentusage-detect"></a>
+### Chapter 4: Workstation Credential Auto-Detection (`agentusage doctor --detect` / `agentusage detect`)
 
-`agentusage detect` scans `$PATH`, configuration paths (`~/.config`, `~/.claude`, Cursor directories), environment variables, and `credentials.json` without writing anything to disk.
+`agentusage doctor --detect` scans `$PATH`, configuration paths (`~/.config`, `~/.claude`, Cursor directories), environment variables, and `credentials.json` without writing anything to disk.
+
+The legacy `agentusage detect` command is retained as a hidden, backward-compatible alias that emits deprecation guidance to `stderr` while keeping `stdout` identical for scripts.
 
 ```mermaid
 sequenceDiagram
@@ -397,7 +393,11 @@ sequenceDiagram
 
 ### Chapter 5: System & Environment Diagnostics (`agentusage doctor`)
 
-`agentusage doctor` executes health checks across terminal color support, configuration permissions (enforcing `0600` on credentials), daemon service registration, SQLite `PRAGMA integrity_check(1)`, and tmux/Claude Code statuslines.
+`agentusage doctor` executes 4 comprehensive health checks across terminal color support, configuration permissions (enforcing `0600` on credentials), daemon service registration / SQLite `PRAGMA integrity_check(1)`, and tool detection / integration hooks.
+
+It also provides targeted operational flags:
+- `--detect`: Runs the workstation credential auto-detection report (with optional `--all` to list all registered providers).
+- `--fix-legacy-statuslines`: Cleans up legacy statusline configuration from Claude Code (`~/.claude/settings.json`) and tmux (`~/.tmux.conf`), creating timestamped `.bak` backups before modifying any files.
 
 ```mermaid
 sequenceDiagram
@@ -425,11 +425,10 @@ sequenceDiagram
         participant DB as SQLite DB (telemetry.db)
     end
 
-    box rgb(220, 252, 231) Tools, Hooks & Statusline
+    box rgb(220, 252, 231) Tools & Integrations
         participant ToolCheck as checkDoctorToolsAndIntegrations()
-        participant TmuxCheck as checkDoctorStatuslineAndTmux()
-        participant ClaudeConf as ~/.claude/settings.json
-        participant TmuxConf as ~/.tmux.conf
+        participant Detect as detect.AutoDetect()
+        participant Match as integrations.MatchDetected()
     end
 
     User->>+Cmd: agentusage doctor [--verbose]
@@ -474,22 +473,15 @@ sequenceDiagram
     rect rgb(220, 252, 231)
         Note over Doc: Check 4: Tools & Integrations
         Doc->>+ToolCheck: checkDoctorToolsAndIntegrations(d, verbose)
-        ToolCheck->>ToolCheck: detect.AutoDetect() & integrations.MatchDetected()
+        ToolCheck->>+Detect: detect.AutoDetect()
+        Detect-->>-ToolCheck: Detected tools
+        ToolCheck->>+Match: integrations.MatchDetected()
+        Match-->>-ToolCheck: Detected hooks
         ToolCheck->>Stdout: [OK] Detected Tools (X) & Integration Hooks (Y)
         ToolCheck-->>-Doc: Integrations audited
     end
 
-    rect rgb(254, 226, 226)
-        Note over Doc: Check 5: Statusline & Tmux
-        Doc->>+TmuxCheck: checkDoctorStatuslineAndTmux(d)
-        TmuxCheck->>+ClaudeConf: Check for "agentusage statusline"
-        ClaudeConf-->>-TmuxCheck: Configured / Not configured
-        TmuxCheck->>+TmuxConf: Check for "agentusage tmux" segment
-        TmuxConf-->>-TmuxCheck: Configured / Not configured
-        TmuxCheck-->>-Doc: Statusline audited
-    end
-
-    Doc->>Stdout: Result Summary: All systems healthy (N checks passed)
+    Doc->>Stdout: Result Summary: All systems healthy (4 checks passed)
     Doc-->>-Cmd: Return nil
     Cmd-->>-User: Exit code 0
 ```

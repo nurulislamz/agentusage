@@ -29,27 +29,26 @@ AGENTUSAGE_DEBUG=1 agentusage
 
 ---
 
-## 2. CLI Reports & Cost Exports
+## 2. CLI Quota & Discovery Queries
 
 ```bash
-# Daily token and cost breakdown per provider & model
-agentusage daily
+# Query remaining quota and reset times for an account or box (defaults to 5h window)
+agentusage get <account-id>
 
-# Weekly usage summary (Monday-Sunday)
-agentusage weekly
+# Output format options for scripting
+agentusage get <account-id> --format json
+agentusage get <account-id> --format plain
+agentusage get <account-id> --format table
 
-# Monthly aggregate spend
-agentusage monthly
+# Query specific quota horizons
+agentusage get <account-id> --window weekly
+agentusage get <account-id> --window all
 
-# Active billing block tracking (e.g. Claude Code 5-hour rolling blocks)
-agentusage blocks
-
-# Top spending models across all agents
-agentusage top
-
-# Export telemetry to JSON or CSV
-agentusage export --format json --since 7d --output ./export.json
-agentusage export --format csv --since 30d --output ./export.csv
+# List all configured accounts, providers, and container statuses
+agentusage list
+agentusage list --format table
+agentusage list --format json
+agentusage list -q                       # Output bare IDs only for shell pipelines
 ```
 
 ---
@@ -58,45 +57,23 @@ agentusage export --format csv --since 30d --output ./export.csv
 
 ```bash
 # Check daemon health, uptime, and event stats
-agentusage telemetry daemon status
-
-# Start daemon in background
-agentusage telemetry daemon start
-
-# Stop daemon
-agentusage telemetry daemon stop
-
-# Restart daemon
-agentusage telemetry daemon restart
-
-# Install daemon as autostart system service (systemd / launchd)
-agentusage telemetry daemon install
-
-# Uninstall autostart system service
-agentusage telemetry daemon uninstall
+agentusage daemon status
+agentusage daemon status --details
 
 # Run daemon in foreground (for debugging/containers)
-agentusage telemetry daemon
-```
+agentusage daemon run
+agentusage daemon run --verbose
 
----
+# Install daemon as autostart system service (systemd / launchd)
+agentusage daemon install
 
-## 4. Agent Integrations & Hooks
+# Uninstall autostart system service
+agentusage daemon uninstall
 
-```bash
-# List detected coding agents and integration hook status
-agentusage integrations list
-
-# Install integration hooks
-agentusage integrations install claude_code
-agentusage integrations install codex
-agentusage integrations install opencode
-
-# Upgrade all installed hooks to current binary version
-agentusage integrations upgrade --all
-
-# Uninstall an integration hook
-agentusage integrations uninstall claude_code
+# Ingest live coding tool hook events (Claude Code, Codex, OpenCode)
+agentusage daemon hook claude_code < /tmp/turn.json
+agentusage daemon hook codex < /tmp/codex-event.json
+agentusage daemon hook opencode < /tmp/opencode-hook.json
 ```
 
 ### Multi-account boxes
@@ -164,73 +141,37 @@ Check for conflicting profiles: `sudo aa-status | grep -i bwrap`.
 
 ---
 
-## 5. tmux & Statusline Setup
+## 5. Diagnostics, Maintenance & Migration
 
 ```bash
-# Run interactive tmux setup wizard
-agentusage tmux install
-
-# Scripted install (write directly to tmux.conf)
-agentusage tmux install --write --preset compact
-
-# Reload tmux configuration immediately
-tmux source-file ~/.config/tmux/tmux.conf
-# (or if using ~/.tmux.conf): tmux source-file ~/.tmux.conf
-
-# Setup provider icon fonts (Kitty, Ghostty, WezTerm)
-agentusage tmux font setup
-
-# View all 12 built-in tmux status bar presets
-agentusage tmux presets
-
-# Diagnose tmux integration setup
-agentusage tmux doctor
-
-# Install Claude Code terminal footer statusline
-agentusage statusline install
-```
-
----
-
-## 6. Token Pricing & Rate Calculations
-
-```bash
-# Look up token pricing rates for a model
-agentusage pricing lookup gpt-4o
-agentusage pricing lookup claude-3-7-sonnet
-
-# Calculate estimated cost for input/output token counts
-agentusage pricing calculate --model claude-3-7-sonnet --input 50000 --output 10000
-
-# Update pricing registry cache from upstream feeds
-agentusage pricing update
-```
-
----
-
-## 7. Diagnostics, Maintenance & Reset
-
-```bash
-# Run full system and environment health checks
+# Run 4-point system, config, daemon, and hook diagnostics
 agentusage doctor
+agentusage doctor --verbose
 
-# Scan system for installed AI tools & API key env vars
-agentusage detect
+# Run detailed workstation tool and credential discovery (read-only)
+agentusage doctor --detect
+agentusage doctor --detect --all
+
+# Clean obsolete agentUsage/openusage statusline settings from configs (with backup)
+agentusage doctor --fix-legacy-statuslines
 
 # Check SQLite database integrity
-sqlite3 ~/.local/state/openusage/telemetry.db "PRAGMA integrity_check;"
-
-# Compact database and prune old records
-agentusage telemetry vacuum
-
-# Remove stale socket file if daemon crashed
-rm -f ~/.local/state/openusage/daemon.sock
-
-# Kill all running agentusage instances
-killall agentusage 2>/dev/null
+sqlite3 ~/.local/state/agentusage/telemetry.db "PRAGMA integrity_check;"
 
 # Clean reset (wipes cache and restarts cleanly)
-rm -rf ~/.cache/agentusage ~/.local/state/openusage/daemon.sock
+rm -rf ~/.cache/agentusage ~/.local/state/agentusage/daemon.sock
+```
+
+---
+
+## 6. Simulation & Testing
+
+```bash
+# Run standalone interactive simulation dashboard with synthetic workloads
+make demo
+
+# Run with custom loop interval
+go run ./cmd/demo -interval 2s -loop
 ```
 
 ---

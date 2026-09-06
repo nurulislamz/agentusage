@@ -36,6 +36,21 @@ var retainedCommands = []string{
 	"serve",
 }
 
+var visibleEverydayCommands = []string{
+	"doctor",
+	"get",
+	"list",
+	"serve",
+}
+
+var visibleAdminCommands = []string{
+	"daemon",
+}
+
+var compatibilityCommands = []string{
+	"detect",
+}
+
 func TestRootCommands_RemovedCommandsNotPresent(t *testing.T) {
 	root := newRootCommand()
 	commands := root.Commands()
@@ -93,7 +108,7 @@ func TestRootCommands_ExecuteRemovedCommandsReturnError(t *testing.T) {
 	}
 }
 
-func TestRootCommands_HelpOutputDoesNotContainRemovedCommands(t *testing.T) {
+func TestRootCommands_HelpOutputGroupsAndCompatibility(t *testing.T) {
 	root := newRootCommand()
 	var out bytes.Buffer
 	root.SetOut(&out)
@@ -106,37 +121,66 @@ func TestRootCommands_HelpOutputDoesNotContainRemovedCommands(t *testing.T) {
 
 	helpOutput := out.String()
 
-	// Available Commands section
-	availIdx := strings.Index(helpOutput, "Available Commands:")
-	if availIdx == -1 {
-		t.Fatalf("expected 'Available Commands:' section in help output, got:\n%s", helpOutput)
+	// Verify command group headings exist in help output
+	if !strings.Contains(helpOutput, "Everyday Commands:") {
+		t.Errorf("expected 'Everyday Commands:' group in help output, got:\n%s", helpOutput)
 	}
-	availSection := helpOutput[availIdx:]
-	if flagsIdx := strings.Index(availSection, "Flags:"); flagsIdx != -1 {
-		availSection = availSection[:flagsIdx]
+	if !strings.Contains(helpOutput, "Advanced Service Administration:") {
+		t.Errorf("expected 'Advanced Service Administration:' group in help output, got:\n%s", helpOutput)
 	}
 
+	// Verify removed commands are not anywhere in help output
 	for _, removed := range removedCommands {
-		// Check that the command name is not listed as an available command
-		for _, line := range strings.Split(availSection, "\n") {
-			fields := strings.Fields(line)
-			if len(fields) > 0 && fields[0] == removed {
-				t.Errorf("removed command %q found in Available Commands section: %q", removed, line)
-			}
+		if strings.Contains(helpOutput, "\n  "+removed+" ") {
+			t.Errorf("removed command %q found in help output", removed)
 		}
 	}
 
-	for _, retained := range retainedCommands {
-		found := false
-		for _, line := range strings.Split(availSection, "\n") {
+	// Verify visible everyday commands are listed
+	for _, everyday := range visibleEverydayCommands {
+		if !strings.Contains(helpOutput, everyday) {
+			t.Errorf("visible everyday command %q not found in help output", everyday)
+		}
+	}
+
+	// Verify visible admin commands are listed
+	for _, admin := range visibleAdminCommands {
+		if !strings.Contains(helpOutput, admin) {
+			t.Errorf("visible admin command %q not found in help output", admin)
+		}
+	}
+
+	// Verify compatibility command (detect) is hidden from help output
+	for _, comp := range compatibilityCommands {
+		for _, line := range strings.Split(helpOutput, "\n") {
 			fields := strings.Fields(line)
-			if len(fields) > 0 && fields[0] == retained {
-				found = true
-				break
+			if len(fields) > 0 && fields[0] == comp {
+				t.Errorf("compatibility command %q should be hidden, but found in help output: %q", comp, line)
 			}
 		}
-		if !found {
-			t.Errorf("retained command %q not found in Available Commands section", retained)
-		}
+	}
+}
+
+func TestRootCommands_CompatibilityRoutesExecute(t *testing.T) {
+	root := newRootCommand()
+	var stdout, stderr bytes.Buffer
+	root.SetOut(&stdout)
+	root.SetErr(&stderr)
+	root.SetArgs([]string{"detect"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error executing compatibility route 'detect': %v", err)
+	}
+
+	// Assert deprecation diagnostic is sent to stderr
+	errOutput := stderr.String()
+	if !strings.Contains(errOutput, "deprecated") || !strings.Contains(errOutput, "doctor --detect") {
+		t.Errorf("expected deprecation notice in stderr, got:\n%s", errOutput)
+	}
+
+	// Assert report output was produced on stdout
+	outText := stdout.String()
+	if !strings.Contains(outText, "Tools detected:") || !strings.Contains(outText, "Accounts detected:") {
+		t.Errorf("expected detection report on stdout, got:\n%s", outText)
 	}
 }
