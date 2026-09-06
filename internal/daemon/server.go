@@ -36,6 +36,7 @@ type Service struct {
 
 	spoolMu     sync.Mutex // guards spool filesystem operations (read/write/cleanup)
 	logThrottle *core.LogThrottle
+	startLock   *os.File // exclusive startup lock; held for process lifetime
 
 	rmCache       *readModelCache
 	dataIngested  atomic.Bool  // set when new data is ingested; read model loop skips refresh when clean
@@ -151,6 +152,23 @@ func startService(ctx context.Context, cfg Config) (*Service, error) {
 		cfg.PollInterval = 30 * time.Second
 	}
 
+	// Take an exclusive startup lock BEFORE opening the SQLite store. Auto-
+	// spawned helpers (EnsureRunning) used to open the DB first, unlink -shm,
+	// and only then discover another daemon already owned the socket — racing
+	// the live writer and risking WAL/shm corruption or a false integrity
+	// failure that renames the live DB to *.corrupt.*. The lock serializes
+	// startup without binding the listen socket before Serve is ready.
+	lockFile, err := acquireDaemonLock(cfg.SocketPath)
+	if err != nil {
+		return nil, err
+	}
+	lockHeld := true
+	defer func() {
+		if lockHeld {
+			releaseDaemonLock(lockFile)
+		}
+	}()
+
 	store, err := telemetry.OpenStore(cfg.DBPath)
 	if err != nil {
 		return nil, fmt.Errorf("open daemon telemetry store: %w", err)
@@ -182,6 +200,7 @@ func startService(ctx context.Context, cfg Config) (*Service, error) {
 		pollState:     make(map[string]*providerPollState),
 		pollKick:      make(chan struct{}, 1),
 		clock:         core.SystemClock{},
+		startLock:     lockFile,
 	}
 
 	svc.infof(
@@ -200,6 +219,7 @@ func startService(ctx context.Context, cfg Config) (*Service, error) {
 		_ = store.Close()
 		return nil, err
 	}
+	lockHeld = false
 
 	go telemetry.RunWALCheckpointLoop(ctx, store.DB(), cfg.DBPath, func(key, level, msg string) {
 		switch level {
@@ -229,10 +249,13 @@ func (s *Service) Close() error {
 		return nil
 	}
 	_ = observability.Flush(context.Background())
-	if s.store == nil {
-		return nil
+	var err error
+	if s.store != nil {
+		err = s.store.Close()
 	}
-	return s.store.Close()
+	releaseDaemonLock(s.startLock)
+	s.startLock = nil
+	return err
 }
 
 // --- Ingest helpers ---
@@ -343,22 +366,43 @@ func (s *Service) flushBacklog(ctx context.Context, retryReqs []telemetry.Ingest
 
 // --- HTTP server ---
 
+// claimDaemonSocket makes the process the exclusive owner of the daemon
+// socket path before any other startup side effects (notably OpenStore).
+func claimDaemonSocket(socketPath string) (net.Listener, error) {
+	socketPath = strings.TrimSpace(socketPath)
+	if socketPath == "" {
+		return nil, fmt.Errorf("telemetry daemon socket path is empty")
+	}
+	if err := os.MkdirAll(filepath.Dir(socketPath), 0o755); err != nil {
+		return nil, fmt.Errorf("create telemetry daemon socket dir: %w", err)
+	}
+	if err := EnsureSocketPathAvailable(socketPath); err != nil {
+		return nil, err
+	}
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return nil, fmt.Errorf("listen telemetry daemon socket: %w", err)
+	}
+	if err := os.Chmod(socketPath, 0o600); err != nil {
+		_ = listener.Close()
+		_ = os.Remove(socketPath)
+		return nil, fmt.Errorf("chmod telemetry daemon socket: %w", err)
+	}
+	return listener, nil
+}
+
 func (s *Service) startSocketServer(ctx context.Context) error {
-	if strings.TrimSpace(s.cfg.SocketPath) == "" {
-		return fmt.Errorf("telemetry daemon socket path is empty")
-	}
-	if err := os.MkdirAll(filepath.Dir(s.cfg.SocketPath), 0o755); err != nil {
-		return fmt.Errorf("create telemetry daemon socket dir: %w", err)
-	}
-	if err := EnsureSocketPathAvailable(s.cfg.SocketPath); err != nil {
+	listener, err := claimDaemonSocket(s.cfg.SocketPath)
+	if err != nil {
 		return err
 	}
+	return s.serveSocketListener(ctx, listener)
+}
 
-	listener, err := net.Listen("unix", s.cfg.SocketPath)
-	if err != nil {
-		return fmt.Errorf("listen telemetry daemon socket: %w", err)
+func (s *Service) serveSocketListener(ctx context.Context, listener net.Listener) error {
+	if listener == nil {
+		return fmt.Errorf("telemetry daemon socket listener is nil")
 	}
-	_ = os.Chmod(s.cfg.SocketPath, 0o600)
 	s.infof("socket_listening", "path=%s", s.cfg.SocketPath)
 
 	mux := http.NewServeMux()
