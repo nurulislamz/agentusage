@@ -125,7 +125,10 @@ func SaveCredentialTo(path, accountID, apiKey string) error {
 
 	creds, err := LoadCredentialsFrom(path)
 	if err != nil {
-		creds = Credentials{Keys: make(map[string]string)}
+		// Refuse to overwrite the file with a single key when the existing
+		// credentials cannot be parsed — that used to wipe every other key
+		// and session after a corrupt/partial credentials.json.
+		return err
 	}
 
 	creds.Keys[accountID] = apiKey
@@ -181,7 +184,9 @@ func SaveSessionTo(path, accountID string, session BrowserSession) error {
 
 	creds, err := LoadCredentialsFrom(path)
 	if err != nil {
-		creds = Credentials{Keys: make(map[string]string), Sessions: make(map[string]BrowserSession)}
+		// Same as SaveCredentialTo: never clobber an unreadable credentials
+		// file by writing a fresh single-entry map.
+		return err
 	}
 	if creds.Sessions == nil {
 		creds.Sessions = make(map[string]BrowserSession)

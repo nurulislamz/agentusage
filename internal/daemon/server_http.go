@@ -83,10 +83,39 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tally, _ := s.ingestBatch(r.Context(), parsed.Requests)
+	tally, retries := s.ingestBatch(r.Context(), parsed.Requests)
 	warnings := append([]string(nil), parsed.Warnings...)
-	if tally.failed > 0 {
-		warnings = append(warnings, fmt.Sprintf("%d ingest failures", tally.failed))
+
+	// Re-queue transient ingest failures onto the durable spool so they are
+	// not silently dropped (integrations treat HTTP 200 as success and do
+	// not retry based on the Failed count).
+	if len(retries) > 0 {
+		if s.pipeline != nil {
+			tally.failed = 0
+			flush, enqueued, flushWarnings := s.flushBacklog(r.Context(), retries, len(retries))
+			warnings = append(warnings, flushWarnings...)
+			if enqueued == 0 && flush.Processed == 0 {
+				tally.failed = len(retries)
+				warnings = append(warnings, fmt.Sprintf("%d ingest failures (retry enqueue failed)", len(retries)))
+			} else {
+				tally.processed += flush.Processed
+				tally.ingested += flush.Ingested
+				tally.deduped += flush.Deduped
+				tally.failed += flush.Failed
+				if remaining := len(retries) - flush.Processed; remaining > 0 {
+					warnings = append(warnings, fmt.Sprintf("%d event(s) remain queued in spool", remaining))
+				}
+			}
+		} else {
+			warnings = append(warnings, fmt.Sprintf("%d ingest failures", tally.failed))
+		}
+	}
+
+	if tally.ingested > 0 {
+		// Arm read-model refresh so cached dashboard snapshots pick up the
+		// newly stored hook events instead of staying stale until the next
+		// provider poll/collect cycle.
+		s.markDataIngested()
 	}
 
 	writeJSON(w, http.StatusOK, HookResponse{

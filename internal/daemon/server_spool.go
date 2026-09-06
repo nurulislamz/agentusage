@@ -184,6 +184,22 @@ func (s *Service) processHookSpool(ctx context.Context, dir string) {
 		if tally.ingested > 0 {
 			s.markDataIngested()
 		}
+
+		// Keep the spool file when any ingest failed so a later pass can
+		// retry. Successful rows from a partial batch are deduped on replay.
+		// Deleting here used to drop Claude/Codex hook events permanently
+		// under transient DB lock/timeouts.
+		if tally.failed > 0 {
+			s.warnf(
+				"hook_spool_ingest_retry",
+				"file=%s source=%s processed=%d ingested=%d deduped=%d failed=%d kept=true",
+				filepath.Base(path), raw.Source,
+				tally.processed, tally.ingested, tally.deduped, tally.failed,
+			)
+			processed++
+			continue
+		}
+
 		_ = os.Remove(path)
 		processed++
 
