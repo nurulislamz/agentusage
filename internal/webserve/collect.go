@@ -12,9 +12,6 @@ import (
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/daemon"
 	"github.com/nurulislamz/agentusage/internal/export"
-	"github.com/nurulislamz/agentusage/internal/providers/antigravity"
-	"github.com/nurulislamz/agentusage/internal/providers/cursor"
-	"github.com/nurulislamz/agentusage/internal/providers/opencode"
 	"github.com/nurulislamz/agentusage/internal/tui"
 	"github.com/nurulislamz/agentusage/internal/version"
 )
@@ -72,84 +69,6 @@ func newCollector(opts Options) *collector {
 	rt := daemon.NewViewRuntime(nil, daemon.ResolveSocketPath(), core.DebugEnabled())
 	rt.SetTimeWindow(tw)
 
-	cachedAccounts := core.MergeAccounts(cfg.Accounts, cfg.AutoDetectedAccounts)
-	cursorProv := cursor.New()
-	antigravityProv := antigravity.New()
-	opencodeProv := opencode.New()
-
-	enrich := func(ctx context.Context, snaps map[string]core.UsageSnapshot, accountID string) {
-		if len(snaps) == 0 {
-			return
-		}
-		targetSnaps := snaps
-		accountID = strings.TrimSpace(accountID)
-		if accountID != "" {
-			targetSnaps = make(map[string]core.UsageSnapshot)
-			if snap, ok := snaps[accountID]; ok {
-				targetSnaps[accountID] = snap
-			} else {
-				return
-			}
-		}
-		enrichCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
-		defer cancel()
-
-		cursorSnaps := make(map[string]core.UsageSnapshot, len(targetSnaps))
-		agSnaps := make(map[string]core.UsageSnapshot, len(targetSnaps))
-		opencodeSnaps := make(map[string]core.UsageSnapshot, len(targetSnaps))
-		for k, v := range targetSnaps {
-			cursorSnaps[k] = v
-			agSnaps[k] = v
-			opencodeSnaps[k] = v
-		}
-
-		var wg sync.WaitGroup
-		wg.Add(3)
-		go func() {
-			defer wg.Done()
-			cursorProv.EnrichSnapshots(enrichCtx, cachedAccounts, cursorSnaps)
-		}()
-		go func() {
-			defer wg.Done()
-			antigravityProv.EnrichSnapshots(enrichCtx, cachedAccounts, agSnaps)
-		}()
-		go func() {
-			defer wg.Done()
-			opencodeProv.EnrichSnapshots(enrichCtx, cachedAccounts, opencodeSnaps)
-		}()
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			wg.Wait()
-		}()
-		select {
-		case <-done:
-		case <-enrichCtx.Done():
-			return
-		}
-
-		for k, v := range cursorSnaps {
-			if v.ProviderID == "cursor" || strings.HasPrefix(k, "cursor") {
-				targetSnaps[k] = v
-			}
-		}
-		for k, v := range agSnaps {
-			if v.ProviderID == "antigravity" || strings.HasPrefix(k, "antigravity") || strings.HasPrefix(k, "ag-") {
-				targetSnaps[k] = v
-			}
-		}
-		for k, v := range opencodeSnaps {
-			if v.ProviderID == "opencode" || strings.HasPrefix(k, "opencode") {
-				targetSnaps[k] = v
-			}
-		}
-		if accountID != "" {
-			if snap, ok := targetSnaps[accountID]; ok {
-				snaps[accountID] = snap
-			}
-		}
-	}
-
 	c := &collector{
 		ttl:    time.Duration(refresh) * time.Second,
 		source: src,
@@ -157,7 +76,7 @@ func newCollector(opts Options) *collector {
 		now:    now,
 		opts:   opts,
 		rt:     rt,
-		enrich: enrich,
+		enrich: nil,
 		meta: collectorMeta{
 			version:        strings.TrimSpace(opts.Version),
 			timeWindow:     strings.TrimSpace(opts.TimeWindow),
