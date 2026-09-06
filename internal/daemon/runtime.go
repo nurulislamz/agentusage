@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -149,14 +150,27 @@ func (r *ViewRuntime) ResetEnsureThrottle() {
 	r.SetClient(nil)
 }
 
+// NewMockClient creates a Client with a custom RoundTripper for tests.
+func NewMockClient(socketPath string, rt http.RoundTripper) *Client {
+	return &Client{
+		SocketPath: socketPath,
+		http: &http.Client{
+			Transport: rt,
+			Timeout:   12 * time.Second,
+		},
+	}
+}
+
 func (r *ViewRuntime) ReadForWindow(ctx context.Context, window core.TimeWindow) SnapshotFrame {
 	return r.readFrame(ctx, window, false)
 }
 
+// Deprecated: ReadWithFallback is a compatibility wrapper; callers should prefer ReadForWindow.
 func (r *ViewRuntime) ReadWithFallback(ctx context.Context) SnapshotFrame {
 	return r.ReadForWindow(ctx, r.TimeWindow())
 }
 
+// Deprecated: ReadWithFallbackForWindow is a compatibility wrapper; callers should prefer ReadForWindow.
 func (r *ViewRuntime) ReadWithFallbackForWindow(ctx context.Context, timeWindow core.TimeWindow) SnapshotFrame {
 	return r.ReadForWindow(ctx, timeWindow)
 }

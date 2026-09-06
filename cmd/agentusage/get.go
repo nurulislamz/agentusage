@@ -17,7 +17,6 @@ import (
 	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/daemon"
-	"github.com/nurulislamz/agentusage/internal/providers"
 )
 
 type PoolMetric struct {
@@ -244,18 +243,47 @@ func findAccount(accounts []core.AccountConfig, target string) (core.AccountConf
 	return core.AccountConfig{}, false
 }
 
+var ensureDaemonClientFunc = func(ctx context.Context) (*daemon.Client, error) {
+	socketPath := daemon.ResolveSocketPath()
+	return daemon.EnsureRunning(ctx, socketPath, core.DebugEnabled())
+}
+
 func fetchAccountSnapshot(ctx context.Context, acct core.AccountConfig, cfg config.Config) (core.UsageSnapshot, error) {
-	for _, p := range providers.AllProviders() {
-		if strings.EqualFold(p.ID(), acct.Provider) {
-			snap, err := p.Fetch(ctx, acct)
-			if err != nil {
-				return snap, err
+	client, err := ensureDaemonClientFunc(ctx)
+	if err != nil {
+		return core.UsageSnapshot{}, fmt.Errorf("daemon unavailable: %w", err)
+	}
+
+	// Kick a provider poll and wait for completion to ensure fresh usage data
+	_ = client.RequestPollWait(ctx)
+	if ctx.Err() != nil {
+		return core.UsageSnapshot{}, ctx.Err()
+	}
+
+	tw := core.ParseTimeWindow(cfg.Data.TimeWindow)
+	req := daemon.ReadModelRequest{
+		TimeWindow: tw,
+		Refresh:    true,
+	}
+	snaps, err := client.ReadModel(ctx, req)
+	if err != nil {
+		return core.UsageSnapshot{}, fmt.Errorf("reading usage from daemon: %w", err)
+	}
+
+	snap, ok := snaps[acct.ID]
+	if !ok {
+		for id, s := range snaps {
+			if strings.EqualFold(id, acct.ID) {
+				snap = s
+				ok = true
+				break
 			}
-			snap = core.NormalizeUsageSnapshotWithConfig(snap, cfg.ModelNormalization)
-			return snap, nil
 		}
 	}
-	return core.UsageSnapshot{}, fmt.Errorf("no provider adapter registered for %q", acct.Provider)
+	if !ok {
+		return core.UsageSnapshot{}, fmt.Errorf("no usage snapshot found for account %q", acct.ID)
+	}
+	return snap, nil
 }
 
 func buildGetResponse(acct core.AccountConfig, snap core.UsageSnapshot, requestedWindow string) GetResponse {

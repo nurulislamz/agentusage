@@ -163,40 +163,12 @@ func TestCollectorViewRuntimeMaintained(t *testing.T) {
 	}
 }
 
-func TestCollectorTargetedEnrichment(t *testing.T) {
+func TestCollectorNoProviderEnrichmentClosures(t *testing.T) {
 	c := newCollector(Options{
 		RefreshSeconds: 30,
 	})
-	if c.enrich == nil {
-		t.Fatal("expected enrich function to be initialized")
-	}
-
-	snapCursor := core.NewUsageSnapshot("cursor", "cursor-1")
-	snapAntigravity := core.NewUsageSnapshot("antigravity", "ag-1")
-	snapOpenAI := core.NewUsageSnapshot("openai", "oai-1")
-
-	snaps := map[string]core.UsageSnapshot{
-		"cursor-1": snapCursor,
-		"ag-1":     snapAntigravity,
-		"oai-1":    snapOpenAI,
-	}
-
-	ctx := context.Background()
-	// Enrich targeted account "cursor-1"
-	c.enrich(ctx, snaps, "cursor-1")
-
-	// Ensure non-targeted snapshots were untouched
-	if snaps["ag-1"].ProviderID != "antigravity" || snaps["ag-1"].AccountID != "ag-1" {
-		t.Errorf("ag-1 was unexpectedly modified: %+v", snaps["ag-1"])
-	}
-	if snaps["oai-1"].ProviderID != "openai" || snaps["oai-1"].AccountID != "oai-1" {
-		t.Errorf("oai-1 was unexpectedly modified: %+v", snaps["oai-1"])
-	}
-
-	// Targeted non-existent account should do nothing
-	c.enrich(ctx, snaps, "non-existent")
-	if len(snaps) != 3 {
-		t.Errorf("expected 3 snapshots, got %d", len(snaps))
+	if c.enrich != nil {
+		t.Fatal("expected enrich closure to be nil (presentation consumes shared daemon snapshots directly)")
 	}
 }
 

@@ -1,11 +1,22 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
+	"github.com/nurulislamz/agentusage/internal/daemon"
+	"github.com/nurulislamz/agentusage/internal/tui"
+	"github.com/nurulislamz/agentusage/internal/webserve"
 )
 
 func TestFindAccount(t *testing.T) {
@@ -189,5 +200,227 @@ func TestFormatDuration(t *testing.T) {
 		if got != c.want {
 			t.Errorf("formatDuration(%v) = %q, want %q", c.d, got, c.want)
 		}
+	}
+}
+
+func TestFetchAccountSnapshot_SuccessAndPolling(t *testing.T) {
+	pollCount := 0
+	readModelCount := 0
+	expectedSnap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		AccountID:  "antigravity-nurulz",
+		Status:     core.StatusOK,
+	}
+
+	mockClient := daemon.NewMockClient("/tmp/mock.sock", mockDaemonRT(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path == "/v1/poll" {
+			pollCount++
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader([]byte(`{"status":"polled"}`))),
+				Header:     make(http.Header),
+			}, nil
+		}
+		if req.URL.Path == "/v1/read-model" {
+			readModelCount++
+			resp := daemon.ReadModelResponse{
+				Snapshots: map[string]core.UsageSnapshot{
+					"antigravity-nurulz": expectedSnap,
+				},
+			}
+			body, _ := json.Marshal(resp)
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(body)),
+				Header:     make(http.Header),
+			}, nil
+		}
+		return &http.Response{StatusCode: http.StatusNotFound}, nil
+	}))
+
+	origEnsure := ensureDaemonClientFunc
+	ensureDaemonClientFunc = func(ctx context.Context) (*daemon.Client, error) {
+		return mockClient, nil
+	}
+	defer func() { ensureDaemonClientFunc = origEnsure }()
+
+	acct := core.AccountConfig{ID: "antigravity-nurulz", Provider: "antigravity"}
+	cfg := config.DefaultConfig()
+
+	snap, err := fetchAccountSnapshot(context.Background(), acct, cfg)
+	if err != nil {
+		t.Fatalf("fetchAccountSnapshot unexpected error: %v", err)
+	}
+	if snap.AccountID != "antigravity-nurulz" {
+		t.Errorf("snap.AccountID = %q, want antigravity-nurulz", snap.AccountID)
+	}
+	if pollCount != 1 {
+		t.Errorf("pollCount = %d, want 1", pollCount)
+	}
+	if readModelCount != 1 {
+		t.Errorf("readModelCount = %d, want 1", readModelCount)
+	}
+}
+
+func TestFetchAccountSnapshot_ErrorSemantics(t *testing.T) {
+	origEnsure := ensureDaemonClientFunc
+	defer func() { ensureDaemonClientFunc = origEnsure }()
+
+	acct := core.AccountConfig{ID: "antigravity-nurulz", Provider: "antigravity"}
+	cfg := config.DefaultConfig()
+
+	// 1. Daemon unavailable must error and NOT return zero quota
+	ensureDaemonClientFunc = func(ctx context.Context) (*daemon.Client, error) {
+		return nil, errors.New("daemon process failed to start")
+	}
+	snap, err := fetchAccountSnapshot(context.Background(), acct, cfg)
+	if err == nil {
+		t.Fatal("expected error when daemon is unavailable, got nil")
+	}
+	if snap.Status != "" {
+		t.Errorf("expected empty snapshot status on error, got %v", snap.Status)
+	}
+
+	// 2. Context deadline exceeded during poll wait
+	mockClientTimeout := daemon.NewMockClient("/tmp/mock.sock", mockDaemonRT(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path == "/v1/poll" {
+			time.Sleep(50 * time.Millisecond)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader([]byte(`{}`)))}, nil
+	}))
+	ensureDaemonClientFunc = func(ctx context.Context) (*daemon.Client, error) {
+		return mockClientTimeout, nil
+	}
+	ctxTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	_, err = fetchAccountSnapshot(ctxTimeout, acct, cfg)
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+
+	// 3. Account missing from read-model snapshots
+	mockClientEmpty := daemon.NewMockClient("/tmp/mock.sock", mockDaemonRT(func(req *http.Request) (*http.Response, error) {
+		resp := daemon.ReadModelResponse{
+			Snapshots: map[string]core.UsageSnapshot{},
+		}
+		body, _ := json.Marshal(resp)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewReader(body)),
+			Header:     make(http.Header),
+		}, nil
+	}))
+	ensureDaemonClientFunc = func(ctx context.Context) (*daemon.Client, error) {
+		return mockClientEmpty, nil
+	}
+	_, err = fetchAccountSnapshot(context.Background(), acct, cfg)
+	if err == nil {
+		t.Fatal("expected error when account missing from snapshots")
+	}
+	if !strings.Contains(err.Error(), "no usage snapshot found") {
+		t.Errorf("error = %q, want 'no usage snapshot found'", err.Error())
+	}
+}
+
+func TestParityFixtures_Get_Web_TUI(t *testing.T) {
+	fixedNow := time.Now().UTC().Truncate(time.Second)
+	resetTime := fixedNow.Add(2 * time.Hour)
+	limit := 100.0
+	used := 15.0
+	remaining := 85.0
+
+	snap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		AccountID:  "antigravity-nurulz",
+		Status:     core.StatusOK,
+		Timestamp:  fixedNow,
+		Metrics: map[string]core.Metric{
+			"quota_gemini_5h": {
+				Limit:     &limit,
+				Used:      &used,
+				Remaining: &remaining,
+				Unit:      "%",
+				Window:    "5h",
+			},
+		},
+		Resets: map[string]time.Time{
+			"quota_gemini_5h": resetTime,
+		},
+	}
+
+	acct := core.AccountConfig{
+		ID:       "antigravity-nurulz",
+		Provider: "antigravity",
+	}
+
+	// 1. Presentation: get command JSON response
+	getResp := buildGetResponse(acct, snap, "5h")
+	if getResp.Remaining == nil || *getResp.Remaining != 85.0 {
+		t.Fatalf("get remaining = %v, want 85.0", getResp.Remaining)
+	}
+	if !strings.EqualFold(getResp.Status, "ok") {
+		t.Fatalf("get status = %q, want ok", getResp.Status)
+	}
+	if getResp.ResetsIn == "" || (!strings.Contains(getResp.ResetsIn, "2h") && !strings.Contains(getResp.ResetsIn, "1h")) {
+		t.Fatalf("get resets_in = %q, want approx 2h countdown", getResp.ResetsIn)
+	}
+
+	// 2. Presentation: webserve envelope
+	opts := webserve.Options{
+		TimeWindow: "5h",
+		Theme:      "Deep Space",
+		Now:        func() time.Time { return fixedNow },
+		Collect: func() (webserve.Envelope, error) {
+			return webserve.Envelope{
+				TimeWindow: "5h",
+				Snapshots:  []core.UsageSnapshot{snap},
+			}, nil
+		},
+	}
+	srv, err := webserve.NewServer(opts)
+	if err != nil {
+		t.Fatalf("webserve.NewServer: %v", err)
+	}
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/snapshots", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("web serve status = %d", w.Code)
+	}
+	var env webserve.Envelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+		t.Fatalf("decode web envelope: %v", err)
+	}
+	if len(env.Views) != 1 {
+		t.Fatalf("web views count = %d, want 1", len(env.Views))
+	}
+	webView := env.Views[0]
+	if webView.AccountID != "antigravity-nurulz" {
+		t.Errorf("web account ID = %q, want antigravity-nurulz", webView.AccountID)
+	}
+
+	// Verify TUI-Web parity tool reports 0 issues
+	issues := webserve.VerifyTUIWebParity(opts, env)
+	if len(issues) > 0 {
+		t.Fatalf("VerifyTUIWebParity issues: %+v", issues)
+	}
+
+	// 3. Presentation: TUI model detail projection
+	cfg := config.DefaultConfig()
+	cfg.Data.TimeWindow = "5h"
+	proj := tui.NewWebProjectorFromConfig(cfg)
+	proj.Now = fixedNow
+	tuiSnapMap := map[string]core.UsageSnapshot{
+		"antigravity-nurulz": snap,
+	}
+	ordered := proj.OrderSnapshots(tuiSnapMap)
+	if len(ordered) != 1 {
+		t.Fatalf("tui ordered snapshots count = %d, want 1", len(ordered))
+	}
+	tuiSnap := ordered[0]
+	if tuiSnap.Metrics["quota_gemini_5h"].Remaining == nil || *tuiSnap.Metrics["quota_gemini_5h"].Remaining != 85.0 {
+		t.Errorf("tui remaining = %v, want 85.0", tuiSnap.Metrics["quota_gemini_5h"].Remaining)
+	}
+	if tuiSnap.Status != core.StatusOK {
+		t.Errorf("tui status = %v, want StatusOK", tuiSnap.Status)
 	}
 }

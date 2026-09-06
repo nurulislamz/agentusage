@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -17,9 +16,6 @@ import (
 	"github.com/nurulislamz/agentusage/internal/daemon"
 	"github.com/nurulislamz/agentusage/internal/dashboardapp"
 	"github.com/nurulislamz/agentusage/internal/exporter"
-	"github.com/nurulislamz/agentusage/internal/providers/antigravity"
-	"github.com/nurulislamz/agentusage/internal/providers/cursor"
-	"github.com/nurulislamz/agentusage/internal/providers/opencode"
 	"github.com/nurulislamz/agentusage/internal/tui"
 	"github.com/nurulislamz/agentusage/internal/version"
 )
@@ -61,30 +57,7 @@ func runDashboard(cfg config.Config) {
 	viewRuntime.SetTimeWindow(timeWindow)
 
 	var program *tea.Program
-	cursorProv := cursor.New()
-	antigravityProv := antigravity.New()
-	opencodeProv := opencode.New()
-	dispatcher := &snapshotDispatcher{
-		enrich: func(snaps map[string]core.UsageSnapshot) {
-			enrichCtx, enrichCancel := context.WithTimeout(ctx, 8*time.Second)
-			defer enrichCancel()
-			var wg sync.WaitGroup
-			wg.Add(3)
-			go func() {
-				defer wg.Done()
-				cursorProv.EnrichSnapshots(enrichCtx, cachedAccounts, snaps)
-			}()
-			go func() {
-				defer wg.Done()
-				antigravityProv.EnrichSnapshots(enrichCtx, cachedAccounts, snaps)
-			}()
-			go func() {
-				defer wg.Done()
-				opencodeProv.EnrichSnapshots(enrichCtx, cachedAccounts, snaps)
-			}()
-			wg.Wait()
-		},
-	}
+	dispatcher := &snapshotDispatcher{}
 
 	model.SetOnAddAccount(func(acct core.AccountConfig) {
 		if strings.TrimSpace(acct.ID) == "" || strings.TrimSpace(acct.Provider) == "" {

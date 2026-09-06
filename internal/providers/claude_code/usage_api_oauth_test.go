@@ -203,19 +203,18 @@ func TestOAuthAuthHeaders(t *testing.T) {
 }
 
 // TestUsageAuthSources_NamesAndOrder pins down the fixture list itself:
-// cookie/org is tried before oauth, matching the macOS-first, CLI-fallback
-// priority documented on usageAuthSources.
+// oauth is tried before cookie, matching the OAuth-first priority.
 func TestUsageAuthSources_NamesAndOrder(t *testing.T) {
 	p := &Provider{}
 	sources := p.usageAuthSources("org-uuid")
 	if len(sources) != 2 {
 		t.Fatalf("len(sources) = %d, want 2", len(sources))
 	}
-	if sources[0].name != "cookie" {
-		t.Errorf("sources[0].name = %q, want %q", sources[0].name, "cookie")
+	if sources[0].name != "oauth" {
+		t.Errorf("sources[0].name = %q, want %q", sources[0].name, "oauth")
 	}
-	if sources[1].name != "oauth" {
-		t.Errorf("sources[1].name = %q, want %q", sources[1].name, "oauth")
+	if sources[1].name != "cookie" {
+		t.Errorf("sources[1].name = %q, want %q", sources[1].name, "cookie")
 	}
 }
 
@@ -331,5 +330,98 @@ func TestReadUsageAPI_PinsSuccessfulAuthSource(t *testing.T) {
 	}
 	if oauthCalls != 2 {
 		t.Fatalf("oauth server calls after credential removal = %d, want still 2 (prepare should fail before any request)", oauthCalls)
+	}
+}
+
+func TestReadUsageAPI_FallbackOnMissingOAuth(t *testing.T) {
+	setTempHome(t) // no credentials file -> missing OAuth
+	p := &Provider{}
+	snap := core.NewUsageSnapshot("claude_code", "acct")
+	err := p.readUsageAPI(context.Background(), "org-uuid", &snap)
+	if err == nil {
+		t.Fatal("expected error when both sources fail")
+	}
+	// Missing OAuth should allow probing cookie source, so error mentions both oauth and cookie
+	if !strings.Contains(err.Error(), "oauth:") || !strings.Contains(err.Error(), "cookie:") {
+		t.Fatalf("expected both oauth and cookie in error, got %v", err)
+	}
+}
+
+func TestReadUsageAPI_FallbackOnRejectedOAuth(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+	}))
+	defer srv.Close()
+
+	old := oauthUsageURL
+	oauthUsageURL = srv.URL
+	defer func() { oauthUsageURL = old }()
+
+	futureMs := strconv.FormatInt(time.Now().Add(time.Hour).UnixMilli(), 10)
+	writeCredentials(t, `{"claudeAiOauth":{"accessToken":"rejected-tok","expiresAt":`+futureMs+`}}`)
+
+	p := &Provider{}
+	snap := core.NewUsageSnapshot("claude_code", "acct")
+	err := p.readUsageAPI(context.Background(), "org-uuid", &snap)
+	if err == nil {
+		t.Fatal("expected error when rejected OAuth and failed cookie")
+	}
+	// 401 rejected OAuth should allow probing cookie source
+	if !strings.Contains(err.Error(), "oauth: API returned 401") || !strings.Contains(err.Error(), "cookie:") {
+		t.Fatalf("expected both 401 oauth and cookie attempt in error, got %v", err)
+	}
+}
+
+func TestReadUsageAPI_NoCookieFallbackOn429(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":"rate_limited"}`))
+	}))
+	defer srv.Close()
+
+	old := oauthUsageURL
+	oauthUsageURL = srv.URL
+	defer func() { oauthUsageURL = old }()
+
+	futureMs := strconv.FormatInt(time.Now().Add(time.Hour).UnixMilli(), 10)
+	writeCredentials(t, `{"claudeAiOauth":{"accessToken":"tok-429","expiresAt":`+futureMs+`}}`)
+
+	p := &Provider{}
+	snap := core.NewUsageSnapshot("claude_code", "acct")
+	err := p.readUsageAPI(context.Background(), "org-uuid", &snap)
+	if err == nil {
+		t.Fatal("expected error on 429")
+	}
+	// Rate limit 429 MUST NOT fallback to cookie source
+	if !strings.Contains(err.Error(), "oauth: API returned 429") {
+		t.Fatalf("expected 429 in error, got %v", err)
+	}
+	if strings.Contains(err.Error(), "cookie:") {
+		t.Fatalf("did not expect cookie fallback on 429 rate limit, got %v", err)
+	}
+}
+
+func TestReadUsageAPI_NoCookieFallbackOnNetworkError(t *testing.T) {
+	// Point oauthUsageURL at closed server to trigger connection error
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	srv.Close()
+
+	old := oauthUsageURL
+	oauthUsageURL = srv.URL
+	defer func() { oauthUsageURL = old }()
+
+	futureMs := strconv.FormatInt(time.Now().Add(time.Hour).UnixMilli(), 10)
+	writeCredentials(t, `{"claudeAiOauth":{"accessToken":"tok-net","expiresAt":`+futureMs+`}}`)
+
+	p := &Provider{}
+	snap := core.NewUsageSnapshot("claude_code", "acct")
+	err := p.readUsageAPI(context.Background(), "org-uuid", &snap)
+	if err == nil {
+		t.Fatal("expected error on network failure")
+	}
+	// Network error MUST NOT fallback to cookie source
+	if strings.Contains(err.Error(), "cookie:") {
+		t.Fatalf("did not expect cookie fallback on network error, got %v", err)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -435,5 +436,104 @@ func TestViewRuntime_DisconnectReturnsLastGoodSnapshots(t *testing.T) {
 	}
 	if rt.State().Status != DaemonStatusError {
 		t.Fatalf("state on disconnect = %v, want Error", rt.State().Status)
+	}
+}
+
+func TestOverlappingClientRefreshes_DoNotMultiplyUpstreamFetches(t *testing.T) {
+	var upstreamFetches sync.WaitGroup
+	var fakeUpstreamFetchCount int
+	var fetchMu sync.Mutex
+
+	scheduler := newPollScheduler(30 * time.Second)
+
+	transport := mockDaemonRoundTripper(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path == "/v1/poll" {
+			genID, isLeader, done := scheduler.BeginGeneration()
+			if isLeader {
+				fetchMu.Lock()
+				fakeUpstreamFetchCount++
+				fetchMu.Unlock()
+				// Simulate upstream fetch work duration so concurrent calls overlap
+				time.Sleep(50 * time.Millisecond)
+				scheduler.EndGeneration(genID)
+			} else {
+				// Follower waits for generation completion without making upstream calls
+				<-done
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"status":"polled"}`)),
+				Header:     make(http.Header),
+			}, nil
+		}
+		if req.URL.Path == "/v1/read-model" {
+			resp := ReadModelResponse{
+				Snapshots: map[string]core.UsageSnapshot{
+					"shared-account": {
+						ProviderID: "shared-provider",
+						AccountID:  "shared-account",
+						Status:     core.StatusOK,
+					},
+				},
+			}
+			body, _ := json.Marshal(resp)
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(body)),
+				Header:     make(http.Header),
+			}, nil
+		}
+		return &http.Response{StatusCode: http.StatusNotFound}, nil
+	})
+
+	// Create 3 distinct client runtimes representing:
+	// 1. TUI dashboard ViewRuntime
+	// 2. Web server collector ViewRuntime
+	// 3. CLI get command client
+	client1 := NewMockClient("/tmp/mock.sock", transport)
+	rt1 := NewViewRuntime(nil, "/tmp/mock.sock", false)
+	rt1.SetClient(client1)
+
+	client2 := NewMockClient("/tmp/mock.sock", transport)
+	rt2 := NewViewRuntime(nil, "/tmp/mock.sock", false)
+	rt2.SetClient(client2)
+
+	client3 := NewMockClient("/tmp/mock.sock", transport)
+	rt3 := NewViewRuntime(nil, "/tmp/mock.sock", false)
+	rt3.SetClient(client3)
+
+	const numClients = 3
+	upstreamFetches.Add(numClients)
+	frames := make([]SnapshotFrame, numClients)
+
+	// Launch all 3 client refreshes simultaneously
+	startBarrier := make(chan struct{})
+	rts := []*ViewRuntime{rt1, rt2, rt3}
+
+	for i := 0; i < numClients; i++ {
+		go func(idx int) {
+			defer upstreamFetches.Done()
+			<-startBarrier
+			frames[idx] = rts[idx].RefreshForWindow(context.Background(), core.TimeWindow30d)
+		}(i)
+	}
+
+	close(startBarrier)
+	upstreamFetches.Wait()
+
+	// All 3 presentations must receive the refreshed snapshot
+	for i, frame := range frames {
+		if len(frame.Snapshots) != 1 || frame.Snapshots["shared-account"].AccountID != "shared-account" {
+			t.Fatalf("client %d received invalid frame: %+v", i, frame)
+		}
+	}
+
+	// But fake upstream fetches must have executed EXACTLY ONCE for this overlapping generation
+	fetchMu.Lock()
+	count := fakeUpstreamFetchCount
+	fetchMu.Unlock()
+
+	if count != 1 {
+		t.Fatalf("expected exactly 1 fake upstream fetch across %d overlapping client refreshes, got %d", numClients, count)
 	}
 }

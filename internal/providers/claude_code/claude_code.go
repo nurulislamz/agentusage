@@ -445,11 +445,20 @@ type usageAuthSource struct {
 	prepare func() (url string, setAuth func(*http.Request), err error)
 }
 
-// usageAuthSources lists the auth sources in priority order: cookie/org
-// (macOS desktop app) first, then the CLI's own OAuth token as the fallback
-// used everywhere the desktop app's session cookies aren't available.
+// usageAuthSources lists the auth sources in priority order: OAuth token first,
+// then cookie/org as fallback when OAuth credentials are unavailable or rejected.
 func (p *Provider) usageAuthSources(orgUUID string) []usageAuthSource {
 	return []usageAuthSource{
+		{
+			name: "oauth",
+			prepare: func() (string, func(*http.Request), error) {
+				token, err := readClaudeCodeOAuthToken()
+				if err != nil {
+					return "", nil, err
+				}
+				return oauthUsageURL, oauthAuthHeaders(token), nil
+			},
+		},
 		{
 			name: "cookie",
 			prepare: func() (string, func(*http.Request), error) {
@@ -459,16 +468,6 @@ func (p *Provider) usageAuthSources(orgUUID string) []usageAuthSource {
 				}
 				url := fmt.Sprintf("https://claude.ai/api/organizations/%s/usage", orgUUID)
 				return url, cookieAuthHeaders(cookies), nil
-			},
-		},
-		{
-			name: "oauth",
-			prepare: func() (string, func(*http.Request), error) {
-				token, err := readClaudeCodeOAuthToken()
-				if err != nil {
-					return "", nil, err
-				}
-				return oauthUsageURL, oauthAuthHeaders(token), nil
 			},
 		},
 	}
@@ -502,6 +501,20 @@ func oauthAuthHeaders(token string) func(*http.Request) {
 	}
 }
 
+// isFatalOAuthError returns true if the OAuth failure is a network error or
+// rate limit (429), in which case probing fallback cookie auth is disallowed.
+func isFatalOAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "API returned 429") ||
+		strings.Contains(msg, "API request failed") ||
+		strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "timeout") ||
+		strings.Contains(msg, "deadline exceeded")
+}
+
 // readUsageAPI resolves usage data through one of usageAuthSources. Once a
 // source has succeeded, it's pinned (p.lastUsageAuthSource) and later calls
 // go straight to it instead of re-probing every source on every poll; if the
@@ -526,10 +539,14 @@ func (p *Provider) readUsageAPI(ctx context.Context, orgUUID string, snap *core.
 
 	var errs []string
 	for _, src := range sources {
-		if err := p.tryUsageAuthSource(ctx, src, snap); err == nil {
+		err := p.tryUsageAuthSource(ctx, src, snap)
+		if err == nil {
 			return nil
-		} else {
-			errs = append(errs, fmt.Sprintf("%s: %v", src.name, err))
+		}
+		errs = append(errs, fmt.Sprintf("%s: %v", src.name, err))
+		// If OAuth fails with a rate limit (429) or network failure, do not fallback to cookies
+		if src.name == "oauth" && isFatalOAuthError(err) {
+			break
 		}
 	}
 
