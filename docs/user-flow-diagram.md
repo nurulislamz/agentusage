@@ -1,6 +1,6 @@
 # agentUsage User Flow Diagrams
 
-> **2026-09-05 proposal:** [Section 1.1](#11-proposed-simplified-usage-flow) shows the simplified target experience. The remaining detailed flows and the quick-reference table are archived reference material awaiting implementation; they do not describe the proposed command surface. [Implementation plan and agent handoff](superpowers/plans/2026-09-05-usage-simplification.md).
+> **Verified Implementation:** This guide reflects the simplified single-collection-owner architecture. The terminal dashboard, web interface, and `get` command all read through the shared background helper. Status-line acquisition and manual daemon installation are no longer required for normal usage. See the [implementation plan](superpowers/plans/2026-09-05-usage-simplification.md) for full context.
 
 > [!NOTE]
 > Looking for deep architectural details, internal Go packages, socket handlers, mutex locks, and SQLite schema mechanics? See [Command Flow Architecture & Swimlane Diagrams](COMMAND_FLOW_DIAGRAMS.md). This document focuses exclusively on the **functional user experience**—what each feature does, how it behaves, what keystrokes or flags you use, and what outputs you see.
@@ -13,7 +13,7 @@ Pre-rendered SVG diagrams are embedded for direct viewing in GitHub, VS Code, an
 
 ---
 
-## Archived Reference: Feature Flow Index
+## Feature Flow Index
 
 | Category | Command / Feature | What It Does |
 |---|---|---|
@@ -22,17 +22,17 @@ Pre-rendered SVG diagrams are embedded for direct viewing in GitHub, VS Code, an
 | | `w` / `1`–`7` (Time Windows) | Cycles quota horizons (5h rolling limit, 24h, 7d, 30d, billing, lifetime) |
 | | `a` (Add Account) | In-app modal to add AI providers and store credentials securely (0600) |
 | | `s` (Settings Modal) | Customizes visual themes, refresh rates, alert thresholds, and cost visibility |
-| **CLI & Auditing** | `agentusage get <id>` | Fast quota and rate limit query (plain %, table, or JSON) |
+| **CLI & Auditing** | `agentusage get <id>` | Fast quota and rate limit query (plain %, table, or JSON) via service |
 | | `agentusage list` | Lists all configured and detected accounts with health statuses |
-| | `agentusage detect` | Audits workstation for AI tools, configs, and masked credentials |
-| | `agentusage doctor` | Comprehensive 5-point environment, security, daemon, and hook audit |
+| | `agentusage detect` | Deprecated alias for `doctor --detect` (masked workstation credentials) |
+| | `agentusage doctor` | Environment diagnostics, `--detect` discovery, and `--fix-legacy-statuslines` migration |
 | **Web Dashboard** | `agentusage serve` | Launches browser-based dashboard on localhost with real-time cards |
 | | `agentusage serve --detach` / `--stop` | Manages persistent background web daemon with PID lifecycle |
 | | `agentusage serve --verify` | Automated TUI-to-Web visual and numerical parity audit |
 | **Telemetry Daemon** | `agentusage daemon run` / `status` | Starts polling engine or checks daemon socket and database health |
 | | `agentusage daemon install` / `uninstall` | Registers telemetry daemon as OS background service (systemd/launchd) |
 | | `agentusage daemon hook <source>` | Ingests real-time events from Claude Code, OpenCode, and Codex hooks |
-| **Simulation** | `agentusage demo` | Launches interactive simulation dashboard with synthetic workloads |
+| **Simulation** | `make demo` | Launches interactive simulation dashboard with synthetic workloads |
 
 ---
 
@@ -42,11 +42,9 @@ The primary interface of `agentUsage` is a full-screen, high-performance termina
 
 ---
 
-### 1.1 Proposed simplified usage flow
+### 1.1 Simplified Usage Flow (Default Launch & Real-Time Monitoring)
 
-**Planned behavior, not yet implemented.** This is the target for the [usage simplification implementation plan](superpowers/plans/2026-09-05-usage-simplification.md).
-
-Sign in with your provider tool, open agentUsage, and see usage. Saved credentials supply access to quota APIs; Antigravity renews access directly when its refresh token and OAuth client configuration are available. Other providers keep their supported login methods. Local usage history remains available where APIs do not supply token/spend detail.
+Sign in with your provider tool once, open agentUsage, and see accurate usage. Saved credentials supply access to quota APIs; Antigravity renews access directly when its refresh token and OAuth client configuration are available. Other providers keep their supported login methods. Local usage history remains available where APIs do not supply token/spend detail.
 
 ![Proposed user flow: Open and view usage](diagrams/user_01_dashboard_launch.svg)
 
@@ -586,6 +584,8 @@ deactivate CLI
 #### What does it do?
 Automatically scans your local workstation environment—including `$PATH` binaries, default config directories, and environment variables—to find existing AI coding tools and credentials without writing anything to disk.
 
+> **Note:** `agentusage detect` is retained as a deprecated compatibility alias for `agentusage doctor --detect`. Diagnostic notices are printed to `stderr` while the structured discovery report is sent to `stdout`.
+
 #### Functional Sequence Diagram
 
 ![User Flow: Auto-Detection](diagrams/user_08_detect_credentials.svg)
@@ -667,7 +667,7 @@ deactivate CLI
 ### 2.4 `agentusage doctor` (Comprehensive System & Environment Diagnostics)
 
 #### What does it do?
-Runs an automated 5-point health check across the operating system environment, file permissions, daemon socket, SQLite database integrity, integration hooks, and tmux statuslines, providing instant troubleshooting guidance.
+Runs an automated 4-point health check across the operating system environment, file permissions, daemon socket, SQLite database integrity, and integration hooks. Also supports `--detect` for detailed tool discovery and `--fix-legacy-statuslines` for migrating legacy configuration files.
 
 #### Functional Sequence Diagram
 
@@ -690,12 +690,11 @@ box "agentUsage CLI" #DBEAFE
     participant Doctor as "agentusage doctor"
 end box
 
-box "5 Health Audit Checks" #FEF3C7
+box "4 Health Audit Checks" #FEF3C7
     participant Sys as "1. System & Terminal"
     participant Sec as "2. Config & Permissions"
     participant Daemon as "3. Daemon & SQLite"
     participant Hooks as "4. Tools & Hooks"
-    participant Tmux as "5. Statusline & Tmux"
 end box
 
 box "Report" #DCFCE7
@@ -725,12 +724,15 @@ activate Hooks
 Hooks --> Doctor : [OK] Claude Code hook registered in ~/.claude/settings.json
 deactivate Hooks
 
-Doctor -> Tmux : Check tmux statusline segment configuration
-activate Tmux
-Tmux --> Doctor : [OK] agentusage statusline segment detected
-deactivate Tmux
+opt With --detect flag
+    Doctor -> Doctor : Run credential & tool auto-detection report
+end
 
-Doctor -> Stdout : Render diagnostic summary:\n"All systems healthy (5/5 checks passed)"
+opt With --fix-legacy-statuslines flag
+    Doctor -> Doctor : Migrate and clean owned status-line settings
+end
+
+Doctor -> Stdout : Render diagnostic summary:\n"All systems healthy (4/4 checks passed)"
 activate Stdout
 Stdout --> User : Clear status checklist with remediation hints
 deactivate Stdout
@@ -742,13 +744,14 @@ deactivate Doctor
 
 #### How it functions:
 1. Run `agentusage doctor` whenever diagnosing unexpected behavior or after installing updates.
-2. The command audits 5 critical subsystems sequentially:
+2. The command audits 4 critical subsystems sequentially:
    - **System & Terminal**: Verifies OS, Go architecture, and terminal color capability (`COLORTERM=truecolor`).
    - **Config & Security**: Verifies configuration validity and flags unsafe credential permissions (warns if not `0600`).
    - **Daemon & Database**: Checks Unix socket responsiveness and runs SQLite `PRAGMA integrity_check`.
    - **Tools & Hooks**: Inspects hook scripts for Claude Code, OpenCode, and Codex.
-   - **Tmux & Statusline**: Confirms presence of statusline helpers in `~/.tmux.conf`.
-3. Passes with exit code `0` when all systems are healthy, or displays actionable remediation hints for any warning or failure.
+3. Pass `--detect` to run workstation credential and tool auto-discovery.
+4. Pass `--fix-legacy-statuslines` to clean legacy status-line configurations with automatic backups.
+5. Passes with exit code `0` when all systems are healthy, or displays actionable remediation hints for any warning or failure.
 
 ---
 

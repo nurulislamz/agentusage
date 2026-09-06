@@ -32,15 +32,22 @@ func newDetectCommand() *cobra.Command {
 		Long: `Runs the same auto-detection logic agentusage uses on startup and prints
 what it found, including which file, env var, or keychain entry each
 credential came from. Tokens are masked. Nothing is written to disk.`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			result := detect.AutoDetect()
-			detect.ApplyCredentials(&result)
-			return printDetectReport(os.Stdout, result, showAll)
+		Hidden: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			fmt.Fprintln(cmd.ErrOrStderr(), "warning: 'agentusage detect' is deprecated; use 'agentusage doctor --detect' instead")
+			return runDetectReport(cmd.OutOrStdout(), showAll)
 		},
 	}
 	cmd.Flags().BoolVar(&showAll, "all", false,
 		"include providers with no credentials in the report")
 	return cmd
+}
+
+// runDetectReport runs the credential auto-detection pipeline and prints the report to out.
+func runDetectReport(out io.Writer, showAll bool) error {
+	result := detect.AutoDetect()
+	detect.ApplyCredentials(&result)
+	return printDetectReport(out, result, showAll)
 }
 
 func printDetectReport(out io.Writer, result detect.Result, showAll bool) error {

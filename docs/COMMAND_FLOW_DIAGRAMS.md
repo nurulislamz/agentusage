@@ -80,9 +80,8 @@ box "Config & Auth Layer" #FEF3C7
     participant Theme as "tui.LoadThemes()"
 end box
 
-box "Core & Enrichers" #DCFCE7
+box "Core & UI" #DCFCE7
     participant Disp as "snapshotDispatcher"
-    participant Enrich as "Provider Enrichers\n(Cursor, AGY, OpenCode)"
     participant Tea as "tea.Program\n(Model)"
 end box
 
@@ -105,7 +104,7 @@ Main -> Dash ++ : runDashboard(cfg)
 Dash -> Theme : tui.LoadThemes() & SetThemeByName()
 Dash -> Tea : tui.NewModel(thresholds, accounts, timeWindow)
 Dash -> ViewRT : daemon.NewViewRuntime(socketPath)
-Dash -> Disp : Init snapshotDispatcher(enrichCallback)
+Dash -> Disp : Init snapshotDispatcher(nil)
 
 par Background Update Check
     Dash -> Update : runStartupUpdateCheck()
@@ -119,23 +118,16 @@ else Background Exporter
 else Broadcaster Periodic Loop
     Dash -> Bcast : StartBroadcaster(ctx, viewRuntime, interval)
     loop Every Refresh Interval
-        Bcast -> ViewRT ++ : ReadWithFallbackForWindow(ctx, timeWindow)
+        Bcast -> ViewRT ++ : ReadForWindow(ctx, timeWindow)
         alt Daemon Online
             ViewRT -> Sock ++ : HTTP GET /v1/snapshots
             Sock --> ViewRT -- : Return SnapshotFrame
-        else Daemon Offline / Unreachable
-            ViewRT -> ViewRT : Direct Provider Poll Fallback
+        else Daemon Offline / Reconnecting
+            ViewRT -> ViewRT : Return cached SnapshotFrame with status
         end
         ViewRT --> Bcast -- : SnapshotFrame
         Bcast -> Disp : dispatch(frame)
-        Disp -> Tea : program.Send(SnapshotsMsg [raw])
-        
-        par Asynchronous Local Tool Enrichment
-            Disp -> Enrich : EnrichSnapshots(cachedAccounts, snaps)
-            note over Enrich : Concurrently query Cursor SQLite,\nAntigravity containers, OpenCode DB
-            Enrich --> Disp : Mutated enriched snapshots
-            Disp -> Tea : program.Send(SnapshotsMsg [enriched])
-        end
+        Disp -> Tea : program.Send(SnapshotsMsg)
 
         opt Exporter Active
             Bcast -> Exporter : exp.Ingest(snapshots)
@@ -1153,9 +1145,9 @@ end
 
 ---
 
-## 11. Demo Simulation Flow (`agentusage demo`)
+## 11. Demo Simulation Runner (`make demo` / `cmd/demo`)
 
-The standalone demo runner (`cmd/demo/main.go`) executes a simulated, zero-dependency environment with realistic synthetic snapshots across all 37 providers for visual testing and documentation previews.
+The standalone demo runner (`cmd/demo/main.go`, executed via `make demo`) executes a simulated, zero-dependency environment with realistic synthetic snapshots across all 37 providers for visual testing and documentation previews. It is a development workflow runner rather than a root CLI subcommand.
 
 ![agentusage demo simulation](diagrams/14_demo_simulation.svg)
 
@@ -1227,15 +1219,15 @@ Main --> User -- : Exit code 0
 
 | Command | File Path | Primary Responsibilities | Concurrency / Goroutines | Fallback Mechanism |
 |---|---|---|---|---|
-| **`agentusage`** | `cmd/agentusage/dashboard.go` | Bubble Tea interactive terminal dashboard, multi-account view, window toggles | Broadcaster ticker, async enrichment (Cursor, AGY, OpenCode), app update checker, exporter | Falls back from daemon socket to direct provider polling |
+| **`agentusage`** | `cmd/agentusage/dashboard.go` | Bubble Tea interactive terminal dashboard, multi-account view, window toggles | Broadcaster ticker, app update checker, exporter | Reconnects to daemon socket; displays cached usage frame during reconnect |
 | **`get <id>`** | `cmd/agentusage/get.go` | Fetch usage & limits for a box or account (5h limit default); outputs JSON, plain %, or table | Synchronous context timeout (default 10s) | Fuzzy account matching (ID -> provider -> prefix) |
 | **`list`** | `cmd/agentusage/list.go` | List available accounts, providers, auth modes, and container statuses | Synchronous | Auto-detects terminal vs pipe for table vs JSON output |
-| **`detect`** | `cmd/agentusage/detect.go` | Discovers local AI tools in PATH, local dirs, env vars, and credentials | Parallel filesystem & PATH discovery | Read-only; masks all keys with zero disk mutation |
-| **`doctor`** | `cmd/agentusage/doctor.go` | System health, permissions, daemon socket, SQLite integrity, integrations | Synchronous with bounded sub-timeouts (1.5s daemon probe) | Graceful degradation if daemon service is not installed |
-| **`serve`** | `cmd/agentusage/serve.go` | Web dashboard HTTP server, background detachment, TUI/web parity testing | HTTP server goroutine, browser launcher, signal trap | Fallback from daemon to direct poll; auto-copies binary on detach |
+| **`detect`** | `cmd/agentusage/detect.go` | Discovers local AI tools in PATH, local dirs, env vars, and credentials | Parallel filesystem & PATH discovery | Read-only; hidden deprecated alias for `doctor --detect` |
+| **`doctor`** | `cmd/agentusage/doctor.go` | System health, permissions, daemon socket, SQLite integrity, integrations, `--detect`, `--fix-legacy-statuslines` | Synchronous with bounded sub-timeouts (1.5s daemon probe) | Graceful degradation if daemon service is not installed |
+| **`serve`** | `cmd/agentusage/serve.go` | Web dashboard HTTP server, background detachment, TUI/web parity testing | HTTP server goroutine, browser launcher, signal trap | Connects to daemon socket with cached frame fallback; auto-copies binary on detach |
 | **`daemon run`** | `cmd/agentusage/daemon.go` | Telemetry background daemon, SQLite store, socket RPC, provider poller | Poller loop, spool cleaner, daily retention, read model cache, socket server | Poll scheduler coalesces burst kicks into single fetch |
 | **`daemon status`** | `cmd/agentusage/daemon.go` | Inspects system service state and probes daemon health via socket | Bounded socket RPC | Probes both OS service manager and raw Unix socket |
 | **`daemon install` / `uninstall`** | `cmd/agentusage/daemon.go` | Installs/uninstalls systemd user unit or launchd LaunchAgent | Synchronous OS command exec | Platform detection (Linux systemd vs macOS launchd) |
 | **`daemon hook`** | `cmd/agentusage/daemon.go` | Ingests agent telemetry events from stdin or argv | Asynchronous HTTP over Unix domain socket | Falls back to local direct SQLite write, then to local spool queue |
 | **`config` (Lifecycle)** | `internal/config/` | Secure credentials (0600) vs public settings separation, account merging | Protected by `saveMu` and `credMu` package mutexes | Fallback to auto-detected default config if file unreadable |
-| **`demo`** | `cmd/demo/main.go` | Realistic synthetic telemetry scenario replay for UI validation | Simulated ticker loop | 100% synthetic, zero network/disk dependencies |
+| **`demo` (runner)** | `cmd/demo/main.go` | Realistic synthetic telemetry scenario replay for UI validation (run via `make demo`) | Simulated ticker loop | 100% synthetic, zero network/disk dependencies |

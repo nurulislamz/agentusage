@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -51,19 +49,69 @@ func (d *doctorChecker) fail(format string, a ...any) {
 }
 
 func newDoctorCommand() *cobra.Command {
-	var verbose bool
+	var (
+		verbose              bool
+		detectFlag           bool
+		showAll              bool
+		fixLegacyStatuslines bool
+	)
 	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Run comprehensive system and environment diagnostics",
 		Long: `Run full health and diagnostic checks across agentUsage configuration,
-telemetry daemon, database integrity, auto-detected tools, and integration hooks.`,
+telemetry daemon, database integrity, auto-detected tools, and integration hooks.
+
+Use --detect to run the detailed credential auto-detection report (read-only).
+Use --fix-legacy-statuslines to migrate and clean legacy status-line configurations.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			runDoctorDiagnostics(os.Stdout, verbose)
+			if fixLegacyStatuslines {
+				return runFixLegacyStatuslines(cmd.OutOrStdout())
+			}
+			if detectFlag {
+				return runDetectReport(cmd.OutOrStdout(), showAll)
+			}
+			runDoctorDiagnostics(cmd.OutOrStdout(), verbose)
 			return nil
 		},
 	}
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "include verbose diagnostic details")
+	cmd.Flags().BoolVar(&detectFlag, "detect", false, "run detailed workstation tool and credential discovery")
+	cmd.Flags().BoolVar(&showAll, "all", false, "include providers with no credentials in the detect report (used with --detect)")
+	cmd.Flags().BoolVar(&fixLegacyStatuslines, "fix-legacy-statuslines", false, "remove obsolete agentUsage/openusage statusline settings from config files")
 	return cmd
+}
+
+func runFixLegacyStatuslines(out io.Writer) error {
+	dirs := integrations.NewDefaultDirs()
+	results := integrations.CleanLegacyStatusLines(dirs)
+
+	fmt.Fprintln(out, "Legacy Status-Line Migration")
+	fmt.Fprintln(out, strings.Repeat("-", 40))
+
+	var cleaned, skipped, errors int
+	for _, res := range results {
+		switch res.Outcome {
+		case integrations.OutcomeCleaned:
+			cleaned++
+			fmt.Fprintf(out, "[CLEANED] %s (backup: %s)\n", res.Path, res.Backup)
+		case integrations.OutcomeSkippedCustom:
+			skipped++
+			fmt.Fprintf(out, "[SKIPPED] %s (preserved custom statusline)\n", res.Path)
+		case integrations.OutcomeError:
+			errors++
+			fmt.Fprintf(out, "[ERROR]   %s: %v\n", res.Path, res.Err)
+		case integrations.OutcomeNotFound, integrations.OutcomeNoStatusline:
+			// Normal clean state; no output needed
+		}
+	}
+
+	fmt.Fprintln(out)
+	if cleaned == 0 && skipped == 0 && errors == 0 {
+		fmt.Fprintln(out, "Result: No legacy status-line configurations found.")
+	} else {
+		fmt.Fprintf(out, "Result: Migration complete (%d cleaned, %d custom preserved, %d error(s)).\n", cleaned, skipped, errors)
+	}
+	return nil
 }
 
 func runDoctorDiagnostics(out io.Writer, verbose bool) {
@@ -76,7 +124,6 @@ func runDoctorDiagnostics(out io.Writer, verbose bool) {
 	checkDoctorConfig(d)
 	checkDoctorDaemon(d, verbose)
 	checkDoctorToolsAndIntegrations(d, verbose)
-	checkDoctorStatuslineAndTmux(d)
 
 	fmt.Fprintln(out)
 	if d.failCount == 0 && d.warnCount == 0 {
@@ -264,52 +311,6 @@ func checkDoctorToolsAndIntegrations(d *doctorChecker, verbose bool) {
 		sort.Strings(actionableHooks)
 		d.info("Recommended Hooks: %s", strings.Join(actionableHooks, ", "))
 	}
-}
-
-func checkDoctorStatuslineAndTmux(d *doctorChecker) {
-	home, err := os.UserHomeDir()
-	if err == nil {
-		claudeSettings := filepath.Join(home, ".claude", "settings.json")
-		if data, err := os.ReadFile(claudeSettings); err == nil {
-			if strings.Contains(string(data), "agentusage statusline") || strings.Contains(string(data), "openusage statusline") {
-				d.ok("Claude Code Statusline: configured in %s", claudeSettings)
-			}
-		}
-	}
-
-	if _, err := exec.LookPath("tmux"); err == nil {
-		if conf, err := detectTmuxConfForDoctor(); err == nil && conf != "" {
-			if present, _ := checkSentinelPresent(conf); present {
-				d.ok("tmux Integration: segment configured in %s", conf)
-			}
-		}
-	}
-}
-
-func detectTmuxConfForDoctor() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	candidates := []string{
-		filepath.Join(home, ".config", "tmux", "tmux.conf"),
-		filepath.Join(home, ".tmux.conf"),
-	}
-	for _, c := range candidates {
-		if _, err := os.Stat(c); err == nil {
-			return c, nil
-		}
-	}
-	return "", nil
-}
-
-func checkSentinelPresent(path string) (bool, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false, err
-	}
-	content := string(data)
-	return strings.Contains(content, "agentusage tmux") || strings.Contains(content, "openusage tmux"), nil
 }
 
 func formatFileSize(bytes int64) string {
