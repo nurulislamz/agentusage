@@ -160,3 +160,29 @@ func TestStartService_InvalidConfig(t *testing.T) {
 		t.Error("expected error for invalid DBPath in RunServer")
 	}
 }
+
+func TestStartService_StartupLockPreventsStoreOpen(t *testing.T) {
+	tempDir := t.TempDir()
+	socketPath := filepath.Join(tempDir, "daemon.sock")
+	dbPath := filepath.Join(tempDir, "should-not-be-created.db")
+
+	lockFile, err := acquireDaemonLock(socketPath)
+	if err != nil {
+		t.Fatalf("acquireDaemonLock: %v", err)
+	}
+	defer releaseDaemonLock(lockFile)
+
+	_, err = startService(context.Background(), Config{
+		SocketPath:      socketPath,
+		DBPath:          dbPath,
+		SpoolDir:        filepath.Join(tempDir, "spool"),
+		CollectInterval: 10 * time.Minute,
+		PollInterval:    10 * time.Minute,
+	})
+	if err == nil {
+		t.Fatal("expected startService to fail when startup lock is held")
+	}
+	if _, statErr := os.Stat(dbPath); !os.IsNotExist(statErr) {
+		t.Fatalf("OpenStore ran despite held startup lock; db path state = %v", statErr)
+	}
+}
