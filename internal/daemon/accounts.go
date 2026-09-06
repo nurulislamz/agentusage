@@ -182,6 +182,12 @@ func resolveConfigAccounts(
 	return ApplyCredentials(accounts)
 }
 
+var (
+	loadAccountsAndNormFunc             = LoadAccountsAndNorm
+	buildReadModelRequestFromConfigFunc = BuildReadModelRequestFromConfig
+	disabledAccountsFromConfigFunc      = DisabledAccountsFromConfig
+)
+
 func LoadAccountsAndNorm() ([]core.AccountConfig, core.ModelNormalizationConfig, error) {
 	cfg, err := config.Load()
 	if err != nil {

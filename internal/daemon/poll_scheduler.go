@@ -9,6 +9,11 @@ import (
 	"github.com/nurulislamz/agentusage/internal/core"
 )
 
+type pollGeneration struct {
+	id   uint64
+	done chan struct{}
+}
+
 // PollScheduler manages per-provider adaptive backoff to reduce CPU usage when data
 // sources are idle. Each account gets its own backoff state: when consecutive polls
 // detect no changes, the effective interval increases until a provider-specific cap.
@@ -16,6 +21,9 @@ type PollScheduler struct {
 	mu           sync.Mutex
 	states       map[string]*pollBackoffState
 	baseInterval time.Duration
+	clock        core.Clock
+	activeGen    *pollGeneration
+	genCount     uint64
 }
 
 type pollBackoffState struct {
@@ -23,6 +31,7 @@ type pollBackoffState struct {
 	consecutiveNoChange int
 	lastSnapshotHash    string
 	hasLocalDetector    bool // true if provider implements ChangeDetector
+	rateLimitUntil      time.Time
 }
 
 // backoff tier thresholds and multipliers
@@ -53,6 +62,75 @@ func newPollScheduler(baseInterval time.Duration) *PollScheduler {
 	}
 }
 
+func (ps *PollScheduler) SetClock(clock core.Clock) {
+	if ps == nil {
+		return
+	}
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	ps.clock = clock
+}
+
+func (ps *PollScheduler) now() time.Time {
+	if ps != nil && ps.clock != nil {
+		return ps.clock.Now()
+	}
+	return time.Now()
+}
+
+func (ps *PollScheduler) BeginGeneration() (genID uint64, isLeader bool, done <-chan struct{}) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	if ps.activeGen != nil {
+		return ps.activeGen.id, false, ps.activeGen.done
+	}
+	ps.genCount++
+	ch := make(chan struct{})
+	ps.activeGen = &pollGeneration{id: ps.genCount, done: ch}
+	return ps.genCount, true, ch
+}
+
+func (ps *PollScheduler) EndGeneration(genID uint64) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	if ps.activeGen != nil && ps.activeGen.id == genID {
+		close(ps.activeGen.done)
+		ps.activeGen = nil
+	}
+}
+
+func (ps *PollScheduler) ActiveGenerationID() uint64 {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	if ps.activeGen != nil {
+		return ps.activeGen.id
+	}
+	return 0
+}
+
+func (ps *PollScheduler) RecordRateLimit(accountID string, until time.Time) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	state, ok := ps.states[accountID]
+	if !ok {
+		state = &pollBackoffState{}
+		ps.states[accountID] = state
+	}
+	state.rateLimitUntil = until
+}
+
+func (ps *PollScheduler) ClearRateLimit(accountID string) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	if state, ok := ps.states[accountID]; ok {
+		state.rateLimitUntil = time.Time{}
+	}
+}
+
 // ShouldPoll returns true if enough time has elapsed for this account's current
 // backoff tier. If the provider implements ChangeDetector, mark it accordingly
 // for the correct cap.
@@ -69,8 +147,12 @@ func (ps *PollScheduler) ShouldPoll(accountID string, hasLocalDetector bool) boo
 	}
 	state.hasLocalDetector = hasLocalDetector
 
+	if !state.rateLimitUntil.IsZero() && ps.now().Before(state.rateLimitUntil) {
+		return false
+	}
+
 	interval := ps.effectiveIntervalLocked(state)
-	return time.Since(state.lastPollAt) >= interval
+	return ps.now().Sub(state.lastPollAt) >= interval
 }
 
 // RecordPoll records that a poll was executed. changed indicates whether the data
@@ -85,7 +167,7 @@ func (ps *PollScheduler) RecordPoll(accountID string, changed bool) {
 		ps.states[accountID] = state
 	}
 
-	state.lastPollAt = time.Now()
+	state.lastPollAt = ps.now()
 	if changed {
 		state.consecutiveNoChange = 0
 	} else {

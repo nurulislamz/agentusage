@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"golang.org/x/mod/semver"
 
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 	"github.com/nurulislamz/agentusage/internal/version"
 )
 
@@ -43,6 +45,20 @@ func ClassifyEnsureError(err error) DaemonState {
 	}
 }
 
+type serviceLifecycleManager interface {
+	IsSupported() bool
+	IsInstalled() bool
+	Start() error
+	InstallHint() string
+}
+
+var (
+	serviceManagerFactory = func(socketPath string) (serviceLifecycleManager, error) {
+		return NewServiceManager(socketPath)
+	}
+	spawnDaemonFunc = spawnDaemonProcess
+)
+
 func EnsureRunning(ctx context.Context, socketPath string, verbose bool) (*Client, error) {
 	socketPath = strings.TrimSpace(socketPath)
 	if socketPath == "" {
@@ -50,13 +66,38 @@ func EnsureRunning(ctx context.Context, socketPath string, verbose bool) (*Clien
 	}
 	client := NewClient(socketPath)
 
+	// 1. Prefer healthy helper: if already running and current, use it directly.
 	health, healthErr := WaitForHealthInfo(ctx, client, 1200*time.Millisecond)
-	if healthErr == nil && HealthCurrent(health) {
-		return client, nil
+	if healthErr == nil {
+		if HealthCurrent(health) {
+			return client, nil
+		}
+		// Running but outdated -> fail clearly on version incompatibility without auto-installing service.
+		manager, _ := serviceManagerFactory(socketPath)
+		hint := "agentusage daemon install"
+		if manager != nil && manager.InstallHint() != "" {
+			hint = manager.InstallHint()
+		}
+		return nil, fmt.Errorf(
+			"telemetry daemon is out of date (running=%s expected=%s); run `%s` to upgrade",
+			HealthVersion(health), strings.TrimSpace(version.Version), hint,
+		)
 	}
 
-	needsUpgrade := healthErr == nil
-	return ensureViaServiceManager(ctx, client, socketPath, verbose, needsUpgrade, health)
+	// 2. Installed managed service: if supported and installed, start it.
+	manager, err := serviceManagerFactory(socketPath)
+	if err == nil && manager.IsSupported() && manager.IsInstalled() {
+		return startViaManagedService(ctx, client, manager, false, socketPath)
+	}
+
+	// 3. Ordinary helper spawn: spawn background helper process.
+	if err := spawnDaemonFunc(socketPath, verbose); err != nil {
+		return nil, fmt.Errorf("start telemetry daemon: %w", err)
+	}
+	if err := waitAndVerifyDaemon(ctx, client, socketPath); err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 func ensureViaServiceManager(
@@ -67,23 +108,26 @@ func ensureViaServiceManager(
 	needsUpgrade bool,
 	health HealthResponse,
 ) (*Client, error) {
-	manager, err := NewServiceManager(socketPath)
+	manager, err := serviceManagerFactory(socketPath)
 	if err != nil {
 		return nil, err
 	}
 
-	if needsUpgrade && !manager.IsSupported() {
+	if needsUpgrade {
 		return nil, fmt.Errorf(
-			"telemetry daemon is out of date (running=%s expected=%s) and auto-upgrade is unsupported on %s",
-			HealthVersion(health), strings.TrimSpace(version.Version), runtime.GOOS,
+			"telemetry daemon is out of date (running=%s expected=%s); run `%s` to upgrade",
+			HealthVersion(health), strings.TrimSpace(version.Version), manager.InstallHint(),
 		)
 	}
 
-	if manager.IsSupported() {
+	if manager.IsSupported() && manager.IsInstalled() {
 		return startViaManagedService(ctx, client, manager, needsUpgrade, socketPath)
 	}
 
-	if err := spawnDaemonProcess(socketPath, verbose); err != nil {
+	if err := spawnDaemonFunc(socketPath, verbose); err != nil {
+		if waitErr := waitAndVerifyDaemon(ctx, client, socketPath); waitErr == nil {
+			return client, nil
+		}
 		return nil, fmt.Errorf("start telemetry daemon: %w", err)
 	}
 	if err := waitAndVerifyDaemon(ctx, client, socketPath); err != nil {
@@ -95,14 +139,12 @@ func ensureViaServiceManager(
 func startViaManagedService(
 	ctx context.Context,
 	client *Client,
-	manager ServiceManager,
+	manager serviceLifecycleManager,
 	needsUpgrade bool,
 	socketPath string,
 ) (*Client, error) {
 	if needsUpgrade {
-		if err := manager.Install(); err != nil {
-			return nil, fmt.Errorf("upgrade telemetry daemon service: %w", err)
-		}
+		return nil, fmt.Errorf("telemetry daemon is out of date; run `%s` to upgrade", manager.InstallHint())
 	}
 	if !manager.IsInstalled() {
 		return nil, fmt.Errorf("telemetry daemon service is not installed; run `%s`", manager.InstallHint())
@@ -113,10 +155,16 @@ func startViaManagedService(
 		if waitErr := waitAndVerifyDaemon(ctx, client, socketPath); waitErr == nil {
 			return client, nil
 		}
-		return nil, fmt.Errorf("start telemetry daemon service: %w\n%s", err, StartupDiagnostics(manager, socketPath))
+		if sm, ok := manager.(ServiceManager); ok {
+			return nil, fmt.Errorf("start telemetry daemon service: %w\n%s", err, StartupDiagnostics(sm, socketPath))
+		}
+		return nil, fmt.Errorf("start telemetry daemon service: %w", err)
 	}
 	if err := waitAndVerifyDaemon(ctx, client, socketPath); err != nil {
-		return nil, fmt.Errorf("%w\n%s", err, StartupDiagnostics(manager, socketPath))
+		if sm, ok := manager.(ServiceManager); ok {
+			return nil, fmt.Errorf("%w\n%s", err, StartupDiagnostics(sm, socketPath))
+		}
+		return nil, err
 	}
 	return client, nil
 }
@@ -327,7 +375,39 @@ func TailTextLines(text string, maxLines int) string {
 }
 
 func spawnDaemonProcess(socketPath string, verbose bool) error {
-	_ = verbose
-	_ = socketPath
-	return fmt.Errorf("daemon process auto-spawn is unsupported on %s without a managed service", runtime.GOOS)
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve executable: %w", err)
+	}
+	exe = ResolveStableExecutable(exe)
+
+	stateDir, err := telemetry.DefaultStateDir()
+	if err == nil && strings.TrimSpace(stateDir) != "" {
+		_ = os.MkdirAll(stateDir, 0o755)
+	}
+
+	args := []string{"daemon", "run", "--socket-path", socketPath}
+	if verbose {
+		args = append(args, "--verbose")
+	}
+
+	cmd := exec.Command(exe, args...)
+	if stateDir != "" {
+		stdoutLog, err := os.OpenFile(filepath.Join(stateDir, "daemon.stdout.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err == nil {
+			cmd.Stdout = stdoutLog
+		}
+		stderrLog, err := os.OpenFile(filepath.Join(stateDir, "daemon.stderr.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err == nil {
+			cmd.Stderr = stderrLog
+		}
+	}
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	if cmd.Process != nil {
+		_ = cmd.Process.Release()
+	}
+	return nil
 }
