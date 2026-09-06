@@ -26,6 +26,9 @@ type ViewRuntime struct {
 	stateMu    sync.RWMutex
 	state      DaemonState
 	timeWindow core.TimeWindow
+
+	lastGoodMu        sync.RWMutex
+	lastGoodSnapshots map[core.TimeWindow]map[string]core.UsageSnapshot
 }
 
 func NewViewRuntime(
@@ -34,11 +37,12 @@ func NewViewRuntime(
 	verbose bool,
 ) *ViewRuntime {
 	return &ViewRuntime{
-		client:      client,
-		socketPath:  strings.TrimSpace(socketPath),
-		verbose:     verbose,
-		logThrottle: core.NewLogThrottle(8, time.Minute),
-		state:       DaemonState{Status: DaemonStatusConnecting},
+		client:            client,
+		socketPath:        strings.TrimSpace(socketPath),
+		verbose:           verbose,
+		logThrottle:       core.NewLogThrottle(8, time.Minute),
+		state:             DaemonState{Status: DaemonStatusConnecting},
+		lastGoodSnapshots: make(map[core.TimeWindow]map[string]core.UsageSnapshot),
 	}
 }
 
@@ -145,12 +149,16 @@ func (r *ViewRuntime) ResetEnsureThrottle() {
 	r.SetClient(nil)
 }
 
+func (r *ViewRuntime) ReadForWindow(ctx context.Context, window core.TimeWindow) SnapshotFrame {
+	return r.readFrame(ctx, window, false)
+}
+
 func (r *ViewRuntime) ReadWithFallback(ctx context.Context) SnapshotFrame {
-	return r.ReadWithFallbackForWindow(ctx, r.TimeWindow())
+	return r.ReadForWindow(ctx, r.TimeWindow())
 }
 
 func (r *ViewRuntime) ReadWithFallbackForWindow(ctx context.Context, timeWindow core.TimeWindow) SnapshotFrame {
-	return r.readFrame(ctx, timeWindow, false)
+	return r.ReadForWindow(ctx, timeWindow)
 }
 
 // RefreshForWindow kicks a blocking daemon poll, then reads the read-model
@@ -186,7 +194,20 @@ func (r *ViewRuntime) readFrame(ctx context.Context, timeWindow core.TimeWindow,
 	snaps, err := r.fetchReadModel(ctx, client, ReadModelRequest{TimeWindow: frame.TimeWindow, Refresh: refresh})
 	if err != nil {
 		r.throttledLogError(err)
+		r.lastGoodMu.RLock()
+		if cached, ok := r.lastGoodSnapshots[frame.TimeWindow]; ok && len(cached) > 0 {
+			frame.Snapshots = core.DeepCloneSnapshots(cached)
+		}
+		r.lastGoodMu.RUnlock()
 		return frame
+	}
+	if len(snaps) > 0 && SnapshotsHaveUsableData(snaps) {
+		r.lastGoodMu.Lock()
+		if r.lastGoodSnapshots == nil {
+			r.lastGoodSnapshots = make(map[core.TimeWindow]map[string]core.UsageSnapshot)
+		}
+		r.lastGoodSnapshots[frame.TimeWindow] = core.DeepCloneSnapshots(snaps)
+		r.lastGoodMu.Unlock()
 	}
 	frame.Snapshots = snaps
 	return frame
@@ -223,6 +244,11 @@ func (r *ViewRuntime) fetchReadModel(
 	retryCtx, retryCancel := context.WithTimeout(ctx, readTimeout)
 	snaps, err = recovered.ReadModel(retryCtx, request)
 	retryCancel()
+	if err == nil {
+		r.setState(DaemonState{Status: DaemonStatusRunning})
+	} else {
+		r.setState(ClassifyEnsureError(err))
+	}
 	return snaps, err
 }
 

@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -178,3 +179,138 @@ func TestHTTPBasePollInterval(t *testing.T) {
 }
 
 func ptr(f float64) *float64 { return &f }
+
+type testFakeClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func newTestFakeClock(t time.Time) *testFakeClock {
+	return &testFakeClock{now: t}
+}
+
+func (f *testFakeClock) Now() time.Time {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.now
+}
+
+func (f *testFakeClock) Advance(d time.Duration) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.now = f.now.Add(d)
+}
+
+func TestPollScheduler_FakeClock_DeterministicAdvance(t *testing.T) {
+	t0 := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	clk := newTestFakeClock(t0)
+
+	ps := newPollScheduler(30 * time.Second)
+	ps.SetClock(clk)
+
+	// First poll should run
+	if !ps.ShouldPoll("acct1", false) {
+		t.Fatal("first poll should run")
+	}
+	ps.RecordPoll("acct1", true)
+
+	// Advance clock by 10s (< 30s base interval)
+	clk.Advance(10 * time.Second)
+	if ps.ShouldPoll("acct1", false) {
+		t.Fatal("should not poll 10s after previous poll with 30s interval")
+	}
+
+	// Advance clock by another 25s (total 35s >= 30s)
+	clk.Advance(25 * time.Second)
+	if !ps.ShouldPoll("acct1", false) {
+		t.Fatal("should poll 35s after previous poll with 30s interval")
+	}
+}
+
+func TestPollScheduler_RateLimitBackoff(t *testing.T) {
+	t0 := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	clk := newTestFakeClock(t0)
+
+	ps := newPollScheduler(30 * time.Second)
+	ps.SetClock(clk)
+
+	// Initial poll
+	if !ps.ShouldPoll("acct1", false) {
+		t.Fatal("initial poll should run")
+	}
+
+	// Record rate limit until t0 + 60s
+	resetAt := t0.Add(60 * time.Second)
+	ps.RecordRateLimit("acct1", resetAt)
+
+	// Immediate poll should be blocked by rate limit
+	if ps.ShouldPoll("acct1", false) {
+		t.Fatal("should be blocked while rate limited")
+	}
+
+	// Advance 30s (still before resetAt)
+	clk.Advance(30 * time.Second)
+	if ps.ShouldPoll("acct1", false) {
+		t.Fatal("should still be blocked before rate limit reset")
+	}
+
+	// Advance another 35s (past resetAt)
+	clk.Advance(35 * time.Second)
+	if !ps.ShouldPoll("acct1", false) {
+		t.Fatal("should allow poll after rate limit reset expired")
+	}
+
+	// Test fallback default backoff with future time
+	ps.RecordRateLimit("acct2", t0.Add(5*time.Minute))
+	if ps.ShouldPoll("acct2", false) {
+		t.Fatal("should be blocked with future rate limit date")
+	}
+	// Clear rate limit
+	ps.ClearRateLimit("acct2")
+	if !ps.ShouldPoll("acct2", false) {
+		t.Fatal("should allow poll after clearing rate limit")
+	}
+}
+
+func TestPollScheduler_GenerationCoalescing(t *testing.T) {
+	ps := newPollScheduler(30 * time.Second)
+
+	// Begin first generation
+	genID1, isLeader1, done1 := ps.BeginGeneration()
+	if genID1 != 1 || !isLeader1 {
+		t.Fatalf("first generation ID = %d, isLeader = %v, want 1 and true", genID1, isLeader1)
+	}
+	if ps.ActiveGenerationID() != 1 {
+		t.Fatalf("active generation ID = %d, want 1", ps.ActiveGenerationID())
+	}
+
+	// Second concurrent begin returns the exact same generation
+	genID2, isLeader2, done2 := ps.BeginGeneration()
+	if genID2 != genID1 || isLeader2 {
+		t.Fatalf("concurrent generation ID = %d (want %d), isLeader = %v (want false)", genID2, genID1, isLeader2)
+	}
+	if done2 != done1 {
+		t.Fatal("concurrent generation Done channel must be identical")
+	}
+
+	// End generation
+	ps.EndGeneration(genID1)
+
+	select {
+	case <-done1:
+		// Expected: Done channel closed
+	default:
+		t.Fatal("expected done1 channel to be closed after EndGeneration")
+	}
+
+	if ps.ActiveGenerationID() != 0 {
+		t.Fatalf("active generation ID = %d, want 0 after EndGeneration", ps.ActiveGenerationID())
+	}
+
+	// Subsequent generation gets incremented ID
+	genID3, isLeader3, _ := ps.BeginGeneration()
+	if genID3 != 2 || !isLeader3 {
+		t.Fatalf("next generation ID = %d, isLeader = %v, want 2 and true", genID3, isLeader3)
+	}
+	ps.EndGeneration(genID3)
+}

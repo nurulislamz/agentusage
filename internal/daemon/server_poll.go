@@ -30,14 +30,37 @@ func (s *Service) runPollLoop(ctx context.Context) {
 }
 
 func (s *Service) pollProviders(ctx context.Context) {
-	if s == nil || s.quotaIngest == nil {
+	if s == nil || (s.quotaIngest == nil && s.pollScheduler == nil) {
 		return
 	}
+	if s.pollScheduler == nil {
+		s.pollMu.Lock()
+		defer s.pollMu.Unlock()
+		s.doPoll(ctx)
+		return
+	}
+
+	genID, isLeader, done := s.pollScheduler.BeginGeneration()
+	if !isLeader {
+		select {
+		case <-done:
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+	defer s.pollScheduler.EndGeneration(genID)
+
+	execCtx := s.serviceContext(ctx)
+	s.doPoll(execCtx)
+}
+
+func (s *Service) doPoll(ctx context.Context) {
 	s.pollMu.Lock()
 	defer s.pollMu.Unlock()
 	started := time.Now()
 
-	accounts, modelNorm, err := LoadAccountsAndNorm()
+	accounts, modelNorm, err := loadAccountsAndNormFunc()
 	if err != nil {
 		if s.shouldLog("poll_config_warning", 20*time.Second) {
 			s.warnf("poll_config_warning", "error=%v", err)
@@ -88,14 +111,18 @@ func (s *Service) pollProviders(ctx context.Context) {
 		return
 	}
 
-	ingestCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
-	defer cancel()
-	ingestErr := s.ingestQuotaSnapshots(ingestCtx, snapshots)
-	if ingestErr != nil && s.shouldLog("poll_ingest_warning", 10*time.Second) {
-		s.warnf("poll_ingest_warning", "error=%v", ingestErr)
+	var ingestErr error
+	if s.quotaIngest != nil {
+		ingestCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+		defer cancel()
+		ingestErr = s.ingestQuotaSnapshots(ingestCtx, snapshots)
+		if ingestErr != nil && s.shouldLog("poll_ingest_warning", 10*time.Second) {
+			s.warnf("poll_ingest_warning", "error=%v", ingestErr)
+		}
 	}
 	if ingestErr == nil && len(snapshots) > 0 {
 		s.markDataIngested()
+		s.publishReadModelSync(ctx)
 	}
 
 	durationMs := time.Since(started).Milliseconds()
@@ -189,6 +216,9 @@ func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountCon
 	defer cancel()
 
 	snap, fetchErr := provider.Fetch(fetchCtx, account)
+	if snap.Timestamp.IsZero() {
+		snap.Timestamp = s.now().UTC()
+	}
 	fetchDurationMs := time.Since(fetchStart).Milliseconds()
 	if fetchErr != nil {
 		s.warnf(
@@ -196,12 +226,25 @@ func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountCon
 			"provider=%s account_id=%s duration_ms=%d error=%v",
 			account.Provider, account.ID, fetchDurationMs, fetchErr,
 		)
-		snap = core.UsageSnapshot{
-			ProviderID: account.Provider,
-			AccountID:  account.ID,
-			Timestamp:  s.now().UTC(),
-			Status:     core.StatusError,
-			Message:    fetchErr.Error(),
+		s.pollStateMu.Lock()
+		prevState := s.pollState[account.ID]
+		s.pollStateMu.Unlock()
+		if prevState != nil && prevState.hasSnap && (prevState.lastSnap.Status == core.StatusOK || prevState.lastSnap.Status == core.StatusLimited) {
+			cached := prevState.lastSnap.DeepClone()
+			cached.EnsureMaps()
+			cached.Status = core.StatusError
+			cached.Message = fetchErr.Error()
+			cached.Diagnostics["last_error"] = fetchErr.Error()
+			cached.Diagnostics["last_error_at"] = s.now().UTC().Format(time.RFC3339)
+			snap = cached
+		} else {
+			snap = core.UsageSnapshot{
+				ProviderID: account.Provider,
+				AccountID:  account.ID,
+				Timestamp:  s.now().UTC(),
+				Status:     core.StatusError,
+				Message:    fetchErr.Error(),
+			}
 		}
 	} else {
 		if s.shouldLog("provider_fetch_"+account.ID, 60*time.Second) {
@@ -211,6 +254,30 @@ func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountCon
 				account.Provider, account.ID, fetchDurationMs, snap.Status,
 			)
 		}
+		if snap.Status == core.StatusLimited {
+			resetAt := findResetBoundary(snap)
+			if resetAt.IsZero() || resetAt.Before(s.now()) {
+				resetAt = s.now().Add(time.Minute)
+			}
+			s.pollScheduler.RecordRateLimit(account.ID, resetAt)
+		} else if snap.Status == core.StatusOK {
+			s.pollScheduler.ClearRateLimit(account.ID)
+		} else if snap.Status == core.StatusError {
+			s.pollStateMu.Lock()
+			prevState := s.pollState[account.ID]
+			s.pollStateMu.Unlock()
+			if prevState != nil && prevState.hasSnap && (prevState.lastSnap.Status == core.StatusOK || prevState.lastSnap.Status == core.StatusLimited) {
+				cached := prevState.lastSnap.DeepClone()
+				cached.EnsureMaps()
+				cached.Status = core.StatusError
+				if snap.Message != "" {
+					cached.Message = snap.Message
+				}
+				cached.Diagnostics["last_error"] = snap.Message
+				cached.Diagnostics["last_error_at"] = s.now().UTC().Format(time.RFC3339)
+				snap = cached
+			}
+		}
 	}
 	snap = core.NormalizeUsageSnapshotWithConfig(snap, modelNorm)
 
@@ -218,7 +285,7 @@ func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountCon
 	changed := s.pollScheduler.SnapshotChanged(account.ID, snap)
 	s.pollScheduler.RecordPoll(account.ID, changed)
 
-	// Record successful fetch for future change detection.
+	// Record successful fetch or error state for future change detection.
 	s.pollStateMu.Lock()
 	s.pollState[account.ID] = &providerPollState{
 		lastFetchAt: s.now(),
@@ -228,6 +295,29 @@ func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountCon
 	s.pollStateMu.Unlock()
 
 	return &snap
+}
+
+func findResetBoundary(snap core.UsageSnapshot) time.Time {
+	var earliest time.Time
+	for _, resetAt := range snap.Resets {
+		if resetAt.IsZero() {
+			continue
+		}
+		if earliest.IsZero() || resetAt.Before(earliest) {
+			earliest = resetAt
+		}
+	}
+	return earliest
+}
+
+func (s *Service) WithClock(c core.Clock) *Service {
+	if s != nil {
+		s.clock = c
+		if s.pollScheduler != nil {
+			s.pollScheduler.SetClock(c)
+		}
+	}
+	return s
 }
 
 func snapshotResetPassed(snap core.UsageSnapshot, since, now time.Time) bool {

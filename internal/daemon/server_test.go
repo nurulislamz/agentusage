@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -376,5 +378,392 @@ func TestReadModelCache_OperationsAndEviction(t *testing.T) {
 	cache.mu.RUnlock()
 	if totalEntries > 50 {
 		t.Errorf("cache entries = %d, want <= 50 after eviction", totalEntries)
+	}
+}
+
+type fakeCountingProvider struct {
+	mu           sync.Mutex
+	fetchCount   int
+	barrier      chan struct{}
+	fetchErr     error
+	snapshotFunc func() core.UsageSnapshot
+}
+
+func (f *fakeCountingProvider) ID() string { return "fake-prov" }
+func (f *fakeCountingProvider) Describe() core.ProviderInfo {
+	return core.ProviderInfo{Name: "Fake Provider"}
+}
+func (f *fakeCountingProvider) Spec() core.ProviderSpec               { return core.ProviderSpec{} }
+func (f *fakeCountingProvider) DashboardWidget() core.DashboardWidget { return core.DashboardWidget{} }
+func (f *fakeCountingProvider) DetailWidget() core.DetailWidget       { return core.DetailWidget{} }
+
+func (f *fakeCountingProvider) Fetch(ctx context.Context, acct core.AccountConfig) (core.UsageSnapshot, error) {
+	f.mu.Lock()
+	f.fetchCount++
+	barrier := f.barrier
+	f.mu.Unlock()
+
+	if barrier != nil {
+		select {
+		case <-barrier:
+		case <-ctx.Done():
+			return core.UsageSnapshot{}, ctx.Err()
+		}
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.fetchErr != nil {
+		return core.UsageSnapshot{}, f.fetchErr
+	}
+	if f.snapshotFunc != nil {
+		return f.snapshotFunc(), nil
+	}
+	used := 50.0
+	return core.UsageSnapshot{
+		ProviderID: acct.Provider,
+		AccountID:  acct.ID,
+		Status:     core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"requests": {Used: &used},
+		},
+	}, nil
+}
+
+func TestServer_SimultaneousRefreshes_CoalescedGenerationAndSharedCompletion(t *testing.T) {
+	tempDir := t.TempDir()
+	barrier := make(chan struct{})
+	prov := &fakeCountingProvider{
+		barrier: barrier,
+	}
+	acct := core.AccountConfig{ID: "acct-barrier", Provider: "fake-prov"}
+
+	origLoad := loadAccountsAndNormFunc
+	origBuild := buildReadModelRequestFromConfigFunc
+	origDisabled := disabledAccountsFromConfigFunc
+	defer func() {
+		loadAccountsAndNormFunc = origLoad
+		buildReadModelRequestFromConfigFunc = origBuild
+		disabledAccountsFromConfigFunc = origDisabled
+	}()
+
+	loadAccountsAndNormFunc = func() ([]core.AccountConfig, core.ModelNormalizationConfig, error) {
+		return []core.AccountConfig{acct}, core.DefaultModelNormalizationConfig(), nil
+	}
+	buildReadModelRequestFromConfigFunc = func() (ReadModelRequest, error) {
+		return ReadModelRequest{
+			Accounts:   []ReadModelAccount{{AccountID: acct.ID, ProviderID: acct.Provider}},
+			TimeWindow: core.TimeWindow30d,
+		}, nil
+	}
+	disabledAccountsFromConfigFunc = func() map[string]bool {
+		return map[string]bool{}
+	}
+
+	svc := &Service{
+		cfg: Config{
+			DBPath: filepath.Join(tempDir, "empty.db"),
+		},
+		providerByID:  map[string]core.UsageProvider{"fake-prov": prov},
+		pollScheduler: newPollScheduler(30 * time.Second),
+		rmCache:       newReadModelCache(),
+		pollState:     make(map[string]*providerPollState),
+		pollKick:      make(chan struct{}, 1),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 3)
+
+	// Refresh 1: Scheduled / background timer poll
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		svc.pollProviders(ctx)
+	}()
+
+	// Wait briefly for pollProviders to begin generation and hit barrier
+	time.Sleep(50 * time.Millisecond)
+
+	// Refresh 2: Manual HTTP poll with wait=1
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		req := httptest.NewRequest(http.MethodPost, "/v1/poll?wait=1", nil)
+		w := httptest.NewRecorder()
+		svc.handlePoll(w, req)
+		if w.Code != http.StatusOK {
+			errCh <- fmt.Errorf("manual poll 1 status=%d", w.Code)
+		}
+	}()
+
+	// Refresh 3: Another simultaneous manual HTTP poll with wait=1
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		req := httptest.NewRequest(http.MethodPost, "/v1/poll?wait=1", nil)
+		w := httptest.NewRecorder()
+		svc.handlePoll(w, req)
+		if w.Code != http.StatusOK {
+			errCh <- fmt.Errorf("manual poll 2 status=%d", w.Code)
+		}
+	}()
+
+	// Give goroutines time to reach the barrier
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify that while blocked at the barrier:
+	// 1. One active generation exists
+	activeGen := svc.pollScheduler.ActiveGenerationID()
+	if activeGen == 0 {
+		t.Error("expected active generation while blocked at barrier")
+	}
+
+	// 2. Upstream provider Fetch was invoked exactly once (coalesced!)
+	prov.mu.Lock()
+	fCount := prov.fetchCount
+	prov.mu.Unlock()
+	if fCount != 1 {
+		t.Fatalf("expected 1 fetch while coalesced at barrier, got %d", fCount)
+	}
+
+	// Release the barrier
+	close(barrier)
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Fatalf("goroutine error: %v", err)
+	}
+
+	// Upstream fetch count must still be 1 (no duplicate calls after barrier released)
+	prov.mu.Lock()
+	fCount = prov.fetchCount
+	prov.mu.Unlock()
+	if fCount != 1 {
+		t.Fatalf("expected exactly 1 fetch total across all simultaneous refreshes, got %d", fCount)
+	}
+
+	// Active generation must be ended (0)
+	if svc.pollScheduler.ActiveGenerationID() != 0 {
+		t.Errorf("active generation after completion = %d, want 0", svc.pollScheduler.ActiveGenerationID())
+	}
+
+	// Result must be published in read model cache
+	req := ReadModelRequest{
+		Accounts:   []ReadModelAccount{{AccountID: acct.ID, ProviderID: acct.Provider}},
+		TimeWindow: core.TimeWindow30d,
+	}
+	cacheKey := ReadModelRequestKey(req)
+	cached, _, ok := svc.rmCache.get(cacheKey)
+	if !ok || len(cached) == 0 {
+		t.Fatal("read model cache missing published result after generation end")
+	}
+	snap := cached[acct.ID]
+	if snap.Status != core.StatusOK {
+		t.Errorf("snapshot status = %v, want StatusOK", snap.Status)
+	}
+	if snap.Metrics["requests"].Used == nil || *snap.Metrics["requests"].Used != 50.0 {
+		t.Errorf("snapshot metric requests = %v, want 50.0", snap.Metrics["requests"])
+	}
+}
+
+func TestServer_DeterministicFreshness_FakeClock_And_LastErrorRetained(t *testing.T) {
+	tempDir := t.TempDir()
+	t0 := time.Date(2026, 9, 6, 10, 0, 0, 0, time.UTC)
+	clk := newTestFakeClock(t0)
+
+	prov := &fakeCountingProvider{}
+	acct := core.AccountConfig{ID: "acct-clock", Provider: "fake-prov"}
+
+	origLoad := loadAccountsAndNormFunc
+	origBuild := buildReadModelRequestFromConfigFunc
+	origDisabled := disabledAccountsFromConfigFunc
+	defer func() {
+		loadAccountsAndNormFunc = origLoad
+		buildReadModelRequestFromConfigFunc = origBuild
+		disabledAccountsFromConfigFunc = origDisabled
+	}()
+
+	loadAccountsAndNormFunc = func() ([]core.AccountConfig, core.ModelNormalizationConfig, error) {
+		return []core.AccountConfig{acct}, core.DefaultModelNormalizationConfig(), nil
+	}
+	buildReadModelRequestFromConfigFunc = func() (ReadModelRequest, error) {
+		return ReadModelRequest{
+			Accounts:   []ReadModelAccount{{AccountID: acct.ID, ProviderID: acct.Provider}},
+			TimeWindow: core.TimeWindow30d,
+		}, nil
+	}
+	disabledAccountsFromConfigFunc = func() map[string]bool {
+		return map[string]bool{}
+	}
+
+	svc := (&Service{
+		cfg: Config{
+			DBPath: filepath.Join(tempDir, "empty.db"),
+		},
+		providerByID:  map[string]core.UsageProvider{"fake-prov": prov},
+		pollScheduler: newPollScheduler(30 * time.Second),
+		rmCache:       newReadModelCache(),
+		pollState:     make(map[string]*providerPollState),
+		pollKick:      make(chan struct{}, 1),
+	}).WithClock(clk)
+
+	ctx := context.Background()
+
+	// 1. Initial successful poll at t0
+	svc.pollProviders(ctx)
+
+	req := ReadModelRequest{
+		Accounts:   []ReadModelAccount{{AccountID: acct.ID, ProviderID: acct.Provider}},
+		TimeWindow: core.TimeWindow30d,
+	}
+	cacheKey := ReadModelRequestKey(req)
+	cached, _, ok := svc.rmCache.get(cacheKey)
+	if !ok {
+		t.Fatal("cache missing after initial poll")
+	}
+	snap := cached[acct.ID]
+	if snap.Status != core.StatusOK {
+		t.Fatalf("initial status = %v, want StatusOK", snap.Status)
+	}
+	// Timestamp stamped by fake clock at t0
+	if !snap.Timestamp.Equal(t0) {
+		t.Fatalf("snapshot timestamp = %v, want deterministic clock time %v", snap.Timestamp, t0)
+	}
+
+	// 2. Advance fake clock by 1 hour
+	t1 := t0.Add(1 * time.Hour)
+	clk.Advance(1 * time.Hour)
+
+	// Simulate provider failure on upstream API
+	prov.mu.Lock()
+	prov.fetchErr = errors.New("upstream API 500 internal server error")
+	prov.mu.Unlock()
+
+	// Run poll during failure
+	svc.pollProviders(ctx)
+
+	cached2, _, ok2 := svc.rmCache.get(cacheKey)
+	if !ok2 {
+		t.Fatal("cache missing after second poll")
+	}
+	snap2 := cached2[acct.ID]
+
+	// Must retain last successful values and last-success timestamp
+	if snap2.Status != core.StatusError {
+		t.Errorf("status on failure = %v, want StatusError", snap2.Status)
+	}
+	if !snap2.Timestamp.Equal(t0) {
+		t.Errorf("snapshot timestamp = %v, want preserved last-success timestamp %v", snap2.Timestamp, t0)
+	}
+	if snap2.Metrics["requests"].Used == nil || *snap2.Metrics["requests"].Used != 50.0 {
+		t.Errorf("retained metric requests = %v, want 50.0", snap2.Metrics["requests"])
+	}
+
+	// Must identify error diagnostics and error timestamp
+	if snap2.Diagnostics["last_error"] != "upstream API 500 internal server error" {
+		t.Errorf("diagnostics last_error = %q", snap2.Diagnostics["last_error"])
+	}
+	if snap2.Diagnostics["last_error_at"] != t1.Format(time.RFC3339) {
+		t.Errorf("diagnostics last_error_at = %q, want %q", snap2.Diagnostics["last_error_at"], t1.Format(time.RFC3339))
+	}
+}
+
+func TestServer_ScheduledAndExplicitRefresh_ShareRateLimitBackoff(t *testing.T) {
+	tempDir := t.TempDir()
+	t0 := time.Date(2026, 9, 6, 10, 0, 0, 0, time.UTC)
+	clk := newTestFakeClock(t0)
+
+	resetAt := t0.Add(2 * time.Hour)
+	prov := &fakeCountingProvider{
+		snapshotFunc: func() core.UsageSnapshot {
+			return core.UsageSnapshot{
+				ProviderID: "fake-prov",
+				AccountID:  "acct-ratelimit",
+				Status:     core.StatusLimited,
+				Resets: map[string]time.Time{
+					"requests": resetAt,
+				},
+			}
+		},
+	}
+	acct := core.AccountConfig{ID: "acct-ratelimit", Provider: "fake-prov"}
+
+	origLoad := loadAccountsAndNormFunc
+	origBuild := buildReadModelRequestFromConfigFunc
+	origDisabled := disabledAccountsFromConfigFunc
+	defer func() {
+		loadAccountsAndNormFunc = origLoad
+		buildReadModelRequestFromConfigFunc = origBuild
+		disabledAccountsFromConfigFunc = origDisabled
+	}()
+
+	loadAccountsAndNormFunc = func() ([]core.AccountConfig, core.ModelNormalizationConfig, error) {
+		return []core.AccountConfig{acct}, core.DefaultModelNormalizationConfig(), nil
+	}
+	buildReadModelRequestFromConfigFunc = func() (ReadModelRequest, error) {
+		return ReadModelRequest{
+			Accounts:   []ReadModelAccount{{AccountID: acct.ID, ProviderID: acct.Provider}},
+			TimeWindow: core.TimeWindow30d,
+		}, nil
+	}
+	disabledAccountsFromConfigFunc = func() map[string]bool {
+		return map[string]bool{}
+	}
+
+	svc := (&Service{
+		cfg: Config{
+			DBPath: filepath.Join(tempDir, "empty.db"),
+		},
+		providerByID:  map[string]core.UsageProvider{"fake-prov": prov},
+		pollScheduler: newPollScheduler(30 * time.Second),
+		rmCache:       newReadModelCache(),
+		pollState:     make(map[string]*providerPollState),
+		pollKick:      make(chan struct{}, 1),
+	}).WithClock(clk)
+
+	ctx := context.Background()
+
+	// 1. Initial poll returns StatusLimited with resetAt = t0 + 2h
+	svc.pollProviders(ctx)
+	if prov.fetchCount != 1 {
+		t.Fatalf("fetchCount = %d, want 1", prov.fetchCount)
+	}
+
+	// 2. Advance clock to t0 + 30m (still within rate-limit window)
+	clk.Advance(30 * time.Minute)
+
+	// Scheduled check
+	if svc.pollScheduler.ShouldPoll(acct.ID, false) {
+		t.Fatal("pollScheduler.ShouldPoll returned true while rate limited")
+	}
+
+	// Explicit manual poll: handlePoll with wait=1
+	req := httptest.NewRequest(http.MethodPost, "/v1/poll?wait=1", nil)
+	w := httptest.NewRecorder()
+	svc.handlePoll(w, req)
+
+	// Provider Fetch should NOT be invoked again because rate-limit is shared
+	if prov.fetchCount != 1 {
+		t.Fatalf("fetchCount after explicit poll during rate limit = %d, want 1 (should not hammer upstream)", prov.fetchCount)
+	}
+
+	// 3. Advance clock past resetAt (t0 + 2h + 1m)
+	clk.Advance(91 * time.Minute)
+
+	if !svc.pollScheduler.ShouldPoll(acct.ID, false) {
+		t.Fatal("pollScheduler.ShouldPoll returned false after rate limit expired")
+	}
+
+	// Now explicit poll can fetch
+	req2 := httptest.NewRequest(http.MethodPost, "/v1/poll?wait=1", nil)
+	w2 := httptest.NewRecorder()
+	svc.handlePoll(w2, req2)
+
+	if prov.fetchCount != 2 {
+		t.Fatalf("fetchCount after rate limit expired = %d, want 2", prov.fetchCount)
 	}
 }

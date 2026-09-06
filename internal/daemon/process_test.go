@@ -2,11 +2,15 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -268,8 +272,8 @@ func TestWaitForHealth_NilAndTimeout(t *testing.T) {
 
 func TestSpawnDaemonProcess(t *testing.T) {
 	err := spawnDaemonProcess("/tmp/test.sock", true)
-	if err == nil || !strings.Contains(err.Error(), "unsupported") {
-		t.Errorf("spawnDaemonProcess err = %v, want unsupported message", err)
+	if err != nil && strings.Contains(err.Error(), "unsupported") {
+		t.Errorf("spawnDaemonProcess err = %v, want helper spawn supported", err)
 	}
 }
 
@@ -284,7 +288,7 @@ func TestStartViaManagedService_And_EnsureViaServiceManager(t *testing.T) {
 		exePath: "/tmp/go-build123/exe/main",
 	}
 	_, err := startViaManagedService(ctx, client, mgrTransient, true, "/tmp/test.sock")
-	if err == nil || !strings.Contains(err.Error(), "upgrade telemetry daemon service") {
+	if err == nil || !strings.Contains(err.Error(), "to upgrade") {
 		t.Errorf("expected upgrade error, got: %v", err)
 	}
 
@@ -340,5 +344,271 @@ func TestEnsureRunning_OfflineSocket(t *testing.T) {
 	_, err := EnsureRunning(ctx, "/tmp/nonexistent_socket_test.sock", false)
 	if err == nil {
 		t.Error("expected error ensuring running on nonexistent socket")
+	}
+}
+
+func startMockHealthServer(t *testing.T, socketPath string, resp HealthResponse) net.Listener {
+	t.Helper()
+	_ = os.Remove(socketPath)
+	l, err := net.Listen("unix", socketPath)
+	if err != nil {
+		t.Fatalf("listen unix socket: %v", err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+	server := &http.Server{Handler: mux}
+	go func() { _ = server.Serve(l) }()
+	t.Cleanup(func() {
+		_ = server.Close()
+		_ = l.Close()
+		_ = os.Remove(socketPath)
+	})
+	return l
+}
+
+func TestEnsureRunning_AlreadyHealthyHelper(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix sockets not supported in this test on windows")
+	}
+	socketPath := shortSocketPath(t, "healthy")
+	startMockHealthServer(t, socketPath, HealthResponse{
+		Status:           "ok",
+		DaemonVersion:    strings.TrimSpace(version.Version),
+		APIVersion:       APIVersion,
+		ProviderRegistry: ProviderRegistryHash(),
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	client, err := EnsureRunning(ctx, socketPath, false)
+	if err != nil {
+		t.Fatalf("EnsureRunning failed: %v", err)
+	}
+	if client == nil || client.SocketPath != socketPath {
+		t.Fatalf("client = %v, want client with socket %s", client, socketPath)
+	}
+}
+
+func TestEnsureRunning_OutdatedHelper(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix sockets not supported in this test on windows")
+	}
+	origVersion := version.Version
+	version.Version = "v1.2.0"
+	t.Cleanup(func() { version.Version = origVersion })
+
+	socketPath := shortSocketPath(t, "outdated")
+	startMockHealthServer(t, socketPath, HealthResponse{
+		Status:           "ok",
+		DaemonVersion:    "v0.1.0",
+		APIVersion:       APIVersion,
+		ProviderRegistry: ProviderRegistryHash(),
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	client, err := EnsureRunning(ctx, socketPath, false)
+	if err == nil {
+		t.Fatal("expected error for outdated helper, got nil")
+	}
+	if !strings.Contains(err.Error(), "out of date") {
+		t.Fatalf("expected 'out of date' in error, got: %v", err)
+	}
+	if client != nil {
+		t.Fatalf("expected nil client, got: %v", client)
+	}
+}
+
+type fakeServiceManager struct {
+	supported   bool
+	installed   bool
+	startCalled bool
+	startFn     func() error
+}
+
+func (f *fakeServiceManager) IsSupported() bool { return f.supported }
+func (f *fakeServiceManager) IsInstalled() bool { return f.installed }
+func (f *fakeServiceManager) Start() error {
+	f.startCalled = true
+	if f.startFn != nil {
+		return f.startFn()
+	}
+	return nil
+}
+func (f *fakeServiceManager) InstallHint() string { return "agentusage daemon install" }
+
+func TestEnsureRunning_ExistingManagedService(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix sockets not supported in this test on windows")
+	}
+	socketPath := shortSocketPath(t, "managed")
+	_ = os.Remove(socketPath)
+	t.Cleanup(func() { _ = os.Remove(socketPath) })
+
+	origFactory := serviceManagerFactory
+	origSpawn := spawnDaemonFunc
+	t.Cleanup(func() {
+		serviceManagerFactory = origFactory
+		spawnDaemonFunc = origSpawn
+	})
+
+	spawnCalled := false
+	spawnDaemonFunc = func(sp string, v bool) error {
+		spawnCalled = true
+		return nil
+	}
+
+	fakeMgr := &fakeServiceManager{
+		supported: true,
+		installed: true,
+		startFn: func() error {
+			startMockHealthServer(t, socketPath, HealthResponse{
+				Status:           "ok",
+				DaemonVersion:    strings.TrimSpace(version.Version),
+				APIVersion:       APIVersion,
+				ProviderRegistry: ProviderRegistryHash(),
+			})
+			return nil
+		},
+	}
+	serviceManagerFactory = func(string) (serviceLifecycleManager, error) {
+		return fakeMgr, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client, err := EnsureRunning(ctx, socketPath, false)
+	if err != nil {
+		t.Fatalf("EnsureRunning failed: %v", err)
+	}
+	if client == nil {
+		t.Fatal("expected client, got nil")
+	}
+	if !fakeMgr.startCalled {
+		t.Error("expected managed service Start() to be called")
+	}
+	if spawnCalled {
+		t.Error("spawnDaemonFunc should not be called when managed service is installed")
+	}
+}
+
+func TestEnsureRunning_DefaultLaunch_NoServiceInstalled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix sockets not supported in this test on windows")
+	}
+	socketPath := shortSocketPath(t, "nomanaged")
+	_ = os.Remove(socketPath)
+	t.Cleanup(func() { _ = os.Remove(socketPath) })
+
+	origFactory := serviceManagerFactory
+	origSpawn := spawnDaemonFunc
+	t.Cleanup(func() {
+		serviceManagerFactory = origFactory
+		spawnDaemonFunc = origSpawn
+	})
+
+	spawnCalled := false
+	spawnDaemonFunc = func(sp string, v bool) error {
+		spawnCalled = true
+		startMockHealthServer(t, socketPath, HealthResponse{
+			Status:           "ok",
+			DaemonVersion:    strings.TrimSpace(version.Version),
+			APIVersion:       APIVersion,
+			ProviderRegistry: ProviderRegistryHash(),
+		})
+		return nil
+	}
+
+	fakeMgr := &fakeServiceManager{
+		supported: true,
+		installed: false,
+	}
+	serviceManagerFactory = func(string) (serviceLifecycleManager, error) {
+		return fakeMgr, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client, err := EnsureRunning(ctx, socketPath, false)
+	if err != nil {
+		t.Fatalf("EnsureRunning failed: %v", err)
+	}
+	if client == nil {
+		t.Fatal("expected client, got nil")
+	}
+	if fakeMgr.startCalled {
+		t.Error("managed service Start() should not be called when not installed")
+	}
+	if !spawnCalled {
+		t.Error("spawnDaemonFunc should be called when managed service is not installed")
+	}
+}
+
+func TestEnsureRunning_TwoSimultaneousFirstClients(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix sockets not supported in this test on windows")
+	}
+	socketPath := shortSocketPath(t, "simultaneous")
+	_ = os.Remove(socketPath)
+	t.Cleanup(func() { _ = os.Remove(socketPath) })
+
+	origFactory := serviceManagerFactory
+	origSpawn := spawnDaemonFunc
+	t.Cleanup(func() {
+		serviceManagerFactory = origFactory
+		spawnDaemonFunc = origSpawn
+	})
+
+	var spawnMu sync.Mutex
+	var spawnCount int
+	spawnDaemonFunc = func(sp string, v bool) error {
+		spawnMu.Lock()
+		defer spawnMu.Unlock()
+		spawnCount++
+		if spawnCount == 1 {
+			startMockHealthServer(t, socketPath, HealthResponse{
+				Status:           "ok",
+				DaemonVersion:    strings.TrimSpace(version.Version),
+				APIVersion:       APIVersion,
+				ProviderRegistry: ProviderRegistryHash(),
+			})
+		}
+		return nil
+	}
+
+	serviceManagerFactory = func(string) (serviceLifecycleManager, error) {
+		return &fakeServiceManager{supported: false, installed: false}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	clients := make([]*Client, 2)
+	errs := make([]error, 2)
+
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			clients[idx], errs[idx] = EnsureRunning(ctx, socketPath, false)
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < 2; i++ {
+		if errs[i] != nil {
+			t.Fatalf("client %d EnsureRunning error: %v", i, errs[i])
+		}
+		if clients[i] == nil {
+			t.Fatalf("client %d is nil", i)
+		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -308,4 +309,131 @@ func TestEnsureClient_Branches(t *testing.T) {
 
 	// 4. ResetEnsureThrottle
 	rt.ResetEnsureThrottle()
+}
+
+func TestViewRuntime_ReadForWindow_And_Wrappers(t *testing.T) {
+	mockClient := &Client{
+		SocketPath: "/tmp/mock.sock",
+		http: &http.Client{
+			Transport: mockDaemonRoundTripper(func(req *http.Request) (*http.Response, error) {
+				resp := ReadModelResponse{
+					Snapshots: map[string]core.UsageSnapshot{
+						"acc1": {ProviderID: "prov1", AccountID: "acc1", Status: core.StatusOK},
+					},
+				}
+				body, _ := json.Marshal(resp)
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+					Header:     make(http.Header),
+				}, nil
+			}),
+		},
+	}
+
+	rt := NewViewRuntime(nil, "/tmp/mock.sock", false)
+	rt.SetClient(mockClient)
+	ctx := context.Background()
+
+	frame1 := rt.ReadForWindow(ctx, core.TimeWindow30d)
+	if len(frame1.Snapshots) != 1 || frame1.Snapshots["acc1"].AccountID != "acc1" {
+		t.Fatalf("ReadForWindow failed: %+v", frame1)
+	}
+
+	frame2 := rt.ReadWithFallbackForWindow(ctx, core.TimeWindow30d)
+	if len(frame2.Snapshots) != 1 || frame2.Snapshots["acc1"].AccountID != "acc1" {
+		t.Fatalf("ReadWithFallbackForWindow failed: %+v", frame2)
+	}
+
+	frame3 := rt.ReadWithFallback(ctx)
+	if len(frame3.Snapshots) != 1 || frame3.Snapshots["acc1"].AccountID != "acc1" {
+		t.Fatalf("ReadWithFallback failed: %+v", frame3)
+	}
+}
+
+func TestViewRuntime_ColdStartLoadingState(t *testing.T) {
+	origSpawn := spawnDaemonFunc
+	spawnDaemonFunc = func(socketPath string, verbose bool) error {
+		return fmt.Errorf("spawn disabled in test")
+	}
+	defer func() { spawnDaemonFunc = origSpawn }()
+
+	rt := NewViewRuntime(nil, "/tmp/nonexistent_test_12345.sock", false)
+	if st := rt.State(); st.Status != DaemonStatusConnecting {
+		t.Fatalf("initial cold start state = %v, want Connecting", st.Status)
+	}
+
+	frame := rt.ReadForWindow(context.Background(), core.TimeWindow30d)
+	if len(frame.Snapshots) != 0 {
+		t.Fatalf("cold start snapshots = %v, want empty", frame.Snapshots)
+	}
+	if st := rt.State(); st.Status != DaemonStatusError && st.Status != DaemonStatusConnecting {
+		t.Fatalf("cold start failed state = %v, want Error or Connecting", st.Status)
+	}
+}
+
+func TestViewRuntime_DisconnectReturnsLastGoodSnapshots(t *testing.T) {
+	origSpawn := spawnDaemonFunc
+	spawnDaemonFunc = func(socketPath string, verbose bool) error {
+		return fmt.Errorf("spawn disabled in test")
+	}
+	defer func() { spawnDaemonFunc = origSpawn }()
+
+	isOnline := true
+	mockClient := &Client{
+		SocketPath: "/tmp/mock.sock",
+		http: &http.Client{
+			Transport: mockDaemonRoundTripper(func(req *http.Request) (*http.Response, error) {
+				if !isOnline {
+					return nil, fmt.Errorf("connection refused")
+				}
+				resp := ReadModelResponse{
+					Snapshots: map[string]core.UsageSnapshot{
+						"acc1": {
+							ProviderID: "prov1",
+							AccountID:  "acc1",
+							Status:     core.StatusOK,
+							Metrics: map[string]core.Metric{
+								"requests": {Used: ptr(42.0)},
+							},
+						},
+					},
+				}
+				body, _ := json.Marshal(resp)
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+					Header:     make(http.Header),
+				}, nil
+			}),
+		},
+	}
+
+	rt := NewViewRuntime(nil, "/tmp/mock.sock", false)
+	rt.SetClient(mockClient)
+	ctx := context.Background()
+
+	// 1. Initial successful read
+	frame := rt.ReadForWindow(ctx, core.TimeWindow30d)
+	if len(frame.Snapshots) != 1 {
+		t.Fatalf("initial read failed: %+v", frame)
+	}
+	if rt.State().Status != DaemonStatusRunning {
+		t.Fatalf("state = %v, want Running", rt.State().Status)
+	}
+
+	// 2. Disconnect daemon
+	isOnline = false
+
+	// 3. Read again on disconnect -> returns last good snapshots
+	frameAfterDisconnect := rt.ReadForWindow(ctx, core.TimeWindow30d)
+	if len(frameAfterDisconnect.Snapshots) != 1 {
+		t.Fatalf("expected last-good snapshots on disconnect, got: %+v", frameAfterDisconnect)
+	}
+	if snap, ok := frameAfterDisconnect.Snapshots["acc1"]; !ok || snap.Metrics["requests"].Used == nil || *snap.Metrics["requests"].Used != 42.0 {
+		t.Fatalf("expected cached snapshot with metric=42, got: %+v", frameAfterDisconnect.Snapshots)
+	}
+	if rt.State().Status != DaemonStatusError {
+		t.Fatalf("state on disconnect = %v, want Error", rt.State().Status)
+	}
 }

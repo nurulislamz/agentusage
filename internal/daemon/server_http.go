@@ -140,7 +140,7 @@ func (s *Service) handleReadModel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.Accounts) == 0 {
-		configReq, configErr := BuildReadModelRequestFromConfig()
+		configReq, configErr := buildReadModelRequestFromConfigFunc()
 		if configErr != nil || len(configReq.Accounts) == 0 {
 			writeJSON(w, http.StatusOK, ReadModelResponse{Snapshots: map[string]core.UsageSnapshot{}})
 			return
@@ -193,7 +193,7 @@ func (s *Service) handleReadModel(w http.ResponseWriter, r *http.Request) {
 	// empty until the next ingest event.
 	s.markDataIngested()
 	s.refreshReadModelCacheAsync(s.serviceContext(r.Context()), cacheKey, req, 60*time.Second)
-	snapshots = ReadModelTemplatesFromRequest(req, DisabledAccountsFromConfig())
+	snapshots = ReadModelTemplatesFromRequest(req, disabledAccountsFromConfigFunc())
 	writeJSON(w, http.StatusOK, ReadModelResponse{Snapshots: snapshots})
 	durationMs := time.Since(started).Milliseconds()
 	if durationMs >= 1200 && s.shouldLog("read_model_slow", 30*time.Second) {

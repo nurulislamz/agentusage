@@ -13,7 +13,7 @@ func (s *Service) computeReadModel(
 	req ReadModelRequest,
 ) (map[string]core.UsageSnapshot, error) {
 	start := time.Now()
-	templates := ReadModelTemplatesFromRequest(req, DisabledAccountsFromConfig())
+	templates := ReadModelTemplatesFromRequest(req, disabledAccountsFromConfigFunc())
 	if len(templates) == 0 {
 		return map[string]core.UsageSnapshot{}, nil
 	}
@@ -27,13 +27,45 @@ func (s *Service) computeReadModel(
 	if err != nil {
 		return result, err
 	}
-	accounts, modelNorm, loadErr := LoadAccountsAndNorm()
+	accounts, modelNorm, loadErr := loadAccountsAndNormFunc()
 	if loadErr == nil {
+		historySnapshots := make(map[string]core.UsageSnapshot, len(result))
+		for id, sn := range result {
+			historySnapshots[id] = sn
+		}
 		result = s.enrichReadModelSnapshots(ctx, accounts, modelNorm, result)
+		for id, enriched := range result {
+			base := historySnapshots[id]
+			if len(base.DailySeries) > 0 && len(enriched.DailySeries) == 0 {
+				enriched.DailySeries = base.DailySeries
+			}
+			if len(base.ModelUsage) > 0 && len(enriched.ModelUsage) == 0 {
+				enriched.ModelUsage = base.ModelUsage
+			}
+			result[id] = enriched
+		}
 	}
 	core.Tracef("[read_model_perf] computeReadModel TOTAL: %dms (window=%s, accounts=%d, results=%d)",
 		time.Since(start).Milliseconds(), tw, len(req.Accounts), len(result))
 	return result, err
+}
+
+func (s *Service) publishReadModelSync(ctx context.Context) {
+	if s == nil || s.rmCache == nil {
+		return
+	}
+	req, err := buildReadModelRequestFromConfigFunc()
+	if err != nil || len(req.Accounts) == 0 {
+		return
+	}
+	cacheKey := ReadModelRequestKey(req)
+	computeCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	snapshots, err := s.computeReadModel(computeCtx, req)
+	if err == nil && len(snapshots) > 0 {
+		s.rmCache.set(cacheKey, snapshots)
+		s.pushToExporter(computeCtx, snapshots)
+	}
 }
 
 func (s *Service) refreshReadModelCacheAsync(
