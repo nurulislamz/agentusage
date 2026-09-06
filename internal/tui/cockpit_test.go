@@ -90,3 +90,23 @@ func TestRenderCockpit_NarrowTerminal(t *testing.T) {
 		t.Fatal("expected non-empty output on narrow terminal")
 	}
 }
+
+func TestRenderCockpit_NonGaugeMetricError(t *testing.T) {
+	now := time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC)
+	snap := core.UsageSnapshot{
+		ProviderID: "openai",
+		AccountID:  "openai-main",
+		Status:     core.StatusOK,
+		Timestamp:  now,
+		Metrics: map[string]core.Metric{
+			"orphan_stat": {
+				Used: core.Float64Ptr(42),
+			},
+		},
+	}
+
+	out := RenderCockpit(snap, now, 80, 0.20, 0.05, core.TimeWindow30d, false, config.UsageModeRemaining)
+	if !strings.Contains(out, "ERROR") || !strings.Contains(out, "cannot render as bar or graph") {
+		t.Errorf("expected ERROR banner in cockpit for non-gauge metric, got:\n%s", out)
+	}
+}

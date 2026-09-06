@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 
@@ -20,63 +21,10 @@ func buildTileCompactMetricSummaryLines(snap core.UsageSnapshot, widget core.Das
 	return buildTileCompactMetricSummaryLinesWithHide(snap, widget, innerW, false)
 }
 
-// buildTileCompactMetricSummaryLinesWithHide is the hide-costs-aware variant.
-// When hideCosts is true, monetary keys (USD-valued, burn rate, anything that
-// would render dollars) are dropped from both row collection and segment
-// emission so $-amounts never reach the screen.
+// buildTileCompactMetricSummaryLinesWithHide returns nil, nil because usage metrics
+// must always be displayed as bars or graphs rather than compact numeric summaries.
 func buildTileCompactMetricSummaryLinesWithHide(snap core.UsageSnapshot, widget core.DashboardWidget, innerW int, hideCosts bool) ([]string, map[string]bool) {
-	if len(snap.Metrics) == 0 || len(widget.CompactRows) == 0 {
-		return nil, nil
-	}
-
-	specs := make([]compactMetricRowSpec, 0, len(widget.CompactRows))
-	for _, row := range widget.CompactRows {
-		spec := compactMetricRowSpec{
-			label:       row.Label,
-			keys:        row.Keys,
-			maxSegments: row.MaxSegments,
-		}
-		if row.Matcher.Prefix != "" || row.Matcher.Suffix != "" {
-			prefix := row.Matcher.Prefix
-			suffix := row.Matcher.Suffix
-			spec.match = func(key string, _ core.Metric) bool {
-				if prefix != "" && !strings.HasPrefix(key, prefix) {
-					return false
-				}
-				if suffix != "" && !strings.HasSuffix(key, suffix) {
-					return false
-				}
-				return true
-			}
-		}
-		specs = append(specs, spec)
-	}
-
-	consumed := make(map[string]bool)
-	var lines []string
-	for _, spec := range specs {
-		segments, usedKeys := collectCompactMetricSegments(spec, widget, snap.Metrics, consumed, hideCosts)
-		if len(segments) == 0 {
-			continue
-		}
-
-		value := strings.Join(segments, " · ")
-		maxValueW := innerW - lipgloss.Width(spec.label) - 6
-		if maxValueW < 12 {
-			maxValueW = 12
-		}
-		value = truncateToWidth(value, maxValueW)
-
-		lines = append(lines, renderDotLeaderRow(spec.label, value, innerW))
-		for _, key := range usedKeys {
-			consumed[key] = true
-		}
-	}
-
-	if len(lines) == 0 {
-		return nil, nil
-	}
-	return lines, consumed
+	return nil, nil
 }
 
 // isMonetaryMetricKey reports whether a metric key/value would render a dollar
@@ -349,6 +297,45 @@ func (m Model) buildTileMetricLines(snap core.UsageSnapshot, widget core.Dashboa
 	return m.buildTileMetricLinesWithHide(snap, widget, innerW, skipKeys, false)
 }
 
+func RenderMetricErrorLine(label string, innerW int) string {
+	errBadge := lipgloss.NewStyle().
+		Foreground(colorMantle).
+		Background(colorCrit).
+		Bold(true).
+		Padding(0, 1).
+		Render("ERROR")
+	errMsg := lipgloss.NewStyle().
+		Foreground(colorCrit).
+		Bold(true).
+		Render(fmt.Sprintf("%s: cannot render as bar or graph", label))
+	full := errBadge + " " + errMsg
+	if innerW > 0 && lipgloss.Width(full) > innerW {
+		return truncateToWidth(full, innerW)
+	}
+	return full
+}
+
+func findDailySeriesForMetric(snap core.UsageSnapshot, key string) []core.TimePoint {
+	if snap.DailySeries == nil {
+		return nil
+	}
+	candidates := []string{
+		key,
+		"usage_" + key,
+		"tokens_" + key,
+		"usage_model_" + key,
+		"usage_client_" + key,
+		"usage_source_" + key,
+		"usage_project_" + key,
+	}
+	for _, c := range candidates {
+		if pts, ok := snap.DailySeries[c]; ok && len(pts) > 0 {
+			return pts
+		}
+	}
+	return nil
+}
+
 func (m Model) buildTileMetricLinesWithHide(snap core.UsageSnapshot, widget core.DashboardWidget, innerW int, skipKeys map[string]bool, hideCosts bool) []string {
 	if len(snap.Metrics) == 0 {
 		return nil
@@ -359,6 +346,9 @@ func (m Model) buildTileMetricLinesWithHide(snap core.UsageSnapshot, widget core
 	maxLabel := innerW/2 - 1
 	if maxLabel < 8 {
 		maxLabel = 8
+	}
+	if maxLabel > 18 {
+		maxLabel = 18
 	}
 
 	var lines []string
@@ -373,14 +363,7 @@ func (m Model) buildTileMetricLinesWithHide(snap core.UsageSnapshot, widget core
 		if shouldSuppressMetricLine(widget, key, met, snap.Metrics) {
 			continue
 		}
-		if metricHasGauge(key, met) {
-			continue
-		}
 		if hideCosts && isMonetaryMetricKey(key, met) {
-			continue
-		}
-		value := formatTileMetricValue(key, met)
-		if value == "" {
 			continue
 		}
 
@@ -389,7 +372,56 @@ func (m Model) buildTileMetricLinesWithHide(snap core.UsageSnapshot, widget core
 			label = label[:maxLabel-1] + "…"
 		}
 
-		lines = append(lines, renderDotLeaderRow(label, value, innerW))
+		// 1. Can it be rendered as a bar/gauge?
+		if metricHasGauge(key, met) {
+			usedPct := metricUsedPercent(key, met)
+			if usedPct < 0 {
+				usedPct = 0
+			}
+			if usedPct > 100 {
+				usedPct = 100
+			}
+			gaugeW := innerW - maxLabel - 10
+			if gaugeW < 6 {
+				gaugeW = 6
+			}
+			var gauge string
+			if m.isUsageModeUsed() {
+				gauge = RenderUsageGauge(usedPct, gaugeW, m.warnThreshold, m.critThreshold)
+			} else {
+				remainingPct := 100 - usedPct
+				if remainingPct < 0 {
+					remainingPct = 0
+				}
+				if remainingPct > 100 {
+					remainingPct = 100
+				}
+				gauge = RenderGauge(remainingPct, gaugeW, m.warnThreshold, m.critThreshold)
+			}
+			labelR := lipgloss.NewStyle().Foreground(colorSubtext).Width(maxLabel).Render(label)
+			lines = append(lines, labelR+" "+gauge)
+			continue
+		}
+
+		// 2. Can it be rendered as a graph/sparkline from daily series?
+		points := findDailySeriesForMetric(snap, key)
+		if len(points) > 1 {
+			vals := make([]float64, len(points))
+			for i, p := range points {
+				vals[i] = math.Max(0, p.Value)
+			}
+			sparkW := innerW - maxLabel - 4
+			if sparkW < 6 {
+				sparkW = 6
+			}
+			spark := RenderSparkline(vals, sparkW, ProviderColor(snap.ProviderID))
+			labelR := lipgloss.NewStyle().Foreground(colorSubtext).Width(maxLabel).Render(label)
+			lines = append(lines, labelR+" "+spark)
+			continue
+		}
+
+		// 3. Unable to render as a bar or graph -> big error message!
+		lines = append(lines, RenderMetricErrorLine(metricLabel(widget, key), innerW))
 	}
 	return lines
 }

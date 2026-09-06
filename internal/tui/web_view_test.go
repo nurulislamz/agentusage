@@ -264,9 +264,9 @@ func TestWebProjectorCommandCodeDetailCards(t *testing.T) {
 		t.Errorf("expected monthly subscription gauge with cap info, got %#v", gauges)
 	}
 
-	kvRows := rowsOfKind(usage, "kv")
-	if len(kvRows) == 0 {
-		t.Errorf("expected compact KV summary row in usage card, got %#v", usage.Rows)
+	textRows := rowsOfKind(usage, "text")
+	if len(textRows) == 0 {
+		t.Errorf("expected plan/cap text subtitle row in usage card, got %#v", usage.Rows)
 	}
 }
 

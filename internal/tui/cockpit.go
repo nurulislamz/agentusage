@@ -158,11 +158,7 @@ func RenderCockpit(
 				}
 				quotaLines = append(quotaLines, fmt.Sprintf("  %s %s %s%s", labelPadded, bar, pctStr, hint))
 			} else {
-				val := l.Value
-				if val == "" {
-					val = "—"
-				}
-				quotaLines = append(quotaLines, fmt.Sprintf("  %s %s", labelPadded, lipgloss.NewStyle().Foreground(colorText).Render(val)))
+				quotaLines = append(quotaLines, "  "+RenderMetricErrorLine(label, w-6))
 			}
 		}
 	} else if summaryText != "" {

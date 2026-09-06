@@ -30,6 +30,11 @@ func (m Model) buildTileGaugeLines(snap core.UsageSnapshot, widget core.Dashboar
 			return curLines
 		}
 	}
+	if snap.ProviderID == "codex" {
+		if codexLines := m.buildCodexTileGaugeLines(snap, innerW); len(codexLines) > 0 {
+			return codexLines
+		}
+	}
 
 	maxLabelW := 14
 	gaugeW := innerW - maxLabelW - 10 // label + gauge + " XX.X%" + spaces
@@ -837,3 +842,156 @@ func buildCursorPlanUsageLines(snap core.UsageSnapshot, innerW int, isUsed bool,
 
 	return lines
 }
+
+func (m Model) buildCodexTileGaugeLines(snap core.UsageSnapshot, innerW int) []string {
+	return buildCodexUsageLines(snap, innerW, m.isUsageModeUsed(), m.viewNow(), m.warnThreshold, m.critThreshold)
+}
+
+func buildCodexUsageLines(snap core.UsageSnapshot, innerW int, isUsed bool, now time.Time, warnThresh, critThresh float64) []string {
+	hasQuota := false
+	for _, k := range []string{
+		"codex_credit_percent_used", "codex_credit_limit",
+		"rate_limit_primary", "rate_limit_secondary",
+		"rate_limit_code_review_primary", "composer_context_pct",
+		"context_window", "plan_auto_percent_used", "plan_api_percent_used",
+		"plan_percent_used",
+	} {
+		if m, ok := snap.Metrics[k]; ok && metricHasGauge(k, m) {
+			hasQuota = true
+			break
+		}
+	}
+	if !hasQuota {
+		for k, m := range snap.Metrics {
+			if strings.HasPrefix(k, "rate_limit_") && metricHasGauge(k, m) {
+				hasQuota = true
+				break
+			}
+		}
+	}
+	if !hasQuota {
+		return nil
+	}
+
+	barW := innerW - 14
+	if barW < 20 {
+		barW = 20
+	}
+
+	var lines []string
+
+	title := "OPENAI CODEX"
+	if plan := strings.TrimSpace(snap.Raw["plan_type"]); plan != "" {
+		title = fmt.Sprintf("CODEX (%s)", strings.ToUpper(plan))
+	} else if plan := strings.TrimSpace(snap.Attributes["plan_type"]); plan != "" {
+		title = fmt.Sprintf("CODEX (%s)", strings.ToUpper(plan))
+	}
+	bullet := lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("◈ ")
+	lines = append(lines, bullet+lipgloss.NewStyle().Bold(true).Foreground(colorText).Render(title))
+	lines = append(lines, "")
+
+	renderedKeys := make(map[string]bool)
+
+	renderItem := func(label string, candidateKeys []string) {
+		var met core.Metric
+		found := false
+		matchedKey := ""
+		for _, k := range candidateKeys {
+			if renderedKeys[k] {
+				continue
+			}
+			if m, ok := snap.Metrics[k]; ok && metricHasGauge(k, m) {
+				met = m
+				found = true
+				matchedKey = k
+				break
+			}
+		}
+		if !found {
+			return
+		}
+		renderedKeys[matchedKey] = true
+
+		usedPct := metricUsedPercent(matchedKey, met)
+		if usedPct < 0 {
+			return
+		}
+		if usedPct > 100 {
+			usedPct = 100
+		}
+		remainingPct := 100 - usedPct
+		if remainingPct < 0 {
+			remainingPct = 0
+		}
+
+		var resetAt time.Time
+		if r, hasReset := snap.Resets[matchedKey]; hasReset {
+			resetAt = r
+		} else if r, hasReset := snap.Resets[matchedKey+"_reset"]; hasReset {
+			resetAt = r
+		}
+
+		var gaugeBar string
+		if isUsed {
+			gaugeBar = RenderUsageGauge(usedPct, barW, warnThresh, critThresh)
+		} else {
+			gaugeBar = RenderGauge(remainingPct, barW, warnThresh, critThresh)
+		}
+
+		suffix := "Remaining"
+		if isUsed {
+			suffix = "Used"
+		}
+		displayLabel := label + " " + suffix
+
+		lines = append(lines, "  "+lipgloss.NewStyle().Foreground(colorSubtext).Render(displayLabel))
+		lines = append(lines, "    "+gaugeBar)
+
+		if matchedKey == "codex_credit_percent_used" || matchedKey == "codex_credit_limit" {
+			if annot := tileCodexCreditProjectionAnnotation(snap, usedPct, now); annot != "" {
+				lines = append(lines, "    "+dimStyle.Render(annot))
+			} else if !resetAt.IsZero() {
+				lines = append(lines, "    "+RenderQuotaStatusAndTimerLineWithMode(remainingPct, resetAt, now, isUsed))
+			}
+		} else if !resetAt.IsZero() {
+			lines = append(lines, "    "+RenderQuotaStatusAndTimerLineWithMode(remainingPct, resetAt, now, isUsed))
+		}
+		lines = append(lines, "")
+	}
+
+	// 1. Credits
+	renderItem("Credits", []string{"codex_credit_percent_used", "codex_credit_limit"})
+
+	// 2. Primary limit (5-hour)
+	renderItem("5-Hour Quota", []string{"rate_limit_primary"})
+
+	// 3. Secondary limit (weekly)
+	renderItem("Weekly Quota", []string{"rate_limit_secondary"})
+
+	// 4. Code Review limit
+	renderItem("Code Review Limit", []string{"rate_limit_code_review_primary"})
+
+	// 5. Context Window
+	renderItem("Context Window", []string{"composer_context_pct", "context_window"})
+
+	// 6. Plan usage
+	if !renderedKeys["rate_limit_primary"] {
+		renderItem("Auto Plan", []string{"plan_auto_percent_used"})
+	}
+	if !renderedKeys["rate_limit_secondary"] {
+		renderItem("API Plan", []string{"plan_api_percent_used"})
+	}
+	renderItem("Plan", []string{"plan_percent_used"})
+
+	// 7. Additional Rate Limits
+	for _, k := range core.SortedStringKeys(snap.Metrics) {
+		if strings.HasPrefix(k, "rate_limit_") && !renderedKeys[k] {
+			rawName := strings.TrimPrefix(k, "rate_limit_")
+			cleanLabel := metricLabel(dashboardWidget(snap.ProviderID), rawName)
+			renderItem(cleanLabel, []string{k})
+		}
+	}
+
+	return lines
+}
+

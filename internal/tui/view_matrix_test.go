@@ -68,3 +68,31 @@ func TestRenderMatrixView_Empty(t *testing.T) {
 		t.Fatalf("expected empty state message, got:\n%s", out)
 	}
 }
+
+func TestFormatMatrixQuotaCell_ErrorOnNonGauge(t *testing.T) {
+	// 1. With percent: returns mini bar
+	pct := 75.0
+	lineWithPct := WebUsageLine{
+		Label:   "Session",
+		Short:   "Sess",
+		Percent: &pct,
+	}
+	cellWithPct := formatMatrixQuotaCell(lineWithPct)
+	if !strings.Contains(cellWithPct, "75%") {
+		t.Errorf("expected 75%% in cell, got %q", cellWithPct)
+	}
+
+	// 2. Without percent: returns error banner, never plain value
+	lineWithoutPct := WebUsageLine{
+		Label: "Tokens",
+		Short: "Tok",
+		Value: "5000",
+	}
+	cellWithoutPct := formatMatrixQuotaCell(lineWithoutPct)
+	if strings.Contains(cellWithoutPct, "5000") {
+		t.Errorf("plain value 5000 should not be rendered, got %q", cellWithoutPct)
+	}
+	if !strings.Contains(cellWithoutPct, "ERROR") || !strings.Contains(cellWithoutPct, "cannot render as bar or graph") {
+		t.Errorf("expected ERROR banner in matrix cell, got %q", cellWithoutPct)
+	}
+}

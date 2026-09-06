@@ -227,14 +227,7 @@ func (m Model) renderBentoTile(snap core.UsageSnapshot, selected bool, tileW int
 				pctStr := lipgloss.NewStyle().Foreground(toneCol).Bold(true).Render(fmt.Sprintf("%3.0f%%", pct))
 				bodyRows = append(bodyRows, fmt.Sprintf("%s %s %s", lblStr, bar, pctStr))
 			} else {
-				val := l.Value
-				if val == "" {
-					val = "—"
-				}
-				if len(val) > tileW-14 {
-					val = val[:tileW-15] + "…"
-				}
-				bodyRows = append(bodyRows, fmt.Sprintf("%s %s", lblStr, val))
+				bodyRows = append(bodyRows, RenderMetricErrorLine(lbl, tileW-6))
 			}
 		}
 	} else {

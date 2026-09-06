@@ -30,8 +30,8 @@ func dashboardWidget() core.DashboardWidget {
 			},
 		),
 		providerbase.WithMetricLabels(map[string]string{
-			"rate_limit_primary":               "Primary Usage",
-			"rate_limit_secondary":             "Secondary Usage",
+			"rate_limit_primary":               "5-Hour Quota",
+			"rate_limit_secondary":             "Weekly Quota",
 			"rate_limit_code_review_primary":   "Code Review Limit",
 			"rate_limit_code_review_secondary": "Code Review Secondary",
 			"plan_percent_used":                "Plan Used",
@@ -50,8 +50,8 @@ func dashboardWidget() core.DashboardWidget {
 			"ai_tracked_files":                 "AI Tracked",
 		}),
 		providerbase.WithCompactLabels(map[string]string{
-			"rate_limit_primary":        "primary",
-			"rate_limit_secondary":      "secondary",
+			"rate_limit_primary":        "5h",
+			"rate_limit_secondary":      "weekly",
 			"plan_auto_percent_used":    "auto",
 			"plan_api_percent_used":     "api",
 			"requests_today":            "today",

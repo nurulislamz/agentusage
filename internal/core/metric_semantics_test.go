@@ -13,4 +13,10 @@ func TestMetricUsedPercent(t *testing.T) {
 	if got := MetricUsedPercent("rpm", Metric{Limit: &limit, Used: &used}); got != 40 {
 		t.Fatalf("used form = %v, want 40", got)
 	}
+	if got := MetricUsedPercent("quota", Metric{Unit: "%", Remaining: &remaining}); got != 40 {
+		t.Fatalf("unit %% remaining = %v, want 40", got)
+	}
+	if got := MetricUsedPercent("context_window", Metric{Limit: &limit, Used: &used}); got != 40 {
+		t.Fatalf("context_window with limit = %v, want 40", got)
+	}
 }

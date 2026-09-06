@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -176,6 +177,11 @@ func buildDetailUsageSection(snap core.UsageSnapshot, widget core.DashboardWidge
 	if snap.ProviderID == "command_code" {
 		if ccLines := buildCommandCodeDetailUsageSection(snap, innerW, warnThresh, critThresh, now, isUsedMode); len(ccLines) > 0 {
 			return ccLines
+		}
+	}
+	if snap.ProviderID == "codex" {
+		if codexLines := buildCodexDetailUsageSection(snap, innerW, warnThresh, critThresh, now, isUsedMode); len(codexLines) > 0 {
+			return codexLines
 		}
 	}
 
@@ -543,6 +549,10 @@ func buildCommandCodeDetailUsageSection(snap core.UsageSnapshot, innerW int, war
 	return lines
 }
 
+func buildCodexDetailUsageSection(snap core.UsageSnapshot, innerW int, warnThresh, critThresh float64, now time.Time, isUsedMode bool) []string {
+	return buildCodexUsageLines(snap, innerW, isUsedMode, now, warnThresh, critThresh)
+}
+
 // buildDetailGaugeLines builds gauge bars for the detail view.
 func buildDetailGaugeLines(snap core.UsageSnapshot, widget core.DashboardWidget, innerW int, warnThresh, critThresh float64, now time.Time, isUsedMode bool) []string {
 	maxLabelW := 18
@@ -799,45 +809,40 @@ func buildDetailProjectionSection(snap core.UsageSnapshot, innerW int) []string 
 }
 
 // buildDetailCodexCreditForecastSection renders Codex's subscription credit
-// quota alongside Claude Code's cost-based forecast. Codex credits are quota
-// units rather than USD, so they intentionally do not reuse burn_rate, whose
-// shared analytics meaning is dollars per hour.
+// quota as a gauge bar or sparkline, with error lines for metrics that cannot be rendered as a bar/graph.
 func buildDetailCodexCreditForecastSection(snap core.UsageSnapshot, innerW int) []string {
 	var lines []string
 
-	if metric, ok := snap.Metrics["codex_credit_limit"]; ok && metric.Limit != nil && metric.Used != nil {
-		used := *metric.Used
-		limit := *metric.Limit
-		percent := float64(0)
-		if limit > 0 {
-			percent = used / limit * 100
+	if metric, ok := snap.Metrics["codex_credit_limit"]; ok && metric.Limit != nil && *metric.Limit > 0 {
+		usedPct := float64(0)
+		if metric.Used != nil {
+			usedPct = *metric.Used / *metric.Limit * 100
 		}
-		lines = append(lines, renderDotLeaderRow("Credit Usage",
-			fmt.Sprintf("%s / %s credits (%.0f%%)", formatNumber(used), formatNumber(limit), percent), innerW))
+		barW := innerW - 20
+		if barW < 8 {
+			barW = 8
+		}
+		gauge := RenderUsageGauge(usedPct, barW, 0.3, 0.15)
+		labelR := lipgloss.NewStyle().Foreground(colorSubtext).Width(16).Render("Credit Usage")
+		lines = append(lines, labelR+" "+gauge)
 	}
 
 	rateMetric, hasRate := snap.Metrics["codex_credit_burn_rate"]
-	if hasRate && rateMetric.Used != nil && *rateMetric.Used > 0 {
-		lines = append(lines, renderDotLeaderRow("Credit Rate",
-			fmt.Sprintf("%s credits/hour", formatNumber(*rateMetric.Used)), innerW))
+	if hasRate && rateMetric.Used != nil {
+		if pts := findDailySeriesForMetric(snap, "codex_credit_burn_rate"); len(pts) > 1 {
+			vals := make([]float64, len(pts))
+			for i, p := range pts {
+				vals[i] = math.Max(0, p.Value)
+			}
+			spark := RenderSparkline(vals, innerW-20, colorLavender)
+			lines = append(lines, lipgloss.NewStyle().Foreground(colorSubtext).Width(16).Render("Credit Rate")+" "+spark)
+		} else {
+			lines = append(lines, RenderMetricErrorLine("Credit Rate", innerW))
+		}
 	}
 
-	if runoutMetric, ok := snap.Metrics["codex_credit_runout_hours"]; ok && runoutMetric.Used != nil {
-		hours := *runoutMetric.Used
-		if hours >= 0 {
-			value := "now"
-			if hours > 0 {
-				if hours < 24 {
-					value = fmt.Sprintf("%.1fh left", hours)
-				} else {
-					value = fmt.Sprintf("%.1f days left", hours/24)
-				}
-			}
-			if hasRate && rateMetric.Used != nil && *rateMetric.Used > 0 {
-				value += fmt.Sprintf(" at %s credits/hour", formatNumber(*rateMetric.Used))
-			}
-			lines = append(lines, renderDotLeaderRow("Credit Forecast", value, innerW))
-		}
+	if _, ok := snap.Metrics["codex_credit_runout_hours"]; ok {
+		lines = append(lines, RenderMetricErrorLine("Credit Forecast", innerW))
 	}
 
 	return lines
@@ -884,6 +889,9 @@ func buildDetailOtherMetrics(snap core.UsageSnapshot, widget core.DashboardWidge
 	if maxLabel < 8 {
 		maxLabel = 8
 	}
+	if maxLabel > 18 {
+		maxLabel = 18
+	}
 
 	for _, key := range keys {
 		if skipKeys[key] {
@@ -899,15 +907,47 @@ func buildDetailOtherMetrics(snap core.UsageSnapshot, widget core.DashboardWidge
 		if !core.IncludeDetailMetricKey(key) {
 			continue
 		}
-		value := formatTileMetricValue(key, met)
-		if value == "" {
-			continue
-		}
+
 		label := metricLabel(widget, key)
 		if len(label) > maxLabel {
 			label = label[:maxLabel-1] + "…"
 		}
-		lines = append(lines, renderDotLeaderRow(label, value, innerW))
+
+		if metricHasGauge(key, met) {
+			usedPct := metricUsedPercent(key, met)
+			if usedPct < 0 {
+				usedPct = 0
+			}
+			if usedPct > 100 {
+				usedPct = 100
+			}
+			gaugeW := innerW - maxLabel - 10
+			if gaugeW < 8 {
+				gaugeW = 8
+			}
+			gauge := RenderUsageGauge(usedPct, gaugeW, 0.3, 0.15)
+			labelR := lipgloss.NewStyle().Foreground(colorSubtext).Width(maxLabel).Render(label)
+			lines = append(lines, labelR+" "+gauge)
+			continue
+		}
+
+		points := findDailySeriesForMetric(snap, key)
+		if len(points) > 1 {
+			vals := make([]float64, len(points))
+			for i, p := range points {
+				vals[i] = math.Max(0, p.Value)
+			}
+			sparkW := innerW - maxLabel - 4
+			if sparkW < 6 {
+				sparkW = 6
+			}
+			spark := RenderSparkline(vals, sparkW, ProviderColor(snap.ProviderID))
+			labelR := lipgloss.NewStyle().Foreground(colorSubtext).Width(maxLabel).Render(label)
+			lines = append(lines, labelR+" "+spark)
+			continue
+		}
+
+		lines = append(lines, RenderMetricErrorLine(label, innerW))
 	}
 	return lines
 }

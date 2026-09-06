@@ -127,6 +127,7 @@ func (m *Model) buildTileBodyLines(
 	isCustomQuota := snap.ProviderID == "antigravity" ||
 		snap.ProviderID == "opencode" ||
 		snap.ProviderID == "command_code" ||
+		snap.ProviderID == "codex" ||
 		(snap.ProviderID == "cursor" && len(topUsageLines) > 0)
 	if !isCustomQuota {
 		if di.summary != "" {

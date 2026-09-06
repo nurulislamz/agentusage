@@ -52,3 +52,33 @@ func TestRenderBentoView_Empty(t *testing.T) {
 		t.Fatalf("expected empty state message, got:\n%s", out)
 	}
 }
+
+func TestRenderBentoView_NonGaugeMetricsRenderError(t *testing.T) {
+	now := time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC)
+	snap := core.UsageSnapshot{
+		ProviderID: "anthropic",
+		AccountID:  "claude-work",
+		Status:     core.StatusOK,
+		Timestamp:  now,
+		Metrics: map[string]core.Metric{
+			"stat": {
+				Used: core.Float64Ptr(42),
+			},
+		},
+	}
+
+	m := Model{
+		dashboardView: dashboardViewBento,
+		sortedIDs:     []string{"claude-work"},
+		snapshots: map[string]core.UsageSnapshot{
+			"claude-work": snap,
+		},
+		cursor:        0,
+		referenceTime: now,
+	}
+
+	out := m.renderBentoView(100, 24)
+	if !strings.Contains(out, "ERROR") || !strings.Contains(out, "cannot rende") {
+		t.Errorf("expected ERROR banner in bento view, got:\n%s", out)
+	}
+}

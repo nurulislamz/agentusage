@@ -533,3 +533,108 @@ func TestBuildTileGaugeLines_FiveHourBeforeWeekly(t *testing.T) {
 		t.Fatalf("expected Five Hour Limit (pos %d) before Weekly Limit (pos %d) in command code tile", idxCc5h, idxCcWk)
 	}
 }
+
+func TestBuildTileGaugeLines_Codex(t *testing.T) {
+	now := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	m := tileGaugeTestModel(now)
+	widget := core.DashboardWidget{
+		GaugeMaxLines: 6,
+	}
+
+	snapCodex := core.UsageSnapshot{
+		ProviderID: "codex",
+		Metrics: map[string]core.Metric{
+			"codex_credit_percent_used": {
+				Used: core.Float64Ptr(45.0),
+				Unit: "%",
+			},
+			"rate_limit_primary": {
+				Used:      core.Float64Ptr(20.0),
+				Remaining: core.Float64Ptr(80.0),
+				Limit:     core.Float64Ptr(100.0),
+				Window:    "5h",
+			},
+			"rate_limit_secondary": {
+				Used:      core.Float64Ptr(60.0),
+				Remaining: core.Float64Ptr(40.0),
+				Limit:     core.Float64Ptr(100.0),
+				Window:    "7d",
+			},
+			"rate_limit_code_review_primary": {
+				Used:      core.Float64Ptr(10.0),
+				Remaining: core.Float64Ptr(90.0),
+				Limit:     core.Float64Ptr(100.0),
+			},
+			"composer_context_pct": {
+				Used: core.Float64Ptr(35.0),
+				Unit: "%",
+			},
+		},
+		Resets: map[string]time.Time{
+			"rate_limit_primary":   now.Add(3 * time.Hour),
+			"rate_limit_secondary": now.Add(5 * 24 * time.Hour),
+		},
+	}
+
+	lines := m.buildTileGaugeLines(snapCodex, widget, 70)
+	joined := strings.Join(lines, "\n")
+
+	for _, want := range []string{"Credits Remaining", "5-Hour Quota", "Weekly Quota", "Code Review Limit", "Context Window"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("expected Codex tile gauge lines to contain %q, got:\n%s", want, joined)
+		}
+	}
+}
+
+func TestBuildTileMetricLines_EnforceBarGraphOrError(t *testing.T) {
+	now := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	m := tileGaugeTestModel(now)
+	widget := core.DashboardWidget{}
+
+	snap := core.UsageSnapshot{
+		ProviderID: "openai",
+		Metrics: map[string]core.Metric{
+			// Gaugeable metric (has limit & used)
+			"requests_quota": {
+				Used:  core.Float64Ptr(30.0),
+				Limit: core.Float64Ptr(100.0),
+			},
+			// Metric with daily series (can render as sparkline)
+			"daily_tokens": {
+				Used: core.Float64Ptr(50000),
+			},
+			// Metric without limit or series (cannot render as bar or graph -> error)
+			"orphan_stat": {
+				Used: core.Float64Ptr(42),
+			},
+		},
+		DailySeries: map[string][]core.TimePoint{
+			"daily_tokens": {
+				{Value: 1000},
+				{Value: 2000},
+				{Value: 3000},
+			},
+		},
+	}
+
+	lines := m.buildTileMetricLines(snap, widget, 60, nil)
+	joined := strings.Join(lines, "\n")
+
+	// 1. Gaugeable metric should render gauge bar
+	if !strings.Contains(joined, "Requests Quota") {
+		t.Errorf("expected Requests Quota gauge line, got:\n%s", joined)
+	}
+
+	// 2. Daily series metric should render sparkline
+	if !strings.Contains(joined, "Daily Tokens") {
+		t.Errorf("expected Daily Tokens sparkline line, got:\n%s", joined)
+	}
+
+	// 3. Orphan metric must render big error banner, NOT plain numbers "42"
+	if strings.Contains(joined, "···· 42") || strings.Contains(joined, "42") {
+		t.Errorf("plain numeric metric formatting found in output:\n%s", joined)
+	}
+	if !strings.Contains(joined, "ERROR") || !strings.Contains(joined, "Orphan Stat: cannot render as bar or graph") {
+		t.Errorf("expected prominent error message for orphan_stat, got:\n%s", joined)
+	}
+}

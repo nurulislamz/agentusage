@@ -231,14 +231,7 @@ func formatMatrixQuotaCell(l WebUsageLine) string {
 		pctStr := lipgloss.NewStyle().Foreground(toneCol).Bold(true).Render(fmt.Sprintf("%3.0f%%", pct))
 		return fmt.Sprintf("%s %s %s", padRight(lbl, 4), bar, pctStr)
 	}
-	val := l.Value
-	if val == "" {
-		val = "—"
-	}
-	if len(val) > 10 {
-		val = val[:9] + "…"
-	}
-	return fmt.Sprintf("%s %s", padRight(lbl, 4), val)
+	return RenderMetricErrorLine(lbl, 0)
 }
 
 func renderSubmenuMiniBar(percent float64, width int, toneColor lipgloss.Color) string {

@@ -26,9 +26,27 @@ func TestBuildDetailCodexCreditForecastSection(t *testing.T) {
 
 	lines := buildDetailCodexCreditForecastSection(snap, 100)
 	output := strings.Join(lines, "\n")
-	for _, want := range []string{"Credit Usage", "2572 / 7500 credits (34%)", "200 credits/hour", "Credit Forecast", "1.0 days left"} {
+	for _, want := range []string{"Credit Usage", "34.30%", "Credit Rate: cannot render as bar or graph", "Credit Forecast: cannot render as bar or graph"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("expected forecast output to contain %q, got %q", want, output)
 		}
+	}
+
+	// When daily series exists for burn rate, sparkline graph is rendered
+	snapWithSeries := snap
+	snapWithSeries.DailySeries = map[string][]core.TimePoint{
+		"codex_credit_burn_rate": {
+			{Value: 100},
+			{Value: 150},
+			{Value: 200},
+		},
+	}
+	linesWithSeries := buildDetailCodexCreditForecastSection(snapWithSeries, 100)
+	outputWithSeries := strings.Join(linesWithSeries, "\n")
+	if strings.Contains(outputWithSeries, "Credit Rate: cannot render as bar or graph") {
+		t.Errorf("expected sparkline graph for burn rate with series, but got error banner in %q", outputWithSeries)
+	}
+	if !strings.Contains(outputWithSeries, "Credit Rate") {
+		t.Errorf("expected Credit Rate line in %q", outputWithSeries)
 	}
 }

@@ -143,11 +143,7 @@ func (m Model) renderBarCard(snap core.UsageSnapshot, selected bool, cardW int, 
 				}
 				bodyRows = append(bodyRows, fmt.Sprintf("  %s %s %s%s", lblPadded, bar, pctStr, hint))
 			} else {
-				val := l.Value
-				if val == "" {
-					val = "—"
-				}
-				bodyRows = append(bodyRows, fmt.Sprintf("  %s %s", lblPadded, val))
+				bodyRows = append(bodyRows, "  "+RenderMetricErrorLine(lbl, cardW-6))
 			}
 		}
 	} else {
@@ -289,11 +285,7 @@ func (m Model) renderDialCard(snap core.UsageSnapshot, selected bool, cardW int,
 				dialRows = append(dialRows, fmt.Sprintf("  %s  %s%s", arcTop, padRight(lbl, 10), dimStyle.Render(hint)))
 				dialRows = append(dialRows, fmt.Sprintf("  %s", arcBot))
 			} else {
-				val := l.Value
-				if val == "" {
-					val = "—"
-				}
-				dialRows = append(dialRows, fmt.Sprintf("  ( %s ) %s", padRight(lbl, 6), val))
+				dialRows = append(dialRows, "  "+RenderMetricErrorLine(lbl, cardW-6))
 			}
 		}
 	} else {
@@ -424,11 +416,7 @@ func (m Model) renderStripRow(snap core.UsageSnapshot, selected bool, stripW int
 				}
 				rowLines = append(rowLines, fmt.Sprintf("  %s %s %s%s", lblStr, bar, pctStr, dimStyle.Render(hint)))
 			} else {
-				val := l.Value
-				if val == "" {
-					val = "—"
-				}
-				rowLines = append(rowLines, fmt.Sprintf("  %s %s", lblStr, val))
+				rowLines = append(rowLines, "  "+RenderMetricErrorLine(lbl, stripW-6))
 			}
 		}
 	} else {

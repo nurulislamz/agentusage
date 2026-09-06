@@ -375,12 +375,8 @@ func (m Model) renderListSubmenuRow(snap core.UsageSnapshot, di providerDisplayI
 			bar := renderSubmenuMiniBar(pct, 4, toneCol)
 			pctStr := lipgloss.NewStyle().Foreground(toneCol).Bold(true).Render(fmt.Sprintf("%3.0f%%", pct))
 			meterParts = append(meterParts, fmt.Sprintf("%s %s %s", lbl, bar, pctStr))
-		} else if l.Value != "" {
-			val := l.Value
-			if len(val) > 8 {
-				val = val[:7] + "…"
-			}
-			meterParts = append(meterParts, fmt.Sprintf("%s %s", lbl, val))
+		} else {
+			meterParts = append(meterParts, RenderMetricErrorLine(lbl, 0))
 		}
 	}
 

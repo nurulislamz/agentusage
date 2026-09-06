@@ -106,3 +106,48 @@ func TestRenderGaugeBoards_Empty(t *testing.T) {
 		t.Fatalf("expected empty state in strips, got:\n%s", out)
 	}
 }
+
+func TestGaugeBoards_NonGaugeMetricsRenderError(t *testing.T) {
+	now := time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC)
+	// Snapshot with a non-gauge usage line (percent is nil, value was plain number)
+	snap := core.UsageSnapshot{
+		ProviderID: "openai",
+		AccountID:  "openai-test",
+		Status:     core.StatusOK,
+		Timestamp:  now,
+		Metrics: map[string]core.Metric{
+			"stat": {
+				Used: core.Float64Ptr(42),
+			},
+		},
+	}
+	m := Model{
+		sortedIDs: []string{"openai-test"},
+		snapshots: map[string]core.UsageSnapshot{
+			"openai-test": snap,
+		},
+		cursor:        0,
+		referenceTime: now,
+	}
+
+	// Bars card should show error banner when metric cannot be rendered as bar/graph
+	m.dashboardView = dashboardViewBars
+	outBars := m.renderBarsView(90, 24)
+	if !strings.Contains(outBars, "ERROR") || !strings.Contains(outBars, "cannot render as bar or graph") {
+		t.Errorf("expected error banner in bars view for non-gauge metric, got:\n%s", outBars)
+	}
+
+	// Dials card should show error banner
+	m.dashboardView = dashboardViewDials
+	outDials := m.renderDialsView(90, 24)
+	if !strings.Contains(outDials, "ERROR") || !strings.Contains(outDials, "cannot render as bar or graph") {
+		t.Errorf("expected error banner in dials view for non-gauge metric, got:\n%s", outDials)
+	}
+
+	// Strips row should show error banner
+	m.dashboardView = dashboardViewStrips
+	outStrips := m.renderStripsView(90, 24)
+	if !strings.Contains(outStrips, "ERROR") || !strings.Contains(outStrips, "cannot render as bar or graph") {
+		t.Errorf("expected error banner in strips view for non-gauge metric, got:\n%s", outStrips)
+	}
+}
