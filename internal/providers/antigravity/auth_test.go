@@ -374,7 +374,7 @@ func TestRefreshAccessToken_Branches(t *testing.T) {
 	server500Attempts := int32(0)
 	server500 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&server500Attempts, 1)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		http.Error(w, "internal server error access_token=body-secret refresh_token=body-secret", http.StatusInternalServerError)
 	}))
 	defer server500.Close()
 
@@ -417,6 +417,9 @@ func TestRefreshAccessToken_Branches(t *testing.T) {
 	}
 	if attempts := atomic.LoadInt32(&server500Attempts); attempts != 2 {
 		t.Errorf("500 retry attempts = %d, want 2", attempts)
+	}
+	if strings.Contains(err.Error(), "body-secret") {
+		t.Errorf("transient refresh error leaked response body: %v", err)
 	}
 }
 

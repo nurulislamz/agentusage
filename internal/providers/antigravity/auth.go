@@ -395,7 +395,7 @@ func doTokenRefreshRequest(ctx context.Context, refreshToken string, client *htt
 		}
 		return oauthToken{}, &RefreshTransientError{
 			StatusCode: resp.StatusCode,
-			Message:    fmt.Sprintf("token refresh HTTP %d: %s", resp.StatusCode, truncate(string(body), 100)),
+			Message:    fmt.Sprintf("token refresh HTTP %d", resp.StatusCode),
 		}
 	}
 

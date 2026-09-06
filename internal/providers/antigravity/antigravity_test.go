@@ -1007,13 +1007,16 @@ func TestRetrieveUserQuotaSummary_Branches(t *testing.T) {
 
 	// 2. HTTP Non-200 Error
 	tsErr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "permission denied", http.StatusForbidden)
+		http.Error(w, "permission denied access_token=body-secret", http.StatusForbidden)
 	}))
 	defer tsErr.Close()
 
 	_, err = retrieveUserQuotaSummary(context.Background(), "token", tsErr.URL+"/v1internal", tsErr.Client())
 	if err == nil || !strings.Contains(err.Error(), "HTTP 403") {
 		t.Errorf("expected HTTP 403 error, got %v", err)
+	}
+	if strings.Contains(err.Error(), "body-secret") {
+		t.Errorf("quota API error leaked response body: %v", err)
 	}
 
 	// 3. Malformed JSON

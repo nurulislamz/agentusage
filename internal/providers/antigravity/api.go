@@ -98,7 +98,7 @@ func retrieveUserQuotaSummary(ctx context.Context, accessToken, baseURL string, 
 		}
 		return quotaSummaryResponse{}, &APIError{
 			StatusCode: resp.StatusCode,
-			Message:    truncate(string(body), 200),
+			Message:    http.StatusText(resp.StatusCode),
 			RetryAfter: retryAfter,
 		}
 	}
