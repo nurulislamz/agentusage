@@ -156,16 +156,44 @@ Fresh GitHub pass. Important naming split: **openusage.ai** (macOS menu bar) ≠
 
 Sources: GitHub search/API 2026-09-07 (stars approximate).
 
-### Update 2026-09-08
+### Open source — 8 Sep 2026
 
-| Repo | Stars | Delta / why it matters |
-|---|---:|---|
-| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.4k | Pushed **today** (2026-09-08) — report-format peer still racing. |
-| [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) | ~187 | openusage.sh twin; last push ~2026-09-07. |
-| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~219 | Real-time #2 local peer. |
-| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.0k | openusage.ai menu-bar — naming collision only. |
-| [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) | ~76 | OpenUsage menu-bar fork lineage; quiet since 2026-09-07. |
+Fresh weekday GitHub/gh pass (Europe/London). Substantive landscape across ccusage/OpenUsage peers, LLM cost CLIs, local SQLite/TUI dashboards, OTel cost stacks, and Cursor/Claude/Copilot/Codex parsers. Stars/licenses from GitHub API 2026-09-08.
 
-**Also watch:** AgentCost (hosted/gateway FinOps docs at agentcost.in) — adjacent layer, not a GitHub twin to agentUsage’s local autodetection thesis.
+| Repo | Stars | License | Why it matters |
+|---|---:|---|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.4k | NOASSERTION | Category CLI daily/session/blocks cost from local agent JSONL. Pushed today. |
+| [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) | ~187 | MIT | openusage.sh local multi-tool quota/spend TUI + SQLite. Nearest product twin. |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.0k | MIT | openusage.ai macOS menu-bar tracker. Naming collision only. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~219 | MIT | Real-time cross-agent token/cost monitor (+ Cloud/MCP). Number-two local peer. |
+| [zhnd/lumo](https://github.com/zhnd/lumo) | ~147 | MIT | Local-first Claude Code usage/cost/session dashboard. SQLite/TUI UX reference. |
+| [sculptdotfun/viberank](https://github.com/sculptdotfun/viberank) | ~115 | MIT | Public leaderboard on ccusage data. |
+| [cobra91/better-ccusage](https://github.com/cobra91/better-ccusage) | ~84 | MIT | Faster multi-provider ccusage-style JSONL analyzer. |
+| [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) | ~76 | MIT | Open-source OpenUsage menu-bar fork; Rust + Tauri. |
+| [851-labs/tokenmaxxing](https://github.com/851-labs/tokenmaxxing) | ~69 | MIT | Local CLI on ccusage that syncs personal usage with peers. |
+| [Nihondo/AgentLimits](https://github.com/Nihondo/AgentLimits) | ~56 | MIT | macOS widgets for Codex/Claude limits + ccusage heatmap. |
+| [kenn-io/vibepulse](https://github.com/kenn-io/vibepulse) | ~53 | MIT | macOS menubar for Claude Code + Codex via ccusage. |
+| [ItsJazii/pane](https://github.com/ItsJazii/pane) | ~40 | NOASSERTION | Windows tray port of OpenUsage menu-bar line (Claude/Codex/Cursor/Copilot). |
+| [ofershap/cursor-usage-tracker](https://github.com/ofershap/cursor-usage-tracker) | ~33 | MIT | Self-hosted Cursor Enterprise spend + anomaly alerts. Team FinOps. |
+| [agiwhitelist/tokdiet](https://github.com/agiwhitelist/tokdiet) | ~33 | MIT | Local reverse-proxy meter between agents and APIs + live dashboard. |
+| [itvincent-git/codex-usage-desktop](https://github.com/itvincent-git/codex-usage-desktop) | ~28 | MIT | Local-first Codex quota/desktop analytics (macOS + Windows). |
+| [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~58.3k | NOASSERTION | AI gateway spend tracking / virtual keys / pricing tables. Adjacent layer. |
+| [langfuse/langfuse](https://github.com/langfuse/langfuse) | ~34.3k | NOASSERTION | OSS LLM observability + OTel. Complementary if exporting traces. |
+| [Portkey-AI/gateway](https://github.com/Portkey-AI/gateway) | ~12.9k | MIT | AI gateway with cost/guardrails. Adjacent FinOps layer. |
+| [Helicone/helicone](https://github.com/Helicone/helicone) | ~6.1k | Apache-2.0 | OSS LLM observability proxy. Adjacent, not a desktop twin. |
 
-Sources: GitHub API 2026-09-08.
+**Also watch (wrappers / OTel / niche parsers)**
+- [atomchung/ccstory](https://github.com/atomchung/ccstory) (~43★, MIT), [goniszewski/cctray](https://github.com/goniszewski/cctray) (~42★, MIT), [sivchari/ccowl](https://github.com/sivchari/ccowl) (~40★, MIT) — narrative / menu-bar wrappers on Claude usage.
+- [saurabhhgi/claude-code-otel-dashboard](https://github.com/saurabhhgi/claude-code-otel-dashboard) — OTel Collector to Prometheus to Grafana for Claude Code cost/tokens/sessions.
+- [hestonhamilton/claude-code-usage-stats](https://github.com/hestonhamilton/claude-code-usage-stats) (GPL-3.0) — FastAPI + SQLite multi-machine Claude usage + Prometheus/Grafana.
+- [chpock/openusage-cli](https://github.com/chpock/openusage-cli) (MIT) — daemon/CLI collecting provider usage via OpenUsage plugins to local REST API.
+- [ryoppippi/ccusage](https://github.com/ryoppippi/ccusage) mirrors ccusage/ccusage; AgentCost (https://agentcost.in/docs/guides/agentcost-integration-into-existing-projects/) — instrumented gateway FinOps (adjacent).
+
+**Build takeaways (8 Sep)**
+1. **openusage.sh** (janekbaraniewski) remains the collision twin; **openusage.ai** (robinebers) is the larger menu-bar brand — keep the naming split sharp in copy.
+2. Stay compatible with **ccusage** report formats (still shipping hard today); differentiate on live quotas + multi-provider auto-detect + dashboard UX.
+3. Splitrail = number-two live local peer; tokdiet = proxy-meter architecture alternative; lumo = local SQLite/TUI UX reference for Claude-centric dashboards.
+4. LiteLLM / Langfuse / Helicone / Portkey / AgentCost stay gateway/OTel-adjacent — useful for pricing/export ideas, not category twins.
+5. Cursor Admin API trackers and single-vendor Codex/Claude desktop apps stay single-pane — agentUsage job is unification across every agent on the machine.
+
+Sources: gh search + GitHub API star/license/push metadata 2026-09-08 (Europe/London).
