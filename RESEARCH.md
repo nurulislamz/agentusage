@@ -70,6 +70,27 @@ Fresh weekend scrape. Twin-risk with OpenUsage remains the headline; Splitrail i
 
 Sources: [openusage.sh](https://openusage.sh/); [openusage cost attribution](https://openusage.sh/docs/guides/cost-attribution/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ryoppippi/ccusage](https://github.com/ryoppippi/ccusage); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); GitHub API star counts 2026-09-07.
 
+### Update 2026-09-08
+
+Fresh weekday scrape. Twin-risk with OpenUsage.sh remains the headline; docs now claim a wider provider set + Antigravity hooks, and a new gateway FinOps name enters the adjacent layer.
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), ~187★) | Homepage still markets ~34–35 providers + local SQLite daemon + tmux/Claude statusline + auto-detect. Docs now say **36 providers** and list opt-in hooks for Claude Code / Codex / OpenCode / **Antigravity**. Last push ~2026-09-07. | **Nearest twin** — category definition still ~1:1. Wedge must be reliability, UX, niche providers, or packaging. |
+| [ccusage](https://github.com/ryoppippi/ccusage) / [ccusage.com](https://ccusage.com/) (~18.4k★) | Still the category CLI for historical daily/weekly/monthly/session/`blocks` across many agents. **Pushed today** (2026-09-08). | Best **log-history / cost-report** OSS peer; thinner live quota/rate-limit TUI + key autodetection. |
+| [Splitrail](https://github.com/Piebald-AI/splitrail) (~219★) | Real-time cross-agent monitor + optional Cloud + MCP (`get_daily_stats`, `get_cost_breakdown`, …). No material star/push move since weekend note (~pushed 2026-09-06). | #2 local “live monitor” peer. |
+| [openusage.ai](https://github.com/robinebers/openusage) (~4.0k★) | Different product (macOS menu-bar). Active Antigravity local spend/history work (reads `~/.gemini/antigravity-cli/conversations/*.db`). | Naming collision only — do not conflate with openusage.sh. |
+| [AgentCost](https://agentcost.in/docs/guides/agentcost-integration-into-existing-projects/) | New-to-dump **instrumented** FinOps: OpenAI-compatible gateway proxy, SDK decorators, LangChain/CrewAI callbacks, OTel/Prometheus export, budgets/caching. | Adjacent **app/gateway** layer (like Helicone/Langfuse/LiteLLM) — not a local multi-agent auto-detect TUI. |
+| Vendor UIs | Cursor Spending / Claude `/usage`/`/cost` / OpenRouter Activity still single-vendor panes. | Fragmentation OpenUsage/agentUsage claim to fix. |
+
+**Positioning refresh**
+- **OpenUsage.sh** = primary collision (now explicitly Antigravity + 36-provider docs).
+- **Splitrail** = rising real-time multi-agent monitor (+ MCP/cloud).
+- **ccusage** = report/parser standard (still shipping hard).
+- Keep Helicone / Langfuse / LiteLLM / **AgentCost** as complementary observability/gateway spend — not desktop twins.
+
+Sources: [openusage.sh](https://openusage.sh/); [openusage.sh/docs](https://openusage.sh/docs/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ryoppippi/ccusage](https://github.com/ryoppippi/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [agentcost.in integration guide](https://agentcost.in/docs/guides/agentcost-integration-into-existing-projects/); GitHub API star counts 2026-09-08.
+
 ## Open source
 
 ### Seeded 2026-09-04
@@ -134,3 +155,17 @@ Fresh GitHub pass. Important naming split: **openusage.ai** (macOS menu bar) ≠
 4. LiteLLM/Langfuse/Helicone/Portkey stay gateway/observability-adjacent.
 
 Sources: GitHub search/API 2026-09-07 (stars approximate).
+
+### Update 2026-09-08
+
+| Repo | Stars | Delta / why it matters |
+|---|---:|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.4k | Pushed **today** (2026-09-08) — report-format peer still racing. |
+| [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) | ~187 | openusage.sh twin; last push ~2026-09-07. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~219 | Real-time #2 local peer. |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.0k | openusage.ai menu-bar — naming collision only. |
+| [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) | ~76 | OpenUsage menu-bar fork lineage; quiet since 2026-09-07. |
+
+**Also watch:** AgentCost (hosted/gateway FinOps docs at agentcost.in) — adjacent layer, not a GitHub twin to agentUsage’s local autodetection thesis.
+
+Sources: GitHub API 2026-09-08.
