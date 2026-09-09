@@ -91,6 +91,31 @@ Fresh weekday scrape. Twin-risk with OpenUsage.sh remains the headline; docs now
 
 Sources: [openusage.sh](https://openusage.sh/); [openusage.sh/docs](https://openusage.sh/docs/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ryoppippi/ccusage](https://github.com/ryoppippi/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [agentcost.in integration guide](https://agentcost.in/docs/guides/agentcost-integration-into-existing-projects/); GitHub API star counts 2026-09-08.
 
+### Update 2026-09-09
+
+Fresh Wednesday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **juliantanx/aiusage** enters as a new local multi-tool dashboard peer (name collision with agentUsage); Splitrail and ccusage both pushed overnight; LiteLLM keeps shipping gateway spend features.
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **~188★**, +1 vs yesterday) | Homepage still markets **34 providers** + local SQLite daemon + tmux/Claude statusline + auto-detect. Docs still say **36 providers** + Antigravity hooks. Last push **2026-09-08 ~20:03 BST**. | **Nearest twin** — category definition still ~1:1. Star creep is slow; product surface stable day-over-day. |
+| [ccusage](https://github.com/ccusage/ccusage) / [ccusage.com](https://ccusage.com/) (**~18.4k★** / 18,444) | Still the category CLI for historical daily/weekly/monthly/session/`blocks` (+ Antigravity / Grok Build / ZCode). **Pushed today** (2026-09-09 ~07:38 BST). | Best **log-history / cost-report** OSS peer; thinner live quota/rate-limit TUI + key autodetection. |
+| [Splitrail](https://github.com/Piebald-AI/splitrail) (**~219★**, flat) | Real-time cross-agent monitor + optional Cloud + MCP. **Pushed overnight** (2026-09-09 ~01:33 BST) after weekend quiet — activity resumed, stars unchanged. | #2 local “live monitor” peer. |
+| [AIUsage](https://github.com/juliantanx/aiusage) (**~120★**) — **new-to-Competitors dump** | Local-first web dashboard (`aiusage serve` → localhost:3847) for tokens/cost/sessions/models/projects/tool calls/quotas across **20+** coding tools; optional GitHub/S3/R2 sync + public leaderboard + desktop widget. Pushed 2026-09-08. | **Rising local peer** closer to OpenUsage/agentUsage than menu-bar wrappers. Also a **product-name collision** risk (AIUsage vs agentUsage) — keep branding distinct. |
+| [openusage.ai](https://github.com/robinebers/openusage) (**~4.1k★** / 4,076) | macOS menu-bar tracker (different product). No push since 2026-09-06; stars +~76 vs yesterday’s ~4.0k note. | Naming collision only — do not conflate with openusage.sh. |
+| Vendor UIs | Cursor Spending / Claude `/usage`/`/cost` / OpenRouter Activity still single-vendor panes. | Fragmentation OpenUsage/agentUsage claim to fix. |
+| Helicone / Langfuse / LiteLLM | **LiteLLM** (~58.3k★, pushed today): spend-by-tool / `LiteLLM_DailyToolSpend` rollups, credential usage tags, spend-log retention — gateway FinOps still moving. **Langfuse** (~34.4k★, pushed today) active OTel observability. **Helicone** (~6.1k★) quiet since ~2026-08-31. | Adjacent layers, not desktop twins. |
+| Also watch (local TUI / wrappers) | [SophanaSok/ai-usage-tui](https://github.com/SophanaSok/ai-usage-tui) (0★, **pushed today**) — Rust TUI for OpenCode/Claude/Codex/Ollama costs + budgets; [paperwave/codeburn](https://github.com/paperwave/codeburn) (0★, stale since Apr) — Claude/Codex/Cursor TUI; [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) (76★, pushed today); [ItsJazii/pane](https://github.com/ItsJazii/pane) (41★, pushed today) Windows tray OpenUsage port. | Early/niche — track, don’t treat as category leaders yet. |
+
+**Positioning refresh**
+- **OpenUsage.sh** = primary collision (34 homepage / 36 docs; +1★ overnight).
+- **juliantanx/aiusage** = new local multi-tool dashboard peer + **name collision** to watch in copy/SEO.
+- **Splitrail** = #2 live local peer (push activity resumed; stars flat).
+- **ccusage** = report/parser standard (still shipping hard today).
+- Keep Helicone / Langfuse / LiteLLM / AgentCost as complementary observability/gateway spend — LiteLLM’s tool-spend rollups are the notable adjacent move this week.
+
+Sources: [openusage.sh](https://openusage.sh/); [openusage.sh/docs](https://openusage.sh/docs/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [github.com/SophanaSok/ai-usage-tui](https://github.com/SophanaSok/ai-usage-tui); LiteLLM docs (spend logs / credential usage); WebSearch 2026-09-09; GitHub API star/push metadata 2026-09-09 (Europe/London).
+
+
 ## Open source
 
 ### Seeded 2026-09-04
