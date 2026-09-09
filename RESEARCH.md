@@ -222,3 +222,31 @@ Fresh weekday GitHub/gh pass (Europe/London). Substantive landscape across ccusa
 5. Cursor Admin API trackers and single-vendor Codex/Claude desktop apps stay single-pane — agentUsage job is unification across every agent on the machine.
 
 Sources: gh search + GitHub API star/license/push metadata 2026-09-08 (Europe/London).
+
+### Open source — 9 Sep 2026
+
+Fresh weekday GitHub pass (Europe/London). ccusage/OpenUsage ecosystem still defining the category; several peers pushed today (ccusage, Splitrail, UsagePal, Pane, Codex desktop).
+
+| Repo | Stars | License | Why it matters |
+|---|---:|---|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.4k | NOASSERTION | Category CLI; pushed today — stay format-compatible. |
+| [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) | ~188 | MIT | openusage.sh local multi-tool TUI + SQLite. Nearest product twin. |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.1k | MIT | openusage.ai menu-bar tracker — naming collision only. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~219 | MIT | Real-time cross-agent monitor; pushed today — number-two local peer. |
+| [zhnd/lumo](https://github.com/zhnd/lumo) | ~147 | MIT | Local-first Claude Code usage/cost/session dashboard. |
+| [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) | ~76 | MIT | OpenUsage menu-bar fork (Rust + Tauri); pushed today. |
+| [ItsJazii/pane](https://github.com/ItsJazii/pane) | ~41 | NOASSERTION | Windows tray OpenUsage port; pushed today. |
+| [itvincent-git/codex-usage-desktop](https://github.com/itvincent-git/codex-usage-desktop) | ~29 | MIT | Local-first Codex quota desktop app; pushed today. |
+| [Baek-Seunghyun/ai-coding-usage-card](https://github.com/Baek-Seunghyun/ai-coding-usage-card) | ~24 | MIT | **New fold-in.** Self-hosted GitHub profile SVG card from ccusage data. |
+| [sculptdotfun/viberank](https://github.com/sculptdotfun/viberank) | ~115 | MIT | Public leaderboard on ccusage data. |
+| [cobra91/better-ccusage](https://github.com/cobra91/better-ccusage) | ~84 | MIT | Faster multi-provider ccusage-style analyzer. |
+| [Nihondo/AgentLimits](https://github.com/Nihondo/AgentLimits) | ~56 | MIT | macOS widgets for Codex/Claude limits + ccusage heatmap. |
+| [agiwhitelist/tokdiet](https://github.com/agiwhitelist/tokdiet) | ~33 | MIT | Local reverse-proxy meter between agents and APIs. |
+| [ofershap/cursor-usage-tracker](https://github.com/ofershap/cursor-usage-tracker) | ~33 | MIT | Self-hosted Cursor Enterprise spend + anomaly alerts. |
+| [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~58.3k | NOASSERTION | AI gateway spend/pricing; active today. Adjacent layer. |
+| [langfuse/langfuse](https://github.com/langfuse/langfuse) | ~34.4k | NOASSERTION | OSS LLM observability + OTel; active today. |
+| [Helicone/helicone](https://github.com/Helicone/helicone) | ~6.1k | Apache-2.0 | OSS LLM observability proxy. Adjacent. |
+
+**Build takeaways:** openusage.sh is the collision twin; openusage.ai is menu-bar brand. Stay ccusage-compatible; differentiate on live quotas + auto-detect + UX. Splitrail/UsagePal/Pane moved today.
+
+Sources: GitHub API 2026-09-09 (Europe/London).
