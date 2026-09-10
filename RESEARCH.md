@@ -275,3 +275,36 @@ Fresh weekday GitHub pass (Europe/London). ccusage/OpenUsage ecosystem still def
 **Build takeaways:** openusage.sh is the collision twin; openusage.ai is menu-bar brand. Stay ccusage-compatible; differentiate on live quotas + auto-detect + UX. Splitrail/UsagePal/Pane moved today.
 
 Sources: GitHub API 2026-09-09 (Europe/London).
+
+### Open source — 10 Sep 2026
+
+Fresh weekday GitHub pass (Europe/London). ccusage / OpenUsage ecosystem still defines the category; **live pushes** on ccusage, openusage.ai, Codex desktop, LiteLLM, Langfuse. New budget-cap / proxy peers worth watching.
+
+| Repo | Stars | License | Why it matters |
+|---|---:|---|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.5k | NOASSERTION | **Pushed today.** Category CLI — stay format-compatible. |
+| [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) | ~190 | MIT | openusage.sh local multi-tool TUI + SQLite. Nearest product twin. |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.1k | MIT | **Pushed today.** openusage.ai menu-bar tracker — naming collision only. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~220 | MIT | Real-time cross-agent monitor — number-two local peer. |
+| [zhnd/lumo](https://github.com/zhnd/lumo) | ~147 | MIT | Local-first Claude Code usage/cost/session dashboard. |
+| [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) | ~76 | MIT | OpenUsage menu-bar fork (Rust + Tauri). |
+| [ItsJazii/pane](https://github.com/ItsJazii/pane) | ~42 | NOASSERTION | Windows tray OpenUsage port. |
+| [itvincent-git/codex-usage-desktop](https://github.com/itvincent-git/codex-usage-desktop) | ~30 | MIT | **Pushed today.** Local-first Codex quota desktop app. |
+| [Baek-Seunghyun/ai-coding-usage-card](https://github.com/Baek-Seunghyun/ai-coding-usage-card) | ~24 | MIT | Self-hosted GitHub profile SVG card from ccusage data. |
+| [sculptdotfun/viberank](https://github.com/sculptdotfun/viberank) | ~116 | MIT | Public leaderboard on ccusage data. |
+| [cobra91/better-ccusage](https://github.com/cobra91/better-ccusage) | ~85 | MIT | Faster multi-provider ccusage-style analyzer. |
+| [Nihondo/AgentLimits](https://github.com/Nihondo/AgentLimits) | ~56 | MIT | macOS widgets for Codex/Claude limits + ccusage heatmap. |
+| [agiwhitelist/tokdiet](https://github.com/agiwhitelist/tokdiet) | ~33 | MIT | Local reverse-proxy meter between agents and APIs. |
+| [ofershap/cursor-usage-tracker](https://github.com/ofershap/cursor-usage-tracker) | ~33 | MIT | Self-hosted Cursor Enterprise spend + anomaly alerts. |
+| [RoninForge/budgetclaw](https://github.com/RoninForge/budgetclaw) | ~8 | MIT | **New fold-in.** Local Claude Code spend monitor with hard budget caps (project/branch). |
+| [DataGrout/lumen](https://github.com/DataGrout/lumen) | ~11 | MIT | **New fold-in.** Real-time LLM token/cost monitor via TLS proxy or HTTP relay. |
+| [sergey-homenko/llm_cost_tracker](https://github.com/sergey-homenko/llm_cost_tracker) | ~44 | MIT | **New fold-in.** Rails-native LLM cost ledger with budget guardrails. |
+| [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~58.4k | NOASSERTION | **Active today.** AI gateway spend/pricing — adjacent layer. |
+| [langfuse/langfuse](https://github.com/langfuse/langfuse) | ~34.4k | NOASSERTION | **Active today.** OSS LLM observability + OTel. |
+| [maximhq/bifrost](https://github.com/maximhq/bifrost) | ~7.9k | Apache-2.0 | **New fold-in / active today.** Enterprise AI gateway (LiteLLM-adjacent). |
+| [Helicone/helicone](https://github.com/Helicone/helicone) | ~6.1k | Apache-2.0 | OSS LLM observability proxy. Adjacent. |
+| [ferro-labs/ai-gateway](https://github.com/ferro-labs/ai-gateway) | ~255 | Apache-2.0 | **New fold-in.** Go AI gateway with cost controls (LiteLLM alternative class). |
+
+**Build takeaways:** openusage.sh is the collision twin; openusage.ai is menu-bar brand. Stay ccusage-compatible; differentiate on live quotas + auto-detect + UX. Budget-cap peers (budgetclaw) and proxy meters (lumen/tokdiet) are rising adjacent patterns.
+
+Sources: GitHub API 2026-09-10 (Europe/London).
