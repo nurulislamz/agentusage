@@ -116,6 +116,31 @@ Fresh Wednesday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; *
 Sources: [openusage.sh](https://openusage.sh/); [openusage.sh/docs](https://openusage.sh/docs/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [github.com/SophanaSok/ai-usage-tui](https://github.com/SophanaSok/ai-usage-tui); LiteLLM docs (spend logs / credential usage); WebSearch 2026-09-09; GitHub API star/push metadata 2026-09-09 (Europe/London).
 
 
+
+### Update 2026-09-10
+
+Fresh Thursday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; star/push creep on the local peers, and openusage.ai (menu-bar) keeps shipping overnight:
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **~190★**, +2 vs yesterday) | Homepage still **34 providers** + local SQLite daemon + tmux/Claude statusline + auto-detect. Docs still **36 providers** + Antigravity hooks. Last pushes overnight were docs-site dep bumps (2026-09-09 ~23:31–23:39 UTC) — product surface stable. | **Nearest twin** — category definition still ~1:1. |
+| [ccusage](https://github.com/ccusage/ccusage) / [ccusage.com](https://ccusage.com/) (**~18.5k★** / 18,469; +~25 vs yesterday) | Still the category CLI for historical daily/weekly/monthly/session/`blocks`. **Pushed today** (2026-09-10 ~01:26 UTC): LiteLLM pricing snapshot chore. | Best **log-history / cost-report** OSS peer; thinner live quota/rate-limit TUI + key autodetection. |
+| [Splitrail](https://github.com/Piebald-AI/splitrail) (**~220★**, +1) | Real-time cross-agent monitor + optional Cloud + MCP. No new push since 2026-09-09 ~00:33 UTC; slow star creep. | #2 local “live monitor” peer. |
+| [AIUsage](https://github.com/juliantanx/aiusage) (**~122★**, +2) | Local web dashboard (`aiusage serve` → localhost:3847) across 20+ tools. Quiet since 2026-09-08 push. | Rising local peer + **name collision** (AIUsage vs agentUsage) — keep branding distinct. |
+| [openusage.ai](https://github.com/robinebers/openusage) (**~4.1k★** / 4,090; +~14) | macOS menu-bar tracker (different product). **Pushed today** (2026-09-10 ~05:32 UTC). | Naming collision only — do not conflate with openusage.sh. |
+| Vendor UIs | Cursor Spending / Claude `/usage`/`/cost` / OpenRouter Activity still single-vendor panes. | Fragmentation OpenUsage/agentUsage claim to fix. |
+| Helicone / Langfuse / LiteLLM | **LiteLLM** (~58.4k★ / 58,426, pushed today) and **Langfuse** (~34.4k★ / 34,427, pushed today) still active gateway/OTel FinOps. **Helicone** (~6.1k★) still quiet since ~2026-08-31. | Adjacent layers, not desktop twins. |
+| Also watch | [ItsJazii/pane](https://github.com/ItsJazii/pane) (42★, +1) Windows tray OpenUsage port; [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) (76★); [SophanaSok/ai-usage-tui](https://github.com/SophanaSok/ai-usage-tui) (0★, last push 2026-09-09). | Early/niche — track, don’t treat as category leaders. |
+
+**Positioning refresh**
+- **OpenUsage.sh** = primary collision (34 homepage / 36 docs; +2★ overnight, docs-only commits).
+- **ccusage** = report/parser standard (still shipping hard — pricing snapshot today; stars climbing faster than OpenUsage).
+- **juliantanx/aiusage** = local multi-tool dashboard peer + name collision.
+- **Splitrail** = #2 live local peer (slow star creep).
+- Keep Helicone / Langfuse / LiteLLM / AgentCost as complementary observability/gateway spend.
+
+Sources: [openusage.sh](https://openusage.sh/); [openusage.sh/docs](https://openusage.sh/docs/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); denshub macOS monitors roundup; GitHub API star/push metadata 2026-09-10 (Europe/London).
+
 ## Open source
 
 ### Seeded 2026-09-04
