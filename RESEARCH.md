@@ -332,3 +332,42 @@ Fresh weekday GitHub pass (Europe/London). ccusage / OpenUsage ecosystem still d
 **Build takeaways:** openusage.sh is the collision twin; openusage.ai is menu-bar brand. Stay ccusage-compatible; differentiate on live quotas + auto-detect + UX. Budget-cap peers (budgetclaw) and proxy meters (lumen/tokdiet) are rising adjacent patterns.
 
 Sources: GitHub API 2026-09-10 (Europe/London).
+
+### Open source — 11 Sep 2026
+
+Fresh weekday GitHub pass (Europe/London). ccusage / OpenUsage ecosystem still defines the category; **live pushes** on ccusage, Codex desktop, budgetclaw, llm_cost_tracker, LiteLLM, Langfuse, Bifrost. New menu-bar / narrative / multi-tool peers (vibebuddy, brink, tokenmaxxing, ccstory).
+
+| Repo | Stars | License | Why it matters |
+|---|---:|---|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.5k | NOASSERTION | **Pushed today.** Category CLI — stay format-compatible. |
+| [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) | ~192 | MIT | openusage.sh local multi-tool TUI + SQLite. Nearest product twin. |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.1k | MIT | openusage.ai menu-bar tracker — naming collision only. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~220 | MIT | Real-time cross-agent monitor — number-two local peer. |
+| [zhnd/lumo](https://github.com/zhnd/lumo) | ~147 | MIT | Local-first Claude Code usage/cost/session dashboard. |
+| [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) | ~77 | MIT | OpenUsage menu-bar fork (Rust + Tauri). |
+| [ItsJazii/pane](https://github.com/ItsJazii/pane) | ~44 | NOASSERTION | Windows tray OpenUsage port. |
+| [itvincent-git/codex-usage-desktop](https://github.com/itvincent-git/codex-usage-desktop) | ~32 | MIT | **Pushed today.** Local-first Codex quota desktop app. |
+| [semantic-craft/iOS-vibebuddy](https://github.com/semantic-craft/iOS-vibebuddy) | ~86 | MIT | **New fold-in / pushed today.** Tracks Claude/Codex/Grok + Cursor usage (closest multi-surface peer). |
+| [semihtalii/brink](https://github.com/semihtalii/brink) | ~53 | MIT | **New fold-in.** Claude/Codex/Cursor limit "on the brink" alerts. |
+| [851-labs/tokenmaxxing](https://github.com/851-labs/tokenmaxxing) | ~69 | MIT | **New fold-in.** Local CLI on ccusage that syncs usage socially. |
+| [atomchung/ccstory](https://github.com/atomchung/ccstory) | ~43 | MIT | **New fold-in.** Narrative recap on top of ccusage ("story", not just bill). |
+| [kenn-io/vibepulse](https://github.com/kenn-io/vibepulse) | ~53 | MIT | **New fold-in.** macOS menubar Claude Code + Codex via ccusage. |
+| [ansonliam/AIUsageMonitor](https://github.com/ansonliam/AIUsageMonitor) | ~28 | MIT | **New fold-in.** Compact Windows widget (Codex/Claude/Antigravity…). |
+| [Baek-Seunghyun/ai-coding-usage-card](https://github.com/Baek-Seunghyun/ai-coding-usage-card) | ~24 | MIT | Self-hosted GitHub profile SVG card from ccusage data. |
+| [sculptdotfun/viberank](https://github.com/sculptdotfun/viberank) | ~116 | MIT | Public leaderboard on ccusage data. |
+| [cobra91/better-ccusage](https://github.com/cobra91/better-ccusage) | ~85 | MIT | Faster multi-provider ccusage-style analyzer. |
+| [Nihondo/AgentLimits](https://github.com/Nihondo/AgentLimits) | ~56 | MIT | macOS widgets for Codex/Claude limits + ccusage heatmap. |
+| [agiwhitelist/tokdiet](https://github.com/agiwhitelist/tokdiet) | ~33 | MIT | Local reverse-proxy meter between agents and APIs. |
+| [ofershap/cursor-usage-tracker](https://github.com/ofershap/cursor-usage-tracker) | ~33 | MIT | Self-hosted Cursor Enterprise spend + anomaly alerts. |
+| [RoninForge/budgetclaw](https://github.com/RoninForge/budgetclaw) | ~8 | MIT | **Pushed today.** Local Claude Code spend monitor with hard budget caps. |
+| [DataGrout/lumen](https://github.com/DataGrout/lumen) | ~11 | MIT | Real-time LLM token/cost monitor via TLS proxy or HTTP relay. |
+| [sergey-homenko/llm_cost_tracker](https://github.com/sergey-homenko/llm_cost_tracker) | ~44 | MIT | **Pushed today.** Rails-native LLM cost ledger with budget guardrails. |
+| [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~58.5k | NOASSERTION | **Active today.** AI gateway spend/pricing — adjacent layer. |
+| [langfuse/langfuse](https://github.com/langfuse/langfuse) | ~34.5k | NOASSERTION | **Active today.** OSS LLM observability + OTel. |
+| [maximhq/bifrost](https://github.com/maximhq/bifrost) | ~8.0k | Apache-2.0 | **Active today.** Enterprise AI gateway (LiteLLM-adjacent). |
+| [Helicone/helicone](https://github.com/Helicone/helicone) | ~6.1k | Apache-2.0 | OSS LLM observability proxy. Adjacent. |
+| [ferro-labs/ai-gateway](https://github.com/ferro-labs/ai-gateway) | ~256 | Apache-2.0 | Go AI gateway with cost controls (LiteLLM alternative class). |
+
+**Build takeaways:** openusage.sh is the collision twin; openusage.ai is menu-bar brand. Stay ccusage-compatible; differentiate on live quotas + auto-detect + UX. Multi-surface peers (vibebuddy/brink) and narrative layers (ccstory) are the new product angles beyond raw spend.
+
+Sources: GitHub API 2026-09-11 (Europe/London).
