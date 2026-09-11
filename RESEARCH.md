@@ -141,6 +141,30 @@ Fresh Thursday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; st
 
 Sources: [openusage.sh](https://openusage.sh/); [openusage.sh/docs](https://openusage.sh/docs/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); denshub macOS monitors roundup; GitHub API star/push metadata 2026-09-10 (Europe/London).
 
+### Update 2026-09-11
+
+Fresh Friday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **ccusage still shipping hardest** (push + stars today); OpenUsage homepage still flubs 34 vs 35 provider counts:
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **~192★**, +2) | Hero still **“35”** providers; lower page still **“34 providers, and counting.”** Listed agents now explicitly include Hermes, Crush, Mux, Codebuff, Droid, Pi beside Claude/Codex/Cursor/Copilot/Gemini/OpenCode/… Last push still docs-site deps (~2026-09-09 23:39 UTC) — no product surface move overnight. | **Nearest twin** — category definition still ~1:1. Count inconsistency is a copy smell, not a wedge. |
+| [ccusage](https://github.com/ccusage/ccusage) / [ccusage.com](https://ccusage.com/) (**~18.5k★** / 18,491; +~22) | Still the category CLI for historical daily/weekly/monthly/session/`blocks` across many agents (**no Cursor** in official source list). **Pushed today** (2026-09-11 ~05:39 UTC). | Best **log-history / cost-report** OSS peer; thinner live quota/rate-limit TUI + key autodetection. |
+| [Splitrail](https://github.com/Piebald-AI/splitrail) (**~220★**, flat) | Real-time cross-agent monitor + optional Cloud + MCP. No new push since 2026-09-09. | #2 local “live monitor” peer — quiet day. |
+| [AIUsage](https://github.com/juliantanx/aiusage) (**~123★**, +1) | Local web dashboard across 20+ tools. Quiet since 2026-09-08. | Rising local peer + **name collision** (AIUsage vs agentUsage). |
+| [openusage.ai](https://github.com/robinebers/openusage) (**~4.1k★** / 4,106; +~16) | macOS menu-bar tracker (different product). Last push ~2026-09-10 19:03 UTC. | Naming collision only — do not conflate with openusage.sh. |
+| Vendor UIs | Cursor Spending / Claude `/usage`/`/cost` / OpenRouter Activity still single-vendor panes. | Fragmentation OpenUsage/agentUsage claim to fix. |
+| Helicone / Langfuse / LiteLLM | **LiteLLM** (~58.5k★ / 58,500, **pushed today**) and **Langfuse** (~34.5k★ / 34,470, **pushed today**) still active gateway/OTel FinOps. **Helicone** (~6.1k★ / 6,144) still quiet since ~2026-08-31. | Adjacent layers, not desktop twins. |
+
+**Positioning refresh**
+- **OpenUsage.sh** = primary collision (34/35 copy split; +2★; docs-only since Wed).
+- **ccusage** = report/parser standard (still shipping today; stars climbing faster than OpenUsage).
+- **juliantanx/aiusage** = local multi-tool dashboard peer + name collision.
+- **Splitrail** = #2 live local peer (flat today).
+- Keep Helicone / Langfuse / LiteLLM / AgentCost as complementary observability/gateway spend.
+
+Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); GitHub API star/push metadata 2026-09-11 (Europe/London).
+
+
 ## Open source
 
 ### Seeded 2026-09-04
