@@ -165,6 +165,32 @@ Fresh Friday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **cc
 Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); GitHub API star/push metadata 2026-09-11 (Europe/London).
 
 
+### Update 2026-09-12
+
+Fresh Saturday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **material overnight moves** on Splitrail (pricing push), Helicone (broke Aug quiet), and openusage.ai (menu-bar still shipping + star climb). Homepage/README/docs now disagree three ways on OpenUsage provider count:
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **~193★**, +1) | Hero still **“35”** providers; lower page still **“34 providers, and counting.”** README + docs still claim **“36 providers”** (incl. Antigravity). Listed agents still include Hermes/Crush/Mux/Codebuff/Droid/Pi beside Claude/Codex/Cursor/Copilot/Gemini/OpenCode/…. Last product-adjacent push still docs-site deps (~2026-09-09 23:39 UTC) — no surface move overnight. | **Nearest twin** — category definition still ~1:1. 34/35/36 count split is a copy smell, not a wedge. |
+| [ccusage](https://github.com/ccusage/ccusage) / [ccusage.com](https://ccusage.com/) (**~18.5k★** / 18,506; +~15) | Still the category CLI for historical daily/weekly/monthly/session/`blocks` across many agents (**no Cursor** in official source list; Grok Build CLI now listed on npm/site). **Pushed today** (2026-09-12 ~05:07 UTC) — LiteLLM pricing snapshot chores. | Best **log-history / cost-report** OSS peer; thinner live quota/rate-limit TUI + key autodetection. |
+| [Splitrail](https://github.com/Piebald-AI/splitrail) (**~221★**, +1) | Real-time cross-agent monitor + optional Cloud + MCP. **Pushed yesterday** (2026-09-11 ~16:40 UTC): Grok 4.6 pricing + Gemini/MiniMax/DeepSeek rate sync (#257) — first product commit since 2026-09-09. | #2 local “live monitor” peer — quiet stars, active pricing. |
+| [AIUsage](https://github.com/juliantanx/aiusage) (**~125★**, +2) | Local web dashboard (`aiusage serve` → :3847) across 20+ tools. Quiet since 2026-09-08 release. | Rising local peer + **name collision** (AIUsage vs agentUsage). |
+| [openusage.ai](https://github.com/robinebers/openusage) (**~4.1k★** / 4,135; +~29) | macOS menu-bar tracker (different product). **Pushed today** (2026-09-12 ~06:43 UTC): v0.7.12-beta.1 changelog + Cursor Grok Bot / Codex Luna pricing fixes. | Naming collision only — do not conflate with openusage.sh. |
+| Vendor UIs | Cursor Spending / Claude `/usage`/`/cost` / OpenRouter Activity still single-vendor panes. | Fragmentation OpenUsage/agentUsage claim to fix. |
+| Helicone / Langfuse / LiteLLM | **LiteLLM** (~58.5k★ / 58,549, **pushed today**, +~49) and **Langfuse** (~34.5k★ / 34,498, pushed ~2026-09-11 22:55 UTC, +~28) still active gateway/OTel FinOps. **Helicone** (~6.1k★ / 6,149) **broke quiet** — push 2026-09-11 ~18:07 UTC (jawn/tsoa routes fix) after ~2026-08-31 silence. | Adjacent layers, not desktop twins. |
+| Also watch (local peers) | [getagentseal/codeburn](https://github.com/getagentseal/codeburn) (~11.0k★, pushed today) — local multi-tool cost CLI (`npx codeburn`, 37 tools); [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) (~5.4k★, pushed today) — terminal token tracker + leaderboard; [deviffyy/OpenQuota](https://github.com/deviffyy/OpenQuota) (~204★, pushed today) — cross-platform limits/spend; [Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar) (~345★) / [tddworks/ClaudeBar](https://github.com/tddworks/ClaudeBar) (~1.5k★) — macOS menu-bar quota peers beside openusage.ai. | High-star adjacent local trackers — watch for category overlap, not yet twins on live multi-provider quota TUI + key autodetection. |
+
+**Positioning refresh**
+- **OpenUsage.sh** = primary collision (34/35/36 copy split; +1★; still docs-only since Wed).
+- **ccusage** = report/parser standard (still shipping today; +~15★ overnight).
+- **Splitrail** = #2 live local peer (pricing push overnight; stars nearly flat).
+- **juliantanx/aiusage** = local multi-tool dashboard peer + name collision (+2★, quiet code).
+- **openusage.ai** = menu-bar naming collision; fastest star climb among “OpenUsage*” names today.
+- Keep Helicone / Langfuse / LiteLLM / AgentCost as complementary observability/gateway spend — Helicone no longer fully dormant.
+
+Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [github.com/getagentseal/codeburn](https://github.com/getagentseal/codeburn); [github.com/junhoyeo/tokscale](https://github.com/junhoyeo/tokscale); [github.com/deviffyy/OpenQuota](https://github.com/deviffyy/OpenQuota); GitHub API star/push metadata 2026-09-12 (Europe/London).
+
+
 ## Open source
 
 ### Seeded 2026-09-04
