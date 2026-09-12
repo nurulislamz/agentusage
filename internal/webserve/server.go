@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/providers/antigravity"
 	"github.com/nurulislamz/agentusage/internal/tui"
 )
@@ -75,6 +74,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/theme", s.handleTheme)
 	mux.HandleFunc("/api/v1/themes", s.handleTheme)
 	mux.HandleFunc("/api/v1/meta", s.handleMeta)
+	mux.HandleFunc("/partial/app", s.handleAppFragment)
+	mux.HandleFunc("/inspect", s.handleInspect)
+	mux.HandleFunc("/actions/theme", s.handleThemeAction)
+	mux.HandleFunc("/actions/usage-mode", s.handleUsageModeAction)
+	mux.HandleFunc("/actions/layout", s.handleLayoutAction)
+	mux.HandleFunc("/actions/view", s.handleViewAction)
 
 	sub, err := fs.Sub(uiFS, "ui")
 	if err != nil {
@@ -83,8 +88,14 @@ func (s *Server) Handler() http.Handler {
 		})
 		return s.withBasePath(mux)
 	}
-	fileServer := http.FileServer(http.FS(sub))
-	mux.Handle("/", noCacheUI(fileServer))
+	fileServer := noCacheUI(http.FileServer(http.FS(sub)))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			s.handleShell(w, r)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 	return s.withBasePath(mux)
 }
 
@@ -230,26 +241,7 @@ func (s *Server) handleUsageMode(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
 		return
 	}
-	mode := normalizeUsageMode(body.UsageMode)
-	if strings.TrimSpace(body.UsageMode) == "" {
-		current := s.collector.opts.UsageMode
-		if current == "" && s.collector.opts.Config != nil {
-			current = s.collector.opts.Config.Dashboard.UsageMode
-		}
-		if normalizeUsageMode(current) == config.UsageModeUsed {
-			mode = config.UsageModeRemaining
-		} else {
-			mode = config.UsageModeUsed
-		}
-	}
-	if !s.collector.demo {
-		if err := config.SaveDashboardUsageMode(mode); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
-	}
-	s.collector.setUsageMode(mode)
-	env, err := s.collector.envelope()
+	env, err := s.applyUsageMode(body.UsageMode)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -291,8 +283,7 @@ func (s *Server) handleTheme(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
 		return
 	}
-	targetTheme := strings.TrimSpace(body.Theme)
-	isBackward := body.Backward || body.Reverse || body.Prev ||
+	backward := body.Backward || body.Reverse || body.Prev ||
 		strings.EqualFold(strings.TrimSpace(body.Direction), "backward") ||
 		strings.EqualFold(strings.TrimSpace(body.Direction), "prev") ||
 		r.URL.Query().Get("backward") == "1" ||
@@ -301,27 +292,7 @@ func (s *Server) handleTheme(w http.ResponseWriter, r *http.Request) {
 		r.URL.Query().Get("prev") == "true" ||
 		strings.EqualFold(r.URL.Query().Get("direction"), "backward") ||
 		strings.EqualFold(r.URL.Query().Get("direction"), "prev")
-
-	if targetTheme == "" {
-		if isBackward {
-			targetTheme = tui.CycleThemeBackward()
-		} else {
-			targetTheme = tui.CycleTheme()
-		}
-	} else {
-		_ = tui.SetThemeByName(targetTheme)
-	}
-	if activeName := tui.ActiveTheme().Name; activeName != "" {
-		targetTheme = activeName
-	}
-	if !s.collector.demo {
-		if err := config.SaveTheme(targetTheme); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
-	}
-	s.collector.setTheme(targetTheme)
-	env, err := s.collector.envelope()
+	env, err := s.applyTheme(strings.TrimSpace(body.Theme), backward)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

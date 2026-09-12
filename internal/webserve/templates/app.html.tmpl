@@ -1,0 +1,69 @@
+{{define "app"}}<div id="app" class="shell layout-{{.Layout.ID}}{{if eq .MobileView "detail"}} mobile-view-detail{{else}} mobile-view-roster{{end}}" data-layout="{{.Layout.ID}}"{{if not .HasData}} hidden{{end}} hx-get="partial/app" hx-trigger="every {{.RefreshSeconds}}s" hx-target="#app" hx-swap="outerHTML" hx-indicator="#fetching-detail">
+  <header class="header top-nav">
+    <div id="header" class="header-main">
+      <div class="brand-group">
+        <span class="logo" aria-hidden="true"><span class="brand-mark">aU</span></span>
+        <span class="brand"><span class="brand-title"><span class="brand-agent">agent</span><span class="brand-usage">Usage</span></span> <span class="brand-studio">Ceramic Studio</span></span>
+        <span class="status-tag">DAEMONS ONLINE ({{len .Views}})</span>
+      </div>
+      <span id="fetching-header" class="fetching"><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>
+      <span class="spacer"></span>
+      <nav class="layout-nav center-tabs" aria-label="Layout view">{{range .Layouts}}<button type="button" class="layout-btn{{if eq .ID $.Layout.ID}} active{{end}}" data-layout="{{.ID}}" hx-post="actions/layout" hx-vals='{"layout":"{{.ID}}"}' title="{{.Hint}}"><span class="layout-icon">{{.Icon}}</span> <span class="layout-label">{{.Label}}</span></button>{{end}}</nav>
+      <div class="right-controls">
+        <div class="search-box" onclick="document.getElementById('footer-btn-filter').click()" title="Filter providers (/)"><span>/</span> filter providers…</div>
+        <span class="header-meta"><span class="meta-icon">⊞</span> {{len .Views}} agents{{if .Filtered}} (filtered){{end}} · {{.Layout.Label}} · {{.Layout.Hint}}</span>
+      </div>
+    </div>
+  </header>
+  <div class="hairline" aria-hidden="true"></div>
+  <div class="body">
+    <nav id="nav" class="nav" hx-target="#app" hx-swap="outerHTML" aria-label="Account roster" hx-indicator="#fetching-detail"{{if ne .Layout.ID "split"}} hidden aria-hidden="true"{{end}}>{{if eq .Layout.ID "split"}}{{template "nav" .}}{{end}}</nav>
+    <div class="vsep" aria-hidden="true"{{if ne .Layout.ID "split"}} hidden{{end}}></div>
+    <main class="panel" aria-label="{{.Layout.Hint}}">
+      <div id="panel"><span id="fetching-detail" class="fetching"><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>{{if .HasData}}<div class="stats-banner">
+        <div class="stat-box">
+          <div class="stat-lab">System Pool Health</div>
+          <div class="stat-val">{{.Stats.Health}} <span class="health-tag tag-{{.Stats.HealthTone}}">{{.Stats.HealthTag}}</span></div>
+          <div class="stat-note">{{.Stats.HealthNote}}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-lab">24h Token Velocity</div>
+          <div class="stat-val mono">{{.Stats.TokenVelocity}} <span class="stat-unit">tok</span></div>
+          <div class="stat-note">{{.Stats.TokenNote}}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-lab">Active Month Spend</div>
+          <div class="stat-val mono">{{.Stats.Spend}}</div>
+          <div class="stat-note">{{.Stats.SpendNote}}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-lab">Cache Hit Efficiency</div>
+          <div class="stat-val mono">{{.Stats.CacheHit}}</div>
+          <div class="stat-note">{{.Stats.CacheNote}}</div>
+        </div>
+      </div>{{end}}{{if not .HasData}}<p class="dim">{{if .Filtered}}No matches.{{else}}No providers.{{end}}</p>{{end}}{{if eq .Layout.ID "split"}}{{with .Selected}}{{template "mobilebar" (cctx $ .)}}{{template "cockpit" (cctx $ .)}}{{end}}{{else if eq .Layout.ID "matrix"}}{{template "matrix" .}}{{else if eq .Layout.ID "bento"}}{{template "bento" .}}{{else}}{{template "board" .}}{{end}}</div>
+    </main>
+  </div>
+  <div class="hairline" aria-hidden="true"></div>
+  <footer class="footer"><div id="footer" class="footer-main" hx-indicator="#fetching-footer">{{template "footer" .}}</div></footer>
+  <span hidden aria-hidden="true">
+    <button id="key-next" hx-get="partial/app?dir=next" tabindex="-1"></button>
+    <button id="key-prev" hx-get="partial/app?dir=prev" tabindex="-1"></button>
+    <button id="key-refresh" hx-get="partial/app?refresh=1{{with .Selected}}&amp;focus={{urlquery .AccountID}}{{end}}" tabindex="-1"></button>
+    <button id="key-refresh-all" hx-get="partial/app?refresh=1" tabindex="-1"></button>
+    <button id="key-mode" hx-post="actions/usage-mode" tabindex="-1"></button>
+    <button id="key-theme-fwd" hx-post="actions/theme" tabindex="-1"></button>
+    <button id="key-theme-back" hx-post="actions/theme" hx-vals='{"direction":"backward"}' tabindex="-1"></button>
+    <button id="key-layout-cycle" hx-post="actions/layout" hx-vals='{"layout":"next"}' tabindex="-1"></button>
+    <button id="key-layout-main" hx-post="actions/layout" hx-vals='{"layout":"nextmain"}' tabindex="-1"></button>
+    <button id="key-view-roster" hx-post="actions/view" hx-vals='{"view":"roster"}' tabindex="-1"></button>
+  </span>
+</div>
+{{template "oob" .}}
+{{end}}
+
+{{define "oob"}}<style id="theme-vars" hx-swap-oob="outerHTML">{{themeVars .Env.ThemeTokens}}</style>
+<meta id="meta-theme-color" hx-swap-oob="outerHTML" content="{{if .Env.ThemeTokens.Base}}{{.Env.ThemeTokens.Base}}{{else}}#0c0e16{{end}}">
+<div id="splash" class="splash" hx-swap-oob="outerHTML" hidden></div>
+<div id="empty-state" class="empty" hx-swap-oob="outerHTML"{{if .HasData}} hidden{{end}}><div class="splash-emblem dim" aria-hidden="true">{{template "apple-logo-lg"}}</div><h2 id="empty-title">{{.EmptyTitle}}</h2><p id="empty-error" class="empty-error"{{if not .EmptyError}} hidden{{end}}>{{.EmptyError}}</p><p id="empty-hint">{{.EmptyHint}}</p></div>
+<div id="status-bar" class="status-bar{{if .StatusToast}} toast{{end}}" hx-swap-oob="outerHTML"{{if not .StatusText}} hidden{{end}}>{{.StatusText}}</div>{{end}}

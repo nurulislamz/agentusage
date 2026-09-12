@@ -285,6 +285,8 @@ func TestFetch_ConsoleDoubleFailure_DoesNotFabricateZeroBalance(t *testing.T) {
 		return client
 	}
 
+	t.Setenv("HOME", t.TempDir())
+
 	acct := core.AccountConfig{
 		ID:        "opencode-personal",
 		Provider:  "opencode",

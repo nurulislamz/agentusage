@@ -1,29 +1,127 @@
-# Ralph Loop Progress Ledger — agentUsage Views
+================================================================================
+AGENTUSAGE WEB UI REDESIGN & CRAFT PARITY PROGRESS
+================================================================================
+Target Mockup: docs/web-dashboard-mockup.png
+Current Snapshot: scratch/current-site.png
+Autonomous Run: /goal Active
+Mode: Autonomous Token-Maxxing Craft Refinement Cycle
 
-- [x] Iteration 1: Split Layout (Submenu Master-Detail & Cockpit) [bfa640c]
-  - Fixed meter percentage and adjacent label collisions (e.g. 100%Week, 58%5h)
-  - Fixed label truncation (e.g. Included clipped to Includ…)
-  - Eliminated redundant timer countdown display (5h00m in 5h00m)
-  - Added clear remaining context to cockpit subhero percentages
+--------------------------------------------------------------------------------
+CURRENT STATUS / SUMMARY OF DISCOVERED GAPS
+--------------------------------------------------------------------------------
+1. Theme & Surface Colors:
+   - Current: Defaulting to light/pale "cirrus" style, stark high-contrast blinding white background.
+   - Target: Cyberpunk / deep space dark theme (#080c14 background, #0f172a / #111827 card surfaces, luminous cyan #38bdf8 accents, neon green #4ade80, chartreuse #a3e635).
 
-- [x] Iteration 2: Matrix Layout (Dense Roster Matrix HUD) [52eac98]
-  - Added Quota 3 column so critical limits (e.g. OpenCode Monthly Limit 0%) are visible
-  - Conditionally rendered Trend column only when telemetry time-series exists
-  - Fixed quota label truncation in table cells
-  - Adjusted row padding to 10px 14px for balanced viewport coverage
+2. Top Navigation Bar:
+   - Current: Plain blue icon, plain text, bulky layout switcher pill list in center, generic subtitle.
+   - Target: Electric cyan bolt icon, "agentUsage" logo with colored "Usage", "1:dashboard" pill badge, green status dot "6 ●", right monospace metadata "[+] 6 providers · remaining · 30d".
 
-- [x] Iteration 3: Bento Grid Layout (Viewport-Fitted Modular Glance Tiles) [7560d35]
-  - Balanced 10-account grid into a symmetrical 3-row layout (2 featured + 4 + 4) with zero gaps
-  - Disambiguated duplicate quota labels (e.g. Antigravity G-Week vs C-Week)
-  - Removed empty sparkline dash placeholder (—) when no history exists
-  - Expanded #panel to fill 100% vertical viewport height
+3. Left Sidebar / Providers List:
+   - Current: Provider cards have "Day cannot render as bar or graph" or "ERROR Models...", irregular spacing, no glowing vertical active border, crude dots.
+   - Target: Category headers with stars (e.g. "CURSOR (1) ★"), sleek monospace accounts, status pill badges ("OK"), capsule-shaped mini progress bars, renewal timing, active card indicator bar.
 
-- [x] Iteration 4: Gauge Wall Layouts (Bars, Dials, Strips) [a155e55]
-  - Added all 6 layouts dynamically to segmented header switcher
-  - Fixed missing % unit on secondary relative dials
-  - Widened account name column in Strips to prevent truncation (opencode-m... -> opencode-mohammed)
-  - Compacted card padding and gauge heights for zero-scroll glanceability
+4. Account Hero Section:
+   - Current: Plain "● codex - cli", no clean subtitle hierarchy, missing electric underline, missing timer alignment.
+   - Target: Green dot, bold monospace account title ("cursor-ide"), provider metadata ("cursor · Pro · demo.user@acme-corp.dev"), "OK" pill, huge stat "$3.45 / $20.00 remaining" with cyan underline bar, "Billing 11d 17h".
 
-- [x] Iteration 5: TUI & Integration Parity
-  - Verified Bubble Tea terminal split view and snapshot parity with web projector
-  - All Go test suites pass with 0 failures
+5. Top KPI Grid (Team Budget & Billing Cycle):
+   - Current: Cards are narrow, left-aligned, leave 25% of viewport as dead space, generic tables.
+   - Target: 2 symmetric wide cards filling the top grid:
+     * Card 1 "TEAM BUDGET": Huge "43.7%" in bright green (#4ade80), rounded pill progress bar with dark track, "$1,572 / $3,600" spent vs "$2,028 remaining".
+     * Card 2 "BILLING CYCLE": Huge "48.7%" in bright lime (#a3e635), rounded pill progress bar, "Feb 11 → Mar 12" vs "11d 17h remaining".
+
+6. Middle Deck (Model Burn & Luminous Sparkline):
+   - Current: Fragmented and missing; some broken text.
+   - Target: Full-width "▶ MODEL BURN" card:
+     * 5-segment stacked distribution bar (purple, orange, teal, blue, yellow).
+     * Legend breakdown with colored swatches, model names, percentages, and costs.
+     * Full-width smooth glowing blue line area/sparkline curve.
+
+7. Bottom Deck (Clients & Code Statistics):
+   - Current: Empty or broken "Other Data" and "Info" with unformatted strings.
+   - Target:
+     * Left card "CLIENTS": Stacked horizontal bar, Composer 53% (5.1k req), Human 41% (4.0k req), Tab 5% (494 req), CLI 1% (42 req).
+     * Right card "CODE STATISTICS": "+139 added" (green), "-335 removed" (coral red), bidirectional audio-equalizer style git delta bar chart.
+
+8. Bottom Footer Status Bar:
+   - Current: Bulky buttons and select dropdown.
+   - Target: Sleek dark HUD status line: "auto-refresh ↻ 30s · j/k · / filter · r refresh · ? help".
+
+--------------------------------------------------------------------------------
+EXECUTION PHASES & TOKEN-MAXXING ROADMAP
+--------------------------------------------------------------------------------
+Phase 0: [COMPLETED] Deep reconnaissance, browser headless setup, current vs target comparison, generation of pane target reference images.
+Phase 1: [COMPLETED] Theme & Core Foundation (Deep Space theme tokens in app.css, typography, dark glass card surfaces, glowing neon accents).
+Phase 2: [COMPLETED] Top Navigation Bar & Brand Header overhaul (lightning bolt, two-tone logo, 1:dashboard / 2:analytics badges, 7 ● status, compact view modes).
+Phase 3: [COMPLETED] Sidebar / Account Roster redesign (category headers with star icons, electric cyan indicator rail, mini capsule gauges, monospace renewal timing).
+Phase 4: [COMPLETED] Main Cockpit Hero & Dual KPI Cards (Team Budget with 43.7% in neon green, Billing Cycle with 48.7% in neon lime, luminous underline bar).
+Phase 5: [COMPLETED] Model Burn Section (5-segment horizontal distribution bar, color swatch breakdown table, luminous bezier SVG area sparkline).
+Phase 6: [COMPLETED] Clients & Code Statistics Cards (Clients 4-segment distribution bar, Code Statistics with +139 / -335 and bidirectional equalizer SVG bar graph).
+Phase 7: [COMPLETED] Footer HUD & Keyboard Shortcuts polish (sleek terminal status bar with j/k, /, u, r, v, t keybindings).
+Phase 8: [COMPLETED] Automated Headless Chrome visual verification (scratch/site-final-verified.png), 100% test pass on internal/webserve, internal/tui, internal/providers/opencode, and full make test with race detector.
+Phase 9: [COMPLETED] Live Real-Provider Integration & Daemon Wiring (bound default port :8080, connected live telemetry daemon with 13 real accounts including cursor-nurulz, opencode-*, antigravity-*, command_code, codex-cli, dynamic cockpit rendering for all live providers, verified in scratch/site-live-real-now.png).
+Phase 10: [COMPLETED - INITIAL EXPLORATION] Concept Exploration & User Review
+Phase 11: [COMPLETED - OPENDESIGN / APPLE HIG OVERHAUL] Elimination of AI Slop & High-Fidelity Apple System Render
+- Directive: Transform "sloppy" generic AI designs into pristine Apple-grade desktop UI grounded in Apple Human Interface Guidelines (HIG), Apple Developer Design Resources, and OpenDesign craft rules.
+- References Analyzed:
+  * Dribbble 26086542: Business Dashboard Design (clean, balanced SaaS hierarchy, structured KPI cards, smooth area chart, data table)
+  * Dribbble 27408806: Wireframe to High-Fidelity Mobile App UI Transformation (Apple-inspired aesthetics, soft shadows, clean typography, rounded squircle cards)
+  * Apple Developer Design Resources: San Francisco (SF Pro Display, SF Pro Text, SF Mono), Liquid Glass / Materials, System Color Palette, squircle curvature
+  * OpenDesign Craft Protocol (ui-craft & frontend-design): Optical alignment, concentric radii, sub-pixel hairline borders (1px solid rgba(255,255,255,0.08)), WCAG AA contrast, strict 8px spatial grid
+- Executed Solution:
+  * Replaced fuzzy diffusion models with deterministic, vector-crisp Headless Chrome rendering (zero hallucinated text, zero blurred icons, zero neon sci-fi bloom).
+  * Rendered and verified all 7 views in docs/redesign_concepts/ at 1920x1080 (16:9 ultra-HD):
+    1. 01_split_cockpit_view.jpg: macOS desktop two-column inspector cockpit (translucent grouped sidebar, team budget & billing cycle cards, model burn area curve, clients & code diff equalizer).
+    2. 02_matrix_hud_view.jpg: Apple Pro dense telemetry matrix (8 provider cards + real-time SQLite ingest event stream).
+    3. 03_bento_grid_view.jpg: Modular Apple Bento grid with Activity-style concentric multi-ring spend donut, 30-day run-rate sparkline, top model & cycle countdown.
+    4. 04_bars_telemetry_view.jpg: Apple Settings / Health style precision linear quota & rate limit meters across 8 providers.
+    5. 05_dials_gauges_view.jpg: 6 Apple Watch Activity ring circular instrument pods (3x2 grid).
+    6. 06_strips_wall_view.jpg: Compact macOS Activity Monitor telemetry strips wall + daemon engine runtime footer.
+    7. 07_analytics_deep_view.jpg: Executive Apple Developer Analytics dashboard (KPI quad, 30-day cumulative spend curves, leaderboard table, cost efficiency ratio).
+  * Automatically launched Windows Explorer for user visual inspection.
+- Clean-Slate Mandate (Strict):
+  * Zero UI/frontend components, CSS classes, or HTML template snippets from the legacy codebase will be re-used.
+  * Every single component (Shell, Navigation, Bento Cards, Activity Rings, Gauges, Area Charts, Data Tables, and HUD) is written 100% from scratch.
+  * Grounded exclusively in the new Apple HIG design tokens and OpenDesign craft rules.
+- Next Step: Await user approval on the preferred Apple HIG view designs, then execute full clean-slate replacement of web templates (internal/webserve/templates/) and CSS (internal/webserve/ui/app.css).
+================================================================================
+
+
+## Phase 12: Multi-Window Quota Telemetry (Apple HIG Redesign) - COMPLETED
+- Addressed user feedback regarding multi-window limits (OpenCode daily/weekly/monthly, Gemini 5h/weekly, Claude 5h/monthly, Cursor fast/daily/cap).
+- Rebuilt and re-rendered all 7 ultra-high-definition Apple HIG concept views:
+  1. 01_split_cockpit_view.jpg: OpenCode multi-window hero cards (24h $3.85/57%, 7d $14.20/57%, 30d $41.80/42%) + Gemini CLI burst monitor + live ingest equalizer.
+  2. 02_matrix_hud_view.jpg: 8-provider matrix with stacked multi-meter rows and live tail event stream.
+  3. 03_bento_grid_view.jpg: Multi-window quota command center bento + 3-ring concentric activity donut + velocity sparkline.
+  4. 04_bars_telemetry_view.jpg: Inset grouped Apple Settings style view with nested sub-meters for all active rate windows.
+  5. 05_dials_gauges_view.jpg: 6 Apple Watch concentric activity ring pods (3 concentric rings per provider).
+  6. 06_strips_wall_view.jpg: Compact Activity Monitor strips with inline multi-meter capsules and filter tags.
+  7. 07_analytics_deep_view.jpg: Executive analytics with multi-window limit pressure monitor ranking saturation urgency.
+- All 7 rendered images verified and copied to artifact directory and docs/redesign_concepts/.
+- Windows Explorer launched for visual inspection.
+
+## Phase 13: OpenDesign Engine Alignment & Color Scheme Refinement - COMPLETED
+- Started local OpenDesign daemon (node /home/nurul/open-design/apps/daemon/bin/od.mjs).
+- Deeply analyzed OpenDesign design systems, craft rules (craft/color.md, craft/anti-ai-slop.md, design-systems/apple/tokens.css).
+- Eliminated "rainbow fruit salad" color clash:
+  * Established OpenDesign 4-layer palette: 70-90% neutrals, 5-10% unified Apple Action Blue (#0a84ff), 0-5% semantic warning amber (#ff9f0a) / red (#ff453a) / green (#30d158).
+  * Shifted dark background from flat pitch black to deep obsidian titanium (#0d0e12) with elevated graphite surfaces (#171821) and inset top highlights (inset 0 1px 0 rgba(255,255,255,0.06)).
+  * Formatted Apple Watch Activity Rings with official Activity tokens: Move Red (#fa114f), Exercise Green (#30d158), Stand Cyan (#00f5d4).
+  * Added letter-spacing: 0.08em on all uppercase labels and data-od-id on all sections.
+- Verified all 7 views with OpenDesign linter (`od lint`): all passed clean with 0 P0 and 0 P1 findings.
+- Re-rendered all 7 views at 1920x1080 and copied to docs/redesign_concepts/ and artifacts.
+- Relaunched Windows Explorer via PowerShell for immediate user inspection.
+
+## Phase 14: Ceramic Swiss Studio Redesign Implementation - COMPLETED
+- User selected Direction 1: Ceramic Swiss Studio (`14_ceramic_swiss_studio.jpg`).
+- Full ground-up redesign of `internal/webserve/` natively in Go, HTML templates, and CSS.
+- Typography: Integrated `Plus Jakarta Sans` for display/headers and `Space Mono` for monospace telemetry metrics, quota pills, and timers.
+- Visual Language: Warm ceramic canvas (`#f7f6f2`) with subtle radial micro-dot matrix pattern, porcelain cards (`#ffffff`), and crisp Swiss 3D offset ink shadows (`4px 4px 0px #1a1a1c`).
+- Top Nav Bar: `aU` squircle mark, `agentUsage` + `Ceramic Studio` badge, pulsing cobalt dot `DAEMONS ONLINE (X)`, segmented view tabs, quick filter input, and metadata counter.
+- 4-Card Global Stats KPI Banner: Real-time System Pool Health, 24h Token Velocity, Active Month Spend, and Cache Hit Efficiency.
+- Multi-Metric Quota Rows: Provider monogram squircle avatars, timeband capsules (`5h`, `7d`, `30d`), quota buffer progress bars, reset countdown timers, and alert styling.
+- Bottom Dock Stream: Real-time event telemetry stream with emerald status indicator, keyboard shortcuts, and theme switcher.
+- Bundled theme definitions added: `ceramic-studio.json`, `cirrus.json`, `cupertino-light.json`, `cupertino-graphite.json`.
+- Verified all unit and render tests in `internal/webserve/...` passing (100% PASS), and verified clean `make build`.
+- Deployed live on `http://127.0.0.1:8090/` and captured verification screenshots across Split, Bento, Bars, and Matrix layouts.

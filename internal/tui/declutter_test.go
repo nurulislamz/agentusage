@@ -214,6 +214,7 @@ func TestOpenCode_MonthlyUsageResetTimer(t *testing.T) {
 	m := NewModel(0.2, 0.05, false, config.DashboardConfig{}, accounts, core.TimeWindow30d)
 
 	now := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
+	m.referenceTime = now
 	snap := core.UsageSnapshot{
 		ProviderID: "opencode",
 		AccountID:  "opencode-test",

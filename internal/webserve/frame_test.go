@@ -8,39 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
-	"github.com/nurulislamz/agentusage/internal/tui"
 )
-
-func TestRenderTUIFrame_MatchesBrandAndAccount(t *testing.T) {
-	ensureTrueColor()
-	_ = tui.ThemeTokensForName("Deep Space")
-
-	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
-	snaps := []core.UsageSnapshot{demoClaude(now), demoCursor(now)}
-	cfg := config.DefaultConfig()
-	cfg.Theme = "Deep Space"
-	cfg.Dashboard.UsageMode = config.UsageModeRemaining
-
-	frame := renderTUIFrame(cfg, snaps, 0, 120, 36)
-	plain := tui.StripANSI(frame)
-	if !strings.Contains(plain, "agentUsage") {
-		t.Fatalf("missing brand:\n%s", plain)
-	}
-	if !strings.Contains(plain, "claude-code") {
-		t.Fatalf("missing selected account:\n%s", plain)
-	}
-	if !strings.Contains(plain, "Usage") {
-		t.Fatalf("missing detail usage section:\n%s", plain)
-	}
-
-	frame1 := renderTUIFrame(cfg, snaps, 1, 120, 36)
-	plain1 := tui.StripANSI(frame1)
-	if !strings.Contains(plain1, "cursor-ide") {
-		t.Fatalf("cursor selection missing cursor-ide:\n%s", plain1)
-	}
-}
 
 func TestSnapshotsIncludeDetailCards(t *testing.T) {
 	srv := testServer(t, Options{Demo: true, Theme: "Deep Space"})

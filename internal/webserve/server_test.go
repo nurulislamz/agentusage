@@ -3,7 +3,6 @@ package webserve
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -121,142 +120,14 @@ func TestSnapshotsRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestIndexServed(t *testing.T) {
-	srv := testServer(t, Options{Demo: true})
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	w := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d", w.Code)
-	}
-	body, _ := io.ReadAll(w.Body)
-	html := string(body)
-	if !strings.Contains(html, "agentUsage") {
-		t.Error("index.html should mention agentUsage")
-	}
-	if !strings.Contains(html, `id="nav"`) || !strings.Contains(html, `id="panel"`) {
-		t.Error("index.html should use native nav/panel chrome")
-	}
-	if strings.Contains(html, "tui-frame") {
-		t.Error("index.html should not paint a TUI frame")
-	}
-	if strings.Contains(html, `src="/app.js"`) || strings.Contains(html, `href="/app.css"`) {
-		t.Error("index.html should not load assets with root-absolute URLs")
-	}
-	if !strings.Contains(html, `src="app.js"`) {
-		t.Error("index.html should load app.js")
-	}
-}
-
 func TestStaticAssets(t *testing.T) {
 	srv := testServer(t, Options{Demo: true})
-	for _, path := range []string{"/app.css", "/app.js"} {
+	for _, path := range []string{"/app.css", "/app.js", "/htmx.min.js"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		w := httptest.NewRecorder()
 		srv.Handler().ServeHTTP(w, req)
 		if w.Code != http.StatusOK {
 			t.Errorf("%s status = %d", path, w.Code)
-		}
-	}
-}
-
-func TestAppJSUsageModeKeyHandler(t *testing.T) {
-	srv := testServer(t, Options{Demo: true})
-	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
-	w := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("/app.js status = %d, want 200", w.Code)
-	}
-	body := w.Body.String()
-
-	checks := []struct {
-		desc    string
-		pattern string
-	}{
-		{"modifier key guard", "ev.ctrlKey || ev.metaKey || ev.altKey"},
-		{"form element guard", `matches("input, textarea, select")`},
-		{"keydown 'u' case", `case "u":`},
-		{"keydown 'U' case", `case "U":`},
-		{"usage mode toggle call", "cycleUsageMode()"},
-		{"footer button usage mode", `id="footer-btn-mode"`},
-	}
-
-	for _, tc := range checks {
-		if !strings.Contains(body, tc.pattern) {
-			t.Errorf("/app.js missing %s (expected pattern %q)", tc.desc, tc.pattern)
-		}
-	}
-}
-
-func TestAppJSUsageOnlyLayouts(t *testing.T) {
-	srv := testServer(t, Options{Demo: true})
-	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
-	w := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("/app.js status = %d, want 200", w.Code)
-	}
-	js := w.Body.String()
-	for _, want := range []string{
-		`id: "bars"`,
-		`id: "dials"`,
-		`id: "strips"`,
-		"function renderBarCard(",
-		"function renderDialCard(",
-		"function renderStripCard(",
-		"function renderBoard(",
-		"function renderArcGauge(",
-		"function usageItems(",
-		"function parseRatio(",
-		"function renderMetricTable(",
-		"function graphGroups(",
-		"function renderGaugeGroups(",
-		"function cycleLayout(",
-		`case "v":`,
-		`id="footer-btn-layout"`,
-		"usage_lines",
-	} {
-		if !strings.Contains(js, want) {
-			t.Errorf("app.js missing %q", want)
-		}
-	}
-
-	cssReq := httptest.NewRequest(http.MethodGet, "/app.css", nil)
-	cssW := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(cssW, cssReq)
-	css := cssW.Body.String()
-	for _, want := range []string{".board-bars", ".board-dials", ".board-strips", ".lin-track", ".dial-svg", ".strip-track", ".metric-table", ".gauge-group"} {
-		if !strings.Contains(css, want) {
-			t.Errorf("app.css missing %q", want)
-		}
-	}
-}
-
-func TestAppJSRefreshKeyHandlers(t *testing.T) {
-	srv := testServer(t, Options{Demo: true})
-	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
-	w := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("/app.js status = %d, want 200", w.Code)
-	}
-	body := w.Body.String()
-
-	checks := []struct {
-		desc    string
-		pattern string
-	}{
-		{"load opts.accountID query param", "account_id"},
-		{"keydown 'r' focused account refresh", `accountID: filteredViews()[state.selected]?.account_id`},
-		{"keydown 'R' refresh all", `case "R":`},
-		{"footer button refresh title", `title="Refresh focused account (r) / all (R)"`},
-		{"footer button focused refresh call", `accountID: filteredViews()[state.selected]?.account_id`},
-	}
-
-	for _, tc := range checks {
-		if !strings.Contains(body, tc.pattern) {
-			t.Errorf("/app.js missing %s (expected pattern %q)", tc.desc, tc.pattern)
 		}
 	}
 }
@@ -559,43 +430,6 @@ func TestTheme_CSRF_OriginProtection(t *testing.T) {
 	}
 }
 
-func TestAppJSThemeKeyHandler(t *testing.T) {
-	srv := testServer(t, Options{Demo: true})
-	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
-	w := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("/app.js status = %d, want 200", w.Code)
-	}
-	body := w.Body.String()
-
-	checks := []struct {
-		desc    string
-		pattern string
-	}{
-		{"theme cycle function", "async function cycleTheme"},
-		{"keydown 't' case", `case "t":`},
-		{"keydown 'T' case", `case "T":`},
-		{"theme toggle call", "cycleTheme()"},
-		{"theme toggle backward call", "cycleTheme(true)"},
-		{"footer button theme", `id="footer-btn-theme"`},
-		{"footer theme select dropdown", `id="footer-theme-select"`},
-		{"theme select change handler", `$("footer-theme-select")?.addEventListener("change"`},
-		{"relative theme API fetch", `fetch("api/v1/theme"`},
-		{"default themes list", "DEFAULT_THEMES"},
-		{"client cycle theme fallback", "cycleThemeClient"},
-		{"color-scheme dark support", `"color-scheme:dark"`},
-		{"color-scheme light support", `"color-scheme:light"`},
-		{"data-theme attribute support", `setAttribute("data-theme"`},
-	}
-
-	for _, tc := range checks {
-		if !strings.Contains(body, tc.pattern) {
-			t.Errorf("/app.js missing %s (expected pattern %q)", tc.desc, tc.pattern)
-		}
-	}
-}
-
 func TestGetThemesEndpoint(t *testing.T) {
 	srv := testServer(t, Options{Demo: true})
 	for _, path := range []string{"/api/v1/theme", "/api/v1/themes"} {
@@ -709,153 +543,6 @@ func TestSnapshotsRefreshWithAccountIDQueryParam(t *testing.T) {
 	}
 }
 
-func TestFetchingUXAssetsContract(t *testing.T) {
-	srv := testServer(t, Options{Demo: true})
-
-	// Test index.html structure
-	{
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		w := httptest.NewRecorder()
-		srv.Handler().ServeHTTP(w, req)
-		if w.Code != http.StatusOK {
-			t.Fatalf("GET / status = %d", w.Code)
-		}
-		html := w.Body.String()
-		// #fetching-header inside .header-main
-		if !strings.Contains(html, `class="header-main"`) || !strings.Contains(html, `id="fetching-header"`) {
-			t.Error("index.html missing header-main or fetching-header")
-		}
-		headerMainIdx := strings.Index(html, `class="header-main"`)
-		fetchingHeaderIdx := strings.Index(html, `id="fetching-header"`)
-		if headerMainIdx == -1 || fetchingHeaderIdx == -1 || fetchingHeaderIdx < headerMainIdx {
-			t.Errorf("expected fetching-header inside/after header-main, got headerMainIdx=%d, fetchingHeaderIdx=%d", headerMainIdx, fetchingHeaderIdx)
-		}
-
-		// #fetching-footer inside .footer-main
-		footerMainIdx := strings.Index(html, `class="footer-main"`)
-		fetchingFooterIdx := strings.Index(html, `id="fetching-footer"`)
-		if footerMainIdx == -1 || fetchingFooterIdx == -1 || fetchingFooterIdx < footerMainIdx {
-			t.Errorf("expected fetching-footer inside/after footer-main, got footerMainIdx=%d, fetchingFooterIdx=%d", footerMainIdx, fetchingFooterIdx)
-		}
-
-		// #fetching-detail should be inside #panel or inline to avoid layout jump
-		panelIdx := strings.Index(html, `id="panel"`)
-		fetchingDetailIdx := strings.Index(html, `id="fetching-detail"`)
-		if panelIdx == -1 || fetchingDetailIdx == -1 || fetchingDetailIdx < panelIdx {
-			t.Errorf("expected fetching-detail inside/after panel, got panelIdx=%d, fetchingDetailIdx=%d", panelIdx, fetchingDetailIdx)
-		}
-		if strings.Contains(html, `<div id="fetching-detail" class="fetching" hidden><span class="spin" aria-hidden="true">⠋</span> Fetching...</div>`+"\n"+`        <div id="panel"></div>`) {
-			t.Error("fetching-detail should not be placed above #panel causing layout shift")
-		}
-	}
-
-	// Test app.css rules
-	{
-		req := httptest.NewRequest(http.MethodGet, "/app.css", nil)
-		w := httptest.NewRecorder()
-		srv.Handler().ServeHTTP(w, req)
-		if w.Code != http.StatusOK {
-			t.Fatalf("GET /app.css status = %d", w.Code)
-		}
-		css := w.Body.String()
-		if strings.Contains(css, ".shell.refreshing .footer-main { display: none; }") ||
-			strings.Contains(css, ".shell.refreshing .footer-main{display:none}") ||
-			strings.Contains(css, ".shell.refreshing .footer-main { display: none") {
-			t.Error("app.css should NOT hide .footer-main when refreshing")
-		}
-		if !strings.Contains(css, ".item.refreshing") {
-			t.Error("app.css should contain styles for .item.refreshing")
-		}
-	}
-
-	// Test app.js rules
-	{
-		req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
-		w := httptest.NewRecorder()
-		srv.Handler().ServeHTTP(w, req)
-		if w.Code != http.StatusOK {
-			t.Fatalf("GET /app.js status = %d", w.Code)
-		}
-		js := w.Body.String()
-		if !strings.Contains(js, "Fetching (") {
-			t.Error("app.js should format dynamic fetching message with account ID")
-		}
-		if !strings.Contains(js, "Fetching all...") {
-			t.Error("app.js should format dynamic fetching message for all accounts")
-		}
-		if !strings.Contains(js, "account_id=") {
-			t.Error("app.js should pass account_id in query string for focused refresh")
-		}
-		if !strings.Contains(js, "350") {
-			t.Error("app.js should enforce minimum visual display time (350ms)")
-		}
-	}
-}
-
-func TestAppJSFetchingIndicatorsPreserved(t *testing.T) {
-	srv := testServer(t, Options{Demo: true})
-	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
-	w := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("GET /app.js status = %d", w.Code)
-	}
-	js := w.Body.String()
-
-	// 1. Assert renderHeader defines #fetching-header
-	renderHeaderIdx := strings.Index(js, "function renderHeader()")
-	if renderHeaderIdx == -1 {
-		t.Fatal("renderHeader not found in app.js")
-	}
-	toneFnIdx := strings.Index(js, "function toneFromPercent(")
-	if toneFnIdx == -1 || toneFnIdx < renderHeaderIdx {
-		t.Fatal("toneFromPercent not found after renderHeader in app.js")
-	}
-	renderHeaderBody := js[renderHeaderIdx:toneFnIdx]
-	if !strings.Contains(renderHeaderBody, `id="fetching-header"`) {
-		t.Error("renderHeader must define id=\"fetching-header\"")
-	}
-
-	// 2. Assert renderBoard defines #fetching-detail in both empty view and normal view
-	renderBoardIdx := strings.Index(js, "function renderBoard()")
-	if renderBoardIdx == -1 {
-		t.Fatal("renderBoard not found in app.js")
-	}
-	renderFooterIdx := strings.Index(js, "function renderFooter()")
-	if renderFooterIdx == -1 || renderFooterIdx < renderBoardIdx {
-		t.Fatal("renderFooter not found after renderBoard in app.js")
-	}
-	renderBoardBody := js[renderBoardIdx:renderFooterIdx]
-
-	emptyViewIdx := strings.Index(renderBoardBody, "if (!views.length)")
-	if emptyViewIdx == -1 {
-		t.Fatal("renderBoard missing 'if (!views.length)' check")
-	}
-	emptyReturnIdx := strings.Index(renderBoardBody[emptyViewIdx:], "return;")
-	if emptyReturnIdx == -1 {
-		t.Fatal("renderBoard missing return in empty view branch")
-	}
-	emptyViewBranch := renderBoardBody[emptyViewIdx : emptyViewIdx+emptyReturnIdx]
-	if !strings.Contains(emptyViewBranch, `id="fetching-detail"`) {
-		t.Error("renderBoard empty view (!views.length) must include id=\"fetching-detail\"")
-	}
-
-	normalViewBranch := renderBoardBody[emptyViewIdx+emptyReturnIdx:]
-	if !strings.Contains(normalViewBranch, `id="fetching-detail"`) {
-		t.Error("renderBoard normal view must include id=\"fetching-detail\"")
-	}
-
-	// 3. Assert renderFooter defines #fetching-footer
-	renderFuncIdx := strings.Index(js, "function render()")
-	if renderFuncIdx == -1 || renderFuncIdx < renderFooterIdx {
-		t.Fatal("render not found after renderFooter in app.js")
-	}
-	renderFooterBody := js[renderFooterIdx:renderFuncIdx]
-	if !strings.Contains(renderFooterBody, `id="fetching-footer"`) {
-		t.Error("renderFooter must define id=\"fetching-footer\"")
-	}
-}
-
 func TestBasePathServesUnderPrefix(t *testing.T) {
 	srv := testServer(t, Options{Demo: true, BasePath: "/agentusage"})
 	handler := srv.Handler()
@@ -883,6 +570,8 @@ func TestBasePathServesUnderPrefix(t *testing.T) {
 		"/agentusage/metrics",
 		"/agentusage/app.js",
 		"/agentusage/app.css",
+		"/agentusage/htmx.min.js",
+		"/agentusage/partial/app",
 		"/agentusage/api/v1/snapshots",
 		"/agentusage/api/v1/meta",
 	} {
@@ -898,25 +587,25 @@ func TestBasePathServesUnderPrefix(t *testing.T) {
 	idxW := httptest.NewRecorder()
 	handler.ServeHTTP(idxW, idx)
 	html := idxW.Body.String()
-	if strings.Contains(html, `href="/app.css"`) || strings.Contains(html, `src="/app.js"`) {
-		t.Error("index.html must not use root-absolute /app.css or /app.js (breaks Tailscale Serve subpaths)")
+	if strings.Contains(html, `href="/app.css"`) || strings.Contains(html, `src="/app.js"`) || strings.Contains(html, `src="/htmx.min.js"`) {
+		t.Error("shell must not use root-absolute asset URLs (breaks Tailscale Serve subpaths)")
 	}
-	if !strings.Contains(html, `href="app.css"`) || !strings.Contains(html, `src="app.js"`) {
-		t.Error("index.html should load app.css and app.js with relative URLs")
+	if !strings.Contains(html, `href="app.css"`) || !strings.Contains(html, `src="app.js"`) || !strings.Contains(html, `src="htmx.min.js"`) {
+		t.Error("shell should load app.css, app.js and htmx.min.js with relative URLs")
+	}
+	if !strings.Contains(html, `hx-get="partial/app"`) {
+		t.Error("shell should request the app fragment with a relative URL")
 	}
 
 	jsReq := httptest.NewRequest(http.MethodGet, "/agentusage/app.js", nil)
 	jsW := httptest.NewRecorder()
 	handler.ServeHTTP(jsW, jsReq)
 	js := jsW.Body.String()
-	if strings.Contains(js, `fetch("/api/v1/snapshots`) || strings.Contains(js, `fetch("/api/v1/usage-mode"`) {
-		t.Error("app.js must not fetch root-absolute /api/v1/* (breaks Tailscale Serve subpaths)")
+	if strings.Contains(js, `"/api/v1/`) || strings.Contains(js, `"/partial/`) {
+		t.Error("app.js must not use root-absolute API/fragment URLs")
 	}
-	if !strings.Contains(js, `fetch("api/v1/snapshots`) || !strings.Contains(js, `fetch("api/v1/usage-mode"`) {
-		t.Error("app.js should fetch api/v1/* with relative URLs")
-	}
-	if !strings.Contains(js, "AbortController") || !strings.Contains(js, "signal: ctrl.signal") {
-		t.Error("app.js should abort hung snapshot fetches so the splash cannot stick forever")
+	if !strings.Contains(js, `htmx.ajax("GET", "partial/app"`) {
+		t.Error("app.js should request the app fragment with a relative URL")
 	}
 }
 

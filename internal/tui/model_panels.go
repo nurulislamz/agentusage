@@ -428,7 +428,7 @@ func (m Model) renderListSubmenuRow(snap core.UsageSnapshot, di providerDisplayI
 
 func (m Model) renderListSummaryRow(snap core.UsageSnapshot, di providerDisplayInfo, w int) string {
 	now := m.viewNow()
-	at, hasReset := sidebarCycleResetAt(snap)
+	at, hasReset := sidebarCycleResetAt(snap, now)
 
 	stripW := 0
 	if di.gaugePercent >= 0 {

@@ -1,0 +1,304 @@
+{{define "nav"}}{{if .HasData}}{{range .Groups}}
+<div class="group{{if .Active}} active{{end}}" style="--p:{{.Accent}}">{{upper .ProviderID}} ({{len .Items}}){{if .Active}} ★{{end}}</div>
+{{range .Items}}<button type="button" class="item nav-item{{if .Active}} selected{{end}}" hx-get="partial/app?account={{urlquery .Key}}" style="--p:{{accent .AccentColor}}">
+  <span class="rail"></span>
+  <span class="name">{{if .StatusIcon}}{{.StatusIcon}}{{else}}●{{end}} {{.AccountID}}</span>
+  <span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span>
+  <div class="sum">
+    {{if .HasGauge}}
+      <span class="mini"><i style="width:{{pct0 .GaugePercent}}%;background:{{if eq .StatusBadge "WARN"}}var(--yellow){{else if eq .StatusBadge "CRIT"}}var(--danger){{else}}var(--green){{end}}"></i></span>
+    {{else if .Meters}}
+      {{range $i, $m := .Meters}}{{if eq $i 0}}{{if $m.Pct}}<span class="mini"><i style="width:{{pct0 $m.Pct}}%;background:{{gaugeColor $m.Tone}}"></i></span>{{end}}{{end}}{{end}}
+    {{end}}
+    <span class="sum-text">{{if .SummaryDisplay}}{{.SummaryDisplay}}{{else}}{{.Summary}}{{end}}</span>
+    <span class="dim">{{if .NextDisplay}}{{.NextDisplay}}{{else}}—{{end}}</span>
+  </div>
+  <div class="meters sr-only">
+    {{if .Meters}}{{range .Meters}}{{if .Pct}}<span class="meter {{toneClass .Tone}}"><span class="meter-lab">{{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}</span><span class="mini"><i style="width:{{pct0 .Pct}}%;background:{{gaugeColor .Tone}}"></i></span><span class="meter-val">{{pct0 .Pct}}%</span></span>{{else}}<span class="meter text"><span class="meter-lab">{{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}</span><span class="meter-val">{{.Value}}</span></span>{{end}}{{end}}{{else}}<span class="dim">{{.Summary}}</span>{{end}}
+  </div>
+  <span class="mobile-chevron" aria-hidden="true">›</span>
+</button>{{end}}
+{{end}}{{end}}{{end}}
+
+{{define "mobilebar"}}<div class="mobile-back-bar">
+  <button type="button" class="mobile-back-btn" id="mobile-back-btn" hx-post="actions/view" hx-vals='{"view":"roster"}' aria-label="Back to account roster"><span aria-hidden="true">‹</span> Back</button>
+  <div class="mobile-pager" role="navigation" aria-label="Account navigation">
+    <button type="button" class="mobile-pager-btn" id="mobile-prev-btn" hx-get="partial/app?dir=wrapprev" aria-label="Previous account">‹</button>
+    <span class="mobile-pager-count">{{.V.Position}} / {{.V.Total}}</span>
+    <button type="button" class="mobile-pager-btn" id="mobile-next-btn" hx-get="partial/app?dir=wrapnext" aria-label="Next account">›</button>
+  </div>
+  <span class="mobile-back-acc">{{.V.AccountID}}</span>
+</div>{{end}}
+
+{{define "cockpit"}}{{with .V}}
+<div class="hero">
+  <h1><span class="dot"></span> {{if .HeroAccountID}}{{.HeroAccountID}}{{else}}{{.AccountID}}{{end}}<span class="fetching"><span class="spin" aria-hidden="true">⠋</span></span></h1>
+  <div class="hero-right">
+    <span>{{if .HeroMeta}}{{.HeroMeta}}{{else}}{{if .ProviderName}}{{.ProviderName}}{{else}}{{.ProviderID}}{{end}}{{if .Detail}} · {{.Detail}}{{end}}{{end}}</span>
+    <span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span>
+    <button type="button" class="footer-btn btn-cockpit-refresh" hx-get="partial/app?refresh=1&amp;focus={{urlquery .AccountID}}" hx-target="#app" hx-swap="outerHTML" title="Refresh account">⟳</button>
+  </div>
+</div>
+<div class="subhero">
+  <div><strong>{{if .HeroPrimaryStat}}{{.HeroPrimaryStat}}{{else}}{{.SummaryDisplay}}{{end}}</strong>{{if or .HeroCycleStat .CycleSchedule}} <span class="reset">· {{if .HeroCycleStat}}{{.HeroCycleStat}}{{else}}{{.CycleSchedule}}{{end}}</span>{{end}}</div>
+  <div class="last-refreshed">{{if .RefreshedText}}{{.RefreshedText}}{{else}}refreshed 12s ago{{end}}</div>
+</div>
+<div class="accent-line"></div>
+
+{{if .HasCockpitCards}}
+<div class="stats">
+  <section class="card kpi-card">
+    <h2>{{.TeamBudget.Title}}</h2>
+    <div class="big {{toneClass .TeamBudget.Tone}}">{{.TeamBudget.PctStr}}</div>
+    <div class="gauge" style="color:{{gaugeColor .TeamBudget.Tone}}"><i style="width:{{pct0 .TeamBudget.Percent}}%;background:{{gaugeColor .TeamBudget.Tone}}"></i></div>
+    <div class="caption"><b>{{.TeamBudget.SubLeft}}</b> · {{.TeamBudget.SubRight}}</div>
+  </section>
+  <section class="card kpi-card">
+    <h2>{{.BillingCycle.Title}}</h2>
+    <div class="big {{toneClass .BillingCycle.Tone}}">{{.BillingCycle.PctStr}}</div>
+    <div class="gauge" style="color:{{gaugeColor .BillingCycle.Tone}}"><i style="width:{{pct0 .BillingCycle.Percent}}%;background:{{gaugeColor .BillingCycle.Tone}}"></i></div>
+    <div class="caption">{{.BillingCycle.SubLeft}} · {{.BillingCycle.SubRight}}</div>
+  </section>
+</div>
+
+{{if .ModelBurn.HasData}}
+<section class="card burn-card">
+  <h2>▸ MODEL BURN</h2>
+  <div class="stack">
+    {{range .ModelBurn.Segments}}
+    <i style="width:{{pct0 .Percent}}%;background:{{.Color}}" title="{{.Name}}: {{.PctStr}} ({{.CostStr}})"></i>
+    {{end}}
+  </div>
+  <div class="rows">
+    {{range .ModelBurn.Segments}}
+    <div class="row">
+      <span class="swatch" style="background:{{.Color}}"></span>
+      <span class="model-name">{{.Name}}</span>
+      <span class="pct">{{.PctStr}}</span>
+      <span class="cost">{{.CostStr}}</span>
+    </div>
+    {{end}}
+  </div>
+  <div class="spark" aria-hidden="true">
+    {{.ModelBurn.ChartSVG}}
+  </div>
+  <div class="hint">{{.ModelBurn.MetaText}}</div>
+</section>
+{{end}}
+
+<div class="pair">
+  {{if .Clients.HasData}}
+  <section class="card clients-card">
+    <h2>CLIENTS</h2>
+    <div class="stack">
+      {{range .Clients.Segments}}
+      <i style="width:{{pct0 .Percent}}%;background:{{.Color}}" title="{{.Name}}: {{.PctStr}} ({{.ReqStr}})"></i>
+      {{end}}
+    </div>
+    <div class="rows clients-rows">
+      {{range .Clients.Segments}}
+      <div class="row">
+        <span class="swatch" style="background:{{.Color}}"></span>
+        <span class="model-name">{{.Name}}</span>
+        <span class="pct">{{.PctStr}}</span>
+        <span class="cost">{{.ReqStr}}</span>
+      </div>
+      {{end}}
+    </div>
+  </section>
+  {{end}}
+
+  {{if .CodeStats.HasData}}
+  <section class="card code-card">
+    <h2>CODE STATISTICS</h2>
+    <div class="code-diff-row">
+      <span class="add">{{.CodeStats.Added}}</span>
+      <span class="del">{{.CodeStats.Removed}}</span>
+    </div>
+    <div class="equalizer-wrap">
+      {{.CodeStats.EqualizerSVG}}
+    </div>
+    <div class="caption">{{.CodeStats.MetaText}}</div>
+  </section>
+  {{end}}
+</div>
+
+{{if or .Graphs .Timers .Cards}}
+<div class="legacy-cards-toggle">
+  <details>
+    <summary class="dim">Diagnostics &amp; Raw Quotas ({{len .Cards}} cards)</summary>
+    <div class="panel-cards-grid" style="margin-top:12px">
+      {{if .Graphs}}<section class="card"><div class="card-header"><h2>Usage &amp; quotas</h2></div><div class="lin-list">{{range .Graphs}}{{if .Title}}<div class="gauge-group"><div class="gauge-group-title">{{.Title}}</div><div class="gauge-group-body">{{range .Items}}{{template "lin-gauge" .}}{{end}}</div></div>{{else}}{{range .Items}}{{template "lin-gauge" .}}{{end}}{{end}}{{end}}</div></section>{{end}}
+      {{if .Timers}}<section class="card"><div class="card-header"><h2>Timers &amp; schedule</h2></div>{{range .Timers}}<div class="timer {{if .Urgent}}tone-warn{{else}}tone-ok{{end}}"><span class="dot"></span><span>{{.Label}}</span><span class="when">{{withIn .Duration}}</span></div>{{end}}</section>{{else if .HasTimerFallback}}<section class="card"><div class="card-header"><h2>Timers &amp; schedule</h2></div><div class="timer tone-ok"><span class="dot"></span><span>Next Reset</span><span class="when">{{withIn .NextReset}}</span></div></section>{{end}}
+      {{template "cards" $}}
+    </div>
+  </details>
+</div>
+{{end}}
+
+{{else}}
+<div class="panel-cards-grid">
+  {{if .Graphs}}<section class="card"><div class="card-header"><h2>Usage &amp; quotas</h2></div><div class="lin-list">{{range .Graphs}}{{if .Title}}<div class="gauge-group"><div class="gauge-group-title">{{.Title}}</div><div class="gauge-group-body">{{range .Items}}{{template "lin-gauge" .}}{{end}}</div></div>{{else}}{{range .Items}}{{template "lin-gauge" .}}{{end}}{{end}}{{end}}</div></section>{{end}}
+  {{if .Timers}}<section class="card"><div class="card-header"><h2>Timers &amp; schedule</h2></div>{{range .Timers}}<div class="timer {{if .Urgent}}tone-warn{{else}}tone-ok{{end}}"><span class="dot"></span><span>{{.Label}}</span><span class="when">{{withIn .Duration}}</span></div>{{end}}</section>{{else if .HasTimerFallback}}<section class="card"><div class="card-header"><h2>Timers &amp; schedule</h2></div><div class="timer tone-ok"><span class="dot"></span><span>Next Reset</span><span class="when">{{withIn .NextReset}}</span></div></section>{{end}}
+  {{if .DailyCost}}{{with cockpitSpark .DailyCost}}<section class="card"><div class="card-header"><h2>Activity &amp; trend</h2></div><div style="padding:4px 0 8px">{{.}}</div>{{template "metric-table" $.V.TrendStats}}</section>{{end}}{{end}}
+  {{template "cards" $}}
+</div>
+{{end}}
+{{end}}{{end}}
+
+{{define "cards"}}{{range .V.Cards}}<section class="card{{if gt (len .Rows) 6}} span-2{{end}}" style="--card:{{cardColor .Color}}"><div class="card-header"><h2>{{.Title}}</h2></div>{{template "card-rows" (cardctx $.M .)}}</section>{{end}}{{end}}
+
+{{define "card-rows"}}{{range .Card.Rows}}{{if eq .Kind "heading"}}<div class="heading">{{if .Value}}{{.Value}}{{else}}{{.Label}}{{end}}</div>
+{{else if eq .Kind "gauge"}}<div class="gauge-block {{toneClass .Tone}}"><div class="gauge-header"><span class="gauge-label">{{.Label}}</span><span class="gauge-stat"><b class="stat-val">{{rowPct .}}%</b><span class="pill {{pillClass .Tone}}">{{$.M.UsageMode}}</span></span></div><div class="gauge" style="color:{{gaugeColor .Tone}}"><i style="width:{{rowPct .}}%;background:currentColor"></i><span class="gauge-threshold" style="left:{{if eq $.M.UsageMode "used"}}80{{else}}20{{end}}%" aria-hidden="true"></span></div><div class="caption">{{rowCaption . $.M.UsageMode}}</div></div>
+{{else if eq .Kind "timer"}}<div class="timer {{toneClass .Tone}}"><span class="dot"></span><span>{{.Label}}</span><span class="when">{{.Value}}</span><span class="hint">{{.Hint}}</span></div>
+{{else if eq .Kind "kv"}}<div class="kv"><span class="dim">{{.Label}}</span><span class="kv-val">{{.Value}}</span></div>
+{{else}}<div class="text-row">{{if .Value}}{{.Value}}{{else}}{{.Label}}{{end}}</div>{{end}}{{end}}{{end}}
+
+{{define "matrix"}}<div class="matrix-container" role="grid" aria-label="Dense Roster Matrix HUD">
+{{range .Groups}}
+<section class="provider-group-box" style="--p:{{.Accent}}">
+  <header class="provider-group-header">
+    <div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{.ProviderName}}</span><span class="provider-count">{{len .Items}} {{if eq (len .Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
+    <div class="provider-group-meta"><span class="pill {{.Rollup}}">{{.RollupLabel}}</span></div>
+  </header>
+  <div class="matrix-table-wrap">
+    <table class="matrix-table" role="table" aria-label="{{.ProviderName}} Matrix">
+      <colgroup><col style="width: 25%"><col style="width: 12%"><col style="width: 17%"><col style="width: 17%"><col style="width: 17%"><col style="width: 12%">{{if $.HasTrendColumn}}<col style="width: 80px">{{end}}<col style="width: 32px"></colgroup>
+      <thead><tr><th scope="col">ACCOUNT</th><th scope="col">STATUS</th><th scope="col">QUOTA 1</th><th scope="col">QUOTA 2</th><th scope="col">QUOTA 3</th><th scope="col">NEXT RESET</th>{{if $.HasTrendColumn}}<th scope="col">TREND</th>{{end}}<th scope="col" aria-label="Toggle"></th></tr></thead>
+      <tbody>
+      {{range .Items}}
+        <tr class="matrix-row{{if .Active}} selected{{end}}{{if .Expanded}} expanded{{end}}" hx-get="partial/app?account={{urlquery .Key}}&amp;expand={{urlquery .Key}}" data-acc="{{.AccountID}}" style="--p:{{accent .AccentColor}}">
+          <td><div class="matrix-app"><span class="matrix-app-icon">{{if .StatusIcon}}{{.StatusIcon}}{{else}}●{{end}}</span><div><div class="matrix-app-title">{{.AccountID}}</div></div></div></td>
+          <td><span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span></td>
+          {{range .MatrixCells}}<td>{{if .}}{{template "quota-cell" .}}{{else}}<span class="dim">—</span>{{end}}</td>{{end}}
+          <td><span class="matrix-reset{{if .Urgent}} urgent{{end}}">{{if .NextDisplay}}{{.NextDisplay}}{{else}}—{{end}}</span></td>
+          {{if $.HasTrendColumn}}<td><div class="matrix-trend">{{with matrixSpark .DailyCost}}{{.}}{{else}}<span class="dim">—</span>{{end}}</div></td>{{end}}
+          <td><span class="matrix-toggle" title="Toggle details">{{if .Expanded}}▾{{else}}▸{{end}}</span></td>
+        </tr>
+        {{if .Expanded}}<tr class="matrix-drawer-row"><td colspan="{{if $.HasTrendColumn}}8{{else}}7{{end}}"><div class="matrix-drawer">{{template "cockpit" (cctx $ .)}}</div></td></tr>{{end}}
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+{{end}}
+</div>{{end}}
+
+{{define "quota-cell"}}{{if .Pct}}<div class="matrix-metric-wrap {{toneClass .Tone}}"><span class="matrix-metric-lab">{{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}</span><span class="matrix-metric-bar"><i style="width:{{pct0 .Pct}}%;background:{{gaugeColor .Tone}}"></i></span><span class="matrix-metric-val">{{pct0 .Pct}}%</span></div>{{else}}<span class="matrix-metric-wrap"><span class="matrix-metric-lab">{{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}</span><span class="matrix-metric-val">{{if .Value}}{{.Value}}{{else}}—{{end}}</span></span>{{end}}{{end}}
+
+{{define "bento"}}<div class="bento-container" role="grid" aria-label="Viewport Bento Glance Tiles">
+{{range .Groups}}
+<section class="provider-group-box" style="--p:{{.Accent}}">
+  <header class="provider-group-header">
+    <div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{.ProviderName}}</span><span class="provider-count">{{len .Items}} {{if eq (len .Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
+    <div class="provider-group-meta"><span class="pill {{.Rollup}}">{{.RollupLabel}}</span></div>
+  </header>
+  <div class="bento-tiles-grid">
+  {{range .Items}}
+    <div class="bento-tile agent-card{{if .IsAlert}} alert{{end}}{{if .Active}} selected{{end}}" hx-get="inspect?account={{urlquery .Key}}" hx-target="#inspect-content" hx-swap="innerHTML" style="--p:{{accent .AccentColor}}" title="Click to inspect {{.AccountID}}">
+      <div class="bento-tile-head">
+        <div class="card-identity">
+          <div class="card-avatar" style="background:{{.AvatarBg}};color:{{.AvatarColor}}">{{.AvatarText}}</div>
+          <div class="bento-head-left">
+            <span class="bento-acc-name">{{.AccountID}}</span>
+            <span class="card-sub">{{subtitle .}}</span>
+          </div>
+        </div>
+        <span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span>
+      </div>
+      <div class="bento-tile-body">{{if .BentoRows}}{{range .BentoRows}}{{if .Pct}}<div class="quota-row bento-quota-row {{toneClass .Tone}}"><div class="q-header"><span class="q-title"><span class="q-pill">{{timebandLabel .Label}}</span> {{.Label}}</span><span class="q-vals bento-quota-pct">{{pct0 .Pct}}%</span></div><div class="bento-quota-bar"><div class="q-bar {{barTone .Tone}}" style="width:{{pct0 .Pct}}%;background:{{gaugeColor .Tone}}"></div></div></div>{{else}}<div class="bento-quota-row"><span class="bento-quota-lab">{{.Label}}</span><span class="dim" style="grid-column:span 2">{{if .Value}}{{.Value}}{{else}}—{{end}}</span></div>{{end}}{{end}}{{else}}<div class="dim" style="font-size:11px">{{if .Summary}}{{.Summary}}{{else}}No active quotas{{end}}</div>{{end}}</div>
+      <div class="bento-tile-foot card-footer"><span class="bento-reset-hint{{if .Urgent}} urgent{{end}}">{{if .NextDisplay}}{{.NextDisplay}}{{else}}—{{end}}</span><span class="card-inspect">Inspect →</span>{{with bentoSpark .DailyCost}}<div class="bento-spark-wrap">{{.}}</div>{{end}}</div>
+    </div>
+  {{end}}
+  </div>
+</section>
+{{end}}
+</div>{{end}}
+
+{{define "board"}}<div class="board-container" role="list" aria-label="{{.Layout.Hint}}">
+{{range .Groups}}
+<section class="provider-group-box" style="--p:{{.Accent}}">
+  <header class="provider-group-header">
+    <div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{.ProviderName}}</span><span class="provider-count">{{len .Items}} {{if eq (len .Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
+    <div class="provider-group-meta"><span class="pill {{.Rollup}}">{{.RollupLabel}}</span></div>
+  </header>
+  <div class="board-grid board-{{$.Layout.ID}}">
+  {{range .Items}}{{if eq $.Layout.ID "dials"}}{{template "dial-card" .}}{{else if eq $.Layout.ID "strips"}}{{template "strip-card" .}}{{else}}{{template "bar-card" .}}{{end}}{{end}}
+  </div>
+</section>
+{{end}}
+</div>{{end}}
+
+{{define "agent-head"}}<div class="agent-head card-header"><div class="card-identity"><div class="card-avatar" style="background:{{.AvatarBg}};color:{{.AvatarColor}}">{{.AvatarText}}</div><div><div class="agent-name card-name">{{if .StatusIcon}}{{.StatusIcon}}{{else}}●{{end}} {{.AccountID}}</div><div class="agent-plan card-sub">{{subtitle .}}</div></div></div><span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span></div>{{end}}
+
+{{define "bar-card"}}<button type="button" class="agent agent-card{{if .IsAlert}} alert{{end}}{{if .Active}} selected{{end}}" hx-get="inspect?account={{urlquery .Key}}" hx-target="#inspect-content" hx-swap="innerHTML" style="--p:{{accent .AccentColor}};--tone:{{gaugeColor .FirstTone}}">{{template "agent-head" .}}{{if or .Graphs .Tables .TrendStats}}<div class="quotas-group">{{if .Graphs}}<div class="lin-list">{{range .Graphs}}{{if .Title}}<div class="gauge-group"><div class="gauge-group-title">{{.Title}}</div><div class="gauge-group-body">{{range .Items}}{{template "lin-gauge" .}}{{end}}</div></div>{{else}}{{range .Items}}{{template "lin-gauge" .}}{{end}}{{end}}{{end}}</div>{{end}}{{template "metric-table" .Tables}}{{if or .TrendStats .DailyCost}}<div class="agent-foot">{{template "metric-table" .TrendStats}}{{with cardSpark .DailyCost}}<div class="spark-wrap" title="Usage trend">{{.}}</div>{{end}}</div>{{end}}</div>{{else}}{{template "usage-fallback" .}}{{end}}<div class="card-footer"><span>Refreshed: {{if .RefreshedText}}{{.RefreshedText}}{{else}}just now{{end}}</span><span class="card-inspect">Inspect →</span></div></button>{{end}}
+
+{{define "dial-card"}}<button type="button" class="agent agent-card{{if .IsAlert}} alert{{end}}{{if .Active}} selected{{end}}" hx-get="inspect?account={{urlquery .Key}}" hx-target="#inspect-content" hx-swap="innerHTML" style="--p:{{accent .AccentColor}};--tone:{{gaugeColor .FirstTone}}">{{template "agent-head" .}}{{if or .Graphs .Tables .TrendStats}}<div>{{if .Graphs}}<div class="dial-row">{{range .Graphs}}{{if .Title}}<div class="gauge-group"><div class="gauge-group-title">{{.Title}}</div><div class="gauge-group-body">{{range .Items}}{{template "arc-gauge" .}}{{end}}</div></div>{{else}}{{range .Items}}{{template "arc-gauge" .}}{{end}}{{end}}{{end}}</div>{{end}}{{template "metric-table" .Tables}}{{if or .TrendStats .DailyCost}}<div class="agent-foot">{{template "metric-table" .TrendStats}}{{with dialSpark .DailyCost}}<div class="spark-wrap">{{.}}</div>{{end}}</div>{{end}}</div>{{else}}{{template "usage-fallback" .}}{{end}}</button>{{end}}
+
+{{define "strip-card"}}<button type="button" class="agent agent-card{{if .IsAlert}} alert{{end}}{{if .Active}} selected{{end}}" hx-get="inspect?account={{urlquery .Key}}" hx-target="#inspect-content" hx-swap="innerHTML" style="--p:{{accent .AccentColor}};--tone:{{gaugeColor .FirstTone}}"><div class="strip-id"><div class="card-identity"><div class="card-avatar" style="background:{{.AvatarBg}};color:{{.AvatarColor}}">{{.AvatarText}}</div><div><span class="agent-name">{{if .StatusIcon}}{{.StatusIcon}}{{else}}●{{end}} {{.AccountID}}</span><span class="agent-plan">{{subtitle .}}</span></div></div><span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span></div><div class="strip-gauges">{{if .Graphs}}{{range .Graphs}}{{if .Title}}<div class="gauge-group"><div class="gauge-group-title">{{.Title}}</div><div class="gauge-group-body">{{range .Items}}{{template "strip-gauge" .}}{{end}}</div></div>{{else}}{{range .Items}}{{template "strip-gauge" .}}{{end}}{{end}}{{end}}{{end}}{{template "metric-table" .Tables}}{{template "metric-table" .TrendStats}}</div><div class="strip-trend">{{stripSpark .DailyCost}}</div></button>{{end}}
+
+{{define "usage-fallback"}}<table class="metric-table"><tbody><tr><th scope="row">Usage</th><td>{{if .Message}}{{.Message}}{{else}}No data{{end}}</td></tr></tbody></table>{{end}}
+
+{{define "lin-gauge"}}<div class="quota-row lin-gauge {{toneClass .Tone}}{{if .Depleted}} depleted{{end}}"><div class="q-header lin-name"><span class="q-title"><span class="q-pill">{{timebandPill .}}</span> {{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}{{if .Depleted}} <span class="limit-flag">Limit reached</span>{{end}}</span><span class="q-vals">{{if .Value}}{{.Value}}{{else if .Pct}}{{pct0 .Pct}}%{{end}}</span></div><div class="lin-track"><div class="q-bar {{barTone .Tone}}" style="width:{{pct1 .Pct}}%;background:{{gaugeColor .Tone}}"></div></div><div class="q-foot lin-meta"><span>{{if .ResetIn}}Resets {{withIn .ResetIn}}{{else}}{{gaugeLeft .}}{{end}}</span><span class="{{if .Urgent}}urgent{{end}}">{{gaugeRight .}}</span></div></div>{{end}}
+
+{{define "arc-gauge"}}<div class="dial {{toneClass .Tone}}{{if .Depleted}} depleted{{end}}"><svg viewBox="0 0 88 58" class="dial-svg" aria-hidden="true"><path class="dial-track" d="M10 48 A34 34 0 0 1 78 48" pathLength="100"/><path class="dial-fill" d="M10 48 A34 34 0 0 1 78 48" pathLength="100" stroke="{{gaugeColor .Tone}}" stroke-dasharray="{{pct0 .Pct}} 100"/><text x="44" y="44" text-anchor="middle">{{arcHub .}}</text></svg><span class="dial-lab">{{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}</span><span class="dial-reset{{if .Urgent}} urgent{{end}}">{{arcReset .}}</span></div>{{end}}
+
+{{define "strip-gauge"}}<div class="strip-metric {{toneClass .Tone}}{{if .Depleted}} depleted{{end}}"><span class="strip-lab">{{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}</span><span class="strip-track"><i style="width:{{pct0 .Pct}}%;background:{{gaugeColor .Tone}}"></i><em>{{stripOverlay .}}</em></span><span class="strip-reset{{if .Urgent}} urgent{{end}}">{{stripReset .}}</span></div>{{end}}
+
+{{define "metric-table"}}{{if .}}<table class="metric-table"><tbody>{{range .}}<tr><th scope="row">{{.Label}}</th><td>{{if .Value}}{{.Value}}{{else}}—{{end}}</td></tr>{{end}}</tbody></table>{{end}}{{end}}
+
+{{define "icon-search"}}<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/><path d="M10.3 10.3 14 14"/></svg>{{end}}
+{{define "icon-contrast"}}<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 1.8a6.2 6.2 0 0 0 0 12.4z" fill="currentColor" stroke="none"/></svg>{{end}}
+{{define "icon-refresh"}}<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 8a5.2 5.2 0 1 1-1.7-3.9"/><path d="M13.2 2.4V5.6h-3.2"/></svg>{{end}}
+{{define "icon-grid"}}<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="2" width="5.2" height="5.2" rx="1.4"/><rect x="8.8" y="2" width="5.2" height="5.2" rx="1.4"/><rect x="2" y="8.8" width="5.2" height="5.2" rx="1.4"/><rect x="8.8" y="8.8" width="5.2" height="5.2" rx="1.4"/></svg>{{end}}
+{{define "icon-theme"}}<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.1"/><path d="M8 1.4v1.7M8 12.9v1.7M1.4 8h1.7M12.9 8h1.7M3.4 3.4l1.2 1.2M11.4 11.4l1.2 1.2M12.6 3.4l-1.2 1.2M4.6 11.4l-1.2 1.2"/></svg>{{end}}
+
+{{define "footer"}}<div class="dock-stream"><span class="live-dot" aria-hidden="true"></span><span class="live-label">LIVE STREAM:</span> <span class="live-stream-text">opencode invoked claude-3-5-sonnet · 1,420 in / 380 out · 410ms</span></div><span id="fetching-footer" class="fetching"><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span><span class="footer-desktop-text">auto-refresh ⟳ {{.RefreshSeconds}}s</span><span class="footer-desktop-text"><kbd>j</kbd>/<kbd>k</kbd> move</span><button type="button" class="footer-btn" id="footer-btn-filter" title="Filter providers (/)" aria-label="Search and filter"><span class="btn-icon">{{template "icon-search"}}</span><kbd class="kbd-hint">/</kbd><span class="btn-label">filter</span></button><button type="button" class="footer-btn" id="footer-btn-mode" hx-post="actions/usage-mode" title="Toggle usage mode (u)" aria-label="Toggle usage mode"><span class="btn-icon">{{template "icon-contrast"}}</span><kbd class="kbd-hint">u</kbd><span class="btn-label">{{.UsageModeLabel}}</span></button><button type="button" class="footer-btn" id="footer-btn-refresh" hx-get="partial/app?refresh=1{{with .Selected}}&amp;focus={{urlquery .AccountID}}{{end}}" title="Refresh focused account (r) / all (R)" aria-label="Refresh usage data"><span class="btn-icon">{{template "icon-refresh"}}</span><kbd class="kbd-hint">r</kbd><span class="btn-label">refresh</span></button><button type="button" class="footer-btn" id="footer-btn-layout" hx-post="actions/layout" hx-vals='{"layout":"next"}' title="Cycle dashboard layout (Tab / l / v)" aria-label="Cycle layout"><span class="btn-icon">{{template "icon-grid"}}</span><kbd class="kbd-hint">v</kbd><span class="btn-label">{{.Layout.Label}}</span></button><button type="button" class="footer-btn" id="footer-btn-theme" hx-post="actions/theme" title="Cycle theme (t forward, Shift+t or right-click back)" aria-label="Toggle theme"><span class="btn-icon">{{template "icon-theme"}}</span><kbd class="kbd-hint">t</kbd><span class="btn-label">theme</span></button><span class="grow footer-desktop-text"></span><span class="footer-desktop-text footer-mockup-tag">{{if .Env.ThemeTokens.Name}}{{.Env.ThemeTokens.Name}}{{else}}Ceramic Studio{{end}} · loopback</span><select id="footer-theme-select" class="footer-theme-select" name="theme" aria-label="Theme selector" hx-post="actions/theme" hx-include="this" hx-trigger="change">{{$active := .Env.ThemeTokens.Name}}{{range .Env.AvailableThemes}}<option value="{{.}}"{{if eq . $active}} selected{{end}}>{{.}}</option>{{end}}</select>{{end}}
+
+{{define "inspect"}}<h2 id="inspect-title" class="inspect-title" hx-swap-oob="outerHTML">{{if .V.StatusIcon}}{{.V.StatusIcon}}{{else}}●{{end}} {{.V.AccountID}}{{if .V.StatusBadge}} · {{.V.StatusBadge}}{{end}}</h2>{{template "cockpit" .}}{{end}}
+
+{{define "apple-logo"}}<svg class="au-apple-logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <linearGradient id="auSquircleGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2c2c2e"/>
+      <stop offset="100%" stop-color="#141416"/>
+    </linearGradient>
+    <linearGradient id="auGaugeGrad" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2997ff"/>
+      <stop offset="60%" stop-color="#0071e3"/>
+      <stop offset="100%" stop-color="#5ac8fa"/>
+    </linearGradient>
+    <linearGradient id="auBorderGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.24)"/>
+      <stop offset="50%" stop-color="rgba(255,255,255,0.06)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.35)"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="30" height="30" rx="7.2" fill="url(#auSquircleGrad)" stroke="url(#auBorderGrad)" stroke-width="1"/>
+  <path d="M 9.5 21.5 A 9 9 0 1 1 22.5 21.5" stroke="url(#auGaugeGrad)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+  <path d="M 8.5 16.5 L 12 16.5 L 14 12.5 L 17 20.5 L 19 16.5 L 23.5 16.5" stroke="#ffffff" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="16" cy="7" r="1.25" fill="#30d158"/>
+</svg>{{end}}
+
+{{define "apple-logo-lg"}}<svg class="au-apple-logo-lg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <linearGradient id="auSquircleGradLg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2c2c2e"/>
+      <stop offset="100%" stop-color="#141416"/>
+    </linearGradient>
+    <linearGradient id="auGaugeGradLg" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2997ff"/>
+      <stop offset="60%" stop-color="#0071e3"/>
+      <stop offset="100%" stop-color="#5ac8fa"/>
+    </linearGradient>
+    <linearGradient id="auBorderGradLg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.28)"/>
+      <stop offset="50%" stop-color="rgba(255,255,255,0.08)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.45)"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14.5" fill="url(#auSquircleGradLg)" stroke="url(#auBorderGradLg)" stroke-width="1.6"/>
+  <path d="M 19 43 A 18 18 0 1 1 45 43" stroke="url(#auGaugeGradLg)" stroke-width="4.2" stroke-linecap="round" fill="none"/>
+  <path d="M 17 33 L 24 33 L 28 25 L 34 41 L 38 33 L 47 33" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="32" cy="14" r="2.5" fill="#30d158"/>
+</svg>{{end}}

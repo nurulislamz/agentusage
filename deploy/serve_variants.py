@@ -28,6 +28,10 @@ DEFAULT_VARIANTS = {
     8082: "bento",
 }
 
+# Static files this runner serves itself; every other path is rendered by the
+# Go backend so the shell, fragments and actions stay server-rendered.
+ASSET_PATHS = ("/app.css", "/app.js", "/htmx.min.js")
+
 VARIANT_DESCRIPTIONS = {
     "split": "Refined Glanceable Submenu + Deep Inspector",
     "matrix": "Dense Roster Matrix HUD",
@@ -67,16 +71,24 @@ def create_variant_handler(variant_id, ui_dir, backend_host, backend_port):
         def handle_request(self, send_body=True):
             clean_path = self.path.split("?", 1)[0]
 
-            # 1. Forward API and healthz requests to backend
-            if clean_path.startswith("/api/") or clean_path == "/healthz":
-                self.proxy_to_backend(send_body=send_body)
+            # The Go backend renders the shell, HTMX fragments and actions; this
+            # server only serves the static assets locally and forwards the rest
+            # with its variant as ?layout=<id>.
+            if clean_path in ASSET_PATHS:
+                self.serve_ui_asset(clean_path, send_body=send_body)
                 return
 
-            # 2. Serve static UI assets
-            self.serve_ui_asset(clean_path, send_body=send_body)
+            self.proxy_to_backend(send_body=send_body, layout=variant_id)
 
-        def proxy_to_backend(self, send_body=True):
-            backend_url = f"http://{backend_host}:{backend_port}{self.path}"
+        def proxy_to_backend(self, send_body=True, layout=None):
+            backend_path = self.path
+            cookie_header = self.headers.get("Cookie", "")
+            if layout and "au_layout=" not in cookie_header:
+                # Only seed the variant's default layout; an explicit in-session
+                # choice (cookie) must survive every htmx request.
+                sep = "&" if "?" in backend_path else "?"
+                backend_path = f"{backend_path}{sep}layout={layout}"
+            backend_url = f"http://{backend_host}:{backend_port}{backend_path}"
             body_bytes = None
             if self.command == "POST":
                 content_length = int(self.headers.get("Content-Length", 0))
@@ -86,7 +98,7 @@ def create_variant_handler(variant_id, ui_dir, backend_host, backend_port):
             req = urllib.request.Request(backend_url, data=body_bytes, method=self.command)
 
             # Forward relevant client headers
-            for header in ["Authorization", "Content-Type", "Accept", "User-Agent", "Sec-Fetch-Site"]:
+            for header in ["Authorization", "Content-Type", "Accept", "User-Agent", "Sec-Fetch-Site", "Cookie"]:
                 val = self.headers.get(header)
                 if val:
                     req.add_header(header, val)
@@ -134,39 +146,20 @@ def create_variant_handler(variant_id, ui_dir, backend_host, backend_port):
                     self.wfile.write(err_msg)
 
         def serve_ui_asset(self, clean_path, send_body=True):
-            if clean_path in ["", "/", "/index.html"]:
-                file_path = os.path.join(ui_dir, "index.html")
-                content_type = "text/html; charset=utf-8"
-                inject_layout = True
-            elif clean_path == "/app.css":
-                file_path = os.path.join(ui_dir, "app.css")
-                content_type = "text/css; charset=utf-8"
-                inject_layout = False
-            elif clean_path == "/app.js":
-                file_path = os.path.join(ui_dir, "app.js")
-                content_type = "application/javascript; charset=utf-8"
-                inject_layout = False
-            else:
-                rel_path = clean_path.lstrip("/")
-                file_path = os.path.join(ui_dir, rel_path)
-                if not os.path.exists(file_path) or not os.path.isfile(file_path):
-                    self.send_error(404, f"Not found: {clean_path}")
-                    return
-                content_type = "application/octet-stream"
-                inject_layout = False
+            rel_path = clean_path.lstrip("/")
+            file_path = os.path.join(ui_dir, rel_path)
+            if not os.path.isfile(file_path):
+                self.send_error(404, f"Not found: {clean_path}")
+                return
+            content_type = {
+                ".css": "text/css; charset=utf-8",
+                ".js": "application/javascript; charset=utf-8",
+                ".svg": "image/svg+xml",
+            }.get(os.path.splitext(file_path)[1], "application/octet-stream")
 
             try:
                 with open(file_path, "rb") as f:
                     content = f.read()
-
-                if inject_layout:
-                    html_str = content.decode("utf-8")
-                    snippet = f'<script>window.__DEFAULT_LAYOUT__="{variant_id}";</script>'
-                    if "</head>" in html_str:
-                        html_str = html_str.replace("</head>", f"  {snippet}\n</head>", 1)
-                    else:
-                        html_str = snippet + html_str
-                    content = html_str.encode("utf-8")
 
                 self.send_response(200)
                 self.send_header("Content-Type", content_type)

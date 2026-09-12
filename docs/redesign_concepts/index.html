@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agentUsage - Design & Font Concepts Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Outfit:wght@500;700;800&family=Instrument+Sans:wght@500;700&family=Syne:wght@700;800&family=Space+Mono:wght@700&family=JetBrains+Mono:wght@700&family=DM+Mono:wght@500&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #0d0f14;
+  color: #f1f3f7;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Header */
+header {
+  height: 64px;
+  background: #141720;
+  border-bottom: 1px solid #222736;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  flex-shrink: 0;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.brand span { color: #3b82f6; }
+.badge {
+  font-size: 11px;
+  background: #1e2433;
+  color: #93c5fd;
+  border: 1px solid #2e384d;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+/* Nav Tabs */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #0d0f14;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid #222736;
+}
+.tab-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8f98ad;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+.tab-btn:hover { color: #ffffff; background: rgba(255,255,255,0.05); }
+.tab-btn.active {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+}
+.tab-num {
+  font-size: 10px;
+  opacity: 0.7;
+  padding: 1px 5px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 4px;
+}
+
+/* View Mode Toggles */
+.view-modes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mode-btn {
+  background: #1e2433;
+  border: 1px solid #2e384d;
+  color: #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mode-btn.active {
+  background: #ffffff;
+  color: #000000;
+}
+
+/* Main Display Area */
+main {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  background: #090a0f;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* Single View */
+.view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1600px;
+  width: 100%;
+}
+.meta-panel {
+  background: #141720;
+  border: 1px solid #222736;
+  border-radius: 12px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.meta-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.meta-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+}
+.font-specimen {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+.spec-chip {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #1e2433;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.preview-frame {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid #222736;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  display: block;
+}
+
+/* Grid View (Show all 5 side-by-side) */
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  width: 100%;
+  max-width: 1800px;
+}
+.grid-item {
+  background: #141720;
+  border: 1px solid #222736;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.grid-item:hover {
+  transform: translateY(-4px);
+  border-color: #3b82f6;
+}
+.grid-item-head {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #222736;
+  background: #181b26;
+}
+.grid-item img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div>agent<span>Usage</span> Design Studio</div>
+    <span class="badge">5 Ground-Up Directions</span>
+  </div>
+
+  <nav class="tabs" id="tabs-bar">
+    <button class="tab-btn active" onclick="showTab(0)"><span class="tab-num">1</span> Ceramic Swiss</button>
+    <button class="tab-btn" onclick="showTab(1)"><span class="tab-num">2</span> Activity Rings</button>
+    <button class="tab-btn" onclick="showTab(2)"><span class="tab-num">3</span> Braun Industrial</button>
+    <button class="tab-btn" onclick="showTab(3)"><span class="tab-num">4</span> Linear Luxe</button>
+    <button class="tab-btn" onclick="showTab(4)"><span class="tab-num">0</span> Studio Light (Classic)</button>
+  </nav>
+
+  <div class="view-modes">
+    <button class="mode-btn active" id="btn-focus" onclick="setMode('focus')">Focused View</button>
+    <button class="mode-btn" id="btn-grid" onclick="setMode('grid')">Compare All (2x2 Grid)</button>
+  </div>
+</header>
+
+<main id="main-area">
+  <!-- Focus View Container -->
+  <div class="view-container" id="focus-view">
+    <div class="meta-panel">
+      <div class="meta-left">
+        <div class="meta-title" id="focus-title">Direction 1: Ceramic Swiss Studio</div>
+        <div class="font-specimen">
+          Display Font: <span class="spec-chip" id="spec-display" style="font-family:'Plus Jakarta Sans'">Plus Jakarta Sans (800)</span>
+          Monospace: <span class="spec-chip" id="spec-mono" style="font-family:'Space Mono'">Space Mono (700)</span>
+        </div>
+      </div>
+      <div style="font-size:12px;color:#94a3b8" id="focus-desc">
+        Warm ceramic paper, solid ink borders, micro-grid texture, horizontal timeband capsules.
+      </div>
+    </div>
+    <img id="focus-img" class="preview-frame" src="14_ceramic_swiss_studio.jpg" alt="Preview">
+  </div>
+
+  <!-- Grid Comparison Container (hidden by default) -->
+  <div class="grid-container" id="grid-view" style="display:none">
+    <div class="grid-item" onclick="selectFromGrid(0)">
+      <div class="grid-item-head">
+        <strong style="font-family:'Plus Jakarta Sans'">1. Ceramic Swiss Studio</strong>
+        <span class="badge">Plus Jakarta Sans + Space Mono</span>
+      </div>
+      <img src="14_ceramic_swiss_studio.jpg" alt="Ceramic Swiss">
+    </div>
+
+    <div class="grid-item" onclick="selectFromGrid(1)">
+      <div class="grid-item-head">
+        <strong style="font-family:'Outfit'">2. Apple Activity Rings Studio</strong>
+        <span class="badge">Outfit + JetBrains Mono</span>
+      </div>
+      <img src="15_apple_activity_rings_studio.jpg" alt="Activity Rings">
+    </div>
+
+    <div class="grid-item" onclick="selectFromGrid(2)">
+      <div class="grid-item-head">
+        <strong style="font-family:'Instrument Sans'">3. Braun Industrial Studio</strong>
+        <span class="badge">Instrument Sans + DM Mono</span>
+      </div>
+      <img src="16_braun_industrial_studio.jpg" alt="Braun Studio">
+    </div>
+
+    <div class="grid-item" onclick="selectFromGrid(3)">
+      <div class="grid-item-head">
+        <strong style="font-family:'Syne'">4. Linear Luxe Studio</strong>
+        <span class="badge">Syne + IBM Plex Mono</span>
+      </div>
+      <img src="17_linear_luxe_studio.jpg" alt="Linear Luxe">
+    </div>
+
+    <div class="grid-item" style="grid-column:span 2" onclick="selectFromGrid(4)">
+      <div class="grid-item-head">
+        <strong>0. Apple Studio Light (Original Classic)</strong>
+        <span class="badge">SF Pro Display + SF Mono</span>
+      </div>
+      <img src="01_apple_studio_light.jpg" alt="Original Studio Light">
+    </div>
+  </div>
+</main>
+
+<script>
+const concepts = [
+  {
+    title: "Direction 1: Ceramic Swiss Studio",
+    display: "Plus Jakarta Sans (800)",
+    displayFont: "'Plus Jakarta Sans', sans-serif",
+    mono: "Space Mono (700)",
+    monoFont: "'Space Mono', monospace",
+    desc: "Warm ceramic paper, solid ink borders with 3D drop-shadow, micro-grid texture, timeband capsule bars.",
+    src: "14_ceramic_swiss_studio.jpg"
+  },
+  {
+    title: "Direction 2: Apple Activity Rings Studio",
+    display: "Outfit (800 Geometric)",
+    displayFont: "'Outfit', sans-serif",
+    mono: "JetBrains Mono (700)",
+    monoFont: "'JetBrains Mono', monospace",
+    desc: "Authentic Apple Watch Concentric Tri-Rings (Red Daily, Green Weekly, Blue Monthly), frosted glass.",
+    src: "15_apple_activity_rings_studio.jpg"
+  },
+  {
+    title: "Direction 3: Braun / Dieter Rams Industrial Studio",
+    display: "Instrument Sans (700 Modernist)",
+    displayFont: "'Instrument Sans', sans-serif",
+    mono: "DM Mono (500 Engineering)",
+    monoFont: "'DM Mono', monospace",
+    desc: "Warm anodized aluminum, Dieter Rams signature orange accents, physical rocker toggles, mixing faders.",
+    src: "16_braun_industrial_studio.jpg"
+  },
+  {
+    title: "Direction 4: Linear / Vercel Ultra-Clean Luxe",
+    display: "Syne (800 Architectural)",
+    displayFont: "'Syne', sans-serif",
+    mono: "IBM Plex Mono (600 Tech)",
+    monoFont: "'IBM Plex Mono', monospace",
+    desc: "Stark paper white minimalism, electric indigo highlights, fine micro-hairlines, high typographic contrast.",
+    src: "17_linear_luxe_studio.jpg"
+  },
+  {
+    title: "Reference: Apple Studio Light (Original Classic)",
+    display: "SF Pro Display (600)",
+    displayFont: "system-ui, sans-serif",
+    mono: "SF Mono / Menlo",
+    monoFont: "monospace",
+    desc: "Floating island pill navigation, light silver canvas, Apple capsule progress meters.",
+    src: "01_apple_studio_light.jpg"
+  }
+];
+
+let currentIndex = 0;
+
+function showTab(index) {
+  currentIndex = index;
+  const c = concepts[index];
+  document.getElementById("focus-title").textContent = c.title;
+  
+  const dispEl = document.getElementById("spec-display");
+  dispEl.textContent = c.display;
+  dispEl.style.fontFamily = c.displayFont;
+  
+  const monoEl = document.getElementById("spec-mono");
+  monoEl.textContent = c.mono;
+  monoEl.style.fontFamily = c.monoFont;
+  
+  document.getElementById("focus-desc").textContent = c.desc;
+  document.getElementById("focus-img").src = c.src;
+
+  const buttons = document.querySelectorAll(".tab-btn");
+  buttons.forEach((b, i) => {
+    b.classList.toggle("active", i === index);
+  });
+
+  setMode('focus');
+}
+
+function selectFromGrid(index) {
+  showTab(index);
+}
+
+function setMode(mode) {
+  const focusView = document.getElementById("focus-view");
+  const gridView = document.getElementById("grid-view");
+  const btnFocus = document.getElementById("btn-focus");
+  const btnGrid = document.getElementById("btn-grid");
+
+  if (mode === 'grid') {
+    focusView.style.display = "none";
+    gridView.style.display = "grid";
+    btnFocus.classList.remove("active");
+    btnGrid.classList.add("active");
+  } else {
+    focusView.style.display = "flex";
+    gridView.style.display = "none";
+    btnFocus.classList.add("active");
+    btnGrid.classList.remove("active");
+  }
+}
+</script>
+
+</body>
+</html>

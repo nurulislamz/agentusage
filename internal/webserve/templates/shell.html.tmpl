@@ -1,0 +1,68 @@
+{{define "shell"}}<!DOCTYPE html>
+<html lang="en" data-theme="{{.ThemeSlug}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="{{.ThemeColor}}" id="meta-theme-color">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <title>agentUsage Ceramic Studio</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a1a1c'/%3E%3Ctext x='16' y='22' font-family='sans-serif' font-size='14' font-weight='800' fill='%23ffffff' text-anchor='middle'%3EaU%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="app.css">
+  <style id="theme-vars"></style>
+</head>
+<body>
+  <div id="app" class="shell layout-split" data-layout="split" hidden hx-get="partial/app" hx-trigger="load, every 10s" hx-target="#app" hx-swap="outerHTML" hx-indicator="#fetching-detail"></div>
+
+  <div id="splash" class="splash">
+    <div class="splash-emblem" aria-hidden="true">{{template "apple-logo-lg"}}</div>
+    <div class="splash-brand"><span class="brand-agent">agent</span><span class="brand-usage">Usage</span></div>
+    <p class="splash-text">Loading usage snapshots…</p>
+  </div>
+
+  <div id="empty-state" class="empty" hidden>
+    <div class="splash-emblem dim" aria-hidden="true">{{template "apple-logo-lg"}}</div>
+    <h2 id="empty-title">No snapshots yet</h2>
+    <p id="empty-error" class="empty-error" hidden></p>
+    <p id="empty-hint">Start the telemetry daemon (<code>agentusage daemon</code>) or configure provider credentials.</p>
+  </div>
+
+  <div id="token-modal" class="modal" hidden>
+    <form id="token-form" class="modal-card">
+      <h2>Unlock dashboard</h2>
+      <p class="muted">This server requires a bearer token. Stored in this tab only.</p>
+      <input id="token-input" type="password" autocomplete="off" placeholder="AGENTUSAGE_SERVE_TOKEN">
+      <p id="token-error" class="error" hidden></p>
+      <button type="submit">Continue</button>
+    </form>
+  </div>
+
+  <div id="inspect-modal" class="modal inspect-modal" hidden>
+    <div class="modal-card inspect-card" role="dialog" aria-modal="true" aria-labelledby="inspect-title">
+      <div class="mobile-sheet-handle" aria-hidden="true"></div>
+      <div class="inspect-header">
+        <h2 id="inspect-title" class="inspect-title">Cockpit Inspection</h2>
+        <button type="button" id="inspect-close" class="inspect-close" aria-label="Close modal">✕</button>
+      </div>
+      <div id="inspect-content" class="inspect-content"></div>
+    </div>
+  </div>
+
+  <div id="filter-bar" class="filter-bar" hidden>
+    <label for="filter-input" class="filter-icon">{{template "icon-search"}}</label>
+    <input id="filter-input" name="q" type="text" spellcheck="false" autocomplete="off" placeholder="filter providers…" value="{{.Filter}}" hx-get="partial/app" hx-trigger="input changed delay:250ms, search" hx-target="#app" hx-swap="outerHTML" hx-include="this">
+    <span class="filter-hint dim">Esc cancel · Enter apply</span>
+    <button type="button" id="filter-close" class="filter-close-btn" aria-label="Close search">✕</button>
+  </div>
+
+  <div id="status-bar" class="status-bar" hidden></div>
+  <script src="htmx.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>{{end}}
