@@ -1165,6 +1165,52 @@ code { color: var(--accent); }
   overflow-wrap: anywhere;
 }
 
+/* In-panel empty filter state */
+.empty-filter-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--surface, #161928);
+  border: 1px dashed var(--border, #1e2235);
+  border-radius: var(--ui-radius-card, 16px);
+  margin: 28px auto;
+  max-width: 460px;
+}
+.empty-filter-icon {
+  font-size: 32px;
+  line-height: 1;
+  color: var(--muted, #7a82a6);
+  margin-bottom: 12px;
+}
+.empty-filter-msg {
+  font-size: var(--text-base, 13.5px);
+  color: var(--fg-2, #b0b4c8);
+  margin-bottom: 16px;
+  line-height: var(--leading, 1.45);
+}
+.empty-filter-msg strong {
+  color: var(--fg, #e4e6f0);
+}
+.btn-clear-filter {
+  background: var(--tint-fill, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--border, #1e2235);
+  color: var(--fg, #e4e6f0);
+  padding: 6px 14px;
+  border-radius: var(--ui-radius-control, 10px);
+  font-family: var(--font-ui, sans-serif);
+  font-size: var(--text-sm, 12.5px);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+}
+.btn-clear-filter:hover {
+  background: var(--tint-hover, rgba(255, 255, 255, 0.12));
+  border-color: var(--border-strong, #1a1a1c);
+}
+
 /* Mobile back bar (split layout on small screens) */
 .mobile-back-bar { display: none; }
 
@@ -1403,6 +1449,36 @@ code { color: var(--accent); }
 }
 .search-box:hover {
   border-color: var(--border-strong, #1a1a1c);
+}
+.search-box.has-query {
+  border-color: var(--accent, #7eb8f7);
+  background: color-mix(in oklab, var(--accent, #7eb8f7) 8%, var(--surface, #161928));
+  color: var(--fg, #e4e6f0);
+}
+.search-box.has-query .search-text {
+  color: var(--fg, #e4e6f0);
+  font-weight: 600;
+}
+.search-kbd {
+  color: var(--muted, #7a82a6);
+}
+.btn-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  margin-left: 2px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted, #7a82a6);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color var(--motion-fast) var(--ease);
+}
+.btn-search-clear:hover {
+  color: var(--fg, #e4e6f0);
 }
 
 /* Global Stats Banner */

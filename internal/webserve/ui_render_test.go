@@ -664,3 +664,64 @@ func TestLayoutBtnActiveContrast(t *testing.T) {
 		t.Errorf("app.css should not use low-contrast #ffffff on var(--surface2) for .layout-btn.active")
 	}
 }
+
+func TestFilterNoMatch_PreservesAppShell(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	w := getHTML(t, srv, "/partial/app?q=zzz-nothing")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+
+	// 1. #app does NOT have hidden attribute
+	appIdx := strings.Index(body, `id="app"`)
+	if appIdx == -1 {
+		t.Fatal("missing #app element")
+	}
+	appClose := strings.Index(body[appIdx:], ">")
+	if appClose == -1 {
+		t.Fatal("malformed #app element tag")
+	}
+	appTag := body[appIdx : appIdx+appClose]
+	if strings.Contains(appTag, "hidden") {
+		t.Errorf("#app should not have hidden on filter mismatch: %s", appTag)
+	}
+
+	// 2. #empty-state DOES have hidden attribute
+	emptyIdx := strings.Index(body, `id="empty-state"`)
+	if emptyIdx == -1 {
+		t.Fatal("missing #empty-state element")
+	}
+	emptyClose := strings.Index(body[emptyIdx:], ">")
+	if emptyClose == -1 {
+		t.Fatal("malformed #empty-state element tag")
+	}
+	emptyTag := body[emptyIdx : emptyIdx+emptyClose]
+	if !strings.Contains(emptyTag, "hidden") {
+		t.Errorf("#empty-state must have hidden attribute on filter mismatch: %s", emptyTag)
+	}
+
+	// 3. Rendered HTML contains .empty-filter-state, No providers matching "zzz-nothing", and the clear button
+	for _, want := range []string{
+		`class="empty-filter-state"`,
+		`class="empty-filter-icon"`,
+		`class="empty-filter-msg"`,
+		`No providers matching "zzz-nothing"`,
+		`class="btn-clear-filter"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing expected empty filter state marker %q", want)
+		}
+	}
+
+	// 4. Header search box reflects query and contains .btn-search-clear
+	for _, want := range []string{
+		`class="search-box has-query"`,
+		`class="btn-search-clear"`,
+		`zzz-nothing`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing expected search box marker %q", want)
+		}
+	}
+}

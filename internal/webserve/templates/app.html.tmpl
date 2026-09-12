@@ -1,4 +1,4 @@
-{{define "app"}}<div id="app" class="shell layout-{{.Layout.ID}}{{if eq .MobileView "detail"}} mobile-view-detail{{else}} mobile-view-roster{{end}}" data-layout="{{.Layout.ID}}"{{if not .HasData}} hidden{{end}} hx-get="partial/app" hx-trigger="every {{.RefreshSeconds}}s" hx-target="#app" hx-swap="outerHTML" hx-indicator="#fetching-detail">
+{{define "app"}}<div id="app" class="shell layout-{{.Layout.ID}}{{if eq .MobileView "detail"}} mobile-view-detail{{else}} mobile-view-roster{{end}}" data-layout="{{.Layout.ID}}"{{if and (not .HasData) (not .Filtered)}} hidden{{end}} hx-get="partial/app" hx-trigger="every {{.RefreshSeconds}}s" hx-target="#app" hx-swap="outerHTML" hx-indicator="#fetching-detail">
   <header class="header top-nav">
     <div id="header" class="header-main">
       <div class="brand-group">
@@ -10,7 +10,13 @@
       <span class="spacer"></span>
       <nav class="layout-nav center-tabs" aria-label="Layout view">{{range .Layouts}}<button type="button" class="layout-btn{{if eq .ID $.Layout.ID}} active{{end}}" data-layout="{{.ID}}" hx-post="actions/layout" hx-vals='{"layout":"{{.ID}}"}' title="{{.Hint}}"><span class="layout-icon">{{.Icon}}</span> <span class="layout-label">{{.Label}}</span></button>{{end}}</nav>
       <div class="right-controls">
-        <div class="search-box" onclick="document.getElementById('footer-btn-filter').click()" title="Filter providers (/)"><span>/</span> filter providers…</div>
+        <div class="search-box{{if .Filtered}} has-query{{end}}" title="Filter providers (/)">
+          <span class="search-kbd" onclick="document.getElementById('footer-btn-filter').click()">/</span>
+          <span class="search-text" onclick="document.getElementById('footer-btn-filter').click()">{{if .Filtered}}{{.Filter}}{{else}}filter providers…{{end}}</span>
+          {{if .Filtered}}
+          <button type="button" class="btn-search-clear" onclick="event.stopPropagation();var inp=document.getElementById('filter-input');if(inp){inp.value='';htmx.trigger(inp,'input');}" title="Clear filter" aria-label="Clear filter">✕</button>
+          {{end}}
+        </div>
         <span class="header-meta"><span class="meta-icon">⊞</span> {{len .Views}} agents{{if .Filtered}} (filtered){{end}} · {{.Layout.Label}} · {{.Layout.Hint}}</span>
       </div>
     </div>
@@ -41,7 +47,11 @@
           <div class="stat-val mono">{{.Stats.CacheHit}}</div>
           <div class="stat-note">{{.Stats.CacheNote}}</div>
         </div>
-      </div>{{end}}{{if not .HasData}}<p class="dim">{{if .Filtered}}No matches.{{else}}No providers.{{end}}</p>{{end}}{{if eq .Layout.ID "split"}}{{with .Selected}}{{template "mobilebar" (cctx $ .)}}{{template "cockpit" (cctx $ .)}}{{end}}{{else if eq .Layout.ID "matrix"}}{{template "matrix" .}}{{else if eq .Layout.ID "bento"}}{{template "bento" .}}{{else}}{{template "board" .}}{{end}}</div>
+      </div>{{end}}{{if not .HasData}}{{if .Filtered}}<div class="empty-filter-state">
+        <div class="empty-filter-icon" aria-hidden="true">⊘</div>
+        <div class="empty-filter-msg"><strong>No matches.</strong> No providers matching "{{.Filter}}"</div>
+        <button type="button" class="btn-clear-filter" onclick="var inp=document.getElementById('filter-input');if(inp){inp.value='';htmx.trigger(inp,'input');}" title="Clear filter query">Clear filter</button>
+      </div>{{else}}<p class="dim">No providers.</p>{{end}}{{end}}{{if eq .Layout.ID "split"}}{{with .Selected}}{{template "mobilebar" (cctx $ .)}}{{template "cockpit" (cctx $ .)}}{{end}}{{else if eq .Layout.ID "matrix"}}{{template "matrix" .}}{{else if eq .Layout.ID "bento"}}{{template "bento" .}}{{else}}{{template "board" .}}{{end}}</div>
     </main>
   </div>
   <div class="hairline" aria-hidden="true"></div>
@@ -65,5 +75,5 @@
 {{define "oob"}}<style id="theme-vars" hx-swap-oob="outerHTML">{{themeVars .Env.ThemeTokens}}</style>
 <meta id="meta-theme-color" hx-swap-oob="outerHTML" content="{{if .Env.ThemeTokens.Base}}{{.Env.ThemeTokens.Base}}{{else}}#0c0e16{{end}}">
 <div id="splash" class="splash" hx-swap-oob="outerHTML" hidden></div>
-<div id="empty-state" class="empty" hx-swap-oob="outerHTML"{{if .HasData}} hidden{{end}}><div class="splash-emblem dim" aria-hidden="true">{{template "apple-logo-lg"}}</div><h2 id="empty-title">{{.EmptyTitle}}</h2><p id="empty-error" class="empty-error"{{if not .EmptyError}} hidden{{end}}>{{.EmptyError}}</p><p id="empty-hint">{{.EmptyHint}}</p></div>
+<div id="empty-state" class="empty" hx-swap-oob="outerHTML"{{if or .HasData .Filtered}} hidden{{end}}><div class="splash-emblem dim" aria-hidden="true">{{template "apple-logo-lg"}}</div><h2 id="empty-title">{{.EmptyTitle}}</h2><p id="empty-error" class="empty-error"{{if not .EmptyError}} hidden{{end}}>{{.EmptyError}}</p><p id="empty-hint">{{.EmptyHint}}</p></div>
 <div id="status-bar" class="status-bar{{if .StatusToast}} toast{{end}}" hx-swap-oob="outerHTML"{{if not .StatusText}} hidden{{end}}>{{.StatusText}}</div>{{end}}
