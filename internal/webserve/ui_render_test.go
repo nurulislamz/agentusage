@@ -145,7 +145,7 @@ func TestAppFragmentLayouts(t *testing.T) {
 	}{
 		{"split", []string{`class="hero"`, `class="item nav-item`}},
 		{"matrix", []string{`class="matrix-table"`, `class="matrix-row`, `class="provider-group-box"`}},
-		{"bento", []string{`class="bento-tile`, `class="bento-quota-bar"`}},
+		{"bento", []string{`class="bento-tiles-grid"`, `class="bento-tile`, `class="bento-quota-bar"`}},
 		{"bars", []string{`class="board-grid board-bars"`, `class="lin-track"`}},
 		{"dials", []string{`class="board-grid board-dials"`, `class="dial-svg"`}},
 		{"strips", []string{`class="board-grid board-strips"`, `class="strip-track"`}},
@@ -160,6 +160,11 @@ func TestAppFragmentLayouts(t *testing.T) {
 			for _, marker := range tc.markers {
 				if !strings.Contains(html, marker) {
 					t.Errorf("layout %s missing %q", tc.layout, marker)
+				}
+			}
+			if tc.layout == "bento" || tc.layout == "bars" || tc.layout == "dials" {
+				if strings.Contains(html, "provider-group-box") {
+					t.Errorf("layout %s should not use provider-group-box boxing in glance views", tc.layout)
 				}
 			}
 			if !strings.Contains(html, `data-layout="`+tc.layout+`"`) {
@@ -416,9 +421,12 @@ func TestStylesheetKeepsLayoutHooks(t *testing.T) {
 	css := w.Body.String()
 	for _, want := range []string{
 		".board-bars", ".board-dials", ".board-strips", ".lin-track", ".dial-svg",
-		".strip-track", ".metric-table", ".gauge-group", ".bento-tile", ".matrix-table",
+		".strip-track", ".metric-table", ".gauge-group", ".bento-tile", ".bento-tiles-grid", ".matrix-table",
 		".item.refreshing", ".fetching.htmx-request", ".sr-only",
 		"prefers-reduced-motion",
+		"padding: 14px 20px 56px;",
+		"repeat(auto-fill, minmax(",
+		"repeat(3, 1fr)",
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css missing %q", want)

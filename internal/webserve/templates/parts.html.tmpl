@@ -187,14 +187,8 @@
 {{define "quota-cell"}}{{if .Pct}}<div class="matrix-metric-wrap {{toneClass .Tone}}"><span class="matrix-metric-lab">{{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}</span><span class="matrix-metric-bar"><i style="width:{{pct0 .Pct}}%;background:{{gaugeColor .Tone}}"></i></span><span class="matrix-metric-val">{{pct0 .Pct}}%</span></div>{{else}}<span class="matrix-metric-wrap"><span class="matrix-metric-lab">{{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}</span><span class="matrix-metric-val">{{if .Value}}{{.Value}}{{else}}—{{end}}</span></span>{{end}}{{end}}
 
 {{define "bento"}}<div class="bento-container" role="grid" aria-label="Viewport Bento Glance Tiles">
-{{range .Groups}}
-<section class="provider-group-box" style="--p:{{.Accent}}">
-  <header class="provider-group-header">
-    <div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{.ProviderName}}</span><span class="provider-count">{{len .Items}} {{if eq (len .Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
-    <div class="provider-group-meta"><span class="pill {{.Rollup}}">{{.RollupLabel}}</span></div>
-  </header>
   <div class="bento-tiles-grid">
-  {{range .Items}}
+  {{range .Views}}
     <div class="bento-tile agent-card{{if .IsAlert}} alert{{end}}{{if .Active}} selected{{end}}" hx-get="inspect?account={{urlquery .Key}}" hx-target="#inspect-content" hx-swap="innerHTML" style="--p:{{accent .AccentColor}}" title="Click to inspect {{.AccountID}}">
       <div class="bento-tile-head">
         <div class="card-identity">
@@ -211,22 +205,12 @@
     </div>
   {{end}}
   </div>
-</section>
-{{end}}
 </div>{{end}}
 
-{{define "board"}}<div class="board-container" role="list" aria-label="{{.Layout.Hint}}">
-{{range .Groups}}
-<section class="provider-group-box" style="--p:{{.Accent}}">
-  <header class="provider-group-header">
-    <div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{.ProviderName}}</span><span class="provider-count">{{len .Items}} {{if eq (len .Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
-    <div class="provider-group-meta"><span class="pill {{.Rollup}}">{{.RollupLabel}}</span></div>
-  </header>
+{{define "board"}}<div class="board-container board-{{$.Layout.ID}}" role="list" aria-label="{{.Layout.Hint}}">
   <div class="board-grid board-{{$.Layout.ID}}">
-  {{range .Items}}{{if eq $.Layout.ID "dials"}}{{template "dial-card" .}}{{else if eq $.Layout.ID "strips"}}{{template "strip-card" .}}{{else}}{{template "bar-card" .}}{{end}}{{end}}
+  {{range .Views}}{{if eq $.Layout.ID "dials"}}{{template "dial-card" .}}{{else if eq $.Layout.ID "strips"}}{{template "strip-card" .}}{{else}}{{template "bar-card" .}}{{end}}{{end}}
   </div>
-</section>
-{{end}}
 </div>{{end}}
 
 {{define "agent-head"}}<div class="agent-head card-header"><div class="card-identity"><div class="card-avatar" style="background:{{.AvatarBg}};color:{{.AvatarColor}}">{{.AvatarText}}</div><div><div class="agent-name card-name">{{if .StatusIcon}}{{.StatusIcon}}{{else}}●{{end}} {{.AccountID}}</div><div class="agent-plan card-sub">{{subtitle .}}</div></div></div><span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span></div>{{end}}
