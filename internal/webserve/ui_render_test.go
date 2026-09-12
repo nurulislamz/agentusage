@@ -436,3 +436,204 @@ func TestStylesheetKeepsLayoutHooks(t *testing.T) {
 		t.Error("app.css should not hide the footer while refreshing")
 	}
 }
+
+func renderFragment(t *testing.T, env Envelope, in renderInput) string {
+	t.Helper()
+	var buf strings.Builder
+	model := buildRenderModel(env, in)
+	if err := executeTemplate(&buf, "app", model); err != nil {
+		t.Fatalf("renderFragment: %v", err)
+	}
+	return buf.String()
+}
+
+func renderInspect(t *testing.T, env Envelope, in renderInput) string {
+	t.Helper()
+	var buf strings.Builder
+	model := buildRenderModel(env, in)
+	if model.Selected == nil {
+		t.Fatalf("renderInspect: model.Selected is nil")
+	}
+	if err := executeTemplate(&buf, "inspect", cockpitCtx{M: model, V: *model.Selected}); err != nil {
+		t.Fatalf("renderInspect: %v", err)
+	}
+	return buf.String()
+}
+
+func TestErrorSanitization_SuppressesCannotRenderError(t *testing.T) {
+	env := Envelope{
+		Views: []AccountView{
+			{
+				Key:          "err-acct",
+				ProviderID:   "codex",
+				ProviderName: "OpenAI Codex CLI",
+				AccountID:    "codex-cli",
+				Status:       "OK",
+				StatusBadge:  "ALL OK",
+				Summary:      "cannot render as bar or graph",
+				UsageLines: []UsageLine{
+					{Label: "Rate", Value: "cannot render as bar or graph"},
+					{Label: "cannot render as bar or graph", Value: "100"},
+					{Label: "Tokens", Value: "45% used", Percent: f64(45)},
+				},
+				DetailCards: []DetailCard{
+					{
+						ID:    "only-errors",
+						Title: "Diagnostic Errors",
+						Rows: []DetailRow{
+							{Kind: "kv", Label: "Err 1", Value: "cannot render as bar or graph"},
+							{Kind: "kv", Label: "cannot render", Value: "failed"},
+						},
+					},
+					{
+						ID:    "mixed-card",
+						Title: "Quota Details",
+						Rows: []DetailRow{
+							{Kind: "kv", Label: "Err Row", Value: "cannot render as bar or graph"},
+							{Kind: "kv", Label: "Valid Row", Value: "99 reqs"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	layouts := []string{"split", "matrix", "bento", "bars", "dials", "strips"}
+	for _, layout := range layouts {
+		t.Run(layout, func(t *testing.T) {
+			html := renderFragment(t, env, renderInput{Layout: layout})
+			if strings.Contains(strings.ToLower(html), "cannot render as bar or graph") {
+				t.Errorf("layout %s leaked raw error string 'cannot render as bar or graph'", layout)
+			}
+			if strings.Contains(strings.ToLower(html), "cannot render") {
+				t.Errorf("layout %s leaked 'cannot render'", layout)
+			}
+		})
+	}
+
+	t.Run("inspect", func(t *testing.T) {
+		html := renderInspect(t, env, renderInput{Account: "codex-cli"})
+		if strings.Contains(strings.ToLower(html), "cannot render as bar or graph") {
+			t.Errorf("inspect leaked raw error string 'cannot render as bar or graph'")
+		}
+		if strings.Contains(strings.ToLower(html), "cannot render") {
+			t.Errorf("inspect leaked 'cannot render'")
+		}
+		if strings.Contains(html, "only-errors") || strings.Contains(html, "Diagnostic Errors") {
+			t.Errorf("card with all error rows should be dropped")
+		}
+		if !strings.Contains(html, "Valid Row") || !strings.Contains(html, "99 reqs") {
+			t.Errorf("mixed card should retain valid rows")
+		}
+	})
+}
+
+func TestNonPercentageQuotaCalculations(t *testing.T) {
+	t.Run("UsageLine Ratio Calculation", func(t *testing.T) {
+		v := AccountView{
+			ProviderID: "gemini_cli",
+			AccountID:  "gemini-cli",
+			UsageLines: []UsageLine{
+				{Label: "Monthly Spend", Value: "$8.50 / $20.00"},
+			},
+		}
+		lines := buildUsageLines(v, false)
+		if len(lines) == 0 {
+			t.Fatalf("expected usage lines, got none")
+		}
+		if lines[0].Pct == nil {
+			t.Fatalf("expected computed Pct, got nil")
+		}
+		pct := *lines[0].Pct
+		if pct == 0 {
+			t.Errorf("expected non-zero percentage, got 0")
+		}
+		if pct != 57.5 {
+			t.Errorf("expected 57.5%% remaining, got %f", pct)
+		}
+
+		linesUsed := buildUsageLines(v, true)
+		if len(linesUsed) == 0 || linesUsed[0].Pct == nil {
+			t.Fatalf("expected computed Pct in used mode")
+		}
+		if *linesUsed[0].Pct != 42.5 {
+			t.Errorf("expected 42.5%% used, got %f", *linesUsed[0].Pct)
+		}
+	})
+
+	t.Run("Summary Ratio Calculation When No UsageLines", func(t *testing.T) {
+		v := AccountView{
+			ProviderID: "gemini_cli",
+			AccountID:  "gemini-cli",
+			Summary:    "$8.50 / $20.00 · in 08d",
+		}
+		lines := buildUsageLines(v, false)
+		if len(lines) == 0 {
+			t.Fatalf("expected usage lines, got none")
+		}
+		if lines[0].Pct == nil {
+			t.Fatalf("expected computed Pct, got nil")
+		}
+		pct := *lines[0].Pct
+		if pct == 0 {
+			t.Errorf("expected non-zero percentage, got 0")
+		}
+		if pct != 57.5 {
+			t.Errorf("expected 57.5%% remaining, got %f", pct)
+		}
+	})
+
+	t.Run("Rendered Layout Gauges Not Zero", func(t *testing.T) {
+		env := Envelope{
+			Views: []AccountView{
+				{
+					Key:          "gemini-acct",
+					ProviderID:   "gemini_cli",
+					ProviderName: "Gemini CLI",
+					AccountID:    "gemini-cli",
+					Status:       "OK",
+					StatusBadge:  "OK",
+					Summary:      "$8.50 / $20.00",
+				},
+			},
+		}
+
+		barsHTML := renderFragment(t, env, renderInput{Layout: "bars"})
+		if !strings.Contains(barsHTML, `class="lin-track"`) {
+			t.Errorf("bars layout missing lin-track gauge")
+		}
+		if strings.Contains(barsHTML, `width:0%`) || strings.Contains(barsHTML, `width:0.0%`) {
+			t.Errorf("bars layout should not render 0%% width progress bar")
+		}
+		if !strings.Contains(barsHTML, `width:57.5%`) && !strings.Contains(barsHTML, `width:58%`) {
+			t.Errorf("bars layout missing expected 57.5%% or 58%% progress bar")
+		}
+
+		dialsHTML := renderFragment(t, env, renderInput{Layout: "dials"})
+		if !strings.Contains(dialsHTML, `class="dial-fill"`) {
+			t.Errorf("dials layout missing dial-fill gauge")
+		}
+		if strings.Contains(dialsHTML, `stroke-dasharray="0 100"`) {
+			t.Errorf("dials layout should not render 0 dasharray")
+		}
+		if !strings.Contains(dialsHTML, `stroke-dasharray="58 100"`) {
+			t.Errorf("dials layout missing expected stroke-dasharray='58 100'")
+		}
+
+		stripsHTML := renderFragment(t, env, renderInput{Layout: "strips"})
+		if !strings.Contains(stripsHTML, `class="strip-track"`) {
+			t.Errorf("strips layout missing strip-track")
+		}
+		if !strings.Contains(stripsHTML, `width:58%`) {
+			t.Errorf("strips layout missing expected 58%% gauge width")
+		}
+
+		splitHTML := renderFragment(t, env, renderInput{Layout: "split"})
+		if !strings.Contains(splitHTML, `class="mini"`) || !strings.Contains(splitHTML, `width:58%`) {
+			t.Errorf("split nav missing mini gauge capsule with 58%% width")
+		}
+		if !strings.Contains(splitHTML, `58%`) {
+			t.Errorf("split nav missing 58%% percentage stat")
+		}
+	})
+}

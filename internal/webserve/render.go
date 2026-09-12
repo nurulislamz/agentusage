@@ -437,7 +437,33 @@ func resolveSelection(views []AccountView, account, dir string) int {
 	return idx
 }
 
+func isCannotRenderError(s string) bool {
+	lower := strings.ToLower(s)
+	return strings.Contains(lower, "cannot render as bar or graph") || strings.Contains(lower, "cannot render")
+}
+
 func buildRenderView(v AccountView, index int, used bool, now time.Time) renderView {
+	if isCannotRenderError(v.Summary) {
+		v.Summary = ""
+	}
+	if isCannotRenderError(v.Message) {
+		v.Message = ""
+	}
+	if isCannotRenderError(v.Detail) {
+		v.Detail = ""
+	}
+	if isCannotRenderError(v.Status) {
+		v.Status = ""
+	}
+	if isCannotRenderError(v.StatusBadge) {
+		v.StatusBadge = ""
+	}
+	if isCannotRenderError(v.ResetHint) {
+		v.ResetHint = ""
+	}
+	if isCannotRenderError(v.NextReset) {
+		v.NextReset = ""
+	}
 	lines := buildUsageLines(v, used)
 	items := buildUsageItems(v, lines, used)
 	rv := renderView{
@@ -549,22 +575,36 @@ func rollupFor(items []renderView) (string, string) {
 // usage lines
 
 func buildUsageLines(v AccountView, used bool) []usageLine {
+	if isCannotRenderError(v.Summary) {
+		v.Summary = ""
+	}
 	if len(v.UsageLines) > 0 {
 		lines := make([]usageLine, 0, len(v.UsageLines))
 		for _, l := range v.UsageLines {
+			if isCannotRenderError(l.Value) || isCannotRenderError(l.Label) || isCannotRenderError(l.Short) || isCannotRenderError(l.Hint) {
+				continue
+			}
+			pctPtr := clampPctPtr(l.Percent)
+			if pctPtr == nil && l.Value != "" {
+				if u, lim, _, ok := parseRatio(l.Value); ok {
+					pctPtr = ratioPercent(u, lim, used)
+				}
+			}
 			line := usageLine{
 				Label: l.Label, Short: l.Short, Value: l.Value, Hint: l.Hint, ResetIn: l.ResetIn,
-				Tone: l.Tone, Group: l.Group, Pct: clampPctPtr(l.Percent), Urgent: l.Urgent,
+				Tone: l.Tone, Group: l.Group, Pct: pctPtr, Urgent: l.Urgent,
 			}
 			if line.Tone == "" && line.Pct != nil {
 				line.Tone = toneFromPercent(*line.Pct, used)
 			}
 			lines = append(lines, line)
 		}
-		return sortUsageLines(lines)
+		if len(lines) > 0 {
+			return sortUsageLines(lines)
+		}
 	}
 	var lines []usageLine
-	if v.HasGauge {
+	if v.HasGauge && v.GaugePercent > 0 {
 		pct := clampPctVal(v.GaugePercent)
 		reset := firstNonEmpty(v.ResetHint, v.NextReset)
 		lines = append(lines, usageLine{
@@ -575,10 +615,41 @@ func buildUsageLines(v AccountView, used bool) []usageLine {
 			Tone:    toneFromPercent(pct, used),
 		})
 	} else if v.Summary != "" {
-		lines = append(lines, usageLine{Label: "Status", Value: v.Summary, Tone: "dim"})
+		if u, lim, _, ok := parseRatio(v.Summary); ok {
+			pct := ratioPercent(u, lim, used)
+			lines = append(lines, usageLine{
+				Label:   firstNonEmpty(v.Summary, "Usage"),
+				Short:   "Usage",
+				Pct:     pct,
+				ResetIn: stripResetPrefix(firstNonEmpty(v.ResetHint, v.NextReset)),
+				Tone:    toneFromPercent(*pct, used),
+			})
+		} else if v.HasGauge {
+			pct := clampPctVal(v.GaugePercent)
+			reset := firstNonEmpty(v.ResetHint, v.NextReset)
+			lines = append(lines, usageLine{
+				Label:   firstNonEmpty(v.Summary, "Usage"),
+				Short:   "Usage",
+				Pct:     &pct,
+				ResetIn: stripResetPrefix(reset),
+				Tone:    toneFromPercent(pct, used),
+			})
+		} else {
+			lines = append(lines, usageLine{Label: "Status", Value: v.Summary, Tone: "dim"})
+		}
+	} else if v.HasGauge {
+		pct := clampPctVal(v.GaugePercent)
+		reset := firstNonEmpty(v.ResetHint, v.NextReset)
+		lines = append(lines, usageLine{
+			Label:   firstNonEmpty(v.Summary, "Usage"),
+			Short:   "Usage",
+			Pct:     &pct,
+			ResetIn: stripResetPrefix(reset),
+			Tone:    toneFromPercent(pct, used),
+		})
 	}
 	for _, r := range v.Resets {
-		if strings.TrimSpace(r.Duration) == "" {
+		if strings.TrimSpace(r.Duration) == "" || isCannotRenderError(r.Duration) || isCannotRenderError(r.Label) {
 			continue
 		}
 		dup := false
@@ -672,6 +743,9 @@ func buildUsageItems(v AccountView, lines []usageLine, usedMode bool) []usageIte
 	hasTrend := len(v.DailyCost) > 1
 	isCursor := v.ProviderID == "cursor"
 	for _, line := range lines {
+		if isCannotRenderError(line.Label) || isCannotRenderError(line.Value) || isCannotRenderError(line.Short) {
+			continue
+		}
 		if line.Pct != nil {
 			tone := line.Tone
 			if tone == "" {
@@ -692,6 +766,9 @@ func buildUsageItems(v AccountView, lines []usageLine, usedMode bool) []usageIte
 			continue
 		}
 		for _, part := range parts {
+			if isCannotRenderError(part) {
+				continue
+			}
 			if hasTrend && strings.HasPrefix(strings.ToLower(part), "today") {
 				continue
 			}
@@ -1086,6 +1163,9 @@ func antigravityReset(v AccountView, lines []usageLine) (dur, next, title string
 
 func summaryDisplay(summary string) string {
 	s := strings.TrimSpace(summary)
+	if isCannotRenderError(s) {
+		return ""
+	}
 	if s != "" && percentOnly.MatchString(s) {
 		return s + " remaining"
 	}
@@ -1095,11 +1175,17 @@ func summaryDisplay(summary string) string {
 func matrixLines(v AccountView, lines []usageLine) []usageLine {
 	if v.ProviderID == "antigravity" {
 		firstGroup := ""
-		if len(lines) > 0 {
-			firstGroup = lines[0].Group
+		for _, l := range lines {
+			if !isCannotRenderError(l.Label) && !isCannotRenderError(l.Value) && !isCannotRenderError(l.Short) {
+				firstGroup = l.Group
+				break
+			}
 		}
 		var out []usageLine
 		for _, l := range lines {
+			if isCannotRenderError(l.Label) || isCannotRenderError(l.Value) || isCannotRenderError(l.Short) {
+				continue
+			}
 			if l.Group != firstGroup {
 				continue
 			}
@@ -1113,6 +1199,9 @@ func matrixLines(v AccountView, lines []usageLine) []usageLine {
 	seen := map[string]bool{}
 	var out []usageLine
 	for _, l := range lines {
+		if isCannotRenderError(l.Label) || isCannotRenderError(l.Value) || isCannotRenderError(l.Short) {
+			continue
+		}
 		k := strings.ToLower(strings.TrimSpace(firstNonEmpty(l.Short, l.Label)))
 		if k == "" || seen[k] {
 			continue
@@ -1351,10 +1440,16 @@ func matrixCells(lines []usageLine) []*usageLine {
 func bentoRows(lines []usageLine) []bentoRow {
 	counts := map[string]int{}
 	for _, l := range lines {
+		if isCannotRenderError(l.Label) || isCannotRenderError(l.Value) || isCannotRenderError(l.Short) {
+			continue
+		}
 		counts[strings.ToLower(firstNonEmpty(l.Short, l.Label))]++
 	}
 	out := make([]bentoRow, 0, 3)
 	for _, l := range lines {
+		if isCannotRenderError(l.Label) || isCannotRenderError(l.Value) || isCannotRenderError(l.Short) {
+			continue
+		}
 		if len(out) == 3 {
 			break
 		}
@@ -1394,9 +1489,20 @@ func extraCards(v AccountView) []DetailCard {
 	var out []DetailCard
 	for _, card := range v.DetailCards {
 		title := strings.ToLower(strings.TrimSpace(card.Title))
-		if title == "usage" || title == "timers" {
+		if title == "usage" || title == "timers" || isCannotRenderError(card.Title) {
 			continue
 		}
+		var cleanRows []DetailRow
+		for _, row := range card.Rows {
+			if isCannotRenderError(row.Label) || isCannotRenderError(row.Value) || isCannotRenderError(row.Hint) {
+				continue
+			}
+			cleanRows = append(cleanRows, row)
+		}
+		if len(cleanRows) == 0 {
+			continue
+		}
+		card.Rows = cleanRows
 		out = append(out, card)
 	}
 	return out
