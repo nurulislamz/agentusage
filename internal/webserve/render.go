@@ -2163,13 +2163,131 @@ func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
 			MetaText:     "Autonomous agent work",
 		}
 
+	case strings.HasPrefix(v.AccountID, "codex"):
+		rv.HeroMeta = fmt.Sprintf("openai · %s · dev@acme-corp.dev", firstNonEmpty(v.Detail, "OpenAI Codex CLI"))
+		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, "$11.40 today")
+		nextDisp := strings.TrimSpace(rv.NextDisplay)
+		if v.CycleSchedule != "" {
+			rv.HeroCycleStat = v.CycleSchedule
+		} else if nextDisp != "" && nextDisp != "—" && nextDisp != "–" && nextDisp != "-" {
+			rv.HeroCycleStat = "Resets in " + nextDisp
+		} else {
+			rv.HeroCycleStat = "Daily rolling window"
+		}
+		rv.TeamBudget = MetricDeckCard{
+			Title:    "DAILY SPEND",
+			Percent:  22.8,
+			PctStr:   "22.8%",
+			Tone:     "green",
+			SubLeft:  firstNonEmpty(v.Summary, "$11.40 today"),
+			SubRight: "7d $48.20 spend",
+		}
+		rv.BillingCycle = MetricDeckCard{
+			Title:    "TOKEN VELOCITY",
+			Percent:  51.6,
+			PctStr:   "516k tok",
+			Tone:     "lime",
+			SubLeft:  "420k in / 96k out",
+			SubRight: "today",
+		}
+		rv.ModelBurn = ModelBurnDeckCard{
+			HasData: true,
+			Segments: []ModelSegment{
+				{Name: "gpt-5.1-codex", Percent: 100, PctStr: "100%", CostStr: "$11.40", Color: "#10a37f"},
+			},
+			ChartSVG: generateAreaChartSVG(3),
+			MetaText: "trend · daily by model · OpenAI Codex",
+		}
+		rv.Clients = ClientsDeckCard{
+			HasData: true,
+			Segments: []ClientSegment{
+				{Name: "Codex CLI", Percent: 80, PctStr: "80%", ReqStr: "Active", Color: "#10a37f"},
+				{Name: "API Runner", Percent: 20, PctStr: "20%", ReqStr: "Active", Color: "#38bdf8"},
+			},
+		}
+		rv.CodeStats = CodeStatsDeckCard{
+			HasData:      true,
+			Added:        "+260 added",
+			Removed:      "-75 removed",
+			EqualizerSVG: generateCodeEqualizerSVG(3),
+			MetaText:     "Codex code synthesis sessions",
+		}
+
+	case strings.HasPrefix(v.AccountID, "command"):
+		plan := "GOAT"
+		if strings.TrimSpace(v.Detail) != "" && !strings.HasPrefix(strings.TrimSpace(v.Detail), "$") {
+			plan = v.Detail
+		}
+		rv.HeroMeta = fmt.Sprintf("command-code · %s · dev@acme-corp.dev", plan)
+		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, "$34.16 / $70.00 remaining")
+		nextDisp := strings.TrimSpace(rv.NextDisplay)
+		if v.CycleSchedule != "" {
+			rv.HeroCycleStat = v.CycleSchedule
+		} else if nextDisp != "" && nextDisp != "—" && nextDisp != "–" && nextDisp != "-" {
+			rv.HeroCycleStat = "Resets in " + nextDisp
+		} else {
+			rv.HeroCycleStat = "Weekly 80.0% rem"
+		}
+		rv.TeamBudget = MetricDeckCard{
+			Title:    "MONTHLY CREDITS",
+			Percent:  48.8,
+			PctStr:   "48.8%",
+			Tone:     "green",
+			SubLeft:  "$35.84 / $70.00",
+			SubRight: "$34.16 remaining",
+		}
+		rv.BillingCycle = MetricDeckCard{
+			Title:    "WEEKLY ALLOWANCE",
+			Percent:  80.0,
+			PctStr:   "80.0%",
+			Tone:     "lime",
+			SubLeft:  "7d rolling window",
+			SubRight: "80.0% remaining",
+		}
+		rv.ModelBurn = ModelBurnDeckCard{
+			HasData: true,
+			Segments: []ModelSegment{
+				{Name: "command-r-plus", Percent: 65, PctStr: "65%", CostStr: "$23.30", Color: "#a78bfa"},
+				{Name: "command-r", Percent: 35, PctStr: "35%", CostStr: "$12.54", Color: "#38bdf8"},
+			},
+			ChartSVG: generateAreaChartSVG(4),
+			MetaText: "trend · Command Code (GOAT) compute",
+		}
+		rv.Clients = ClientsDeckCard{
+			HasData: true,
+			Segments: []ClientSegment{
+				{Name: "Command CLI", Percent: 85, PctStr: "85%", ReqStr: "Fleet", Color: "#a78bfa"},
+				{Name: "Subagents", Percent: 15, PctStr: "15%", ReqStr: "Tasks", Color: "#38bdf8"},
+			},
+		}
+		rv.CodeStats = CodeStatsDeckCard{
+			HasData:      true,
+			Added:        "+340 added",
+			Removed:      "-110 removed",
+			EqualizerSVG: generateCodeEqualizerSVG(4),
+			MetaText:     "1.4M tokens · Command Code workspace",
+		}
+
 	default:
 		rv.HasCockpitCards = true
 		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, "$0.00 remaining")
-		rv.HeroCycleStat = firstNonEmpty(v.CycleSchedule, "Next reset: "+rv.NextDisplay)
+		cycleStat := strings.TrimSpace(v.CycleSchedule)
+		if cycleStat == "" {
+			nextDisp := strings.TrimSpace(rv.NextDisplay)
+			if nextDisp != "" && nextDisp != "—" && nextDisp != "–" && nextDisp != "-" {
+				cycleStat = "Resets in " + nextDisp
+			} else {
+				cycleStat = "Rolling window"
+			}
+		}
+		rv.HeroCycleStat = cycleStat
 		pct := 50.0
 		if v.GaugePercent >= 0 {
 			pct = v.GaugePercent
+		}
+		subRight := strings.TrimSpace(rv.NextDisplay)
+		if subRight == "—" || subRight == "–" || subRight == "-" {
+			subRight = ""
 		}
 		rv.TeamBudget = MetricDeckCard{
 			Title:    "USAGE QUOTA",
@@ -2177,7 +2295,7 @@ func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
 			PctStr:   fmt.Sprintf("%.1f%%", pct),
 			Tone:     "green",
 			SubLeft:  "Current window",
-			SubRight: rv.NextDisplay,
+			SubRight: subRight,
 		}
 		rv.BillingCycle = MetricDeckCard{
 			Title:    "CYCLE STATUS",
@@ -2185,7 +2303,7 @@ func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
 			PctStr:   fmt.Sprintf("%.1f%%", math.Min(100, pct*1.1)),
 			Tone:     "lime",
 			SubLeft:  firstNonEmpty(v.CycleSchedule, "Active tier"),
-			SubRight: rv.NextDisplay,
+			SubRight: subRight,
 		}
 		rv.ModelBurn = ModelBurnDeckCard{
 			HasData: true,
@@ -2459,6 +2577,76 @@ func barTone(tone string) string {
 	default:
 		return "bar-blue"
 	}
+}
+
+func cleanQuotaLabel(pill, label string) string {
+	p := strings.TrimSpace(pill)
+	l := strings.TrimSpace(label)
+	if l == "" {
+		l = p
+	}
+
+	// If label duplicates pill (e.g. pill="5h", label="5h"), replace with human-readable name.
+	if strings.EqualFold(p, l) {
+		return humanReadableQuotaName(p)
+	}
+
+	// If label starts with pill prefix, strip it cleanly.
+	pLower := strings.ToLower(p)
+	lLower := strings.ToLower(l)
+	if pLower != "" && strings.HasPrefix(lLower, pLower) {
+		remainder := l[len(p):]
+		remainder = strings.TrimLeft(remainder, " -_:·/")
+		remainder = strings.TrimSpace(remainder)
+		if remainder != "" {
+			return remainder
+		}
+		return humanReadableQuotaName(p)
+	}
+
+	return l
+}
+
+func humanReadableQuotaName(pill string) string {
+	switch strings.ToLower(strings.TrimSpace(pill)) {
+	case "5h":
+		return "5-Hour Limit"
+	case "24h", "daily", "today", "day":
+		return "Daily Quota"
+	case "7d", "weekly", "week":
+		return "Weekly Quota"
+	case "30d", "monthly", "month":
+		return "Monthly Quota"
+	case "spend", "cost", "$":
+		return "Monthly Spend"
+	case "fast":
+		return "Fast Quota"
+	case "burst":
+		return "Burst Quota"
+	case "rpm", "minute":
+		return "Request Limit"
+	case "token", "tokens", "tok":
+		return "Token Quota"
+	default:
+		p := strings.TrimSpace(pill)
+		if p == "" || strings.EqualFold(p, "quota") {
+			return "Usage Quota"
+		}
+		return p + " Quota"
+	}
+}
+
+func cleanQuotaTitle(pill string, it usageItem) string {
+	raw := it.Short
+	if strings.TrimSpace(raw) == "" || strings.EqualFold(strings.TrimSpace(raw), strings.TrimSpace(pill)) {
+		if strings.TrimSpace(it.Label) != "" {
+			raw = it.Label
+		}
+	}
+	if strings.TrimSpace(raw) == "" {
+		raw = pill
+	}
+	return cleanQuotaLabel(pill, raw)
 }
 
 

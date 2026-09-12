@@ -429,6 +429,33 @@ code { color: var(--accent); }
   font-family: var(--font-mono);
   font-size: 12px;
 }
+.btn-cockpit-refresh {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
+  background: var(--surface, rgba(255, 255, 255, 0.04));
+  color: var(--subtext);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), transform 0.1s ease;
+}
+.btn-cockpit-refresh:hover {
+  background: var(--surface1, rgba(255, 255, 255, 0.08));
+  border-color: var(--border, rgba(255, 255, 255, 0.2));
+  color: var(--fg);
+}
+.btn-cockpit-refresh:active {
+  transform: scale(0.94);
+}
+.btn-cockpit-refresh svg {
+  width: 14px;
+  height: 14px;
+}
 .subhero {
   display: flex;
   align-items: baseline;
@@ -444,6 +471,7 @@ code { color: var(--accent); }
 .last-refreshed { color: var(--dim); font-size: 11.5px; white-space: nowrap; }
 
 .accent-line {
+  max-width: 240px;
   height: 2px;
   margin: 10px 0 16px;
   border-radius: 2px;
@@ -531,6 +559,39 @@ code { color: var(--accent); }
   letter-spacing: 0.1em;
   color: var(--subtext);
   text-transform: uppercase;
+}
+.burn-details {
+  width: 100%;
+}
+.burn-summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.burn-summary::-webkit-details-marker {
+  display: none;
+}
+.burn-summary h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  cursor: pointer;
+}
+.burn-summary:hover h2 {
+  color: var(--fg);
+}
+.burn-chevron {
+  display: inline-block;
+  font-size: 10px;
+  line-height: 1;
+  transition: transform var(--motion-fast) var(--ease);
+}
+.burn-details[open] .burn-chevron {
+  transform: rotate(90deg);
+}
+.burn-details[open] .burn-summary {
+  margin-bottom: 8px;
 }
 .stack {
   display: flex;
@@ -1323,11 +1384,12 @@ code { color: var(--accent); }
   padding: 8px 18px;
 }
 .top-nav .header-main {
-  background: var(--surface, #ffffff);
-  border: 1.5px solid var(--border-strong, #1a1a1c);
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-soft);
   border-radius: var(--ui-radius-card, 16px);
   padding: 6px 16px;
-  box-shadow: 4px 4px 0px var(--border-strong, #1a1a1c);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   height: auto;
 }
 .brand-group {

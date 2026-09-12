@@ -36,7 +36,7 @@
   <div class="hero-right">
     <span>{{if .HeroMeta}}{{.HeroMeta}}{{else}}{{if .ProviderName}}{{.ProviderName}}{{else}}{{.ProviderID}}{{end}}{{if .Detail}} · {{.Detail}}{{end}}{{end}}</span>
     <span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span>
-    <button type="button" class="footer-btn btn-cockpit-refresh" hx-get="partial/app?refresh=1&amp;focus={{urlquery .AccountID}}" hx-target="#app" hx-swap="outerHTML" title="Refresh account">⟳</button>
+    <button type="button" class="footer-btn btn-cockpit-refresh" hx-get="partial/app?refresh=1&amp;focus={{urlquery .AccountID}}" hx-target="#app" hx-swap="outerHTML" title="Refresh account">{{template "icon-refresh"}}</button>
   </div>
 </div>
 <div class="subhero">
@@ -51,38 +51,40 @@
     <h2>{{.TeamBudget.Title}}</h2>
     <div class="big {{toneClass .TeamBudget.Tone}}">{{.TeamBudget.PctStr}}</div>
     <div class="gauge" style="color:{{gaugeColor .TeamBudget.Tone}}"><i style="width:{{pct0 .TeamBudget.Percent}}%;background:{{gaugeColor .TeamBudget.Tone}}"></i></div>
-    <div class="caption"><b>{{.TeamBudget.SubLeft}}</b> · {{.TeamBudget.SubRight}}</div>
+    <div class="caption">{{if .TeamBudget.SubLeft}}<b>{{.TeamBudget.SubLeft}}</b>{{end}}{{if and .TeamBudget.SubLeft .TeamBudget.SubRight}} · {{end}}{{if .TeamBudget.SubRight}}{{.TeamBudget.SubRight}}{{end}}</div>
   </section>
   <section class="card kpi-card">
     <h2>{{.BillingCycle.Title}}</h2>
     <div class="big {{toneClass .BillingCycle.Tone}}">{{.BillingCycle.PctStr}}</div>
     <div class="gauge" style="color:{{gaugeColor .BillingCycle.Tone}}"><i style="width:{{pct0 .BillingCycle.Percent}}%;background:{{gaugeColor .BillingCycle.Tone}}"></i></div>
-    <div class="caption">{{.BillingCycle.SubLeft}} · {{.BillingCycle.SubRight}}</div>
+    <div class="caption">{{if .BillingCycle.SubLeft}}{{.BillingCycle.SubLeft}}{{end}}{{if and .BillingCycle.SubLeft .BillingCycle.SubRight}} · {{end}}{{if .BillingCycle.SubRight}}{{.BillingCycle.SubRight}}{{end}}</div>
   </section>
 </div>
 
 {{if .ModelBurn.HasData}}
 <section class="card burn-card">
-  <h2>▸ MODEL BURN</h2>
-  <div class="stack">
-    {{range .ModelBurn.Segments}}
-    <i style="width:{{pct0 .Percent}}%;background:{{.Color}}" title="{{.Name}}: {{.PctStr}} ({{.CostStr}})"></i>
-    {{end}}
-  </div>
-  <div class="rows">
-    {{range .ModelBurn.Segments}}
-    <div class="row">
-      <span class="swatch" style="background:{{.Color}}"></span>
-      <span class="model-name">{{.Name}}</span>
-      <span class="pct">{{.PctStr}}</span>
-      <span class="cost">{{.CostStr}}</span>
+  <details open class="burn-details">
+    <summary class="burn-summary"><h2><span class="burn-chevron">▸</span> MODEL BURN</h2></summary>
+    <div class="stack">
+      {{range .ModelBurn.Segments}}
+      <i style="width:{{pct0 .Percent}}%;background:{{.Color}}" title="{{.Name}}: {{.PctStr}} ({{.CostStr}})"></i>
+      {{end}}
     </div>
-    {{end}}
-  </div>
-  <div class="spark" aria-hidden="true">
-    {{.ModelBurn.ChartSVG}}
-  </div>
-  <div class="hint">{{.ModelBurn.MetaText}}</div>
+    <div class="rows">
+      {{range .ModelBurn.Segments}}
+      <div class="row">
+        <span class="swatch" style="background:{{.Color}}"></span>
+        <span class="model-name">{{.Name}}</span>
+        <span class="pct">{{.PctStr}}</span>
+        <span class="cost">{{.CostStr}}</span>
+      </div>
+      {{end}}
+    </div>
+    <div class="spark" aria-hidden="true">
+      {{.ModelBurn.ChartSVG}}
+    </div>
+    <div class="hint">{{.ModelBurn.MetaText}}</div>
+  </details>
 </section>
 {{end}}
 
@@ -219,11 +221,11 @@
 
 {{define "dial-card"}}<button type="button" class="agent agent-card{{if .IsAlert}} alert{{end}}{{if .Active}} selected{{end}}" hx-get="inspect?account={{urlquery .Key}}" hx-target="#inspect-content" hx-swap="innerHTML" style="--p:{{accent .AccentColor}};--tone:{{gaugeColor .FirstTone}}">{{template "agent-head" .}}{{if or .Graphs .Tables .TrendStats}}<div>{{if .Graphs}}<div class="dial-row">{{range .Graphs}}{{if .Title}}<div class="gauge-group"><div class="gauge-group-title">{{.Title}}</div><div class="gauge-group-body">{{range .Items}}{{template "arc-gauge" .}}{{end}}</div></div>{{else}}{{range .Items}}{{template "arc-gauge" .}}{{end}}{{end}}{{end}}</div>{{end}}{{template "metric-table" .Tables}}{{if or .TrendStats .DailyCost}}<div class="agent-foot">{{template "metric-table" .TrendStats}}{{with dialSpark .DailyCost}}<div class="spark-wrap">{{.}}</div>{{end}}</div>{{end}}</div>{{else}}{{template "usage-fallback" .}}{{end}}</button>{{end}}
 
-{{define "strip-card"}}<button type="button" class="agent agent-card{{if .IsAlert}} alert{{end}}{{if .Active}} selected{{end}}" hx-get="inspect?account={{urlquery .Key}}" hx-target="#inspect-content" hx-swap="innerHTML" style="--p:{{accent .AccentColor}};--tone:{{gaugeColor .FirstTone}}"><div class="strip-id"><div class="card-identity"><div class="card-avatar" style="background:{{.AvatarBg}};color:{{.AvatarColor}}">{{.AvatarText}}</div><div><span class="agent-name">{{if .StatusIcon}}{{.StatusIcon}}{{else}}●{{end}} {{.AccountID}}</span><span class="agent-plan">{{subtitle .}}</span></div></div><span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span></div><div class="strip-gauges">{{if .Graphs}}{{range .Graphs}}{{if .Title}}<div class="gauge-group"><div class="gauge-group-title">{{.Title}}</div><div class="gauge-group-body">{{range .Items}}{{template "strip-gauge" .}}{{end}}</div></div>{{else}}{{range .Items}}{{template "strip-gauge" .}}{{end}}{{end}}{{end}}{{end}}{{template "metric-table" .Tables}}{{template "metric-table" .TrendStats}}</div><div class="strip-trend">{{stripSpark .DailyCost}}</div></button>{{end}}
+{{define "strip-card"}}<button type="button" class="agent agent-card{{if .IsAlert}} alert{{end}}{{if .Active}} selected{{end}}" hx-get="inspect?account={{urlquery .Key}}" hx-target="#inspect-content" hx-swap="innerHTML" style="--p:{{accent .AccentColor}};--tone:{{gaugeColor .FirstTone}}"><div class="strip-id"><div class="card-identity"><div class="card-avatar" style="background:{{.AvatarBg}};color:{{.AvatarColor}}">{{.AvatarText}}</div><div><span class="agent-name">{{if .StatusIcon}}{{.StatusIcon}}{{else}}●{{end}} {{.AccountID}}</span> <span class="agent-plan">{{subtitle .}}</span></div></div><span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span></div><div class="strip-gauges">{{if .Graphs}}{{range .Graphs}}{{if .Title}}<div class="gauge-group"><div class="gauge-group-title">{{.Title}}</div><div class="gauge-group-body">{{range .Items}}{{template "strip-gauge" .}}{{end}}</div></div>{{else}}{{range .Items}}{{template "strip-gauge" .}}{{end}}{{end}}{{end}}{{end}}{{template "metric-table" .Tables}}{{template "metric-table" .TrendStats}}</div><div class="strip-trend">{{stripSpark .DailyCost}}</div></button>{{end}}
 
 {{define "usage-fallback"}}<table class="metric-table"><tbody><tr><th scope="row">Usage</th><td>{{if .Message}}{{.Message}}{{else}}No data{{end}}</td></tr></tbody></table>{{end}}
 
-{{define "lin-gauge"}}<div class="quota-row lin-gauge {{toneClass .Tone}}{{if .Depleted}} depleted{{end}}"><div class="q-header lin-name"><span class="q-title"><span class="q-pill">{{timebandPill .}}</span> {{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}{{if .Depleted}} <span class="limit-flag">Limit reached</span>{{end}}</span><span class="q-vals">{{if .Value}}{{.Value}}{{else if .Pct}}{{pct0 .Pct}}%{{end}}</span></div><div class="lin-track"><div class="q-bar {{barTone .Tone}}" style="width:{{pct1 .Pct}}%;background:{{gaugeColor .Tone}}"></div></div><div class="q-foot lin-meta"><span>{{if .ResetIn}}Resets {{withIn .ResetIn}}{{else}}{{gaugeLeft .}}{{end}}</span><span class="{{if .Urgent}}urgent{{end}}">{{gaugeRight .}}</span></div></div>{{end}}
+{{define "lin-gauge"}}<div class="quota-row lin-gauge {{toneClass .Tone}}{{if .Depleted}} depleted{{end}}"><div class="q-header lin-name"><span class="q-title"><span class="q-pill">{{timebandPill .}}</span> {{cleanQuotaTitle (timebandPill .) .}}{{if .Depleted}} <span class="limit-flag">Limit reached</span>{{end}}</span><span class="q-vals">{{if .Value}}{{.Value}}{{else if .Pct}}{{pct0 .Pct}}%{{end}}</span></div><div class="lin-track"><div class="q-bar {{barTone .Tone}}" style="width:{{pct1 .Pct}}%;background:{{gaugeColor .Tone}}"></div></div><div class="q-foot lin-meta"><span>{{gaugeLeft .}}</span><span class="{{if .Urgent}}urgent{{end}}">{{gaugeRight .}}</span></div></div>{{end}}
 
 {{define "arc-gauge"}}<div class="dial {{toneClass .Tone}}{{if .Depleted}} depleted{{end}}"><svg viewBox="0 0 88 58" class="dial-svg" aria-hidden="true"><path class="dial-track" d="M10 48 A34 34 0 0 1 78 48" pathLength="100"/><path class="dial-fill" d="M10 48 A34 34 0 0 1 78 48" pathLength="100" stroke="{{gaugeColor .Tone}}" stroke-dasharray="{{pct0 .Pct}} 100"/><text x="44" y="44" text-anchor="middle">{{arcHub .}}</text></svg><span class="dial-lab">{{if .Short}}{{.Short}}{{else}}{{.Label}}{{end}}</span><span class="dial-reset{{if .Urgent}} urgent{{end}}">{{arcReset .}}</span></div>{{end}}
 

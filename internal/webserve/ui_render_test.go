@@ -725,3 +725,256 @@ func TestFilterNoMatch_PreservesAppShell(t *testing.T) {
 		}
 	}
 }
+
+func TestThemeSynchronization_BrandStudioPillAndAppleLogo(t *testing.T) {
+	srv := testServer(t, Options{Demo: true, Theme: "Ceramic Studio"})
+	w := getHTML(t, srv, "/partial/app")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /partial/app status = %d", w.Code)
+	}
+	html := w.Body.String()
+
+	// 1. Apple Logo SVG squircle emblem
+	for _, want := range []string{
+		`<span class="logo" aria-hidden="true"><svg class="au-apple-logo"`,
+		`id="auSquircleGrad"`,
+		`id="auGaugeGrad"`,
+		`id="auBorderGrad"`,
+		`<path d="M 8.5 16.5 L 12 16.5 L 14 12.5 L 17 20.5 L 19 16.5 L 23.5 16.5"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("app fragment missing apple-logo marker %q", want)
+		}
+	}
+
+	// 2. Dynamic brand-studio pill renders active theme
+	activeTheme := envelopeTheme(t, srv)
+	wantInitial := fmt.Sprintf(`<span class="brand-studio">%s</span>`, activeTheme)
+	if !strings.Contains(html, wantInitial) {
+		t.Errorf("app fragment missing initial brand-studio theme name %q, got %s", wantInitial, html)
+	}
+
+	// 3. Changing theme updates brand-studio pill dynamically
+	themeResp := postForm(t, srv, "/actions/theme", "theme=Nord")
+	if themeResp.Code != http.StatusOK {
+		t.Fatalf("actions/theme status = %d", themeResp.Code)
+	}
+	themeHTML := themeResp.Body.String()
+	if !strings.Contains(themeHTML, `<span class="brand-studio">Nord</span>`) {
+		t.Errorf("expected dynamic brand-studio pill <span class=\"brand-studio\">Nord</span> after theme switch, got html excerpt: %s", themeHTML[:500])
+	}
+
+	// 4. Fallback when ThemeTokens.Name is empty
+	fallbackHTML := renderFragment(t, Envelope{}, renderInput{})
+	if !strings.Contains(fallbackHTML, `<span class="brand-studio">Ceramic Studio</span>`) {
+		t.Errorf("expected fallback to Ceramic Studio when ThemeTokens.Name is empty, got %s", fallbackHTML)
+	}
+}
+
+func TestCleanQuotaLabelsAndNoDuplicates(t *testing.T) {
+	// Unit tests for cleanQuotaLabel
+	tests := []struct {
+		pill     string
+		label    string
+		expected string
+	}{
+		{"5h", "5h", "5-Hour Limit"},
+		{"5H", "5h", "5-Hour Limit"},
+		{"5h", "5h Limit", "Limit"},
+		{"5h", "5h - Claude Pro", "Claude Pro"},
+		{"5h", "5h: Session", "Session"},
+		{"24h", "24h", "Daily Quota"},
+		{"7d", "7d", "Weekly Quota"},
+		{"30d", "30d", "Monthly Quota"},
+		{"Spend", "Spend", "Monthly Spend"},
+		{"Tokens", "Tokens", "Token Quota"},
+		{"Fast", "Fast", "Fast Quota"},
+		{"Burst", "Burst", "Burst Quota"},
+		{"RPM", "RPM", "Request Limit"},
+		{"5h", "Claude 3.5 Sonnet", "Claude 3.5 Sonnet"},
+	}
+
+	for _, tc := range tests {
+		got := cleanQuotaLabel(tc.pill, tc.label)
+		if got != tc.expected {
+			t.Errorf("cleanQuotaLabel(%q, %q) = %q, want %q", tc.pill, tc.label, got, tc.expected)
+		}
+	}
+
+	// Rendering test: verify no duplicate "5h 5h" in lin-gauge and no duplicate reset caption
+	env := Envelope{
+		Views: []AccountView{
+			{
+				Key:          "test-quota-acct",
+				ProviderID:   "claude_code",
+				ProviderName: "Claude Code",
+				AccountID:    "claude-test",
+				Status:       "OK",
+				StatusBadge:  "OK",
+				UsageLines: []UsageLine{
+					{Label: "5h", Short: "5h", Value: "80%", Percent: f64(80), ResetIn: "2h 15m"},
+				},
+			},
+		},
+	}
+
+	barsHTML := renderFragment(t, env, renderInput{Layout: "bars"})
+	if strings.Contains(barsHTML, `<span class="q-pill">5h</span> 5h<`) || strings.Contains(barsHTML, `<span class="q-pill">5h</span> 5h `) {
+		t.Error("bars layout rendered duplicate '5h 5h' quota label")
+	}
+	if !strings.Contains(barsHTML, `<span class="q-pill">5h</span> 5-Hour Limit`) {
+		t.Error("bars layout should render human-readable '5-Hour Limit' instead of duplicate 5h")
+	}
+
+	// lin-meta should not duplicate reset caption
+	if strings.Contains(barsHTML, "Resets in 2h 15mResets in 2h 15m") || strings.Contains(barsHTML, "Resets in 2h 15m Resets in 2h 15m") {
+		t.Error("lin-meta contains duplicate reset caption")
+	}
+}
+
+func fetchEnvelope(t *testing.T, srv *Server) Envelope {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/snapshots", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("snapshots status = %d", w.Code)
+	}
+	var env Envelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	return env
+}
+
+func TestCockpitDashboard_NoDanglingNextResetAndCodexCommandHeroStats(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	env := fetchEnvelope(t, srv)
+
+	// 1. Inspect codex-cli
+	codexHTML := renderInspect(t, env, renderInput{Account: "codex-cli"})
+	if !strings.Contains(codexHTML, "openai · OpenAI Codex CLI · dev@acme-corp.dev") {
+		t.Errorf("codex-cli missing hero meta, got: %s", codexHTML[:300])
+	}
+	if !strings.Contains(codexHTML, "DAILY SPEND") {
+		t.Error("codex-cli should render DAILY SPEND card instead of generic USAGE QUOTA")
+	}
+	if !strings.Contains(codexHTML, "gpt-5.1-codex") {
+		t.Error("codex-cli should render gpt-5.1-codex in model burn")
+	}
+	if strings.Contains(codexHTML, "Next reset:") {
+		t.Error("codex-cli should not have dangling 'Next reset:'")
+	}
+
+	// 2. Inspect command-code
+	cmdHTML := renderInspect(t, env, renderInput{Account: "command-code"})
+	if !strings.Contains(cmdHTML, "command-code · GOAT · dev@acme-corp.dev") {
+		t.Errorf("command-code missing hero meta, got: %s", cmdHTML[:300])
+	}
+	if !strings.Contains(cmdHTML, "MONTHLY CREDITS") {
+		t.Error("command-code should render MONTHLY CREDITS card instead of generic USAGE QUOTA")
+	}
+	if !strings.Contains(cmdHTML, "command-r-plus") {
+		t.Error("command-code should render command-r-plus in model burn")
+	}
+
+	// 3. Fallback account with no CycleSchedule and empty NextDisplay
+	fallbackEnv := Envelope{
+		Views: []AccountView{
+			{
+				Key:          "generic-acct",
+				ProviderID:   "custom",
+				ProviderName: "Custom Agent",
+				AccountID:    "custom-agent",
+				Status:       "OK",
+				StatusBadge:  "OK",
+				Summary:      "$5.00 remaining",
+				NextReset:    "",
+			},
+		},
+	}
+	fallbackHTML := renderInspect(t, fallbackEnv, renderInput{Account: "custom-agent"})
+	if strings.Contains(fallbackHTML, "Next reset:") {
+		t.Error("fallback account must not render dangling 'Next reset:'")
+	}
+	if !strings.Contains(fallbackHTML, "Rolling window") {
+		t.Error("fallback account with empty NextDisplay should render 'Rolling window'")
+	}
+
+	// 4. btn-cockpit-refresh uses icon-refresh template, not raw unicode glyph
+	if strings.Contains(fallbackHTML, `class="footer-btn btn-cockpit-refresh" hx-get="partial/app?refresh=1&amp;focus=custom-agent" hx-target="#app" hx-swap="outerHTML" title="Refresh account">⟳</button>`) {
+		t.Error("btn-cockpit-refresh should use icon-refresh SVG instead of raw glyph ⟳")
+	}
+	if !strings.Contains(fallbackHTML, `class="footer-btn btn-cockpit-refresh"`) || !strings.Contains(fallbackHTML, `M13.2 8a5.2 5.2 0 1 1-1.7-3.9`) {
+		t.Error("btn-cockpit-refresh missing icon-refresh SVG")
+	}
+
+	// 5. burn-card collapsible details
+	cursorHTML := renderInspect(t, env, renderInput{Account: "cursor-ide"})
+	if !strings.Contains(cursorHTML, `<details open class="burn-details">`) || !strings.Contains(cursorHTML, `<summary class="burn-summary"><h2><span class="burn-chevron">▸</span> MODEL BURN</h2></summary>`) {
+		t.Error("cursor-ide burn card missing collapsible burn-details and burn-summary elements")
+	}
+
+	// 6. strip-card space between agent-name and agent-plan
+	stripsHTML := renderFragment(t, env, renderInput{Layout: "strips"})
+	if strings.Contains(stripsHTML, `</span><span class="agent-plan">`) {
+		t.Error("strip-card should have space between agent-name and agent-plan to prevent concatenation")
+	}
+	if !strings.Contains(stripsHTML, `</span> <span class="agent-plan">`) {
+		t.Error("strip-card missing space between agent-name and agent-plan")
+	}
+}
+
+func TestSwissModernistPolishStyles(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	w := getHTML(t, srv, "/app.css")
+	if w.Code != http.StatusOK {
+		t.Fatalf("app.css status = %d", w.Code)
+	}
+	css := w.Body.String()
+
+	// 1. Frosted glass header styling on .top-nav .header-main
+	for _, want := range []string{
+		"backdrop-filter: blur(20px);",
+		"border: 1px solid var(--border-soft);",
+		"box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("app.css missing frosted glass header style %q", want)
+		}
+	}
+	if strings.Contains(css, "box-shadow: 4px 4px 0px var(--border-strong, #1a1a1c);") {
+		t.Error("app.css still contains neo-brutalist header box-shadow 4px 4px 0px")
+	}
+
+	// 2. Accent line scoped to max-width 240px
+	if !strings.Contains(css, ".accent-line {\n  max-width: 240px;") {
+		t.Error("app.css missing max-width: 240px on .accent-line")
+	}
+
+	// 3. Apple-style secondary action icon button for .btn-cockpit-refresh
+	for _, want := range []string{
+		".btn-cockpit-refresh {",
+		"width: 28px;",
+		"height: 28px;",
+		"border-radius: 8px;",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("app.css missing btn-cockpit-refresh style %q", want)
+		}
+	}
+
+	// 4. Collapsible toggle affordances for burn-details and burn-summary
+	for _, want := range []string{
+		".burn-details {",
+		".burn-summary {",
+		".burn-chevron {",
+		".burn-details[open] .burn-chevron {",
+		"transform: rotate(90deg);",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("app.css missing burn card collapsible style %q", want)
+		}
+	}
+}
+

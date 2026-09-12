@@ -2,8 +2,8 @@
   <header class="header top-nav">
     <div id="header" class="header-main">
       <div class="brand-group">
-        <span class="logo" aria-hidden="true"><span class="brand-mark">aU</span></span>
-        <span class="brand"><span class="brand-title"><span class="brand-agent">agent</span><span class="brand-usage">Usage</span></span> <span class="brand-studio">Ceramic Studio</span></span>
+        <span class="logo" aria-hidden="true">{{template "apple-logo"}}</span>
+        <span class="brand"><span class="brand-title"><span class="brand-agent">agent</span><span class="brand-usage">Usage</span></span> <span class="brand-studio">{{if .Env.ThemeTokens.Name}}{{.Env.ThemeTokens.Name}}{{else}}Ceramic Studio{{end}}</span></span>
         <span class="status-tag">DAEMONS ONLINE ({{len .Views}})</span>
       </div>
       <span id="fetching-header" class="fetching"><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>
