@@ -397,3 +397,36 @@ Fresh weekday GitHub pass (Europe/London). ccusage / OpenUsage ecosystem still d
 **Build takeaways:** openusage.sh is the collision twin; openusage.ai is menu-bar brand. Stay ccusage-compatible; differentiate on live quotas + auto-detect + UX. Multi-surface peers (vibebuddy/brink) and narrative layers (ccstory) are the new product angles beyond raw spend.
 
 Sources: GitHub API 2026-09-11 (Europe/London).
+
+### Open source — 12 Sep 2026
+
+Fresh weekend GitHub API pass (Europe/London). Category still owned by **ccusage** + the two OpenUsage brands; **codeburn** remains the loud multi-tool local tracker. **Live today:** ccusage, robinebers/openusage, codeburn, otelite, AgentHarbor, claude-usage-mac, vibepulse (hardware). New fold-ins: single-CLI multi-provider trackers, OTel local dashboards, quota menubars, and hardware status surfaces.
+
+| Repo | Stars | License | Why it matters |
+|---|---:|---|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.5k | NOASSERTION | **Pushed today.** Category CLI — stay format-compatible. |
+| [getagentseal/codeburn](https://github.com/getagentseal/codeburn) | ~11.0k | MIT | **Pushed today.** Local tracker across 37 tools/agents — star-gravity peer. |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.1k | MIT | **Pushed today.** openusage.ai menu-bar brand (naming collision only). |
+| [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) | ~193 | MIT | openusage.sh local multi-tool TUI + SQLite — nearest product twin. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~222 | MIT | Real-time cross-agent cost monitor. |
+| [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) | ~77 | MIT | OpenUsage menu-bar fork (Rust + Tauri). |
+| [Dicklesworthstone/coding_agent_usage_tracker](https://github.com/Dicklesworthstone/coding_agent_usage_tracker) | ~85 | NOASSERTION | **New fold-in.** Single CLI for remaining quotas across Codex/Claude/Gemini/Cursor/Copilot. |
+| [Rodiun/frugon](https://github.com/Rodiun/frugon) | ~212 | MIT | **New fold-in.** Local LLM bill-leak analyzer (where spend escapes). |
+| [mag123c/toktrack](https://github.com/mag123c/toktrack) | ~189 | MIT | **New fold-in.** Ultra-fast Claude Code token/cost tracker. |
+| [planetf1/otelite](https://github.com/planetf1/otelite) | ~88 | NOASSERTION | **New fold-in / pushed today.** Single-binary OTel receiver + local LLM dashboard. |
+| [majiayu000/quotabar](https://github.com/majiayu000/quotabar) | ~51 | MIT | **New fold-in.** Tauri v2 menubar for Claude/Codex/Cursor/Antigravity quotas. |
+| [stevemcqueenz/claude-notch-tracker](https://github.com/stevemcqueenz/claude-notch-tracker) | ~34 | NOASSERTION | **New fold-in.** Mac notch / Dynamic Island live Claude+Codex usage. |
+| [saeedkolivand/claude-usage-mac](https://github.com/saeedkolivand/claude-usage-mac) | ~15 | NOASSERTION | **New fold-in / pushed today.** Claude Code menu-bar + desktop widget. |
+| [abhiunix/AgentHarbor](https://github.com/abhiunix/AgentHarbor) | ~12 | MIT | **New fold-in / pushed today.** Native multi-agent rate-limit + session usage app. |
+| [fagemx/edda](https://github.com/fagemx/edda) | ~36 | Apache-2.0 | **New fold-in / pushed today.** Tamper-evident local ledger for agent decisions (adjacent audit layer). |
+| [niclasvestlund-YT/vibepulse](https://github.com/niclasvestlund-YT/vibepulse) | ~194 | MIT | **New fold-in / pushed today.** ESP32 AMOLED hardware surface for Claude/Codex usage + "needs you" alerts (distinct from kenn-io/vibepulse menubar). |
+| [ticpu/ccusage-statusline-rs](https://github.com/ticpu/ccusage-statusline-rs) | ~16 | MIT | **New fold-in.** Rust ccusage statusline (perf niche). |
+| [semantic-craft/iOS-vibebuddy](https://github.com/semantic-craft/iOS-vibebuddy) | ~86 | MIT | Multi-surface Claude/Codex/Grok/Cursor tracker. |
+| [semihtalii/brink](https://github.com/semihtalii/brink) | ~53 | MIT | Limit "on the brink" alerts. |
+| [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~58.5k | NOASSERTION | Gateway spend/pricing — adjacent. |
+| [langfuse/langfuse](https://github.com/langfuse/langfuse) | ~34.5k | NOASSERTION | OSS LLM observability + OTel. |
+
+**Build takeaways:** Stay ccusage-compatible; differentiate on live quotas + auto-detect + UX. Watch `coding_agent_usage_tracker` / `frugon` / `toktrack` as CLI peers, `otelite` for local OTel dashboards, and menubar/notch/hardware surfaces (quotabar, claude-notch-tracker, ESP32 vibepulse) as distribution angles — not core parsers.
+
+Sources: GitHub API 2026-09-12 (Europe/London).
+
