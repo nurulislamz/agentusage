@@ -637,3 +637,30 @@ func TestNonPercentageQuotaCalculations(t *testing.T) {
 		}
 	})
 }
+
+func TestLayoutBtnActiveContrast(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	w := getHTML(t, srv, "/app.css")
+	if w.Code != http.StatusOK {
+		t.Fatalf("app.css status = %d", w.Code)
+	}
+	css := w.Body.String()
+
+	if !strings.Contains(css, ".layout-btn.active") {
+		t.Fatal("app.css missing .layout-btn.active")
+	}
+
+	for _, want := range []string{
+		"var(--fg",
+		"var(--bg",
+		"font-weight: 600",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("app.css .layout-btn.active missing expected high-contrast token/property %q", want)
+		}
+	}
+
+	if strings.Contains(css, ".layout-btn.active { background: var(--surface2); color: #ffffff;") {
+		t.Errorf("app.css should not use low-contrast #ffffff on var(--surface2) for .layout-btn.active")
+	}
+}

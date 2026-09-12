@@ -292,7 +292,12 @@ code { color: var(--accent); }
   transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
 }
 .layout-btn:hover { background: var(--surface2); color: var(--fg); }
-.layout-btn.active { background: var(--surface2); color: #ffffff; box-shadow: 0 0 6px rgba(0,0,0,0.3); }
+.layout-btn.active {
+  background: var(--fg, #1a1a1c);
+  color: var(--bg, #ffffff);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
 .layout-icon { font-size: 11px; opacity: 0.85; }
 .layout-label { white-space: nowrap; }
 
