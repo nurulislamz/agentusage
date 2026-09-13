@@ -6,7 +6,8 @@
   <span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span>
   <div class="sum">
     {{if .HasGauge}}
-      <span class="mini"><i style="width:{{pct0 .GaugePercent}}%;background:{{if eq .StatusBadge "WARN"}}var(--yellow){{else if eq .StatusBadge "CRIT"}}var(--danger){{else}}var(--green){{end}}"></i></span>
+      {{$cls := pillClass .StatusBadge}}
+      <span class="mini"><i style="width:{{pct0 .GaugePercent}}%;background:{{if eq $cls "crit"}}var(--danger){{else if eq $cls "warn"}}var(--yellow){{else if eq $cls "peach"}}var(--peach){{else if eq $cls "auth"}}var(--warn){{else}}{{gaugeColor .FirstTone}}{{end}}"></i></span>
     {{else if .Meters}}
       {{range $i, $m := .Meters}}{{if eq $i 0}}{{if $m.Pct}}<span class="mini"><i style="width:{{pct0 $m.Pct}}%;background:{{gaugeColor $m.Tone}}"></i></span>{{end}}{{end}}{{end}}
     {{end}}

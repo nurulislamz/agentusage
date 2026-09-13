@@ -1142,3 +1142,122 @@ func TestOpenDesignFooterRedesign(t *testing.T) {
 	}
 }
 
+func TestCockpitDashboard_ExhaustedQuotaLimitToneAndMode(t *testing.T) {
+	// 1. Cursor account at 100% used in used-mode
+	cursorEnv := Envelope{
+		UsageMode: "used",
+		Views: []AccountView{
+			{
+				Key:          "cursor-nurulz",
+				ProviderID:   "cursor",
+				ProviderName: "Cursor",
+				AccountID:    "cursor-nurulz",
+				Status:       "LIMITED",
+				StatusBadge:  "MONTHLY LIMIT",
+				Summary:      "100.0% used",
+				HasGauge:     true,
+				GaugePercent: 100.0,
+				UsageLines: []UsageLine{
+					{
+						Label:   "Plan Usage",
+						Short:   "Plan",
+						Percent: f64(100.0),
+						Value:   "500 / 500 requests",
+						Tone:    "crit",
+					},
+				},
+			},
+		},
+	}
+	cursorHTML := renderInspect(t, cursorEnv, renderInput{Account: "cursor-nurulz"})
+	if strings.Contains(cursorHTML, "QUOTA REMAINING: 100.0%") {
+		t.Error("cursor 100% used must not render deceptive 'QUOTA REMAINING: 100.0%'")
+	}
+	if !strings.Contains(cursorHTML, "QUOTA USED") && !strings.Contains(cursorHTML, "PLAN USAGE") {
+		t.Error("cursor in used mode should render 'QUOTA USED' or 'PLAN USAGE'")
+	}
+	if !strings.Contains(cursorHTML, "tone-crit") {
+		t.Error("cursor 100% used must render with tone-crit")
+	}
+
+	// 2. Command Code account hit monthly limit with live numbers
+	cmdEnv := Envelope{
+		UsageMode: "used",
+		Views: []AccountView{
+			{
+				Key:          "command_code",
+				ProviderID:   "command_code",
+				ProviderName: "Command Code",
+				AccountID:    "command_code",
+				Status:       "LIMITED",
+				StatusBadge:  "MONTHLY LIMIT",
+				Summary:      "Monthly Limit Reached",
+				HasGauge:     true,
+				GaugePercent: 99.8,
+				UsageLines: []UsageLine{
+					{
+						Label:   "Monthly Subscription",
+						Short:   "Month",
+						Percent: f64(99.8),
+						Value:   "$69.88 / $70.00",
+						Hint:    "$0.12 remaining",
+						Tone:    "crit",
+					},
+					{
+						Label:   "Weekly Allowance",
+						Short:   "Week",
+						Percent: f64(20.0),
+						Value:   "$7.00 / $35.00",
+						Hint:    "$28.00 remaining",
+						Tone:    "ok",
+					},
+				},
+			},
+		},
+	}
+	cmdHTML := renderInspect(t, cmdEnv, renderInput{Account: "command_code"})
+	if !strings.Contains(cmdHTML, "MONTHLY CREDITS") {
+		t.Error("command_code should render MONTHLY CREDITS card")
+	}
+	if !strings.Contains(cmdHTML, "$69.88 / $70.00") {
+		t.Error("command_code should display live $69.88 / $70.00 spending")
+	}
+	if !strings.Contains(cmdHTML, "tone-crit") {
+		t.Error("command_code exhausted monthly limit must render with tone-crit")
+	}
+
+	// 3. Cursor account at 0% remaining in remaining-mode
+	remEnv := Envelope{
+		UsageMode: "remaining",
+		Views: []AccountView{
+			{
+				Key:          "cursor-exhausted",
+				ProviderID:   "cursor",
+				ProviderName: "Cursor",
+				AccountID:    "cursor-exhausted",
+				Status:       "LIMITED",
+				StatusBadge:  "MONTHLY LIMIT",
+				Summary:      "0.0% remaining",
+				HasGauge:     true,
+				GaugePercent: 0.0,
+				UsageLines: []UsageLine{
+					{
+						Label:   "Plan Usage",
+						Short:   "Plan",
+						Percent: f64(0.0),
+						Value:   "0 / 500 requests",
+						Tone:    "crit",
+					},
+				},
+			},
+		},
+	}
+	remHTML := renderInspect(t, remEnv, renderInput{Account: "cursor-exhausted"})
+	if !strings.Contains(remHTML, "QUOTA REMAINING") && !strings.Contains(remHTML, "PLAN USAGE") {
+		t.Error("cursor in remaining mode should render 'QUOTA REMAINING' or 'PLAN USAGE'")
+	}
+	if !strings.Contains(remHTML, "tone-crit") {
+		t.Error("cursor 0% remaining must render with tone-crit")
+	}
+}
+

@@ -55,4 +55,36 @@ func TestEffectiveStatus_InfersFromQuotaWhenUnknown(t *testing.T) {
 	}
 }
 
+func TestEffectiveStatus_InfersFromQuotaWhenEmptyOrUnknown(t *testing.T) {
+	snap := UsageSnapshot{
+		Status: "",
+		Metrics: map[string]Metric{
+			"monthly_subscription": {
+				Limit:     floatPtr(100),
+				Used:      floatPtr(99.83),
+				Remaining: floatPtr(0.17),
+				Unit:      "percent",
+				Window:    "month",
+			},
+		},
+	}
+	if got := EffectiveStatus(snap); got != StatusLimited {
+		t.Fatalf("got %q, want LIMITED", got)
+	}
+}
+
+func TestEffectiveStatus_IgnoresToolSuccessRate(t *testing.T) {
+	snap := UsageSnapshot{
+		Status: StatusOK,
+		Metrics: map[string]Metric{
+			"tool_success_rate": {Used: floatPtr(100), Unit: "%"},
+		},
+	}
+	if got := EffectiveStatus(snap); got != StatusOK {
+		t.Fatalf("got %q, want OK", got)
+	}
+}
+
 func floatPtr(v float64) *float64 { return &v }
+
+

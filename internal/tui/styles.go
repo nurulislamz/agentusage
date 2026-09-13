@@ -556,9 +556,9 @@ func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 		}
 
 		isExhausted := false
-		if met.Remaining != nil && *met.Remaining <= 0 {
+		if met.Remaining != nil && *met.Remaining <= 0.5 {
 			isExhausted = true
-		} else if met.Used != nil && *met.Used >= 100 && met.Unit == "%" {
+		} else if met.Used != nil && *met.Used >= 99.5 && (met.Unit == "%" || met.Unit == "percent") {
 			isExhausted = true
 		} else if met.Limit != nil && met.Used != nil && *met.Limit > 0 && *met.Used >= *met.Limit {
 			isExhausted = true
@@ -580,7 +580,7 @@ func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 	}
 
 	// Safeguards: If ANY relevant metric for the active pool (or across available pools)
-	// has Remaining > 0, do NOT report MONTHLY or WEEKLY limit!
+	// has Remaining > 1.0, do NOT report MONTHLY or WEEKLY limit!
 	if exhausted["MONTHLY"] {
 		for key, met := range snap.Metrics {
 			if !isRelevantKey(key) {
@@ -589,7 +589,7 @@ func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 			k := strings.ToLower(key)
 			w := strings.ToLower(met.Window)
 			if strings.Contains(k, "month") || strings.Contains(w, "month") || strings.Contains(w, "30d") {
-				if met.Remaining != nil && *met.Remaining > 0 {
+				if met.Remaining != nil && *met.Remaining > 1.0 {
 					exhausted["MONTHLY"] = false
 					break
 				}
@@ -604,7 +604,7 @@ func resolveExhaustedLimitType(snap core.UsageSnapshot) string {
 			k := strings.ToLower(key)
 			w := strings.ToLower(met.Window)
 			if strings.Contains(k, "weekly") || strings.Contains(k, "week") || strings.Contains(k, "7d") || strings.Contains(w, "weekly") || strings.Contains(w, "7d") {
-				if met.Remaining != nil && *met.Remaining > 0 {
+				if met.Remaining != nil && *met.Remaining > 1.0 {
 					exhausted["WEEKLY"] = false
 					break
 				}

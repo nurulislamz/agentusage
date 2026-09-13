@@ -553,9 +553,25 @@ func computeDisplayInfoRaw(snap core.UsageSnapshot, widget core.DashboardWidget,
 					fiveHourExhausted = true
 				}
 			}
+			monthlyExhausted := false
+			if ms, ok3 := snap.Metrics["monthly_subscription"]; ok3 {
+				if (ms.Used != nil && *ms.Used >= 99.5) || (ms.Remaining != nil && *ms.Remaining <= 0.5) {
+					monthlyExhausted = true
+				}
+			}
+			if mc, ok4 := snap.Metrics["monthly_credits"]; ok4 {
+				if mc.Remaining != nil && *mc.Remaining <= 0.20 {
+					monthlyExhausted = true
+				}
+			}
+			if bal, ok5 := snap.Metrics["balance"]; ok5 {
+				if bal.Remaining != nil && *bal.Remaining <= 0.20 {
+					monthlyExhausted = true
+				}
+			}
 
 			rem := 100.0
-			if weeklyExhausted || fiveHourExhausted {
+			if weeklyExhausted || fiveHourExhausted || monthlyExhausted {
 				rem = 0.0
 			} else {
 				if wu.Remaining != nil {
@@ -576,6 +592,9 @@ func computeDisplayInfoRaw(snap core.UsageSnapshot, widget core.DashboardWidget,
 			} else {
 				info.gaugePercent = rem
 				info.summary = formatPercentSummary(rem, false)
+			}
+			if monthlyExhausted {
+				info.summary = "Monthly Limit Reached"
 			}
 			if bal, ok2 := snap.Metrics["balance"]; ok2 && bal.Remaining != nil && !hideCosts {
 				info.detail = fmt.Sprintf("$%.2f balance", *bal.Remaining)

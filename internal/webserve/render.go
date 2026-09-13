@@ -504,14 +504,19 @@ func buildRenderView(v AccountView, index int, used bool, now time.Time) renderV
 	rv.TrendStats = trendStats(v.DailyCost)
 	for _, l := range lines {
 		if l.Pct != nil {
-			rv.Depleted = isDepleted(*l.Pct, used)
-			break
+			if isDepleted(*l.Pct, used) {
+				rv.Depleted = true
+				break
+			}
 		}
+	}
+	if !rv.Depleted && (strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED") {
+		rv.Depleted = true
 	}
 	rv.AvatarText, rv.AvatarColor, rv.AvatarBg = avatarFor(v.ProviderID, v.AccountID)
 	rv.IsAlert = isCardAlert(v.StatusBadge, v.Status)
 	rv.BentoSpan = bentoSpanFor(v, rv.BentoRows, rv.IsAlert)
-	buildCockpitDashboard(&rv, v, now)
+	buildCockpitDashboard(&rv, v, used, now)
 	return rv
 }
 
@@ -1740,7 +1745,131 @@ func themeSlug(name string) string {
 	return strings.Trim(slug, "-")
 }
 
-func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
+func populateCockpitFromUsageLines(rv *renderView, v AccountView, used bool) bool {
+	if len(rv.Lines) == 0 {
+		return false
+	}
+
+	primaryIdx := 0
+	for i, l := range rv.Lines {
+		if l.Urgent || l.Tone == "crit" || (l.Pct != nil && isDepleted(*l.Pct, used)) {
+			primaryIdx = i
+			break
+		}
+	}
+	l0 := rv.Lines[primaryIdx]
+
+	title0 := strings.ToUpper(firstNonEmpty(l0.Label, l0.Short))
+	if title0 == "" || title0 == "USAGE" || title0 == "STATUS" {
+		if used {
+			title0 = "QUOTA USED"
+		} else {
+			title0 = "QUOTA REMAINING"
+		}
+	}
+
+	pct0 := 0.0
+	pctStr0 := "0.0%"
+	if l0.Pct != nil {
+		pct0 = *l0.Pct
+		pctStr0 = fmt.Sprintf("%.1f%%", pct0)
+	} else if v.GaugePercent >= 0 {
+		pct0 = v.GaugePercent
+		pctStr0 = fmt.Sprintf("%.1f%%", pct0)
+	} else if l0.Value != "" {
+		pctStr0 = l0.Value
+		pct0 = 100.0
+	}
+
+	subLeft0 := firstNonEmpty(l0.Value, v.Summary, v.Detail, "Active plan")
+	subRight0 := firstNonEmpty(l0.ResetIn, l0.Hint, rv.NextDisplay, "current cycle")
+
+	tone0 := l0.Tone
+	if rv.Depleted || isDepleted(pct0, used) || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
+		if isDepleted(pct0, used) || l0.Urgent || l0.Tone == "crit" || primaryIdx == 0 {
+			tone0 = "crit"
+		}
+	}
+	if tone0 == "" {
+		tone0 = toneFromPercent(pct0, used)
+	}
+
+	rv.TeamBudget = MetricDeckCard{
+		Title:    title0,
+		Percent:  pct0,
+		PctStr:   pctStr0,
+		Tone:     tone0,
+		SubLeft:  subLeft0,
+		SubRight: subRight0,
+	}
+
+	secondaryIdx := -1
+	for i := range rv.Lines {
+		if i != primaryIdx {
+			secondaryIdx = i
+			break
+		}
+	}
+
+	if secondaryIdx >= 0 {
+		l1 := rv.Lines[secondaryIdx]
+		title1 := strings.ToUpper(firstNonEmpty(l1.Label, l1.Short))
+		if title1 == "" || title1 == "USAGE" || title1 == "STATUS" {
+			title1 = "BILLING CYCLE"
+		}
+
+		pct1 := 0.0
+		pctStr1 := "0.0%"
+		if l1.Pct != nil {
+			pct1 = *l1.Pct
+			pctStr1 = fmt.Sprintf("%.1f%%", pct1)
+		} else if l1.Value != "" {
+			pctStr1 = l1.Value
+			pct1 = 100.0
+		} else {
+			pct1 = math.Max(5.0, 100.0-pct0)
+			pctStr1 = fmt.Sprintf("%.1f%%", pct1)
+		}
+
+		subLeft1 := firstNonEmpty(l1.Value, v.CycleSchedule, "Active cycle")
+		subRight1 := firstNonEmpty(l1.ResetIn, l1.Hint, rv.NextDisplay, "in cycle")
+
+		tone1 := l1.Tone
+		if l1.Pct != nil && isDepleted(*l1.Pct, used) {
+			tone1 = "crit"
+		}
+		if tone1 == "" {
+			if l1.Pct != nil {
+				tone1 = toneFromPercent(pct1, used)
+			} else {
+				tone1 = "lime"
+			}
+		}
+
+		rv.BillingCycle = MetricDeckCard{
+			Title:    title1,
+			Percent:  pct1,
+			PctStr:   pctStr1,
+			Tone:     tone1,
+			SubLeft:  subLeft1,
+			SubRight: subRight1,
+		}
+	} else {
+		cyclePct := math.Max(5.0, 100.0-pct0)
+		rv.BillingCycle = MetricDeckCard{
+			Title:    "BILLING CYCLE",
+			Percent:  cyclePct,
+			PctStr:   fmt.Sprintf("%.1f%%", cyclePct),
+			Tone:     "lime",
+			SubLeft:  firstNonEmpty(v.CycleSchedule, "Monthly quota"),
+			SubRight: firstNonEmpty(rv.NextDisplay, "in cycle"),
+		}
+	}
+
+	return true
+}
+
+func buildCockpitDashboard(rv *renderView, v AccountView, used bool, now time.Time) {
 	rv.HeroAccountID = v.AccountID
 	rv.HasCockpitCards = true
 
@@ -2024,31 +2153,35 @@ func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
 		rv.HeroMeta = fmt.Sprintf("cursor · %s · %s", firstNonEmpty(v.Detail, "Pro"), v.AccountID)
 		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, "$0.00 remaining")
 		rv.HeroCycleStat = firstNonEmpty(v.CycleSchedule, rv.NextDisplay)
-		pct := 100.0
-		if v.GaugePercent >= 0 {
-			pct = v.GaugePercent
-		}
-		tone := "green"
-		if pct <= 5.0 {
-			tone = "crit"
-		} else if pct < 50.0 {
-			tone = "warn"
-		}
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "QUOTA REMAINING",
-			Percent:  pct,
-			PctStr:   fmt.Sprintf("%.1f%%", pct),
-			Tone:     tone,
-			SubLeft:  firstNonEmpty(v.Summary, "Active plan"),
-			SubRight: firstNonEmpty(rv.NextDisplay, "current cycle"),
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "BILLING CYCLE",
-			Percent:  math.Max(5.0, 100.0-pct),
-			PctStr:   fmt.Sprintf("%.1f%%", math.Max(5.0, 100.0-pct)),
-			Tone:     "lime",
-			SubLeft:  firstNonEmpty(v.CycleSchedule, "Monthly quota"),
-			SubRight: firstNonEmpty(rv.NextDisplay, "in cycle"),
+		if !populateCockpitFromUsageLines(rv, v, used) {
+			pct := 100.0
+			if v.GaugePercent >= 0 {
+				pct = v.GaugePercent
+			}
+			tone := toneFromPercent(pct, used)
+			if rv.Depleted || isDepleted(pct, used) || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
+				tone = "crit"
+			}
+			title := "QUOTA REMAINING"
+			if used {
+				title = "QUOTA USED"
+			}
+			rv.TeamBudget = MetricDeckCard{
+				Title:    title,
+				Percent:  pct,
+				PctStr:   fmt.Sprintf("%.1f%%", pct),
+				Tone:     tone,
+				SubLeft:  firstNonEmpty(v.Summary, "Active plan"),
+				SubRight: firstNonEmpty(rv.NextDisplay, "current cycle"),
+			}
+			rv.BillingCycle = MetricDeckCard{
+				Title:    "BILLING CYCLE",
+				Percent:  math.Max(5.0, 100.0-pct),
+				PctStr:   fmt.Sprintf("%.1f%%", math.Max(5.0, 100.0-pct)),
+				Tone:     "lime",
+				SubLeft:  firstNonEmpty(v.CycleSchedule, "Monthly quota"),
+				SubRight: firstNonEmpty(rv.NextDisplay, "in cycle"),
+			}
 		}
 		rv.ModelBurn = ModelBurnDeckCard{
 			HasData: true,
@@ -2079,25 +2212,35 @@ func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
 		rv.HeroMeta = fmt.Sprintf("opencode · %s · %s", firstNonEmpty(v.Detail, "OpenCode Go"), v.AccountID)
 		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, "OpenCode Go (70 models)")
 		rv.HeroCycleStat = firstNonEmpty(v.CycleSchedule, rv.NextDisplay)
-		pct := 100.0
-		if v.GaugePercent >= 0 {
-			pct = v.GaugePercent
-		}
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "5-HOUR LIMIT",
-			Percent:  pct,
-			PctStr:   fmt.Sprintf("%.1f%%", pct),
-			Tone:     "green",
-			SubLeft:  firstNonEmpty(v.Summary, "Active quota"),
-			SubRight: firstNonEmpty(rv.NextDisplay, "rolling window"),
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "WEEKLY / MONTHLY",
-			Percent:  math.Max(10.0, math.Min(100.0, pct*0.85)),
-			PctStr:   fmt.Sprintf("%.1f%%", math.Max(10.0, math.Min(100.0, pct*0.85))),
-			Tone:     "lime",
-			SubLeft:  firstNonEmpty(v.CycleSchedule, "OpenCode Go"),
-			SubRight: firstNonEmpty(rv.NextDisplay, "7d reset"),
+		if !populateCockpitFromUsageLines(rv, v, used) {
+			pct := 100.0
+			if v.GaugePercent >= 0 {
+				pct = v.GaugePercent
+			}
+			tone := toneFromPercent(pct, used)
+			if rv.Depleted || isDepleted(pct, used) || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
+				tone = "crit"
+			}
+			title := "5-HOUR LIMIT"
+			if used {
+				title = "5-HOUR USED"
+			}
+			rv.TeamBudget = MetricDeckCard{
+				Title:    title,
+				Percent:  pct,
+				PctStr:   fmt.Sprintf("%.1f%%", pct),
+				Tone:     tone,
+				SubLeft:  firstNonEmpty(v.Summary, "Active quota"),
+				SubRight: firstNonEmpty(rv.NextDisplay, "rolling window"),
+			}
+			rv.BillingCycle = MetricDeckCard{
+				Title:    "WEEKLY / MONTHLY",
+				Percent:  math.Max(10.0, math.Min(100.0, pct*0.85)),
+				PctStr:   fmt.Sprintf("%.1f%%", math.Max(10.0, math.Min(100.0, pct*0.85))),
+				Tone:     "lime",
+				SubLeft:  firstNonEmpty(v.CycleSchedule, "OpenCode Go"),
+				SubRight: firstNonEmpty(rv.NextDisplay, "7d reset"),
+			}
 		}
 		rv.ModelBurn = ModelBurnDeckCard{
 			HasData: true,
@@ -2131,6 +2274,8 @@ func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
 		tone := "green"
 		if v.StatusBadge == "AUTH" {
 			tone = "amber"
+		} else if rv.Depleted || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
+			tone = "crit"
 		}
 		rv.TeamBudget = MetricDeckCard{
 			Title:    "SESSION STATUS",
@@ -2183,11 +2328,16 @@ func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
 		} else {
 			rv.HeroCycleStat = "Daily rolling window"
 		}
+		pct := 22.8
+		tone := "green"
+		if rv.Depleted || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
+			tone = "crit"
+		}
 		rv.TeamBudget = MetricDeckCard{
 			Title:    "DAILY SPEND",
-			Percent:  22.8,
+			Percent:  pct,
 			PctStr:   "22.8%",
-			Tone:     "green",
+			Tone:     tone,
 			SubLeft:  firstNonEmpty(v.Summary, "$11.40 today"),
 			SubRight: "7d $48.20 spend",
 		}
@@ -2237,21 +2387,95 @@ func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
 		} else {
 			rv.HeroCycleStat = "Weekly 80.0% rem"
 		}
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "MONTHLY CREDITS",
-			Percent:  48.8,
-			PctStr:   "48.8%",
-			Tone:     "green",
-			SubLeft:  "$35.84 / $70.00",
-			SubRight: "$34.16 remaining",
+
+		var monthlyLine, weeklyLine *usageLine
+		for i := range rv.Lines {
+			lbl := strings.ToLower(rv.Lines[i].Label + " " + rv.Lines[i].Short)
+			if strings.Contains(lbl, "month") && monthlyLine == nil {
+				monthlyLine = &rv.Lines[i]
+			} else if (strings.Contains(lbl, "week") || strings.Contains(lbl, "5h") || strings.Contains(lbl, "hour")) && weeklyLine == nil {
+				weeklyLine = &rv.Lines[i]
+			}
 		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "WEEKLY ALLOWANCE",
-			Percent:  80.0,
-			PctStr:   "80.0%",
-			Tone:     "lime",
-			SubLeft:  "7d rolling window",
-			SubRight: "80.0% remaining",
+
+		if monthlyLine != nil {
+			pct0 := 0.0
+			pctStr0 := "0.0%"
+			if monthlyLine.Pct != nil {
+				pct0 = *monthlyLine.Pct
+				pctStr0 = fmt.Sprintf("%.1f%%", pct0)
+			} else if monthlyLine.Value != "" {
+				pctStr0 = monthlyLine.Value
+				pct0 = 100.0
+			}
+			tone0 := monthlyLine.Tone
+			if isDepleted(pct0, used) || rv.Depleted || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
+				tone0 = "crit"
+			}
+			if tone0 == "" {
+				tone0 = toneFromPercent(pct0, used)
+			}
+			rv.TeamBudget = MetricDeckCard{
+				Title:    "MONTHLY CREDITS",
+				Percent:  pct0,
+				PctStr:   pctStr0,
+				Tone:     tone0,
+				SubLeft:  firstNonEmpty(monthlyLine.Value, "$35.84 / $70.00"),
+				SubRight: firstNonEmpty(monthlyLine.ResetIn, monthlyLine.Hint, rv.NextDisplay, "$34.16 remaining"),
+			}
+
+			if weeklyLine != nil {
+				pct1 := 0.0
+				pctStr1 := "0.0%"
+				if weeklyLine.Pct != nil {
+					pct1 = *weeklyLine.Pct
+					pctStr1 = fmt.Sprintf("%.1f%%", pct1)
+				} else if weeklyLine.Value != "" {
+					pctStr1 = weeklyLine.Value
+					pct1 = 100.0
+				}
+				tone1 := weeklyLine.Tone
+				if weeklyLine.Pct != nil && isDepleted(*weeklyLine.Pct, used) {
+					tone1 = "crit"
+				}
+				if tone1 == "" {
+					tone1 = toneFromPercent(pct1, used)
+				}
+				rv.BillingCycle = MetricDeckCard{
+					Title:    "WEEKLY ALLOWANCE",
+					Percent:  pct1,
+					PctStr:   pctStr1,
+					Tone:     tone1,
+					SubLeft:  firstNonEmpty(weeklyLine.Value, "7d rolling window"),
+					SubRight: firstNonEmpty(weeklyLine.ResetIn, weeklyLine.Hint, rv.NextDisplay, "80.0% remaining"),
+				}
+			} else {
+				rv.BillingCycle = MetricDeckCard{
+					Title:    "WEEKLY ALLOWANCE",
+					Percent:  80.0,
+					PctStr:   "80.0%",
+					Tone:     "lime",
+					SubLeft:  "7d rolling window",
+					SubRight: "80.0% remaining",
+				}
+			}
+		} else {
+			rv.TeamBudget = MetricDeckCard{
+				Title:    "MONTHLY CREDITS",
+				Percent:  48.8,
+				PctStr:   "48.8%",
+				Tone:     "green",
+				SubLeft:  "$35.84 / $70.00",
+				SubRight: "$34.16 remaining",
+			}
+			rv.BillingCycle = MetricDeckCard{
+				Title:    "WEEKLY ALLOWANCE",
+				Percent:  80.0,
+				PctStr:   "80.0%",
+				Tone:     "lime",
+				SubLeft:  "7d rolling window",
+				SubRight: "80.0% remaining",
+			}
 		}
 		rv.ModelBurn = ModelBurnDeckCard{
 			HasData: true,
@@ -2290,45 +2514,67 @@ func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
 			}
 		}
 		rv.HeroCycleStat = cycleStat
-		pct := 50.0
-		if v.GaugePercent >= 0 {
-			pct = v.GaugePercent
-		}
-		subRight := strings.TrimSpace(rv.NextDisplay)
-		if subRight == "—" || subRight == "–" || subRight == "-" {
-			subRight = ""
-		}
-		title := "USAGE QUOTA"
-		pctStr := fmt.Sprintf("%.1f%%", pct)
-		gaugePct := pct
-		tone := "green"
-		billingPctStr := fmt.Sprintf("%.1f%%", math.Min(100, pct*1.1))
-		billingGaugePct := math.Min(100, pct*1.1)
-		billingTone := "lime"
 		if !v.HasGauge && v.GaugePercent <= 0 {
-			title = "ACTIVITY STATUS"
-			pctStr = "Active"
-			gaugePct = 100.0
-			tone = "ok"
-			billingPctStr = "Active"
-			billingGaugePct = 100.0
-			billingTone = "ok"
-		}
-		rv.TeamBudget = MetricDeckCard{
-			Title:    title,
-			Percent:  gaugePct,
-			PctStr:   pctStr,
-			Tone:     tone,
-			SubLeft:  "Current window",
-			SubRight: subRight,
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "CYCLE STATUS",
-			Percent:  billingGaugePct,
-			PctStr:   billingPctStr,
-			Tone:     billingTone,
-			SubLeft:  firstNonEmpty(v.CycleSchedule, "Active tier"),
-			SubRight: subRight,
+			subRight := strings.TrimSpace(rv.NextDisplay)
+			if subRight == "—" || subRight == "–" || subRight == "-" {
+				subRight = ""
+			}
+			rv.TeamBudget = MetricDeckCard{
+				Title:    "ACTIVITY STATUS",
+				Percent:  100.0,
+				PctStr:   "Active",
+				Tone:     "ok",
+				SubLeft:  "Current window",
+				SubRight: subRight,
+			}
+			rv.BillingCycle = MetricDeckCard{
+				Title:    "CYCLE STATUS",
+				Percent:  100.0,
+				PctStr:   "Active",
+				Tone:     "ok",
+				SubLeft:  firstNonEmpty(v.CycleSchedule, "Active tier"),
+				SubRight: subRight,
+			}
+		} else if !populateCockpitFromUsageLines(rv, v, used) {
+			pct := 50.0
+			if v.GaugePercent >= 0 {
+				pct = v.GaugePercent
+			}
+			subRight := strings.TrimSpace(rv.NextDisplay)
+			if subRight == "—" || subRight == "–" || subRight == "-" {
+				subRight = ""
+			}
+			title := "USAGE QUOTA"
+			if used {
+				title = "QUOTA USED"
+			} else {
+				title = "QUOTA REMAINING"
+			}
+			pctStr := fmt.Sprintf("%.1f%%", pct)
+			gaugePct := pct
+			tone := toneFromPercent(pct, used)
+			if rv.Depleted || isDepleted(pct, used) || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
+				tone = "crit"
+			}
+			billingPctStr := fmt.Sprintf("%.1f%%", math.Min(100, pct*1.1))
+			billingGaugePct := math.Min(100, pct*1.1)
+			billingTone := "lime"
+			rv.TeamBudget = MetricDeckCard{
+				Title:    title,
+				Percent:  gaugePct,
+				PctStr:   pctStr,
+				Tone:     tone,
+				SubLeft:  "Current window",
+				SubRight: subRight,
+			}
+			rv.BillingCycle = MetricDeckCard{
+				Title:    "CYCLE STATUS",
+				Percent:  billingGaugePct,
+				PctStr:   billingPctStr,
+				Tone:     billingTone,
+				SubLeft:  firstNonEmpty(v.CycleSchedule, "Active tier"),
+				SubRight: subRight,
+			}
 		}
 		rv.ModelBurn = ModelBurnDeckCard{
 			HasData: true,
@@ -2536,7 +2782,7 @@ func avatarFor(providerID, accountID string) (text, color, bg string) {
 
 func isCardAlert(badge, status string) bool {
 	s := strings.ToLower(badge + " " + status)
-	return strings.Contains(s, "warn") || strings.Contains(s, "crit") || strings.Contains(s, "alert") || strings.Contains(s, "limit")
+	return strings.Contains(s, "warn") || strings.Contains(s, "crit") || strings.Contains(s, "alert") || strings.Contains(s, "limit") || strings.Contains(s, "auth") || strings.Contains(s, "err")
 }
 
 func bentoSpanFor(v AccountView, rows []bentoRow, isAlert bool) string {

@@ -392,9 +392,10 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 	if planCap <= 0 && (creds.Credits.MonthlyCredits > 0 || sum.TotalCost > 0) {
 		planCap = creds.Credits.MonthlyCredits + sum.TotalCost
 	}
+	var monthlyUsed float64
 	if planCap > 0 {
 		monthlyRemaining := creds.Credits.MonthlyCredits
-		monthlyUsed := sum.TotalCost
+		monthlyUsed = sum.TotalCost
 		if monthlyUsed <= 0 && planCap >= monthlyRemaining {
 			monthlyUsed = planCap - monthlyRemaining
 		}
@@ -426,15 +427,17 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 		snap.SetAttribute("monthly_remaining", fmt.Sprintf("$%.2f", monthlyRemaining))
 	}
 
-	// Status calculation: only mark limited when a concrete window is exhausted.
-	// windowLimits.limited alone is not reliable (API may set it while windows still have headroom).
+	// Status calculation: mark limited when any concrete window (5h, weekly, monthly) is exhausted.
 	weeklyExceeded := creds.WindowLimits.Exceeded == "weekly" ||
 		creds.WindowLimits.Weekly.Exceeded ||
 		(weeklyCap > 0 && weeklyUsedDollars >= weeklyCap)
 	fiveHourExceeded := creds.WindowLimits.Exceeded == "fiveHour" ||
 		creds.WindowLimits.FiveHour.Exceeded ||
 		(fiveHourCap > 0 && fiveHourUsedDollars >= fiveHourCap)
-	if weeklyExceeded || fiveHourExceeded {
+	monthlyExceeded := creds.WindowLimits.Exceeded == "monthly" ||
+		(planCap > 0 && monthlyUsed >= planCap) ||
+		(creds.Credits.MonthlyCredits <= 0.20 && totalBalance <= 0.20)
+	if weeklyExceeded || fiveHourExceeded || monthlyExceeded {
 		snap.Status = core.StatusLimited
 	} else {
 		snap.Status = core.StatusOK
@@ -448,10 +451,14 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 		planLabel = fmt.Sprintf("Command Code (%s)", strings.ReplaceAll(planID, "-", " "))
 	}
 	if snap.Status == core.StatusLimited {
-		if weeklyExceeded {
+		if monthlyExceeded {
+			snap.Message = fmt.Sprintf("%s · Monthly Limit Reached", planLabel)
+		} else if weeklyExceeded {
 			snap.Message = fmt.Sprintf("%s · Weekly Limit Reached", planLabel)
 		} else if fiveHourExceeded {
 			snap.Message = fmt.Sprintf("%s · 5h Limit Reached", planLabel)
+		} else {
+			snap.Message = fmt.Sprintf("%s · Limit Reached", planLabel)
 		}
 	} else {
 		if wu, ok := snap.Metrics["weekly_usage"]; ok && wu.Remaining != nil {
