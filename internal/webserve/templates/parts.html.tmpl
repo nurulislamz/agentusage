@@ -157,18 +157,18 @@
 {{else}}<div class="text-row">{{if .Value}}{{.Value}}{{else}}{{.Label}}{{end}}</div>{{end}}{{end}}{{end}}
 
 {{define "matrix"}}<div class="matrix-container" role="grid" aria-label="Dense Roster Matrix HUD">
-{{range .Groups}}
-<section class="provider-group-box" style="--p:{{.Accent}}">
+{{range $i, $g := .Groups}}
+<section class="provider-group-box" style="--p:{{$g.Accent}}">
   <header class="provider-group-header">
-    <div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{.ProviderName}}</span><span class="provider-count">{{len .Items}} {{if eq (len .Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
-    <div class="provider-group-meta"><span class="pill {{.Rollup}}">{{.RollupLabel}}</span></div>
+    <div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{$g.ProviderName}}</span><span class="provider-count">{{len $g.Items}} {{if eq (len $g.Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
+    <div class="provider-group-meta"><span class="pill {{$g.Rollup}}">{{$g.RollupLabel}}</span></div>
   </header>
   <div class="matrix-table-wrap">
-    <table class="matrix-table" role="table" aria-label="{{.ProviderName}} Matrix">
+    <table class="matrix-table" role="table" aria-label="{{$g.ProviderName}} Matrix">
       <colgroup><col style="width: 25%"><col style="width: 12%"><col style="width: 17%"><col style="width: 17%"><col style="width: 17%"><col style="width: 12%">{{if $.HasTrendColumn}}<col style="width: 80px">{{end}}<col style="width: 32px"></colgroup>
-      <thead><tr><th scope="col">ACCOUNT</th><th scope="col">STATUS</th><th scope="col">QUOTA 1</th><th scope="col">QUOTA 2</th><th scope="col">QUOTA 3</th><th scope="col">NEXT RESET</th>{{if $.HasTrendColumn}}<th scope="col">TREND</th>{{end}}<th scope="col" aria-label="Toggle"></th></tr></thead>
+      {{if eq $i 0}}<thead><tr><th scope="col">ACCOUNT</th><th scope="col">STATUS</th><th scope="col">QUOTA 1</th><th scope="col">QUOTA 2</th><th scope="col">QUOTA 3</th><th scope="col">NEXT RESET</th>{{if $.HasTrendColumn}}<th scope="col">TREND</th>{{end}}<th scope="col" aria-label="Toggle"></th></tr></thead>{{end}}
       <tbody>
-      {{range .Items}}
+      {{range $g.Items}}
         <tr class="matrix-row{{if .Active}} selected{{end}}{{if .Expanded}} expanded{{end}}" hx-get="partial/app?account={{urlquery .Key}}&amp;expand={{urlquery .Key}}" data-acc="{{.AccountID}}" style="--p:{{accent .AccentColor}}">
           <td><div class="matrix-app"><span class="matrix-app-icon">{{if .StatusIcon}}{{.StatusIcon}}{{else}}●{{end}}</span><div><div class="matrix-app-title">{{.AccountID}}</div></div></div></td>
           <td><span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span></td>

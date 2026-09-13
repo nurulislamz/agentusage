@@ -179,6 +179,12 @@ func TestAppFragmentLayouts(t *testing.T) {
 					t.Errorf("layout %s should not use provider-group-box boxing in glance views", tc.layout)
 				}
 			}
+			if tc.layout == "matrix" {
+				theadCount := strings.Count(html, "<thead>")
+				if theadCount != 1 {
+					t.Errorf("matrix layout should have exactly 1 <thead>, got %d", theadCount)
+				}
+			}
 			if !strings.Contains(html, `data-layout="`+tc.layout+`"`) {
 				t.Errorf("layout %s missing data-layout marker", tc.layout)
 			}
@@ -440,6 +446,7 @@ func TestStylesheetKeepsLayoutHooks(t *testing.T) {
 		"repeat(auto-fill, minmax(",
 		"repeat(3, 1fr)",
 		".bento-quota-row { display: grid; grid-template-columns: minmax(84px, auto)",
+		".matrix-container .provider-group-box:not(:first-child) thead",
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css missing %q", want)
