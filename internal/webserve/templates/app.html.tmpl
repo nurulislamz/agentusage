@@ -73,7 +73,7 @@
 {{end}}
 
 {{define "oob"}}<style id="theme-vars" hx-swap-oob="outerHTML">{{themeVars .Env.ThemeTokens}}</style>
-<meta id="meta-theme-color" hx-swap-oob="outerHTML" content="{{if .Env.ThemeTokens.Base}}{{.Env.ThemeTokens.Base}}{{else}}#0c0e16{{end}}">
+<meta id="meta-theme-color" hx-swap-oob="outerHTML" content="{{if .Env.ThemeTokens.Base}}{{.Env.ThemeTokens.Base}}{{else}}#f5f5f7{{end}}">
 <div id="splash" class="splash" hx-swap-oob="outerHTML" hidden></div>
 <div id="empty-state" class="empty" hx-swap-oob="outerHTML"{{if or .HasData .Filtered}} hidden{{end}}><div class="splash-emblem dim" aria-hidden="true">{{template "apple-logo-lg"}}</div><h2 id="empty-title">{{.EmptyTitle}}</h2><p id="empty-error" class="empty-error"{{if not .EmptyError}} hidden{{end}}>{{.EmptyError}}</p><p id="empty-hint">{{.EmptyHint}}</p></div>
 <div id="status-bar" class="status-bar{{if .StatusToast}} toast{{end}}" hx-swap-oob="outerHTML"{{if not .StatusText}} hidden{{end}}>{{.StatusText}}</div>{{end}}

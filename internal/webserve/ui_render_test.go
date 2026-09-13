@@ -88,6 +88,18 @@ func TestShellServesServerRenderedChrome(t *testing.T) {
 	if strings.Contains(html, `src="/app.js"`) || strings.Contains(html, `href="/app.css"`) {
 		t.Error("shell must use relative asset URLs for base-path support")
 	}
+	if strings.Contains(html, `data-theme="deep-space"`) {
+		t.Error("shell should not hardcode deep-space theme")
+	}
+	if strings.Contains(html, `content="#0c0e16"`) {
+		t.Error("shell should not hardcode #0c0e16 dark theme color")
+	}
+	if strings.Contains(html, `>aU</text>`) {
+		t.Error("shell favicon should not use plain aU text mark")
+	}
+	if !strings.Contains(html, `M 9.5 21.5`) {
+		t.Error("shell favicon should use vector squircle SVG emblem")
+	}
 }
 
 func TestAppFragmentRendersDemoViews(t *testing.T) {

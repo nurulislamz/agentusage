@@ -91,10 +91,21 @@ func (s *Server) handleShell(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodHead {
 		return
 	}
+	themeSlug := "ceramic-studio"
+	themeColor := "#f5f5f7"
+	env := s.envelopeOrError()
+	if env.ThemeTokens.Name != "" {
+		themeSlug = strings.ToLower(strings.ReplaceAll(env.ThemeTokens.Name, " ", "-"))
+		if env.ThemeTokens.Base != "" {
+			themeColor = env.ThemeTokens.Base
+		}
+	} else if s.collector != nil && s.collector.opts.Theme != "" {
+		themeSlug = strings.ToLower(strings.ReplaceAll(s.collector.opts.Theme, " ", "-"))
+	}
 	data := shellData{
 		Filter:     readUICookie(r, cookieFilter),
-		ThemeSlug:  "deep-space",
-		ThemeColor: "#0c0e16",
+		ThemeSlug:  themeSlug,
+		ThemeColor: themeColor,
 	}
 	if err := executeTemplate(w, "shell", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
