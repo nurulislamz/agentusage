@@ -1,4 +1,4 @@
-{{define "app"}}<div id="app" class="shell layout-{{.Layout.ID}}{{if eq .MobileView "detail"}} mobile-view-detail{{else}} mobile-view-roster{{end}}" data-layout="{{.Layout.ID}}"{{if and (not .HasData) (not .Filtered)}} hidden{{end}} hx-get="partial/app" hx-trigger="every {{.RefreshSeconds}}s" hx-target="#app" hx-swap="outerHTML" hx-indicator="#fetching-detail">
+{{define "app"}}<div id="app" class="shell layout-{{.Layout.ID}}{{if eq .MobileView "detail"}} mobile-view-detail{{else}} mobile-view-roster{{end}}" data-layout="{{.Layout.ID}}"{{if and (not .HasData) (not .Filtered)}} hidden{{end}} hx-get="partial/app?layout={{.Layout.ID}}" hx-include="#filter-input" hx-trigger="every {{.RefreshSeconds}}s" hx-target="#app" hx-swap="outerHTML" hx-indicator="#fetching-detail">
   <header class="header top-nav">
     <div id="header" class="header-main">
       <div class="brand-group">
@@ -57,10 +57,10 @@
   <div class="hairline" aria-hidden="true"></div>
   <footer class="footer"><div id="footer" class="footer-main" hx-indicator="#fetching-footer">{{template "footer" .}}</div></footer>
   <span hidden aria-hidden="true">
-    <button id="key-next" hx-get="partial/app?dir=next" tabindex="-1"></button>
-    <button id="key-prev" hx-get="partial/app?dir=prev" tabindex="-1"></button>
-    <button id="key-refresh" hx-get="partial/app?refresh=1{{with .Selected}}&amp;focus={{urlquery .AccountID}}{{end}}" tabindex="-1"></button>
-    <button id="key-refresh-all" hx-get="partial/app?refresh=1" tabindex="-1"></button>
+    <button id="key-next" hx-get="partial/app?dir=next&amp;layout={{.Layout.ID}}" tabindex="-1"></button>
+    <button id="key-prev" hx-get="partial/app?dir=prev&amp;layout={{.Layout.ID}}" tabindex="-1"></button>
+    <button id="key-refresh" hx-get="partial/app?refresh=1&amp;layout={{.Layout.ID}}{{with .Selected}}&amp;focus={{urlquery .AccountID}}{{end}}" tabindex="-1"></button>
+    <button id="key-refresh-all" hx-get="partial/app?refresh=1&amp;layout={{.Layout.ID}}" tabindex="-1"></button>
     <button id="key-mode" hx-post="actions/usage-mode" tabindex="-1"></button>
     <button id="key-theme-fwd" hx-post="actions/theme" tabindex="-1"></button>
     <button id="key-theme-back" hx-post="actions/theme" hx-vals='{"direction":"backward"}' tabindex="-1"></button>

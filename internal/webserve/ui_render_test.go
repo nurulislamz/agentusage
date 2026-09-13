@@ -127,8 +127,12 @@ func TestAppFragmentRendersDemoViews(t *testing.T) {
 		`class="item nav-item`,
 		`class="hero"`,
 		`id="footer-btn-mode"`,
+		`id="footer-btn-refresh"`,
+		`id="footer-btn-refresh-all"`,
 		`id="footer-btn-layout"`,
 		`id="footer-theme-select"`,
+		`class="kbd-hint">R</kbd>`,
+		`class="btn-label">refresh all</span>`,
 		`id="key-next"`,
 		`hx-post="actions/usage-mode"`,
 		"codex-cli",
@@ -174,9 +178,14 @@ func TestAppFragmentLayouts(t *testing.T) {
 					t.Errorf("layout %s missing %q", tc.layout, marker)
 				}
 			}
-			if tc.layout == "bento" || tc.layout == "bars" || tc.layout == "dials" {
-				if strings.Contains(html, "provider-group-box") {
-					t.Errorf("layout %s should not use provider-group-box boxing in glance views", tc.layout)
+			if tc.layout == "bento" || tc.layout == "bars" || tc.layout == "dials" || tc.layout == "strips" || tc.layout == "matrix" {
+				if !strings.Contains(html, "provider-group-box") {
+					t.Errorf("layout %s should use provider-group-box grouping", tc.layout)
+				}
+			}
+			if tc.layout == "bento" {
+				if !strings.Contains(html, "bento-wide") && !strings.Contains(html, "bento-compact") {
+					t.Errorf("layout bento missing dynamic sizing classes (bento-wide/bento-compact)")
 				}
 			}
 			if tc.layout == "matrix" {
@@ -1065,6 +1074,70 @@ func TestSwissModernistPolishStyles(t *testing.T) {
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css missing burn card collapsible style %q", want)
+		}
+	}
+}
+
+func TestOpenDesignFooterRedesign(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+	w := getHTML(t, srv, "/partial/app")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	html := w.Body.String()
+
+	// 1. Verify 3-zone OpenDesign HUD layout elements in rendered HTML
+	for _, want := range []string{
+		`class="footer-left"`,
+		`class="dock-stream"`,
+		`class="live-dot"`,
+		`class="live-label">LIVE STREAM</span>`,
+		`class="live-stream-text"`,
+		`class="footer-actions"`,
+		`class="footer-action-group footer-nav-group"`,
+		`class="footer-sep"`,
+		`class="footer-action-group footer-data-group"`,
+		`class="footer-btn-segmented"`,
+		`class="footer-action-group footer-view-group"`,
+		`class="footer-right"`,
+		`class="footer-desktop-text footer-cadence-tag"`,
+		`class="footer-desktop-text footer-mockup-tag"`,
+		`class="status-pulse"`,
+		`class="footer-theme-cluster"`,
+		`id="footer-btn-theme"`,
+		`id="footer-theme-select"`,
+		`id="footer-btn-refresh"`,
+		`id="footer-btn-refresh-all"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("rendered fragment missing %q", want)
+		}
+	}
+
+	// 2. Ensure duplicate theme prefix is NOT repeated in footer-mockup-tag
+	if strings.Contains(html, `· loopback</span>`) {
+		t.Error("footer-mockup-tag should not prepend redundant theme name before loopback")
+	}
+
+	// 3. Verify CSS styling hooks for OpenDesign layout
+	cssW := getHTML(t, srv, "/app.css")
+	if cssW.Code != http.StatusOK {
+		t.Fatalf("GET /app.css = %d", cssW.Code)
+	}
+	css := cssW.Body.String()
+
+	for _, want := range []string{
+		".footer-left {",
+		".footer-actions {",
+		".footer-right {",
+		".footer-sep {",
+		".footer-btn-segmented {",
+		".footer-theme-cluster {",
+		".status-pulse {",
+		"text-overflow: ellipsis;",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("app.css missing footer rule %q", want)
 		}
 	}
 }

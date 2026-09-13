@@ -169,6 +169,7 @@ type renderView struct {
 	AvatarColor string
 	AvatarBg    string
 	IsAlert     bool
+	BentoSpan   string
 }
 
 type MetricDeckCard struct {
@@ -509,6 +510,7 @@ func buildRenderView(v AccountView, index int, used bool, now time.Time) renderV
 	}
 	rv.AvatarText, rv.AvatarColor, rv.AvatarBg = avatarFor(v.ProviderID, v.AccountID)
 	rv.IsAlert = isCardAlert(v.StatusBadge, v.Status)
+	rv.BentoSpan = bentoSpanFor(v, rv.BentoRows, rv.IsAlert)
 	buildCockpitDashboard(&rv, v, now)
 	return rv
 }
@@ -2537,6 +2539,18 @@ func isCardAlert(badge, status string) bool {
 	return strings.Contains(s, "warn") || strings.Contains(s, "crit") || strings.Contains(s, "alert") || strings.Contains(s, "limit")
 }
 
+func bentoSpanFor(v AccountView, rows []bentoRow, isAlert bool) string {
+	hasSpark := len(v.DailyCost) > 1
+	hasManyRows := len(rows) >= 3
+	if isAlert || (hasSpark && len(rows) >= 1) || hasManyRows {
+		return "wide"
+	}
+	if len(rows) <= 1 && !hasSpark {
+		return "compact"
+	}
+	return "standard"
+}
+
 func timebandPill(it usageItem) string {
 	s := strings.ToLower(it.Label + " " + it.Short + " " + it.Group)
 	switch {
@@ -2671,5 +2685,3 @@ func cleanQuotaTitle(pill string, it usageItem) string {
 	}
 	return cleanQuotaLabel(pill, raw)
 }
-
-

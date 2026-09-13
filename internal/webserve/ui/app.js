@@ -94,7 +94,18 @@
     const layout = ($("app") || {}).dataset ? $("app").dataset.layout : "";
     if (layout === "matrix") selectedRow(".matrix-row.selected")?.click();
     else if (layout === "bento") selectedRow(".bento-tile.selected")?.click();
+    else selectedRow(".agent-card.selected, .agent.selected")?.click();
   };
+
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      const active = document.activeElement;
+      if (active && active.classList && active.classList.contains("bento-tile")) {
+        ev.preventDefault();
+        active.click();
+      }
+    }
+  });
 
   document.addEventListener("keydown", (ev) => {
     if ($("token-modal") && !$("token-modal").hidden) return;
