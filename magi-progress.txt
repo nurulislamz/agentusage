@@ -1,19 +1,14 @@
-# MAGI Ralph Loop Progress Ledger: TUI Interactions, Scrolling & Button Functionality
+# MAGI Campaign Ledger: GitHub Issue #26 - Ceramic Swiss Studio Polish & Defect Remediation
 
-## Phase 1: Test Authoring (TDD Red-Phase First) [COMPLETED]
-- [x] [TEST-BUTTONS] Unit & behavior tests for all header and footer clickable buttons (menu, layout, mode, refresh, help, detail back)
-- [x] [TEST-SCROLL-VIEWS] Unit & behavior tests for scrolling in all 6 dashboard views (Split, Matrix, Bento, Bars, Dials, Strips) with keys (j/k, PgUp/PgDn, Home/End) and mouse wheel
-- [x] [TEST-CLICK-VIEWS] Unit & behavior tests for clicking items/cards/rows to select across all 6 views and Bento 2D arrow navigation
-- [x] [TEST-COCKPIT-NAV] Unit & behavior tests for Cockpit detail section jumping (Tab/Shift+Tab, Left/Right) and smooth vertical scrolling
-- [x] [TEST-SETTINGS-MODAL] Unit & behavior tests for settings modal clicking and scrolling
+## Campaign Objectives
+Eliminate legacy UI copy-paste artifacts and restore the Ceramic Swiss Studio design system across all 9 web dashboard views in `internal/webserve` as specified in GitHub Issue #26.
 
-## Phase 2: Implementation & Fixes (Green Phase) [COMPLETED]
-- [x] [FIX-BUTTONS] Implement footer and header click hit-testing and button dispatch
-- [x] [FIX-SCROLL-VIEWS] Implement proper scrolling (mouse wheel + PgUp/PgDn + Home/End) for all dashboard views
-- [x] [FIX-CLICK-VIEWS] Implement hit-testing for clicking rows/cards in Matrix, Bento, Bars, Dials, Strips, and 2D arrow keys for Bento
-- [x] [FIX-COCKPIT-NAV] Align Cockpit section starts with rendered sections for Tab/Shift+Tab navigation
-- [x] [FIX-SETTINGS-MODAL] Enhance settings modal mouse click hit-testing for items and toggles
-
-## Verification Gate [PASSED]
-- [x] [VERIFY-SCREENSHOTS] Capture visual verification screenshots of before/after for all fixed interactions
-- [x] [VERIFY-CI] Full `go test ./...`, `make vet`, `make test` pass with race detector
+## Backlog Items
+- [x] [TASK-01-THEME-SHELL] Dynamic Theme Binding, Apple Squircle Emblem & Shell Fallback Cleanup (Root Cause 5, Target 9) [MAGI_APPROVED 3abb630]
+- [x] [TASK-02-GRID-BENTO] Bento Stuttering Labels Fix & 64px Premature Clipping Fix (Root Cause 1, Target 3) [MAGI_APPROVED 70f4aa5]
+- [x] [TASK-03-DIALS-FOOTER] Dials View Card Footer, Timestamp & Inspect Link Restoral (Target 5) [MAGI_APPROVED b1610cc]
+- [x] [TASK-04-MATRIX-THEAD] Matrix HUD Single Table Header & 6x Redundant `<thead>` Suppression (Target 2) [MAGI_APPROVED 5d7c665]
+- [x] [TASK-05-STRIPS-ORPHAN] Strips View Orphan "In" Label Sanitization (Target 6) [MAGI_APPROVED 7512ac5]
+- [x] [TASK-06-DELIMITER-DOTS] KPI Caption & Hero Subtitle Dangling Dot Elimination (`· $2,028`, `Active tier ·`) (Root Cause 7, Targets 1 & 8) [MAGI_APPROVED 3f5d085]
+- [x] [TASK-07-SWISS-POLISH] Cockpit Geometry: Scoped 120px Accent Line & Unbudgeted Provider KPI Fix (Root Cause 8) [MAGI_APPROVED 8a41c44]
+- [x] [TASK-08-TESTS-VERIFY] Comprehensive End-to-End Regression Test Suite & Verification [PASS: go test -race ./..., make vet, go build]
