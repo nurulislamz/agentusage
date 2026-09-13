@@ -191,6 +191,32 @@ Fresh Saturday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **
 Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [github.com/getagentseal/codeburn](https://github.com/getagentseal/codeburn); [github.com/junhoyeo/tokscale](https://github.com/junhoyeo/tokscale); [github.com/deviffyy/OpenQuota](https://github.com/deviffyy/OpenQuota); GitHub API star/push metadata 2026-09-12 (Europe/London).
 
 
+### Update 2026-09-13
+
+Fresh Sunday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **34/35 provider copy split still live** on the homepage (meta/JSON-LD say 35; hero eyebrow + providers H2 say 34). Material overnight moves: **ccusage** still shipping, **TokenBar** engine work, **codeburn** test merges; Splitrail/AIUsage quiet on code.
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **~194★**, +1) | Hero meta / FAQ / schema still **“35”** providers; hero eyebrow + “Supported providers” H2 still **“34 providers, and counting.”** README/docs “36” claim from prior passes not contradicted by a new ship — last product-adjacent push still **2026-09-09** (~23:39 UTC). | **Nearest twin** — category definition still ~1:1. Copy smell persists; no surface move overnight. |
+| [ccusage](https://github.com/ccusage/ccusage) / [ccusage.com](https://ccusage.com/) (**~18.5k★** / 18,520; +~14) | Still the category CLI for historical daily/weekly/monthly/session/`blocks` across many agents (**no Cursor** in official source list). **Pushed today** (2026-09-13 ~05:16 UTC) — LiteLLM pricing snapshots + issue-gate triage policy (#1717). Statusline beta still Claude-focused. | Best **log-history / cost-report** OSS peer; thinner live quota/rate-limit TUI + key autodetection. |
+| [Splitrail](https://github.com/Piebald-AI/splitrail) (**~223★**, +2) | Real-time cross-agent monitor + optional Cloud + MCP. Last product commit still **2026-09-11** (Grok 4.6 pricing + Gemini/MiniMax/DeepSeek rates). Stars nudged; no Sunday code. | #2 local “live monitor” peer — quiet since Fri pricing push. |
+| [AIUsage](https://github.com/juliantanx/aiusage) (**~125★**, flat) | Local web dashboard (`aiusage serve` → :3847) across 20+ tools. Quiet since 2026-09-08 release. | Rising local peer + **name collision** (AIUsage vs agentUsage). |
+| [openusage.ai](https://github.com/robinebers/openusage) (**~4.1k★** / 4,149; +~14) | macOS menu-bar tracker (different product). Last product commits still v0.7.12-beta.1 / Cursor Grok Bot pricing (2026-09-11–12). | Naming collision only — do not conflate with openusage.sh. |
+| Vendor UIs | Cursor Spending / Claude `/usage`/`/cost` / OpenRouter Activity still single-vendor panes. | Fragmentation OpenUsage/agentUsage claim to fix. |
+| Helicone / Langfuse / LiteLLM | **LiteLLM** (~58.6k★ / 58,610, **pushed today**) and **Langfuse** (~34.5k★ / 34,524, pushed ~2026-09-13 04:46 UTC) still active gateway/OTel FinOps. **Helicone** (~6.2k★ / 6,152) still quiet since 2026-09-11 jawn/tsoa fix. | Adjacent layers, not desktop twins. |
+| Also watch (local peers) | [getagentseal/codeburn](https://github.com/getagentseal/codeburn) (~11.0k★ / 10,985, **pushed today**) — local multi-tool cost CLI; [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) (~5.4k★); [deviffyy/OpenQuota](https://github.com/deviffyy/OpenQuota) (~203★); [Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar) (~347★, +2; overnight engine-pin-window / pending-scan docs) / [tddworks/ClaudeBar](https://github.com/tddworks/ClaudeBar) (~1.5k★) — macOS menu-bar quota peers. | High-star adjacent local trackers — watch for category overlap, not yet twins on live multi-provider quota TUI + key autodetection. |
+
+**Positioning refresh**
+- **OpenUsage.sh** = primary collision (34/35 copy split still live; +1★; still no code since Wed).
+- **ccusage** = report/parser standard (still shipping today; +~14★ overnight).
+- **Splitrail** = #2 live local peer (stars +2; quiet code since Fri).
+- **juliantanx/aiusage** = local multi-tool dashboard peer + name collision (flat).
+- **openusage.ai** = menu-bar naming collision; still climbing stars without conflating brands.
+- Keep Helicone / Langfuse / LiteLLM as complementary observability/gateway spend.
+
+Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [github.com/getagentseal/codeburn](https://github.com/getagentseal/codeburn); [github.com/Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar); GitHub API star/push metadata 2026-09-13 (Europe/London).
+
+
 ## Open source
 
 ### Seeded 2026-09-04
