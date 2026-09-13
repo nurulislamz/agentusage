@@ -772,6 +772,13 @@ func buildUsageItems(v AccountView, lines []usageLine, usedMode bool) []usageIte
 			if hasTrend && strings.HasPrefix(strings.ToLower(part), "today") {
 				continue
 			}
+			trimmedPart := strings.TrimSpace(part)
+			if resetPreRe.MatchString(trimmedPart) || strings.HasPrefix(strings.ToLower(trimmedPart), "in ") || strings.HasPrefix(strings.ToLower(trimmedPart), "resets in") {
+				if line.ResetIn == "" {
+					line.ResetIn = stripResetPrefix(trimmedPart)
+				}
+				continue
+			}
 			if used, limit, money, ok := parseRatio(part); ok {
 				pct := ratioPercent(used, limit, usedMode)
 				label := partShort(part, line)
@@ -966,7 +973,7 @@ func partShort(part string, line usageLine) string {
 		return "Out"
 	}
 	head := strings.TrimSpace(strings.ReplaceAll(trimAtDigit(part), ":", ""))
-	if head != "" {
+	if head != "" && !strings.EqualFold(head, "in") && !strings.EqualFold(head, "resets in") {
 		return strings.ToUpper(head[:1]) + head[1:]
 	}
 	return firstNonEmpty(line.Short, line.Label, "Value")

@@ -658,6 +658,27 @@ func TestNonPercentageQuotaCalculations(t *testing.T) {
 		if !strings.Contains(splitHTML, `58%`) {
 			t.Errorf("split nav missing 58%% percentage stat")
 		}
+
+		envWithReset := Envelope{
+			Views: []AccountView{
+				{
+					Key:          "gemini-acct-reset",
+					ProviderID:   "gemini_cli",
+					ProviderName: "Gemini CLI",
+					AccountID:    "gemini-cli",
+					Status:       "OK",
+					StatusBadge:  "OK",
+					Summary:      "$8.50 / $20.00 · in 08d",
+				},
+			},
+		}
+		stripsWithResetHTML := renderFragment(t, envWithReset, renderInput{Layout: "strips"})
+		if strings.Contains(stripsWithResetHTML, `<span class="strip-lab">In</span>`) {
+			t.Errorf("strips layout should not render orphan 'In' label")
+		}
+		if strings.Contains(stripsWithResetHTML, `<th>In</th>`) {
+			t.Errorf("table should not render orphan 'In' header")
+		}
 	})
 }
 
