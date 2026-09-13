@@ -40,7 +40,7 @@
   </div>
 </div>
 <div class="subhero">
-  <div><strong>{{if .HeroPrimaryStat}}{{.HeroPrimaryStat}}{{else}}{{.SummaryDisplay}}{{end}}</strong>{{if or .HeroCycleStat .CycleSchedule}} <span class="reset">· {{if .HeroCycleStat}}{{.HeroCycleStat}}{{else}}{{.CycleSchedule}}{{end}}</span>{{end}}</div>
+  <div><strong>{{if .HeroPrimaryStat}}{{.HeroPrimaryStat}}{{else}}{{.SummaryDisplay}}{{end}}</strong>{{$cycle := cleanHeroCycle .HeroCycleStat .CycleSchedule}}{{if $cycle}} <span class="reset">· {{$cycle}}</span>{{end}}</div>
   <div class="last-refreshed">{{if .RefreshedText}}{{.RefreshedText}}{{else}}refreshed 12s ago{{end}}</div>
 </div>
 <div class="accent-line"></div>
@@ -51,13 +51,13 @@
     <h2>{{.TeamBudget.Title}}</h2>
     <div class="big {{toneClass .TeamBudget.Tone}}">{{.TeamBudget.PctStr}}</div>
     <div class="gauge" style="color:{{gaugeColor .TeamBudget.Tone}}"><i style="width:{{pct0 .TeamBudget.Percent}}%;background:{{gaugeColor .TeamBudget.Tone}}"></i></div>
-    <div class="caption">{{if .TeamBudget.SubLeft}}<b>{{.TeamBudget.SubLeft}}</b>{{end}}{{if and .TeamBudget.SubLeft .TeamBudget.SubRight}} · {{end}}{{if .TeamBudget.SubRight}}{{.TeamBudget.SubRight}}{{end}}</div>
+    <div class="caption">{{if .TeamBudget.SubLeft}}<span class="cap-left"><b>{{.TeamBudget.SubLeft}}</b></span>{{end}}{{if .TeamBudget.SubRight}}<span class="cap-right">{{cleanCaptionRight .TeamBudget.SubRight}}</span>{{end}}</div>
   </section>
   <section class="card kpi-card">
     <h2>{{.BillingCycle.Title}}</h2>
     <div class="big {{toneClass .BillingCycle.Tone}}">{{.BillingCycle.PctStr}}</div>
     <div class="gauge" style="color:{{gaugeColor .BillingCycle.Tone}}"><i style="width:{{pct0 .BillingCycle.Percent}}%;background:{{gaugeColor .BillingCycle.Tone}}"></i></div>
-    <div class="caption">{{if .BillingCycle.SubLeft}}{{.BillingCycle.SubLeft}}{{end}}{{if and .BillingCycle.SubLeft .BillingCycle.SubRight}} · {{end}}{{if .BillingCycle.SubRight}}{{.BillingCycle.SubRight}}{{end}}</div>
+    <div class="caption">{{if .BillingCycle.SubLeft}}<span class="cap-left">{{.BillingCycle.SubLeft}}</span>{{end}}{{if .BillingCycle.SubRight}}<span class="cap-right">{{cleanCaptionRight .BillingCycle.SubRight}}</span>{{end}}</div>
   </section>
 </div>
 

@@ -538,6 +538,10 @@ code { color: var(--accent); }
   display: flex;
   justify-content: space-between;
 }
+.kpi-card .caption .cap-right {
+  margin-left: auto;
+  text-align: right;
+}
 .kpi-card .caption b {
   color: var(--text);
   font-weight: 600;

@@ -976,6 +976,20 @@ func TestCockpitDashboard_NoDanglingNextResetAndCodexCommandHeroStats(t *testing
 	if !strings.Contains(stripsHTML, `</span> <span class="agent-plan">`) {
 		t.Error("strip-card missing space between agent-name and agent-plan")
 	}
+
+	// 7. KPI captions do not have dangling leading dots or floating delimiters
+	if strings.Contains(cursorHTML, "· $2,028 remaining") {
+		t.Error("cursor cockpit KPI caption contains dangling dot '· $2,028 remaining'")
+	}
+	if !strings.Contains(cursorHTML, `<span class="cap-right">$2,028 remaining</span>`) {
+		t.Error("cursor cockpit KPI caption missing cap-right without leading dot")
+	}
+	if !strings.Contains(cursorHTML, `<span class="cap-left"><b>$1,572 / $3,600</b></span>`) {
+		t.Error("cursor cockpit KPI caption missing cap-left wrapper")
+	}
+	if strings.Contains(fallbackHTML, "Active tier ·") {
+		t.Error("fallback cockpit contains dangling dot 'Active tier ·'")
+	}
 }
 
 func TestSwissModernistPolishStyles(t *testing.T) {
