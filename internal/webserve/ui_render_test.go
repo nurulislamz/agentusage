@@ -439,10 +439,14 @@ func TestStylesheetKeepsLayoutHooks(t *testing.T) {
 		"padding: 14px 20px 56px;",
 		"repeat(auto-fill, minmax(",
 		"repeat(3, 1fr)",
+		".bento-quota-row { display: grid; grid-template-columns: minmax(84px, auto)",
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css missing %q", want)
 		}
+	}
+	if strings.Contains(css, "grid-template-columns: 64px 1fr auto;") {
+		t.Error("app.css should not use rigid 64px label column in bento-quota-row")
 	}
 	if strings.Contains(css, ".shell.refreshing .footer-main { display: none; }") {
 		t.Error("app.css should not hide the footer while refreshing")
@@ -841,6 +845,15 @@ func TestCleanQuotaLabelsAndNoDuplicates(t *testing.T) {
 	// lin-meta should not duplicate reset caption
 	if strings.Contains(barsHTML, "Resets in 2h 15mResets in 2h 15m") || strings.Contains(barsHTML, "Resets in 2h 15m Resets in 2h 15m") {
 		t.Error("lin-meta contains duplicate reset caption")
+	}
+
+	// bento should not duplicate "5h 5h"
+	bentoHTML := renderFragment(t, env, renderInput{Layout: "bento"})
+	if strings.Contains(bentoHTML, `<span class="q-pill">5h</span> 5h<`) || strings.Contains(bentoHTML, `<span class="q-pill">5h</span> 5h `) {
+		t.Error("bento layout rendered duplicate '5h 5h' quota label")
+	}
+	if !strings.Contains(bentoHTML, `<span class="q-pill">5h</span> 5-Hour Limit`) {
+		t.Error("bento layout should render human-readable '5-Hour Limit' instead of duplicate 5h")
 	}
 }
 

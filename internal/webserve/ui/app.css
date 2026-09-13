@@ -830,7 +830,7 @@ code { color: var(--accent); }
 
 /* Strips */
 .strip-gauges { display: flex; flex-direction: column; gap: var(--space-2); }
-.strip-metric { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: var(--space-3); font-size: var(--text-sm); }
+.strip-metric { display: grid; grid-template-columns: minmax(84px, auto) 1fr auto; align-items: center; gap: var(--space-3); font-size: var(--text-sm); }
 .strip-lab { color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .strip-track { position: relative; height: 18px; border-radius: var(--radius-pill); background: var(--tint-fill); overflow: hidden; }
 .strip-track i { display: block; height: 100%; border-radius: var(--radius-pill); }
@@ -973,7 +973,7 @@ code { color: var(--accent); }
 .bento-head-left { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .bento-acc-name { font-size: var(--text-base); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bento-tile-body { display: flex; flex-direction: column; gap: var(--space-3); }
-.bento-quota-row { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+.bento-quota-row { display: grid; grid-template-columns: minmax(84px, auto) 1fr auto; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
 .bento-quota-lab { color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bento-quota-bar { height: 6px; border-radius: var(--radius-pill); background: var(--tint-fill); overflow: hidden; }
 .bento-quota-bar i { display: block; height: 100%; border-radius: var(--radius-pill); }
