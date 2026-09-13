@@ -954,6 +954,30 @@ func TestCockpitDashboard_NoDanglingNextResetAndCodexCommandHeroStats(t *testing
 		t.Error("fallback account with empty NextDisplay should render 'Rolling window'")
 	}
 
+	// 3b. Unbudgeted account does not render false 0.0% zero-quota KPI card
+	unbudgetedEnv := Envelope{
+		Views: []AccountView{
+			{
+				Key:          "unbudgeted-acct",
+				ProviderID:   "custom",
+				ProviderName: "Custom Agent",
+				AccountID:    "unbudgeted-agent",
+				Status:       "OK",
+				StatusBadge:  "OK",
+				Summary:      "Pay-as-you-go",
+				HasGauge:     false,
+				GaugePercent: -1,
+			},
+		},
+	}
+	unbudgetedHTML := renderInspect(t, unbudgetedEnv, renderInput{Account: "unbudgeted-agent"})
+	if strings.Contains(unbudgetedHTML, ">0.0%<") {
+		t.Error("unbudgeted account should not render misleading 0.0% quota")
+	}
+	if !strings.Contains(unbudgetedHTML, "ACTIVITY STATUS") || !strings.Contains(unbudgetedHTML, ">Active<") {
+		t.Error("unbudgeted account should render ACTIVITY STATUS with Active")
+	}
+
 	// 4. btn-cockpit-refresh uses icon-refresh template, not raw unicode glyph
 	if strings.Contains(fallbackHTML, `class="footer-btn btn-cockpit-refresh" hx-get="partial/app?refresh=1&amp;focus=custom-agent" hx-target="#app" hx-swap="outerHTML" title="Refresh account">⟳</button>`) {
 		t.Error("btn-cockpit-refresh should use icon-refresh SVG instead of raw glyph ⟳")
@@ -1014,9 +1038,9 @@ func TestSwissModernistPolishStyles(t *testing.T) {
 		t.Error("app.css still contains neo-brutalist header box-shadow 4px 4px 0px")
 	}
 
-	// 2. Accent line scoped to max-width 240px
-	if !strings.Contains(css, ".accent-line {\n  max-width: 240px;") {
-		t.Error("app.css missing max-width: 240px on .accent-line")
+	// 2. Accent line scoped to max-width 120px
+	if !strings.Contains(css, ".accent-line {\n  max-width: 120px;") {
+		t.Error("app.css missing max-width: 120px on .accent-line")
 	}
 
 	// 3. Apple-style secondary action icon button for .btn-cockpit-refresh

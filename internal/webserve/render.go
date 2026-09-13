@@ -2296,19 +2296,35 @@ func buildCockpitDashboard(rv *renderView, v AccountView, now time.Time) {
 		if subRight == "—" || subRight == "–" || subRight == "-" {
 			subRight = ""
 		}
+		title := "USAGE QUOTA"
+		pctStr := fmt.Sprintf("%.1f%%", pct)
+		gaugePct := pct
+		tone := "green"
+		billingPctStr := fmt.Sprintf("%.1f%%", math.Min(100, pct*1.1))
+		billingGaugePct := math.Min(100, pct*1.1)
+		billingTone := "lime"
+		if !v.HasGauge && v.GaugePercent <= 0 {
+			title = "ACTIVITY STATUS"
+			pctStr = "Active"
+			gaugePct = 100.0
+			tone = "ok"
+			billingPctStr = "Active"
+			billingGaugePct = 100.0
+			billingTone = "ok"
+		}
 		rv.TeamBudget = MetricDeckCard{
-			Title:    "USAGE QUOTA",
-			Percent:  pct,
-			PctStr:   fmt.Sprintf("%.1f%%", pct),
-			Tone:     "green",
+			Title:    title,
+			Percent:  gaugePct,
+			PctStr:   pctStr,
+			Tone:     tone,
 			SubLeft:  "Current window",
 			SubRight: subRight,
 		}
 		rv.BillingCycle = MetricDeckCard{
 			Title:    "CYCLE STATUS",
-			Percent:  math.Min(100, pct*1.1),
-			PctStr:   fmt.Sprintf("%.1f%%", math.Min(100, pct*1.1)),
-			Tone:     "lime",
+			Percent:  billingGaugePct,
+			PctStr:   billingPctStr,
+			Tone:     billingTone,
 			SubLeft:  firstNonEmpty(v.CycleSchedule, "Active tier"),
 			SubRight: subRight,
 		}
