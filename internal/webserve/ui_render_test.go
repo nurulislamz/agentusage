@@ -159,7 +159,7 @@ func TestAppFragmentLayouts(t *testing.T) {
 		{"matrix", []string{`class="matrix-table"`, `class="matrix-row`, `class="provider-group-box"`}},
 		{"bento", []string{`class="bento-tiles-grid"`, `class="bento-tile`, `class="bento-quota-bar"`}},
 		{"bars", []string{`class="board-grid board-bars"`, `class="lin-track"`}},
-		{"dials", []string{`class="board-grid board-dials"`, `class="dial-svg"`}},
+		{"dials", []string{`class="board-grid board-dials"`, `class="dial-svg"`, `class="card-footer"`, `class="card-inspect"`}},
 		{"strips", []string{`class="board-grid board-strips"`, `class="strip-track"`}},
 	}
 	for _, tc := range cases {
