@@ -521,3 +521,47 @@ Fresh Sunday GitHub API pass (Europe/London). Category still owned by **ccusage*
 **Build takeaways:** Stay ccusage-compatible; differentiate on live quotas + auto-detect + UX. Watch `better-ccusage` / `viberank` / `tokenmaxxing` as ecosystem gravity around ccusage formats; menubar/widget/desktop peers (AgentLimits, codex-usage-desktop, quotabar) for distribution — not core parsers. Keep Langfuse/LiteLLM/AgentOps as adjacent observability, not product twins.
 
 Sources: GitHub API 2026-09-13 (Europe/London).
+
+
+### Open source — 14 Sep 2026
+
+Fresh Monday GitHub API pass (Europe/London). Category still owned by **ccusage** + the two OpenUsage brands; **codeburn** remains the loud multi-tool local tracker. **Live today:** ccusage, openusage.sh (deps + yesterday's Codex/Crush fixes), codeburn, otelite (**productivity + tool-mix views**), AIUsage **v1.5.16**, TokenBar, usagepal, frugon, AgentHarbor, iOS-vibebuddy, LiteLLM, Langfuse. **New fold-ins:** high-star Claude Code monitors (`Claude-Code-Usage-Monitor`, Clawdmeter, ccseva, claude-lens, claude-code-otel).
+
+| Repo | Stars | License | Why it matters |
+|---|---:|---|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.5k | NOASSERTION | **Pushed today.** Category CLI — stay format-compatible. |
+| [getagentseal/codeburn](https://github.com/getagentseal/codeburn) | ~11.0k | MIT | **Pushed today.** Local tracker across 37 tools — star-gravity peer (CI/docs churn). |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.2k | MIT | openusage.ai menu-bar brand (naming collision only). |
+| [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) | ~195 | MIT | **Active today** (deps). openusage.sh local multi-tool TUI + SQLite — nearest product twin. Product fixes yesterday: Codex 0.153+ + Crush timestamps. |
+| [Maciek-roboblog/Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor) | ~8.7k | MIT | **New fold-in.** Real-time Claude Code usage monitor with predictions/warnings — highest-star Claude-only live monitor. |
+| [HermannBjorgvin/Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter) | ~2.2k | (check) | **New fold-in.** ESP32 desk dashboard for Claude Code usage — hardware distribution angle. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~223 | MIT | Real-time cross-agent cost monitor. |
+| [juliantanx/aiusage](https://github.com/juliantanx/aiusage) | ~126 | MIT | **v1.5.16 today** — local web dashboard across 20+ tools + name collision. |
+| [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) | ~5.4k | MIT | Terminal token tracker + leaderboard (Codex/Antigravity fixes overnight). |
+| [Iamshankhadeep/ccseva](https://github.com/Iamshankhadeep/ccseva) | ~805 | MIT | **New fold-in.** macOS menu bar for live Claude Code usage. |
+| [ColeMurray/claude-code-otel](https://github.com/ColeMurray/claude-code-otel) | ~498 | MIT | **New fold-in.** Observability stack for Claude Code usage/perf/cost (OTel path). |
+| [foyzulkarim/claude-lens](https://github.com/foyzulkarim/claude-lens) | ~246 | MIT | **New fold-in.** Local dashboard: sessions, token costs, cache, tool calls, daily breakdowns. |
+| [frankchiu-dev/claude-codex-usage-dashboard](https://github.com/frankchiu-dev/claude-codex-usage-dashboard) | ~173 | MIT | **New fold-in.** Local Windows dashboard for Claude Code + Codex limits. |
+| [planetf1/otelite](https://github.com/planetf1/otelite) | ~88 | NOASSERTION | **Pushed today.** Productivity view (commits/PRs/LOC per tool) + daily tool-mix token/cost views — OTel local dashboard deepening. |
+| [Rodiun/frugon](https://github.com/Rodiun/frugon) | ~212 | MIT | **Pushed today.** Local LLM bill-leak analyzer. |
+| [mag123c/toktrack](https://github.com/mag123c/toktrack) | ~189 | MIT | Ultra-fast Claude Code token/cost tracker. |
+| [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) | ~77 | MIT | **Pushed today.** OpenUsage menu-bar fork (Rust + Tauri). |
+| [Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar) | ~348 | MIT | **Pushed today.** macOS menu-bar quota peer. |
+| [tddworks/ClaudeBar](https://github.com/tddworks/ClaudeBar) | ~1.5k | (check) | macOS menu-bar Claude quota peer. |
+| [deviffyy/OpenQuota](https://github.com/deviffyy/OpenQuota) | ~204 | MIT | Cross-platform limits/spend tracker. |
+| [Dicklesworthstone/coding_agent_usage_tracker](https://github.com/Dicklesworthstone/coding_agent_usage_tracker) | ~85 | NOASSERTION | Single CLI for remaining quotas across Codex/Claude/Gemini/Cursor/Copilot. |
+| [sculptdotfun/viberank](https://github.com/sculptdotfun/viberank) | ~116 | MIT | Public AI-coding usage leaderboard on ccusage data. |
+| [cobra91/better-ccusage](https://github.com/cobra91/better-ccusage) | ~85 | MIT | Faster multi-provider JSONL analyzer. |
+| [851-labs/tokenmaxxing](https://github.com/851-labs/tokenmaxxing) | ~71 | MIT | Local CLI on ccusage that syncs usage socially. |
+| [Nihondo/AgentLimits](https://github.com/Nihondo/AgentLimits) | ~58 | MIT | macOS widgets for Codex/Claude limits + ccusage heatmap. |
+| [majiayu000/quotabar](https://github.com/majiayu000/quotabar) | ~52 | MIT | Tauri v2 menubar for Claude/Codex/Cursor/Antigravity quotas. |
+| [abhiunix/AgentHarbor](https://github.com/abhiunix/AgentHarbor) | ~12 | MIT | **Pushed today.** Native multi-agent rate-limit + session usage app. |
+| [semantic-craft/iOS-vibebuddy](https://github.com/semantic-craft/iOS-vibebuddy) | ~87 | MIT | **Pushed today.** Multi-surface Claude/Codex/Grok/Cursor tracker. |
+| [zhnd/lumo](https://github.com/zhnd/lumo) | ~147 | MIT | Local-first Claude Code usage/cost/session dashboard. |
+| [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~58.7k | NOASSERTION | **Pushed today.** Gateway spend/pricing — adjacent. |
+| [langfuse/langfuse](https://github.com/langfuse/langfuse) | ~34.6k | NOASSERTION | **Pushed today.** OSS LLM observability + OTel. |
+| [Helicone/helicone](https://github.com/Helicone/helicone) | ~6.2k | Apache-2.0 | OSS LLM observability proxy. Adjacent. |
+
+**Build takeaways:** Stay ccusage-compatible; differentiate on live quotas + auto-detect + UX vs openusage.sh. Fold high-star Claude monitors (Usage-Monitor / Clawdmeter / ccseva / claude-lens) as UX references for predictions, hardware, and local dashboards — not multi-provider twins. `otelite`'s new productivity + tool-mix views are the sharpest adjacent OTel dashboard move today. Keep Langfuse/LiteLLM/Helicone as complementary observability, not product twins.
+
+Sources: GitHub API 2026-09-14 (Europe/London).
