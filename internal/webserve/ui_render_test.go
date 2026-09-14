@@ -169,7 +169,7 @@ func TestAppFragmentRendersDemoViews(t *testing.T) {
 	if err := json.NewDecoder(snapW.Body).Decode(&env); err != nil {
 		t.Fatal(err)
 	}
-	wantCount := fmt.Sprintf("%d agents · Split", len(env.Views))
+	wantCount := fmt.Sprintf("%d agents", len(env.Views))
 
 	for _, want := range []string{
 		`id="app" class="shell layout-split`,
@@ -179,12 +179,14 @@ func TestAppFragmentRendersDemoViews(t *testing.T) {
 		wantCount,
 		`class="item nav-item`,
 		`class="hero"`,
+		`class="header-count"`,
+		`class="fleet-note"`,
 		`id="footer-btn-mode"`,
 		`id="footer-btn-refresh"`,
 		`id="footer-btn-refresh-all"`,
-		`id="footer-btn-layout"`,
+		`id="footer-btn-providers"`,
+		`id="footer-btn-keys"`,
 		`id="footer-theme-select"`,
-		`class="kbd-hint">R</kbd>`,
 		`class="btn-label">refresh all</span>`,
 		`id="key-next"`,
 		`hx-post="actions/usage-mode"`,
@@ -282,7 +284,7 @@ func TestAppFragmentFilterAndSelection(t *testing.T) {
 	if strings.Contains(body, "codex-cli") {
 		t.Error("filtered fragment should drop codex-cli")
 	}
-	if !strings.Contains(body, "1 agents (filtered)") {
+	if !strings.Contains(body, "1 agents") {
 		t.Error("filtered header should report the filtered count")
 	}
 
@@ -459,7 +461,7 @@ func TestAppFragmentHonorsStoredCookies(t *testing.T) {
 	if !strings.Contains(body, "opencode-pro") || strings.Contains(body, "codex-cli") {
 		t.Error("stored filter cookie should restrict the roster")
 	}
-	if !strings.Contains(body, "1 agents (filtered)") {
+	if !strings.Contains(body, "1 agents") {
 		t.Error("stored filter should be reflected in the header count")
 	}
 }
@@ -1119,7 +1121,7 @@ func TestSwissModernistPolishStyles(t *testing.T) {
 	}
 }
 
-func TestOpenDesignFooterRedesign(t *testing.T) {
+func TestQuietDockControlSurfaces(t *testing.T) {
 	srv := testServer(t, Options{Demo: true})
 	w := getHTML(t, srv, "/partial/app")
 	if w.Code != http.StatusOK {
@@ -1127,49 +1129,60 @@ func TestOpenDesignFooterRedesign(t *testing.T) {
 	}
 	html := w.Body.String()
 
-	// 1. Verify 3-zone OpenDesign HUD layout elements in rendered HTML
+	// 1. Presence in rendered /partial/app
 	for _, want := range []string{
-		`class="footer-left"`,
-		`class="dock-stream"`,
-		`class="live-dot"`,
-		`class="live-label">FLEET</span>`,
-		`class="live-stream-text"`,
 		`class="footer-actions"`,
-		`class="footer-action-group footer-nav-group"`,
-		`class="footer-sep"`,
-		`class="footer-action-group footer-data-group"`,
-		`class="footer-btn-segmented"`,
-		`class="footer-action-group footer-view-group"`,
-		`class="footer-right"`,
-		`class="footer-desktop-text footer-cadence-tag"`,
-		`class="footer-desktop-text footer-mockup-tag"`,
-		`class="status-pulse"`,
-		`class="footer-theme-cluster"`,
-		`id="footer-btn-theme"`,
-		`id="footer-theme-select"`,
+		`class="fleet-note"`,
+		`class="live-dot"`,
+		`id="footer-btn-mode"`,
 		`id="footer-btn-refresh"`,
 		`id="footer-btn-refresh-all"`,
+		`id="footer-btn-providers"`,
+		`id="footer-btn-keys"`,
+		`id="footer-theme-select"`,
+		`class="header-count"`,
+		`class="layout-btn active" data-layout=`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("rendered fragment missing %q", want)
 		}
 	}
 
-	// 1b. The fabricated live-stream sample must be gone; the dock reports the
-	// real tracked fleet instead.
-	if strings.Contains(html, "opencode invoked claude-3-5-sonnet") {
-		t.Error("footer must not ship the fabricated live stream sample")
-	}
-	if !strings.Contains(html, "quota windows") {
-		t.Error("footer dock should report tracked quota windows")
+	// 2. Absence in rendered HTML
+	for _, banned := range []string{
+		"kbd-hint",
+		"footer-sep",
+		"footer-btn-segmented",
+		"dock-stream",
+		"live-label",
+		"footer-cadence-tag",
+		"footer-mockup-tag",
+		"status-tag",
+		"header-meta",
+		"footer-btn-filter",
+		"footer-btn-layout",
+		`class="footer-right"`,
+	} {
+		if strings.Contains(html, banned) {
+			t.Errorf("rendered fragment still contains retired token %q", banned)
+		}
 	}
 
-	// 2. Ensure duplicate theme prefix is NOT repeated in footer-mockup-tag
-	if strings.Contains(html, `· loopback</span>`) {
-		t.Error("footer-mockup-tag should not prepend redundant theme name before loopback")
+	// 3. No title= inside <nav class="footer-actions" ...>...</nav>
+	navStart := strings.Index(html, `<nav class="footer-actions"`)
+	if navStart == -1 {
+		t.Fatal("missing <nav class=\"footer-actions\"")
+	}
+	navEndRel := strings.Index(html[navStart:], "</nav>")
+	if navEndRel == -1 {
+		t.Fatal("missing closing </nav> for footer-actions")
+	}
+	navBlock := html[navStart : navStart+navEndRel+len("</nav>")]
+	if strings.Contains(navBlock, "title=") {
+		t.Errorf("footer-actions nav block should not contain title= attribute: %s", navBlock)
 	}
 
-	// 3. Verify CSS styling hooks for OpenDesign layout
+	// 4. CSS styling hooks in /app.css
 	cssW := getHTML(t, srv, "/app.css")
 	if cssW.Code != http.StatusOK {
 		t.Fatalf("GET /app.css = %d", cssW.Code)
@@ -1177,17 +1190,27 @@ func TestOpenDesignFooterRedesign(t *testing.T) {
 	css := cssW.Body.String()
 
 	for _, want := range []string{
-		".footer-left {",
 		".footer-actions {",
-		".footer-right {",
-		".footer-sep {",
-		".footer-btn-segmented {",
-		".footer-theme-cluster {",
-		".status-pulse {",
-		"text-overflow: ellipsis;",
+		".footer-btn {",
+		".footer-theme-select {",
+		".fleet-note {",
+		".layout-btn.active",
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css missing footer rule %q", want)
+		}
+	}
+
+	for _, banned := range []string{
+		".footer-sep {",
+		".footer-btn-segmented {",
+		".dock-stream {",
+		".kbd-hint",
+		".status-tag {",
+		".center-tabs",
+	} {
+		if strings.Contains(css, banned) {
+			t.Errorf("app.css still contains retired rule %q", banned)
 		}
 	}
 }

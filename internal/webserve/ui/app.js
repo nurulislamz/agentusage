@@ -4,6 +4,7 @@
 (() => {
   "use strict";
   const TOKEN_KEY = "au-serve-token";
+  const KEYS_HINT = "keys: j/k or n navigate · / filter · u usage mode · r refresh · R refresh all · t/T theme · v layout · p providers · ? shortcuts";
   const $ = (id) => document.getElementById(id);
   const click = (id) => { const el = $(id); if (el) el.click(); };
 
@@ -310,18 +311,16 @@
       clearFilter();
       return;
     }
-    if (target.closest(".search-box") || target.closest("#footer-btn-filter")) {
+    if (target.closest(".search-box")) {
       openFilter();
+      return;
+    }
+    if (target.closest("#footer-btn-keys")) {
+      showToast(KEYS_HINT);
       return;
     }
     if (target.closest(".layout-btn") && document.querySelector(".empty-filter-state")) {
       clearFilter();
-    }
-    if (ev.shiftKey && target.closest("#footer-btn-theme")) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      click("key-theme-back");
-      return;
     }
     if (target.closest("#status-bar")) {
       const sb = $("status-bar");
@@ -329,13 +328,6 @@
       return;
     }
   }, true);
-
-  document.addEventListener("contextmenu", (ev) => {
-    if (ev.target && ev.target.closest && ev.target.closest("#footer-btn-theme")) {
-      ev.preventDefault();
-      click("key-theme-back");
-    }
-  });
   if ($("filter-close")) $("filter-close").addEventListener("click", () => closeFilter(true));
   if ($("filter-input")) {
     $("filter-input").addEventListener("keydown", (ev) => {
@@ -426,7 +418,7 @@
       case "ArrowUp": case "k": case "K": click("key-prev"); break;
       case "ArrowDown": case "j": case "J": case "n": case "N": click("key-next"); break;
       case "/": ev.preventDefault(); openFilter(); break;
-      case "?": ev.preventDefault(); showToast("Keys: j/k or n (nav), / (filter), u (mode), r/R (refresh), t/T (theme), v (layout), p (boxes)"); break;
+      case "?": ev.preventDefault(); showToast(KEYS_HINT); break;
       case "r": click("key-refresh"); break;
       case "R": click("key-refresh-all"); break;
       case "u": case "U": click("key-mode"); break;

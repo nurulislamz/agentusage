@@ -4,20 +4,20 @@
       <div class="brand-group">
         <span class="logo" aria-hidden="true">{{template "apple-logo"}}</span>
         <span class="brand"><span class="brand-title"><span class="brand-agent">agent</span><span class="brand-usage">Usage</span></span> <span class="brand-studio">{{if .Env.ThemeTokens.Name}}{{.Env.ThemeTokens.Name}}{{else}}Ceramic Studio{{end}}</span></span>
-        <span class="status-tag">DAEMONS ONLINE ({{len .Views}})</span>
       </div>
       <span id="fetching-header" class="fetching"><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>
       <span class="spacer"></span>
-      <nav class="layout-nav center-tabs" aria-label="Layout view">{{range .Layouts}}<button type="button" class="layout-btn{{if eq .ID $.Layout.ID}} active{{end}}" data-layout="{{.ID}}" hx-post="actions/layout" hx-vals='{"layout":"{{.ID}}"}' title="{{.Hint}}" aria-pressed="{{if eq .ID $.Layout.ID}}true{{else}}false{{end}}"><span class="layout-icon">{{.Icon}}</span> <span class="layout-label">{{.Label}}</span></button>{{end}}</nav>
+      <nav class="layout-nav" aria-label="Layout view">{{range .Layouts}}<button type="button" class="layout-btn{{if eq .ID $.Layout.ID}} active{{end}}" data-layout="{{.ID}}" hx-post="actions/layout" hx-vals='{"layout":"{{.ID}}"}' aria-pressed="{{if eq .ID $.Layout.ID}}true{{else}}false{{end}}"><span class="layout-icon" aria-hidden="true">{{.Icon}}</span><span class="layout-label">{{.Label}}</span></button>{{end}}</nav>
+      <span class="spacer"></span>
       <div class="right-controls">
-        <div class="search-box{{if .Filtered}} has-query{{end}}" id="search-box" title="Filter providers (/)" role="button" tabindex="0" aria-label="Filter providers (/)">
+        <div class="search-box{{if .Filtered}} has-query{{end}}" id="search-box" role="button" tabindex="0" aria-label="Filter providers (/)">
           <span class="search-kbd">/</span>
           <span class="search-text">{{if .Filtered}}{{.Filter}}{{else}}filter providers…{{end}}</span>
           {{if .Filtered}}
           <button type="button" class="btn-search-clear" id="btn-search-clear" title="Clear filter" aria-label="Clear filter">✕</button>
           {{end}}
         </div>
-        <span class="header-meta"><span class="meta-icon">⊞</span> {{len .Views}} agents{{if .Filtered}} (filtered){{end}} · {{.Layout.Label}} · {{.Layout.Hint}}</span>
+        <span class="header-count">{{len .Views}} agents{{if .Stats.AtLimit}} · <span class="count-warn">{{.Stats.AtLimit}} at limit</span>{{end}}</span>
       </div>
     </div>
   </header>
