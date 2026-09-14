@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="format-detection" content="telephone=no">
-  <title>agentUsage Ceramic Studio</title>
+  <title>agentUsage {{if .ThemeSlug}}{{.ThemeSlug}}{{else}}Ceramic Studio{{end}}</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='7.2' fill='%23141416' stroke='%232c2c2e' stroke-width='1'/%3E%3Cpath d='M 9.5 21.5 A 9 9 0 1 1 22.5 21.5' stroke='%232997ff' stroke-width='2.2' stroke-linecap='round' fill='none'/%3E%3Cpath d='M 8.5 16.5 L 12 16.5 L 14 12.5 L 17 20.5 L 19 16.5 L 23.5 16.5' stroke='%23ffffff' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Ccircle cx='16' cy='7' r='1.25' fill='%2330d158'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +18,7 @@
   <style id="theme-vars"></style>
 </head>
 <body>
-  <div id="app" class="shell layout-split" data-layout="split" hidden hx-get="partial/app" hx-trigger="load, every 10s" hx-target="#app" hx-swap="outerHTML" hx-indicator="#fetching-detail"></div>
+  <div id="app" class="shell layout-split" data-layout="split" hidden hx-get="partial/app" hx-trigger="load, every 10s" hx-include="#filter-input" hx-target="#app" hx-swap="outerHTML" hx-indicator="#fetching-detail"></div>
 
   <div id="splash" class="splash">
     <div class="splash-emblem" aria-hidden="true">{{template "apple-logo-lg"}}</div>
@@ -34,10 +34,10 @@
   </div>
 
   <div id="token-modal" class="modal" hidden>
-    <form id="token-form" class="modal-card">
-      <h2>Unlock dashboard</h2>
+    <form id="token-form" class="modal-card" role="dialog" aria-modal="true" aria-labelledby="token-title">
+      <h2 id="token-title">Unlock dashboard</h2>
       <p class="muted">This server requires a bearer token. Stored in this tab only.</p>
-      <input id="token-input" type="password" autocomplete="off" placeholder="AGENTUSAGE_SERVE_TOKEN">
+      <input id="token-input" type="password" autocomplete="off" placeholder="AGENTUSAGE_SERVE_TOKEN" aria-label="Bearer token">
       <p id="token-error" class="error" hidden></p>
       <button type="submit">Continue</button>
     </form>
@@ -54,9 +54,17 @@
     </div>
   </div>
 
+  <div id="providers-panel" class="providers-panel" role="dialog" aria-modal="true" aria-labelledby="providers-title" hidden>
+    <div class="providers-panel-head">
+      <h2 id="providers-title">Providers &amp; boxes</h2>
+      <button type="button" id="providers-close" class="inspect-close" aria-label="Close providers panel">✕</button>
+    </div>
+    <div id="providers-content" class="providers-content"></div>
+  </div>
+
   <div id="filter-bar" class="filter-bar" hidden>
     <label for="filter-input" class="filter-icon">{{template "icon-search"}}</label>
-    <input id="filter-input" name="q" type="text" spellcheck="false" autocomplete="off" placeholder="filter providers…" value="{{.Filter}}" hx-get="partial/app" hx-trigger="input changed delay:250ms, search" hx-target="#app" hx-swap="outerHTML" hx-include="this">
+    <input id="filter-input" name="q" type="text" spellcheck="false" autocomplete="off" placeholder="filter providers…" aria-label="Filter providers" value="{{.Filter}}" hx-get="partial/app" hx-trigger="input changed delay:250ms, search" hx-target="#app" hx-swap="outerHTML" hx-include="this">
     <span class="filter-hint dim">Esc cancel · Enter apply</span>
     <button type="button" id="filter-close" class="filter-close-btn" aria-label="Close search">✕</button>
   </div>

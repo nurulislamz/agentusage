@@ -36,7 +36,6 @@ var templateFuncs = template.FuncMap{
 	"pillClass":    pillClass,
 	"pct0":         pct0,
 	"pct1":         pct1,
-	"compact":      formatCompact,
 	"upper":        upper,
 	"subtitle":     viewSubtitle,
 	"accent":       accentOr,
@@ -66,9 +65,7 @@ var templateFuncs = template.FuncMap{
 	"cleanQuotaLabel": cleanQuotaLabel,
 	"cleanQuotaTitle": cleanQuotaTitle,
 	"barTone":         barTone,
-	"isCardAlert":     isCardAlert,
-	"cleanCaptionRight": cleanCaptionRight,
-	"cleanHeroCycle":    cleanHeroCycle,
+	"cleanHeroCycle":  cleanHeroCycle,
 	"cctx":            func(m renderModel, v renderView) cockpitCtx { return cockpitCtx{M: m, V: v} },
 	"cardctx":         func(m renderModel, c DetailCard) cardCtx { return cardCtx{M: m, Card: c} },
 }
@@ -136,13 +133,6 @@ func rowCaption(row DetailRow, mode string) string {
 		return row.Hint
 	}
 	return rowPct(row) + "% " + mode
-}
-
-func cleanCaptionRight(s string) string {
-	s = strings.TrimSpace(s)
-	s = strings.TrimLeft(s, " ·-.:")
-	s = strings.TrimRight(s, " ·-.:")
-	return strings.TrimSpace(s)
 }
 
 func cleanHeroCycle(cycle, schedule string) string {

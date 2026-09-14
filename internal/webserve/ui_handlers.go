@@ -102,8 +102,21 @@ func (s *Server) handleShell(w http.ResponseWriter, r *http.Request) {
 	} else if s.collector != nil && s.collector.opts.Theme != "" {
 		themeSlug = strings.ToLower(strings.ReplaceAll(s.collector.opts.Theme, " ", "-"))
 	}
+	filter := s.resolveFilter(r)
+	if r.URL.Query().Has("q") {
+		s.setUICookie(w, cookieFilter, filter)
+	}
+	if r.URL.Query().Has("layout") {
+		s.setUICookie(w, cookieLayout, s.resolveLayout(r))
+	}
+	if r.URL.Query().Has("account") {
+		s.setUICookie(w, cookieAccount, strings.TrimSpace(r.URL.Query().Get("account")))
+	}
+	if r.URL.Query().Has("view") {
+		s.setUICookie(w, cookieView, strings.TrimSpace(r.URL.Query().Get("view")))
+	}
 	data := shellData{
-		Filter:     readUICookie(r, cookieFilter),
+		Filter:     filter,
 		ThemeSlug:  themeSlug,
 		ThemeColor: themeColor,
 	}
@@ -154,7 +167,11 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request) {
 	if account == "" {
 		account = readUICookie(r, cookieAccount)
 	}
-	env := s.envelopeOrError()
+	refresh := r.URL.Query().Get("refresh") == "1"
+	env, err := s.collector.envelopeRefresh(refresh, account)
+	if err != nil {
+		env = Envelope{Error: err.Error()}
+	}
 	model := buildRenderModel(env, renderInput{
 		Layout:          s.resolveLayout(r),
 		Filter:          s.resolveFilter(r),
@@ -181,8 +198,17 @@ func (s *Server) handleThemeAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = r.ParseForm()
-	theme := strings.TrimSpace(r.FormValue("theme"))
-	backward := strings.EqualFold(strings.TrimSpace(r.FormValue("direction")), "backward")
+	theme := strings.TrimSpace(r.PostFormValue("theme"))
+	if theme == "" {
+		theme = strings.TrimSpace(r.FormValue("theme"))
+	}
+	dir := strings.TrimSpace(r.PostFormValue("direction"))
+	if dir == "" {
+		dir = strings.TrimSpace(r.FormValue("direction"))
+	}
+	backward := strings.EqualFold(dir, "backward") || strings.EqualFold(dir, "prev") ||
+		r.FormValue("backward") == "true" || r.FormValue("backward") == "1" ||
+		r.FormValue("prev") == "true" || r.FormValue("prev") == "1"
 	env, err := s.applyTheme(theme, backward)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -196,7 +222,11 @@ func (s *Server) handleUsageModeAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = r.ParseForm()
-	env, err := s.applyUsageMode(strings.TrimSpace(r.FormValue("usage_mode")))
+	mode := strings.TrimSpace(r.PostFormValue("usage_mode"))
+	if mode == "" {
+		mode = strings.TrimSpace(r.FormValue("usage_mode"))
+	}
+	env, err := s.applyUsageMode(mode)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -209,8 +239,14 @@ func (s *Server) handleLayoutAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = r.ParseForm()
-	current := s.resolveLayout(r)
-	target := strings.TrimSpace(r.FormValue("layout"))
+	current := readUICookie(r, cookieLayout)
+	if current == "" {
+		current = s.resolveLayout(r)
+	}
+	target := strings.TrimSpace(r.PostFormValue("layout"))
+	if target == "" {
+		target = strings.TrimSpace(r.FormValue("layout"))
+	}
 	id := ""
 	switch target {
 	case "next":
@@ -285,7 +321,18 @@ func (s *Server) applyTheme(target string, backward bool) (Envelope, error) {
 			targetTheme = tui.CycleTheme()
 		}
 	} else {
-		_ = tui.SetThemeByName(targetTheme)
+		if !tui.SetThemeByName(targetTheme) {
+			cleaned := strings.ReplaceAll(targetTheme, "-", " ")
+			if !tui.SetThemeByName(cleaned) {
+				for _, name := range tui.AvailableThemeNames() {
+					slug := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+					if strings.EqualFold(slug, targetTheme) || strings.EqualFold(name, targetTheme) {
+						tui.SetThemeByName(name)
+						break
+					}
+				}
+			}
+		}
 	}
 	if activeName := tui.ActiveTheme().Name; activeName != "" {
 		targetTheme = activeName
@@ -323,6 +370,88 @@ func (s *Server) applyUsageMode(requested string) (Envelope, error) {
 	return s.collector.envelope()
 }
 
+// handleProvidersFragment renders the providers/boxes dropdown list.
+func (s *Server) handleProvidersFragment(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	if !s.checkAuth(w, r) {
+		return
+	}
+	env := s.envelopeOrError()
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	data := providerPanelData{Groups: s.providerPanelGroups(env)}
+	if err := executeTemplate(w, "providers", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// handleProviderAction hides, shows, or removes one account and re-renders the
+// dashboard plus an out-of-band refresh of the open dropdown.
+func (s *Server) handleProviderAction(w http.ResponseWriter, r *http.Request) {
+	if !s.requireUIAction(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	op := strings.ToLower(strings.TrimSpace(r.PostFormValue("op")))
+	if op == "" {
+		op = strings.ToLower(strings.TrimSpace(r.FormValue("op")))
+	}
+	accountID := strings.TrimSpace(r.PostFormValue("account_id"))
+	if accountID == "" {
+		accountID = strings.TrimSpace(r.FormValue("account_id"))
+	}
+	if accountID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "account_id is required"})
+		return
+	}
+
+	var err error
+	toast := ""
+	switch op {
+	case "hide":
+		err = s.setAccountVisibility(accountID, false)
+		toast = "Hidden: " + accountID
+	case "show":
+		err = s.setAccountVisibility(accountID, true)
+		toast = "Visible: " + accountID
+	case "delete", "remove":
+		err = s.deleteAccount(accountID)
+		toast = "Removed: " + accountID
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown op " + op})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	env := s.envelopeOrError()
+	in := renderInput{
+		Layout:          s.resolveLayout(r),
+		Filter:          s.resolveFilter(r),
+		Account:         readUICookie(r, cookieAccount),
+		ExpandedAccount: readUICookie(r, cookieExpanded),
+		MobileView:      readUICookie(r, cookieView),
+		Toast:           toast,
+	}
+	model := s.appModel(env, in)
+	s.setAppCookies(w, model)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	if err := executeTemplate(w, "app", model); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data := providerPanelData{Groups: s.providerPanelGroups(env)}
+	if err := executeTemplate(w, "providers-oob", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) renderApp(w http.ResponseWriter, r *http.Request, in renderInput, refresh bool, focus string) {
 	env, err := s.collector.envelopeRefresh(refresh, focus)
 	if err != nil {
@@ -352,12 +481,26 @@ func (s *Server) renderAppEnv(w http.ResponseWriter, r *http.Request, env Envelo
 }
 
 func (s *Server) writeApp(w http.ResponseWriter, r *http.Request, env Envelope, in renderInput) {
+	model := s.appModel(env, in)
+	s.setAppCookies(w, model)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	if err := executeTemplate(w, "app", model); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// appModel builds the dashboard render model for one request.
+func (s *Server) appModel(env Envelope, in renderInput) renderModel {
 	in.Auth = s.AuthEnabled()
 	if in.Now.IsZero() {
 		in.Now = time.Now()
 	}
-	model := buildRenderModel(env, in)
+	return buildRenderModel(env, in)
+}
 
+// setAppCookies persists the dashboard UI state the request resolved to.
+func (s *Server) setAppCookies(w http.ResponseWriter, model renderModel) {
 	s.setUICookie(w, cookieLayout, model.Layout.ID)
 	if model.Selected != nil {
 		s.setUICookie(w, cookieAccount, model.Selected.AccountID)
@@ -367,10 +510,4 @@ func (s *Server) writeApp(w http.ResponseWriter, r *http.Request, env Envelope, 
 	s.setUICookie(w, cookieFilter, model.Filter)
 	s.setUICookie(w, cookieExpanded, model.ExpandedKey)
 	s.setUICookie(w, cookieView, model.MobileView)
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	if err := executeTemplate(w, "app", model); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
 }

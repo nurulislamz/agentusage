@@ -207,6 +207,15 @@ func (c *collector) setUsageMode(mode string) {
 	}
 }
 
+func (c *collector) setConfig(cfg config.Config) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.opts.Config = &cfg
+	if c.collect == nil && !c.cachedAt.IsZero() {
+		c.cached = c.decorate(Envelope{Source: c.cached.Source, Snapshots: c.cached.Snapshots})
+	}
+}
+
 func (c *collector) setTheme(theme string) {
 	theme = strings.TrimSpace(theme)
 	if theme == "" {

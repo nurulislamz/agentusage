@@ -58,6 +58,59 @@ func envelopeUsageMode(t *testing.T, srv *Server) string {
 	return env.UsageMode
 }
 
+func TestBoards_ShowLimitReachedAndRealKPIBanner(t *testing.T) {
+	env := Envelope{
+		UsageMode: "remaining",
+		Views: []AccountView{
+			{
+				Key: "cursor-exhausted", ProviderID: "cursor", ProviderName: "Cursor",
+				AccountID: "cursor-exhausted", Status: "LIMITED", StatusBadge: "MONTHLY LIMIT",
+				Summary: "0.0% remaining", HasGauge: true, GaugePercent: 0,
+				UsageLines: []UsageLine{{Label: "Included", Short: "Included", Percent: f64(0), Tone: "crit", ResetIn: "13d12h"}},
+			},
+			{
+				Key: "codex-cli", ProviderID: "codex", ProviderName: "Codex",
+				AccountID: "codex-cli", Status: "OK", StatusBadge: "OK",
+				Summary: "58.00% remaining", HasGauge: true, GaugePercent: 58,
+				UsageLines: []UsageLine{{Label: "Five Hour Limit", Short: "5h", Percent: f64(58), Tone: "ok", ResetIn: "2h39m"}},
+			},
+		},
+	}
+
+	// Every board keeps the exhausted window unmistakable.
+	for layout, wants := range map[string][]string{
+		"split":  {"Limit reached", "tone-crit", "58.00% remaining"},
+		"matrix": {"Limit reached", "58% left", "tone-crit"},
+		"bento":  {"Limit reached", "58% left", "tone-crit"},
+		"bars":   {"Limit reached", "58% left", "tone-crit"},
+		"dials":  {`class="limit-flag">Limit reached<`, "tone-crit"},
+		"strips": {`strip-metric tone-crit depleted`, "<em>Limit</em>"},
+	} {
+		html := renderFragment(t, env, renderInput{Layout: layout})
+		for _, want := range wants {
+			if !strings.Contains(html, want) {
+				t.Errorf("%s layout missing %q", layout, want)
+			}
+		}
+	}
+
+	// KPI banner reports real fleet numbers, not placeholders.
+	banner := renderFragment(t, env, renderInput{Layout: "bento"})
+	for _, want := range []string{
+		"Accounts At Limit", "Tightest Window", "Average Headroom",
+		"0%", "29%", "across 2 quota windows", "cursor-exhausted",
+	} {
+		if !strings.Contains(banner, want) {
+			t.Errorf("KPI banner missing %q", want)
+		}
+	}
+	for _, banned := range []string{"3.48M", "$242.30", "88.4%", "Token Velocity", "Cache Hit"} {
+		if strings.Contains(banner, banned) {
+			t.Errorf("KPI banner still renders fabricated stat %q", banned)
+		}
+	}
+}
+
 func TestShellServesServerRenderedChrome(t *testing.T) {
 	srv := testServer(t, Options{Demo: true})
 	w := getHTML(t, srv, "/")
@@ -909,38 +962,39 @@ func fetchEnvelope(t *testing.T, srv *Server) Envelope {
 	return env
 }
 
-func TestCockpitDashboard_NoDanglingNextResetAndCodexCommandHeroStats(t *testing.T) {
+func TestCockpit_RealUsageLinesReplaceFabricatedDecks(t *testing.T) {
 	srv := testServer(t, Options{Demo: true})
 	env := fetchEnvelope(t, srv)
 
-	// 1. Inspect codex-cli
-	codexHTML := renderInspect(t, env, renderInput{Account: "codex-cli"})
-	if !strings.Contains(codexHTML, "openai · OpenAI Codex CLI · dev@acme-corp.dev") {
-		t.Errorf("codex-cli missing hero meta, got: %s", codexHTML[:300])
-	}
-	if !strings.Contains(codexHTML, "DAILY SPEND") {
-		t.Error("codex-cli should render DAILY SPEND card instead of generic USAGE QUOTA")
-	}
-	if !strings.Contains(codexHTML, "gpt-5.1-codex") {
-		t.Error("codex-cli should render gpt-5.1-codex in model burn")
-	}
-	if strings.Contains(codexHTML, "Next reset:") {
-		t.Error("codex-cli should not have dangling 'Next reset:'")
-	}
-
-	// 2. Inspect command-code
-	cmdHTML := renderInspect(t, env, renderInput{Account: "command-code"})
-	if !strings.Contains(cmdHTML, "command-code · GOAT · dev@acme-corp.dev") {
-		t.Errorf("command-code missing hero meta, got: %s", cmdHTML[:300])
-	}
-	if !strings.Contains(cmdHTML, "MONTHLY CREDITS") {
-		t.Error("command-code should render MONTHLY CREDITS card instead of generic USAGE QUOTA")
-	}
-	if !strings.Contains(cmdHTML, "command-r-plus") {
-		t.Error("command-code should render command-r-plus in model burn")
+	// No fabricated deck content may survive in any cockpit.
+	for _, acct := range []string{"codex-cli", "command-code", "cursor-ide", "opencode-pro", "gemini-cli", "antigravity-mohammed"} {
+		html := renderInspect(t, env, renderInput{Account: acct})
+		for _, banned := range []string{
+			"MODEL BURN", "CLIENTS</h2>", "CODE STATISTICS",
+			"DAILY SPEND", "MONTHLY CREDITS", "TEAM BUDGET", "CONTAINER FLEET",
+			"Primary Model", "command-r-plus",
+		} {
+			if strings.Contains(html, banned) {
+				t.Errorf("%s cockpit still renders fabricated %q", acct, banned)
+			}
+		}
+		if !strings.Contains(html, "Usage &amp; quotas") {
+			t.Errorf("%s cockpit missing usage & quotas card", acct)
+		}
+		if strings.Contains(html, "Next reset:") {
+			t.Errorf("%s cockpit has dangling 'Next reset:'", acct)
+		}
 	}
 
-	// 3. Fallback account with no CycleSchedule and empty NextDisplay
+	// Real windows render as labelled gauges with mode-aware captions.
+	ccHTML := renderInspect(t, env, renderInput{Account: "command-code"})
+	for _, want := range []string{"Five Hour Limit", "100% left", "Week", "80% left", "Month", "49% left", "Resets in"} {
+		if !strings.Contains(ccHTML, want) {
+			t.Errorf("command-code cockpit missing real quota text %q", want)
+		}
+	}
+
+	// Account without quota windows falls back to its real summary.
 	fallbackEnv := Envelope{
 		Views: []AccountView{
 			{
@@ -956,14 +1010,14 @@ func TestCockpitDashboard_NoDanglingNextResetAndCodexCommandHeroStats(t *testing
 		},
 	}
 	fallbackHTML := renderInspect(t, fallbackEnv, renderInput{Account: "custom-agent"})
-	if strings.Contains(fallbackHTML, "Next reset:") {
-		t.Error("fallback account must not render dangling 'Next reset:'")
+	if !strings.Contains(fallbackHTML, "$5.00 remaining") {
+		t.Error("fallback cockpit should surface the real summary")
 	}
-	if !strings.Contains(fallbackHTML, "Rolling window") {
-		t.Error("fallback account with empty NextDisplay should render 'Rolling window'")
+	if strings.Contains(fallbackHTML, "Rolling window") {
+		t.Error("fallback cockpit should not invent a rolling-window label")
 	}
 
-	// 3b. Unbudgeted account does not render false 0.0% zero-quota KPI card
+	// Unbudgeted account does not render a false 0.0% quota.
 	unbudgetedEnv := Envelope{
 		Views: []AccountView{
 			{
@@ -983,8 +1037,11 @@ func TestCockpitDashboard_NoDanglingNextResetAndCodexCommandHeroStats(t *testing
 	if strings.Contains(unbudgetedHTML, ">0.0%<") {
 		t.Error("unbudgeted account should not render misleading 0.0% quota")
 	}
-	if !strings.Contains(unbudgetedHTML, "ACTIVITY STATUS") || !strings.Contains(unbudgetedHTML, ">Active<") {
-		t.Error("unbudgeted account should render ACTIVITY STATUS with Active")
+	if !strings.Contains(unbudgetedHTML, "Pay-as-you-go") {
+		t.Error("unbudgeted account should render its real summary")
+	}
+	if strings.Contains(unbudgetedHTML, "ACTIVITY STATUS") || strings.Contains(unbudgetedHTML, "CYCLE STATUS") {
+		t.Error("unbudgeted account should not render placeholder status cards")
 	}
 
 	// 4. btn-cockpit-refresh uses icon-refresh template, not raw unicode glyph
@@ -995,13 +1052,7 @@ func TestCockpitDashboard_NoDanglingNextResetAndCodexCommandHeroStats(t *testing
 		t.Error("btn-cockpit-refresh missing icon-refresh SVG")
 	}
 
-	// 5. burn-card collapsible details
-	cursorHTML := renderInspect(t, env, renderInput{Account: "cursor-ide"})
-	if !strings.Contains(cursorHTML, `<details open class="burn-details">`) || !strings.Contains(cursorHTML, `<summary class="burn-summary"><h2><span class="burn-chevron">▸</span> MODEL BURN</h2></summary>`) {
-		t.Error("cursor-ide burn card missing collapsible burn-details and burn-summary elements")
-	}
-
-	// 6. strip-card space between agent-name and agent-plan
+	// 5. strip-card space between agent-name and agent-plan
 	stripsHTML := renderFragment(t, env, renderInput{Layout: "strips"})
 	if strings.Contains(stripsHTML, `</span><span class="agent-plan">`) {
 		t.Error("strip-card should have space between agent-name and agent-plan to prevent concatenation")
@@ -1010,15 +1061,11 @@ func TestCockpitDashboard_NoDanglingNextResetAndCodexCommandHeroStats(t *testing
 		t.Error("strip-card missing space between agent-name and agent-plan")
 	}
 
-	// 7. KPI captions do not have dangling leading dots or floating delimiters
-	if strings.Contains(cursorHTML, "· $2,028 remaining") {
-		t.Error("cursor cockpit KPI caption contains dangling dot '· $2,028 remaining'")
-	}
-	if !strings.Contains(cursorHTML, `<span class="cap-right">$2,028 remaining</span>`) {
-		t.Error("cursor cockpit KPI caption missing cap-right without leading dot")
-	}
-	if !strings.Contains(cursorHTML, `<span class="cap-left"><b>$1,572 / $3,600</b></span>`) {
-		t.Error("cursor cockpit KPI caption missing cap-left wrapper")
+	// 6. No fabricated KPI cards survive; the demo cursor snapshot's real
+	// attributes still surface through the info card.
+	cursorHTML := renderInspect(t, env, renderInput{Account: "cursor-ide"})
+	if strings.Contains(cursorHTML, "TEAM BUDGET") || strings.Contains(cursorHTML, "BILLING CYCLE") {
+		t.Error("cursor cockpit still renders fabricated KPI cards")
 	}
 	if strings.Contains(fallbackHTML, "Active tier ·") {
 		t.Error("fallback cockpit contains dangling dot 'Active tier ·'")
@@ -1064,16 +1111,10 @@ func TestSwissModernistPolishStyles(t *testing.T) {
 		}
 	}
 
-	// 4. Collapsible toggle affordances for burn-details and burn-summary
-	for _, want := range []string{
-		".burn-details {",
-		".burn-summary {",
-		".burn-chevron {",
-		".burn-details[open] .burn-chevron {",
-		"transform: rotate(90deg);",
-	} {
-		if !strings.Contains(css, want) {
-			t.Errorf("app.css missing burn card collapsible style %q", want)
+	// 4. Fabricated cockpit deck styles are gone
+	for _, banned := range []string{".burn-details {", ".kpi-card {", ".clients-card", ".code-card"} {
+		if strings.Contains(css, banned) {
+			t.Errorf("app.css still ships dead fabricated-deck rule %q", banned)
 		}
 	}
 }
@@ -1091,7 +1132,7 @@ func TestOpenDesignFooterRedesign(t *testing.T) {
 		`class="footer-left"`,
 		`class="dock-stream"`,
 		`class="live-dot"`,
-		`class="live-label">LIVE STREAM</span>`,
+		`class="live-label">FLEET</span>`,
 		`class="live-stream-text"`,
 		`class="footer-actions"`,
 		`class="footer-action-group footer-nav-group"`,
@@ -1112,6 +1153,15 @@ func TestOpenDesignFooterRedesign(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Errorf("rendered fragment missing %q", want)
 		}
+	}
+
+	// 1b. The fabricated live-stream sample must be gone; the dock reports the
+	// real tracked fleet instead.
+	if strings.Contains(html, "opencode invoked claude-3-5-sonnet") {
+		t.Error("footer must not ship the fabricated live stream sample")
+	}
+	if !strings.Contains(html, "quota windows") {
+		t.Error("footer dock should report tracked quota windows")
 	}
 
 	// 2. Ensure duplicate theme prefix is NOT repeated in footer-mockup-tag
@@ -1142,8 +1192,8 @@ func TestOpenDesignFooterRedesign(t *testing.T) {
 	}
 }
 
-func TestCockpitDashboard_ExhaustedQuotaLimitToneAndMode(t *testing.T) {
-	// 1. Cursor account at 100% used in used-mode
+func TestCockpit_ExhaustedQuotaRendersLimitReached(t *testing.T) {
+	// 1. Cursor account at 100% used in used-mode.
 	cursorEnv := Envelope{
 		UsageMode: "used",
 		Views: []AccountView{
@@ -1170,17 +1220,20 @@ func TestCockpitDashboard_ExhaustedQuotaLimitToneAndMode(t *testing.T) {
 		},
 	}
 	cursorHTML := renderInspect(t, cursorEnv, renderInput{Account: "cursor-nurulz"})
-	if strings.Contains(cursorHTML, "QUOTA REMAINING: 100.0%") {
-		t.Error("cursor 100% used must not render deceptive 'QUOTA REMAINING: 100.0%'")
+	if !strings.Contains(cursorHTML, "500 / 500 requests") {
+		t.Error("cursor cockpit missing the exhausted window value")
 	}
-	if !strings.Contains(cursorHTML, "QUOTA USED") && !strings.Contains(cursorHTML, "PLAN USAGE") {
-		t.Error("cursor in used mode should render 'QUOTA USED' or 'PLAN USAGE'")
+	if strings.Contains(cursorHTML, "QUOTA REMAINING") {
+		t.Error("cursor 100% used must not render deceptive 'QUOTA REMAINING'")
 	}
 	if !strings.Contains(cursorHTML, "tone-crit") {
 		t.Error("cursor 100% used must render with tone-crit")
 	}
+	if !strings.Contains(cursorHTML, "Limit reached") {
+		t.Error("cursor 100% used must render the 'Limit reached' caption")
+	}
 
-	// 2. Command Code account hit monthly limit with live numbers
+	// 2. Command Code account hit monthly limit with live numbers.
 	cmdEnv := Envelope{
 		UsageMode: "used",
 		Views: []AccountView{
@@ -1216,8 +1269,8 @@ func TestCockpitDashboard_ExhaustedQuotaLimitToneAndMode(t *testing.T) {
 		},
 	}
 	cmdHTML := renderInspect(t, cmdEnv, renderInput{Account: "command_code"})
-	if !strings.Contains(cmdHTML, "MONTHLY CREDITS") {
-		t.Error("command_code should render MONTHLY CREDITS card")
+	if strings.Contains(cmdHTML, "MONTHLY CREDITS") {
+		t.Error("command_code cockpit should not render the fabricated MONTHLY CREDITS card")
 	}
 	if !strings.Contains(cmdHTML, "$69.88 / $70.00") {
 		t.Error("command_code should display live $69.88 / $70.00 spending")
@@ -1225,8 +1278,14 @@ func TestCockpitDashboard_ExhaustedQuotaLimitToneAndMode(t *testing.T) {
 	if !strings.Contains(cmdHTML, "tone-crit") {
 		t.Error("command_code exhausted monthly limit must render with tone-crit")
 	}
+	if !strings.Contains(cmdHTML, "Limit reached") {
+		t.Error("command_code exhausted month must render the 'Limit reached' caption")
+	}
+	if !strings.Contains(cmdHTML, "20% used") {
+		t.Error("command_code weekly window should keep its used-mode caption")
+	}
 
-	// 3. Cursor account at 0% remaining in remaining-mode
+	// 3. Cursor account at 0% remaining in remaining-mode.
 	remEnv := Envelope{
 		UsageMode: "remaining",
 		Views: []AccountView{
@@ -1253,11 +1312,13 @@ func TestCockpitDashboard_ExhaustedQuotaLimitToneAndMode(t *testing.T) {
 		},
 	}
 	remHTML := renderInspect(t, remEnv, renderInput{Account: "cursor-exhausted"})
-	if !strings.Contains(remHTML, "QUOTA REMAINING") && !strings.Contains(remHTML, "PLAN USAGE") {
-		t.Error("cursor in remaining mode should render 'QUOTA REMAINING' or 'PLAN USAGE'")
+	if strings.Contains(remHTML, "QUOTA USED") {
+		t.Error("cursor 0% remaining must not render 'QUOTA USED'")
 	}
 	if !strings.Contains(remHTML, "tone-crit") {
 		t.Error("cursor 0% remaining must render with tone-crit")
 	}
+	if !strings.Contains(remHTML, "Limit reached") {
+		t.Error("cursor 0% remaining must render the 'Limit reached' caption")
+	}
 }
-

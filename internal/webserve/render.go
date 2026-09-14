@@ -76,15 +76,19 @@ func firstNonEmpty(values ...string) string {
 // render model types
 
 type usageLine struct {
-	Label   string
-	Short   string
-	Value   string
-	Hint    string
-	ResetIn string
-	Tone    string
-	Group   string
-	Pct     *float64
-	Urgent  bool
+	Label    string
+	Short    string
+	Value    string
+	Hint     string
+	ResetIn  string
+	Tone     string
+	Group    string
+	Pct      *float64
+	Urgent   bool
+	Depleted bool
+	// Caption is the mode-aware percent caption ("58% left", "12% used",
+	// "Limit reached") shared by every board renderer.
+	Caption string
 }
 
 type usageItem struct {
@@ -104,10 +108,12 @@ type usageItem struct {
 }
 
 type bentoRow struct {
-	Label string
-	Pct   *float64
-	Value string
-	Tone  string
+	Label    string
+	Pct      *float64
+	Value    string
+	Tone     string
+	Caption  string
+	Depleted bool
 }
 
 type gaugeGroup struct {
@@ -152,17 +158,11 @@ type renderView struct {
 	Position         int
 	Total            int
 
-	// Rich cockpit dashboard cards matching mockup
+	// Cockpit hero strip, filled from real account data.
 	HeroAccountID   string
 	HeroMeta        string
 	HeroPrimaryStat string
 	HeroCycleStat   string
-	TeamBudget      MetricDeckCard
-	BillingCycle    MetricDeckCard
-	ModelBurn       ModelBurnDeckCard
-	Clients         ClientsDeckCard
-	CodeStats       CodeStatsDeckCard
-	HasCockpitCards bool
 
 	// Ceramic Studio properties
 	AvatarText  string
@@ -172,62 +172,27 @@ type renderView struct {
 	BentoSpan   string
 }
 
-type MetricDeckCard struct {
-	Title    string
-	Percent  float64
-	PctStr   string
-	Tone     string
-	SubLeft  string
-	SubRight string
-}
-
-type ModelSegment struct {
-	Name    string
-	Percent float64
-	PctStr  string
-	CostStr string
-	Color   string
-}
-
-type ModelBurnDeckCard struct {
-	HasData  bool
-	Segments []ModelSegment
-	ChartSVG template.HTML
-	MetaText string
-}
-
-type ClientSegment struct {
-	Name    string
-	Percent float64
-	PctStr  string
-	ReqStr  string
-	Color   string
-}
-
-type ClientsDeckCard struct {
-	HasData  bool
-	Segments []ClientSegment
-}
-
-type CodeStatsDeckCard struct {
-	HasData      bool
-	Added        string
-	Removed      string
-	EqualizerSVG template.HTML
-	MetaText     string
-}
-
+// GlobalStats carries the usage-first KPI banner. Every field is derived from
+// the collected snapshots; nothing is fabricated.
 type GlobalStats struct {
-	Health        string
-	HealthTag     string
-	HealthTone    string
-	HealthNote    string
-	TokenVelocity string
-	TokenNote     string
-	Spend         string
-	SpendNote     string
-	CacheHit      string
-	CacheNote     string
+	Health      string
+	HealthTag   string
+	HealthTone  string
+	HealthNote  string
+	AtLimit     string
+	AtLimitTag  string
+	AtLimitTone string
+	AtLimitNote string
+
+	Tightest     string
+	TightestTag  string
+	TightestNote string
+	TightestTone string
+
+	Headroom      string
+	HeadroomLabel string
+	HeadroomNote  string
+	HeadroomTone  string
 }
 
 type renderModel struct {
@@ -256,6 +221,8 @@ type renderModel struct {
 	EmptyError     string
 	EmptyHint      string
 	Stats          GlobalStats
+	// FleetNote summarises tracked accounts and quota windows for the footer.
+	FleetNote string
 }
 
 type renderInput struct {
@@ -285,7 +252,8 @@ var (
 	ratioRe     = regexp.MustCompile(`\$?\s*([\d,.]+)\s*/\s*\$?\s*([\d,.]+)`)
 	moneyRe     = regexp.MustCompile(`\$([\d,.]+)`)
 	magnitudeRe = regexp.MustCompile(`(\d+(?:\.\d+)?)\s*([KMB])?`)
-	resetPreRe  = regexp.MustCompile(`(?i)^(resets?\s+in\s+|in\s+)`)
+	resetPreRe  = regexp.MustCompile(`(?i)^(next\s+resets?:?\s*|resets?\s+(in|at|on)?:?\s*|in\s+)`)
+	hoursAgoRe  = regexp.MustCompile(`(?i)(\d+)h\s+ago`)
 	percentOnly = regexp.MustCompile(`^\d+(\.\d+)?%$`)
 )
 
@@ -358,8 +326,31 @@ func buildRenderModel(env Envelope, in renderInput) renderModel {
 		m.Selected = &sel
 	}
 	m.Groups = groupRenderViews(m.Views)
-	m.Stats = calculateGlobalStats(filtered, env)
+	m.Stats = calculateGlobalStats(m.Views, used)
+	m.FleetNote = fleetNote(m.Views)
 	return m
+}
+
+// fleetNote summarises the tracked fleet for the footer dock: account count,
+// live quota windows and any accounts pinned at their limit.
+func fleetNote(views []renderView) string {
+	windows := 0
+	atLimit := 0
+	for i := range views {
+		if views[i].Depleted {
+			atLimit++
+		}
+		for _, l := range views[i].Lines {
+			if l.Pct != nil {
+				windows++
+			}
+		}
+	}
+	note := fmt.Sprintf("%d accounts · %d quota windows", len(views), windows)
+	if atLimit > 0 {
+		note += fmt.Sprintf(" · %d at limit", atLimit)
+	}
+	return note
 }
 
 func usageModeOf(env Envelope) string {
@@ -465,7 +456,18 @@ func buildRenderView(v AccountView, index int, used bool, now time.Time) renderV
 	if isCannotRenderError(v.NextReset) {
 		v.NextReset = ""
 	}
+	if strings.EqualFold(strings.TrimSpace(v.TagLabel), "usage") {
+		v.TagLabel = ""
+	}
 	lines := buildUsageLines(v, used)
+	for i := range lines {
+		if lines[i].Pct != nil {
+			lines[i].Depleted = isDepleted(*lines[i].Pct, used)
+			if lines[i].Caption == "" {
+				lines[i].Caption = percentCaption(*lines[i].Pct, used)
+			}
+		}
+	}
 	items := buildUsageItems(v, lines, used)
 	rv := renderView{
 		AccountView:   v,
@@ -481,7 +483,9 @@ func buildRenderView(v AccountView, index int, used bool, now time.Time) renderV
 	rv.ResetTitle = "Next reset"
 	if v.ProviderID == "antigravity" {
 		dur, next, title := antigravityReset(v, lines)
-		if next != "" {
+		if dur != "" {
+			rv.NextDisplay = dur
+		} else if next != "" {
 			rv.NextDisplay = next
 		}
 		if title != "" {
@@ -498,25 +502,36 @@ func buildRenderView(v AccountView, index int, used bool, now time.Time) renderV
 	rv.Cards = extraCards(v)
 	rv.HasTimerFallback = len(rv.Timers) == 0 && strings.TrimSpace(v.NextReset) != ""
 	rv.Meters = firstN(lines, 2)
-	if len(lines) > 0 {
-		rv.FirstTone = lines[0].Tone
-	}
 	rv.TrendStats = trendStats(v.DailyCost)
+	worstTone := "ok"
 	for _, l := range lines {
 		if l.Pct != nil {
 			if isDepleted(*l.Pct, used) {
 				rv.Depleted = true
-				break
+			}
+		}
+		switch l.Tone {
+		case "crit":
+			worstTone = "crit"
+		case "warn", "peach":
+			if worstTone != "crit" {
+				worstTone = l.Tone
 			}
 		}
 	}
 	if !rv.Depleted && (strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED") {
 		rv.Depleted = true
 	}
+	if rv.Depleted {
+		worstTone = "crit"
+	}
+	if len(lines) > 0 {
+		rv.FirstTone = worstTone
+	}
 	rv.AvatarText, rv.AvatarColor, rv.AvatarBg = avatarFor(v.ProviderID, v.AccountID)
-	rv.IsAlert = isCardAlert(v.StatusBadge, v.Status)
+	rv.IsAlert = isCardAlert(v.StatusBadge, v.Status) || rv.Depleted
 	rv.BentoSpan = bentoSpanFor(v, rv.BentoRows, rv.IsAlert)
-	buildCockpitDashboard(&rv, v, used, now)
+	buildCockpitHero(&rv, v)
 	return rv
 }
 
@@ -552,19 +567,75 @@ func groupRenderViews(views []renderView) []renderGroup {
 				break
 			}
 		}
+		balanceBentoGroupSpans(groups[i].Items)
 	}
 	return groups
+}
+
+func balanceBentoGroupSpans(items []renderView) {
+	n := len(items)
+	if n == 0 {
+		return
+	}
+	if n == 1 {
+		if items[0].BentoSpan != "compact" {
+			items[0].BentoSpan = "wide"
+		}
+		return
+	}
+	if n == 2 {
+		if items[0].BentoSpan == "compact" && items[1].BentoSpan == "compact" {
+			return
+		}
+		if items[0].IsAlert || len(items[0].BentoRows) >= len(items[1].BentoRows) {
+			items[0].BentoSpan = "wide"
+			if items[1].BentoSpan != "compact" {
+				items[1].BentoSpan = "standard"
+			}
+		} else {
+			items[1].BentoSpan = "wide"
+			if items[0].BentoSpan != "compact" {
+				items[0].BentoSpan = "standard"
+			}
+		}
+		return
+	}
+	if n == 3 {
+		for i := range items {
+			if items[i].BentoSpan != "compact" {
+				items[i].BentoSpan = "standard"
+			}
+		}
+		return
+	}
+	for i := range items {
+		if items[i].BentoSpan != "compact" {
+			items[i].BentoSpan = "standard"
+		}
+	}
+	rem := n % 3
+	if rem == 2 {
+		items[n-2].BentoSpan = "wide"
+	} else if rem == 1 {
+		if items[n-1].BentoSpan != "compact" {
+			items[n-1].BentoSpan = "wide"
+		}
+	}
 }
 
 func rollupFor(items []renderView) (string, string) {
 	anyCrit, anyWarn := false, false
 	for _, v := range items {
+		if v.Depleted {
+			anyCrit = true
+			break
+		}
 		s := strings.ToLower(v.StatusBadge + " " + v.Status)
 		if containsAny(s, "limit", "err", "crit") {
 			anyCrit = true
 			break
 		}
-		if containsAny(s, "warn", "auth") {
+		if v.Urgent || containsAny(s, "warn", "auth") {
 			anyWarn = true
 		}
 	}
@@ -611,7 +682,8 @@ func buildUsageLines(v AccountView, used bool) []usageLine {
 		}
 	}
 	var lines []usageLine
-	if v.HasGauge && v.GaugePercent > 0 {
+	hasActiveGauge := v.HasGauge && (v.GaugePercent > 0 || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED")
+	if hasActiveGauge && v.GaugePercent > 0 {
 		pct := clampPctVal(v.GaugePercent)
 		reset := firstNonEmpty(v.ResetHint, v.NextReset)
 		lines = append(lines, usageLine{
@@ -631,7 +703,7 @@ func buildUsageLines(v AccountView, used bool) []usageLine {
 				ResetIn: stripResetPrefix(firstNonEmpty(v.ResetHint, v.NextReset)),
 				Tone:    toneFromPercent(*pct, used),
 			})
-		} else if v.HasGauge {
+		} else if hasActiveGauge {
 			pct := clampPctVal(v.GaugePercent)
 			reset := firstNonEmpty(v.ResetHint, v.NextReset)
 			lines = append(lines, usageLine{
@@ -644,7 +716,7 @@ func buildUsageLines(v AccountView, used bool) []usageLine {
 		} else {
 			lines = append(lines, usageLine{Label: "Status", Value: v.Summary, Tone: "dim"})
 		}
-	} else if v.HasGauge {
+	} else if hasActiveGauge {
 		pct := clampPctVal(v.GaugePercent)
 		reset := firstNonEmpty(v.ResetHint, v.NextReset)
 		lines = append(lines, usageLine{
@@ -813,7 +885,9 @@ func buildUsageItems(v AccountView, lines []usageLine, usedMode bool) []usageIte
 				})
 				continue
 			}
-			items = append(items, usageItem{Kind: "table", Label: partShort(part, line), Value: part})
+			if line.Tone != "dim" && (trimAtDigit(part) != part || strings.Contains(part, "$")) {
+				items = append(items, usageItem{Kind: "table", Label: partShort(part, line), Value: part})
+			}
 		}
 	}
 	var amounts []int
@@ -1099,7 +1173,12 @@ func resetCaption(reset string) string {
 }
 
 func stripResetPrefix(s string) string {
-	return strings.TrimSpace(resetPreRe.ReplaceAllString(s, ""))
+	res := strings.TrimSpace(resetPreRe.ReplaceAllString(s, ""))
+	res = strings.TrimLeft(res, ":- ")
+	if res == ":" || res == "-" {
+		return ""
+	}
+	return res
 }
 
 func clampPctVal(v float64) float64 {
@@ -1121,7 +1200,7 @@ func clampPctPtr(v *float64) *float64 {
 // layout-specific derivations
 
 func nextResetDisplay(v AccountView) string {
-	return firstNonEmpty(v.NextReset, stripResetPrefix(v.ResetHint))
+	return stripResetPrefix(firstNonEmpty(v.NextReset, v.ResetHint))
 }
 
 func antigravityReset(v AccountView, lines []usageLine) (dur, next, title string) {
@@ -1382,16 +1461,34 @@ func formatAge(ms int64) string {
 
 func lastRefreshedText(v AccountView, now time.Time) string {
 	if v.Timestamp.IsZero() {
-		return v.LastRefreshed
+		raw := strings.TrimSpace(v.LastRefreshed)
+		if raw == "" {
+			return ""
+		}
+		lower := strings.ToLower(raw)
+		if strings.HasPrefix(lower, "last refreshed ") {
+			raw = strings.TrimSpace(raw[len("last refreshed "):])
+		} else if strings.HasPrefix(lower, "refreshed ") {
+			raw = strings.TrimSpace(raw[len("refreshed "):])
+		}
+		if m := hoursAgoRe.FindStringSubmatch(raw); len(m) > 1 {
+			if h, err := strconv.Atoi(m[1]); err == nil && h >= 24 {
+				d := h / 24
+				remH := h % 24
+				formatted := fmt.Sprintf("%dd%dh ago", d, remH)
+				raw = hoursAgoRe.ReplaceAllString(raw, formatted)
+			}
+		}
+		return raw
 	}
 	age := now.Sub(v.Timestamp)
 	if age < 5*time.Second {
-		return "Last refreshed just now"
+		return "just now"
 	}
 	if age < 0 {
 		age = 0
 	}
-	return "Last refreshed " + formatAge(age.Milliseconds()) + " ago"
+	return formatAge(age.Milliseconds()) + " ago"
 }
 
 func pct1(p any) string {
@@ -1484,19 +1581,58 @@ func bentoRows(lines []usageLine) []bentoRow {
 				display = strings.ToUpper(prefix) + "-" + raw
 			}
 		}
-		out = append(out, bentoRow{Label: display, Pct: l.Pct, Value: l.Value, Tone: l.Tone})
+		out = append(out, bentoRow{Label: display, Pct: l.Pct, Value: l.Value, Tone: l.Tone, Caption: l.Caption, Depleted: l.Depleted})
 	}
 	return out
 }
 
 func timerRows(v AccountView) []ResetPill {
 	var out []ResetPill
+	seen := make(map[string]bool)
 	for _, r := range v.Resets {
-		if strings.TrimSpace(r.Duration) != "" {
-			out = append(out, r)
+		dur := stripResetPrefix(r.Duration)
+		if dur == "" {
+			continue
 		}
+		label := strings.TrimSpace(r.Label)
+		key := strings.ToLower(label + "|" + dur)
+		if label == "" {
+			key = strings.ToLower(dur)
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		r.Duration = dur
+		out = append(out, r)
 	}
 	return out
+}
+
+func isInternalTelemetryRow(row DetailRow) bool {
+	l := strings.ToLower(strings.TrimSpace(row.Label))
+	v := strings.ToLower(strings.TrimSpace(row.Value))
+	h := strings.ToLower(strings.TrimSpace(row.Hint))
+	all := l + " " + v + " " + h
+	if strings.Contains(all, "telemetry") ||
+		strings.Contains(all, "unmapped") ||
+		strings.Contains(all, "canonical") ||
+		strings.HasPrefix(l, "providers") ||
+		strings.HasPrefix(l, "workspace") ||
+		strings.Contains(all, "workspace /") {
+		return true
+	}
+	telemetryKeys := []string{
+		"link hint", "status file", "installation id", "session id",
+		"ineligible reasons", "oauth scope", "sessions dirs", "mapped_target_missing",
+		"limit_snapshot",
+	}
+	for _, k := range telemetryKeys {
+		if strings.Contains(all, k) {
+			return true
+		}
+	}
+	return false
 }
 
 func extraCards(v AccountView) []DetailCard {
@@ -1509,6 +1645,9 @@ func extraCards(v AccountView) []DetailCard {
 		var cleanRows []DetailRow
 		for _, row := range card.Rows {
 			if isCannotRenderError(row.Label) || isCannotRenderError(row.Value) || isCannotRenderError(row.Hint) {
+				continue
+			}
+			if isInternalTelemetryRow(row) {
 				continue
 			}
 			cleanRows = append(cleanRows, row)
@@ -1529,11 +1668,11 @@ func gaugeLeft(it usageItem) string {
 		}
 		return formatCompact(it.Amount)
 	}
-	if it.Display != "" {
-		return it.Display
-	}
 	if it.Pct != nil {
 		return percentCaption(*it.Pct, it.Mode == "used")
+	}
+	if it.Display != "" {
+		return it.Display
 	}
 	return ""
 }
@@ -1568,7 +1707,7 @@ func arcResetText(it usageItem) string {
 	if it.Display != "" {
 		return it.Display
 	}
-	if it.Pct != nil {
+	if it.Pct != nil && !it.Depleted {
 		return percentCaption(*it.Pct, it.Mode == "used")
 	}
 	return ""
@@ -1688,6 +1827,18 @@ func themeVarsCSS(t ThemeTokens) template.CSS {
 	if strings.EqualFold(strings.TrimSpace(t.Name), "ceramic studio") {
 		shadow = "4px 4px 0px #1a1a1c"
 	}
+	borderStrong := "#1a1a1c"
+	if !light {
+		borderStrong = firstNonEmpty(t.Surface2, "color-mix(in srgb, var(--fg) 28%, var(--border))")
+	}
+	accentOn := "#ffffff"
+	if isLightBase(t.Accent) {
+		accentOn = firstNonEmpty(t.Base, "#141416")
+	}
+	tintFill := "color-mix(in oklab, var(--fg) 9%, transparent)"
+	if light {
+		tintFill = "color-mix(in srgb, var(--fg) 7%, transparent)"
+	}
 	pairs := [][2]string{
 		{"--bg", t.Base}, {"--base", t.Base},
 		{"--mantle", t.Mantle}, {"--surface-warm", t.Mantle},
@@ -1696,7 +1847,7 @@ func themeVarsCSS(t ThemeTokens) template.CSS {
 		{"--fg", t.Text}, {"--text", t.Text},
 		{"--fg-2", t.Subtext}, {"--subtext", t.Subtext},
 		{"--muted", t.Subtext}, {"--dim", firstNonEmpty(t.Dim, t.Subtext)},
-		{"--accent", t.Accent}, {"--accent-on", firstNonEmpty(t.Mantle, "#ffffff")},
+		{"--accent", t.Accent}, {"--accent-on", accentOn},
 		{"--lavender", t.Lavender}, {"--teal", t.Teal}, {"--sapphire", t.Sapphire},
 		{"--success", t.Green}, {"--warn", t.Yellow},
 		{"--danger", t.Red}, {"--crit", t.Red}, {"--peach", t.Peach},
@@ -1706,7 +1857,9 @@ func themeVarsCSS(t ThemeTokens) template.CSS {
 		{"--crimson", "#e53935"},
 		{"--amber", "#f59e0b"},
 		{"--emerald", "#10b981"},
-		{"--border-strong", "#1a1a1c"},
+		{"--border-strong", borderStrong},
+		{"--tint-fill", tintFill},
+		{"--tone", "var(--accent)"},
 		{"--ui-radius-card", shape.RadiusCard},
 		{"--ui-radius-control", shape.RadiusControl},
 		{"--ui-radius-tile", shape.RadiusTile},
@@ -1745,977 +1898,93 @@ func themeSlug(name string) string {
 	return strings.Trim(slug, "-")
 }
 
-func populateCockpitFromUsageLines(rv *renderView, v AccountView, used bool) bool {
-	if len(rv.Lines) == 0 {
-		return false
-	}
-
-	primaryIdx := 0
-	for i, l := range rv.Lines {
-		if l.Urgent || l.Tone == "crit" || (l.Pct != nil && isDepleted(*l.Pct, used)) {
-			primaryIdx = i
-			break
-		}
-	}
-	l0 := rv.Lines[primaryIdx]
-
-	title0 := strings.ToUpper(firstNonEmpty(l0.Label, l0.Short))
-	if title0 == "" || title0 == "USAGE" || title0 == "STATUS" {
-		if used {
-			title0 = "QUOTA USED"
-		} else {
-			title0 = "QUOTA REMAINING"
-		}
-	}
-
-	pct0 := 0.0
-	pctStr0 := "0.0%"
-	if l0.Pct != nil {
-		pct0 = *l0.Pct
-		pctStr0 = fmt.Sprintf("%.1f%%", pct0)
-	} else if v.GaugePercent >= 0 {
-		pct0 = v.GaugePercent
-		pctStr0 = fmt.Sprintf("%.1f%%", pct0)
-	} else if l0.Value != "" {
-		pctStr0 = l0.Value
-		pct0 = 100.0
-	}
-
-	subLeft0 := firstNonEmpty(l0.Value, v.Summary, v.Detail, "Active plan")
-	subRight0 := firstNonEmpty(l0.ResetIn, l0.Hint, rv.NextDisplay, "current cycle")
-
-	tone0 := l0.Tone
-	if rv.Depleted || isDepleted(pct0, used) || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
-		if isDepleted(pct0, used) || l0.Urgent || l0.Tone == "crit" || primaryIdx == 0 {
-			tone0 = "crit"
-		}
-	}
-	if tone0 == "" {
-		tone0 = toneFromPercent(pct0, used)
-	}
-
-	rv.TeamBudget = MetricDeckCard{
-		Title:    title0,
-		Percent:  pct0,
-		PctStr:   pctStr0,
-		Tone:     tone0,
-		SubLeft:  subLeft0,
-		SubRight: subRight0,
-	}
-
-	secondaryIdx := -1
-	for i := range rv.Lines {
-		if i != primaryIdx {
-			secondaryIdx = i
-			break
-		}
-	}
-
-	if secondaryIdx >= 0 {
-		l1 := rv.Lines[secondaryIdx]
-		title1 := strings.ToUpper(firstNonEmpty(l1.Label, l1.Short))
-		if title1 == "" || title1 == "USAGE" || title1 == "STATUS" {
-			title1 = "BILLING CYCLE"
-		}
-
-		pct1 := 0.0
-		pctStr1 := "0.0%"
-		if l1.Pct != nil {
-			pct1 = *l1.Pct
-			pctStr1 = fmt.Sprintf("%.1f%%", pct1)
-		} else if l1.Value != "" {
-			pctStr1 = l1.Value
-			pct1 = 100.0
-		} else {
-			pct1 = math.Max(5.0, 100.0-pct0)
-			pctStr1 = fmt.Sprintf("%.1f%%", pct1)
-		}
-
-		subLeft1 := firstNonEmpty(l1.Value, v.CycleSchedule, "Active cycle")
-		subRight1 := firstNonEmpty(l1.ResetIn, l1.Hint, rv.NextDisplay, "in cycle")
-
-		tone1 := l1.Tone
-		if l1.Pct != nil && isDepleted(*l1.Pct, used) {
-			tone1 = "crit"
-		}
-		if tone1 == "" {
-			if l1.Pct != nil {
-				tone1 = toneFromPercent(pct1, used)
-			} else {
-				tone1 = "lime"
-			}
-		}
-
-		rv.BillingCycle = MetricDeckCard{
-			Title:    title1,
-			Percent:  pct1,
-			PctStr:   pctStr1,
-			Tone:     tone1,
-			SubLeft:  subLeft1,
-			SubRight: subRight1,
-		}
-	} else {
-		cyclePct := math.Max(5.0, 100.0-pct0)
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "BILLING CYCLE",
-			Percent:  cyclePct,
-			PctStr:   fmt.Sprintf("%.1f%%", cyclePct),
-			Tone:     "lime",
-			SubLeft:  firstNonEmpty(v.CycleSchedule, "Monthly quota"),
-			SubRight: firstNonEmpty(rv.NextDisplay, "in cycle"),
-		}
-	}
-
-	return true
-}
-
-func buildCockpitDashboard(rv *renderView, v AccountView, used bool, now time.Time) {
+// buildCockpitHero fills the cockpit hero strip from real account data. The
+// cockpit body renders the projected usage lines directly; the hero only
+// carries identity, status and the active window summary.
+func buildCockpitHero(rv *renderView, v AccountView) {
 	rv.HeroAccountID = v.AccountID
-	rv.HasCockpitCards = true
 
-	switch {
-	case v.AccountID == "cursor-ide":
-		rv.HeroMeta = "cursor · Pro · demo.user@acme-corp.dev"
-		rv.HeroPrimaryStat = "$3.45 / $20.00 remaining"
-		rv.HeroCycleStat = "Billing 11d 17h"
-		if rv.RefreshedText == "" {
-			rv.RefreshedText = "refreshed 12s ago"
-		}
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "TEAM BUDGET",
-			Percent:  43.7,
-			PctStr:   "43.7%",
-			Tone:     "green",
-			SubLeft:  "$1,572 / $3,600",
-			SubRight: "$2,028 remaining",
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "BILLING CYCLE",
-			Percent:  48.7,
-			PctStr:   "48.7%",
-			Tone:     "lime",
-			SubLeft:  "Feb 11 → Mar 12",
-			SubRight: "11d 17h remaining",
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "claude-4.5-opus", Percent: 34, PctStr: "34%", CostStr: "$1.18", Color: "#a78bfa"},
-				{Name: "composer-1.5", Percent: 22, PctStr: "22%", CostStr: "$0.76", Color: "#fb923c"},
-				{Name: "gemini-3-flash", Percent: 18, PctStr: "18%", CostStr: "$0.41", Color: "#38bdf8"},
-				{Name: "gpt-5.2", Percent: 14, PctStr: "14%", CostStr: "$0.32", Color: "#60a5fa"},
-				{Name: "grok-4", Percent: 12, PctStr: "12%", CostStr: "$0.28", Color: "#facc15"},
-			},
-			ChartSVG: generateAreaChartSVG(0),
-			MetaText: "trend · daily by model · +3 more (Ctrl+O)",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "Composer", Percent: 53, PctStr: "53%", ReqStr: "5.1k req", Color: "#a78bfa"},
-				{Name: "Human", Percent: 41, PctStr: "41%", ReqStr: "4.0k req", Color: "#f87171"},
-				{Name: "Tab", Percent: 5, PctStr: "5%", ReqStr: "494 req", Color: "#fb923c"},
-				{Name: "CLI", Percent: 1, PctStr: "1%", ReqStr: "42 req", Color: "#38bdf8"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+139 added",
-			Removed:      "-335 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(0),
-			MetaText:     "2.2k files · 3.6k commits · 65% AI-generated",
-		}
-
-	case v.AccountID == "claude-code":
-		rv.HeroMeta = "claude · Max 5 · dev@acme-corp.dev"
-		rv.HeroPrimaryStat = "$9.20 / $20.00 remaining"
-		rv.HeroCycleStat = "5h resets in 2h 15m"
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "5-HOUR BLOCK",
-			Percent:  62.0,
-			PctStr:   "62.0%",
-			Tone:     "green",
-			SubLeft:  "38% used · $8.40/h",
-			SubRight: "62.0% remaining",
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "WEEKLY LIMIT",
-			Percent:  46.0,
-			PctStr:   "46.0%",
-			Tone:     "lime",
-			SubLeft:  "7d rolling window",
-			SubRight: "resets in 3d",
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "claude-opus-4-6", Percent: 74, PctStr: "74%", CostStr: "$31.20", Color: "#a78bfa"},
-				{Name: "claude-sonnet-4-6", Percent: 20, PctStr: "20%", CostStr: "$8.40", Color: "#38bdf8"},
-				{Name: "claude-haiku-4-5", Percent: 6, PctStr: "6%", CostStr: "$2.58", Color: "#facc15"},
-			},
-			ChartSVG: generateAreaChartSVG(1),
-			MetaText: "trend · daily by model · tokens: 1.5M",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "Claude Code CLI", Percent: 82, PctStr: "82%", ReqStr: "184 req", Color: "#a78bfa"},
-				{Name: "Subagent Tasks", Percent: 18, PctStr: "18%", ReqStr: "42 req", Color: "#38bdf8"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+412 added",
-			Removed:      "-184 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(1),
-			MetaText:     "1.4k files · 820 commits · 92% AI-generated",
-		}
-
-	case v.AccountID == "copilot":
-		rv.HeroMeta = "github · Copilot Business · gh-user@acme.dev"
-		rv.HeroPrimaryStat = "$2.20 / $10.00 · in 06d"
-		rv.HeroCycleStat = "Premium 38% rem"
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "PREMIUM REQUESTS",
-			Percent:  38.0,
-			PctStr:   "38.0%",
-			Tone:     "amber",
-			SubLeft:  "186 / 300 requests",
-			SubRight: "114 remaining",
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "MONTHLY CYCLE",
-			Percent:  80.0,
-			PctStr:   "80.0%",
-			Tone:     "lime",
-			SubLeft:  "Feb 01 → Mar 01",
-			SubRight: "in 06d",
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "claude-3.5-sonnet", Percent: 60, PctStr: "60%", CostStr: "$1.32", Color: "#a78bfa"},
-				{Name: "gpt-4o", Percent: 30, PctStr: "30%", CostStr: "$0.66", Color: "#38bdf8"},
-				{Name: "o1-preview", Percent: 10, PctStr: "10%", CostStr: "$0.22", Color: "#facc15"},
-			},
-			ChartSVG: generateAreaChartSVG(2),
-			MetaText: "trend · premium chat quota breakdown",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "VS Code Editor", Percent: 75, PctStr: "75%", ReqStr: "210 req", Color: "#a78bfa"},
-				{Name: "CLI Terminal", Percent: 25, PctStr: "25%", ReqStr: "70 req", Color: "#38bdf8"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+280 added",
-			Removed:      "-95 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(2),
-			MetaText:     "890 files · 410 commits · 74% AI-generated",
-		}
-
-	case v.AccountID == "gemini-cli":
-		rv.HeroMeta = "google · OAuth Standard · gcp-dev@acme.dev"
-		rv.HeroPrimaryStat = "$8.50 / $20.00 · in 08d"
-		rv.HeroCycleStat = "Tier Quota 91%"
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "MONTHLY QUOTA",
-			Percent:  42.5,
-			PctStr:   "42.5%",
-			Tone:     "green",
-			SubLeft:  "$8.50 / $20.00",
-			SubRight: "$11.50 remaining",
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "BILLING PERIOD",
-			Percent:  73.3,
-			PctStr:   "73.3%",
-			Tone:     "lime",
-			SubLeft:  "Feb 01 → Mar 01",
-			SubRight: "in 08d",
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "gemini-1.5-pro", Percent: 65, PctStr: "65%", CostStr: "$5.52", Color: "#38bdf8"},
-				{Name: "gemini-1.5-flash", Percent: 35, PctStr: "35%", CostStr: "$2.98", Color: "#4ade80"},
-			},
-			ChartSVG: generateAreaChartSVG(3),
-			MetaText: "trend · google cloud platform tokens",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "Antigravity IDE", Percent: 70, PctStr: "70%", ReqStr: "340 req", Color: "#38bdf8"},
-				{Name: "Gemini CLI", Percent: 30, PctStr: "30%", ReqStr: "145 req", Color: "#4ade80"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+312 added",
-			Removed:      "-144 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(3),
-			MetaText:     "612 files · 280 commits · 80% AI-generated",
-		}
-
-	case v.AccountID == "openrouter":
-		rv.HeroMeta = "openrouter · Prepaid API · dev@acme-corp.dev"
-		rv.HeroPrimaryStat = "$15.80 / $50.00 · in 04d"
-		rv.HeroCycleStat = "Balance $15.80"
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "CREDIT BALANCE",
-			Percent:  31.6,
-			PctStr:   "31.6%",
-			Tone:     "amber",
-			SubLeft:  "$34.20 / $50.00",
-			SubRight: "$15.80 remaining",
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "EXPIRY WINDOW",
-			Percent:  86.7,
-			PctStr:   "86.7%",
-			Tone:     "lime",
-			SubLeft:  "30d cycle",
-			SubRight: "in 04d",
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "moonshotai/kimi-k2.5", Percent: 61, PctStr: "61%", CostStr: "$3.76", Color: "#facc15"},
-				{Name: "qwen/qwen3-coder-flash", Percent: 39, PctStr: "39%", CostStr: "$2.44", Color: "#38bdf8"},
-			},
-			ChartSVG: generateAreaChartSVG(4),
-			MetaText: "trend · openrouter multi-provider API",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "Coding Agent", Percent: 85, PctStr: "85%", ReqStr: "180 req", Color: "#facc15"},
-				{Name: "CLI Tool", Percent: 15, PctStr: "15%", ReqStr: "32 req", Color: "#38bdf8"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+195 added",
-			Removed:      "-88 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(4),
-			MetaText:     "410 files · 190 commits · 68% AI-generated",
-		}
-
-	case v.AccountID == "ollama" || v.AccountID == "ollama-local":
-		rv.HeroMeta = "ollama · Local Runtime · http://127.0.0.1:11434"
-		rv.HeroPrimaryStat = "$10.50 / $30.00 · in 06d"
-		rv.HeroCycleStat = "Local 4 models"
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "LOCAL ACTIVITY",
-			Percent:  35.0,
-			PctStr:   "35.0%",
-			Tone:     "green",
-			SubLeft:  "38 / 100 req/day",
-			SubRight: "62 remaining",
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "HARDWARE GPU LOAD",
-			Percent:  48.0,
-			PctStr:   "48.0%",
-			Tone:     "lime",
-			SubLeft:  "VRAM 11.5 / 24 GB",
-			SubRight: "in 06d",
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "qwen2.5-coder:32b", Percent: 55, PctStr: "55%", CostStr: "0.00 USD", Color: "#a78bfa"},
-				{Name: "deepseek-coder-v2:16b", Percent: 30, PctStr: "30%", CostStr: "0.00 USD", Color: "#38bdf8"},
-				{Name: "llama3.1:8b", Percent: 15, PctStr: "15%", CostStr: "0.00 USD", Color: "#4ade80"},
-			},
-			ChartSVG: generateAreaChartSVG(5),
-			MetaText: "trend · local hardware compute",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "Local Antigravity", Percent: 65, PctStr: "65%", ReqStr: "25 req", Color: "#a78bfa"},
-				{Name: "Terminal CLI", Percent: 35, PctStr: "35%", ReqStr: "13 req", Color: "#38bdf8"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+145 added",
-			Removed:      "-42 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(5),
-			MetaText:     "180 files · 95 commits · 88% AI-generated",
-		}
-
-	case strings.HasPrefix(v.AccountID, "cursor"):
-		rv.HeroMeta = fmt.Sprintf("cursor · %s · %s", firstNonEmpty(v.Detail, "Pro"), v.AccountID)
-		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, "$0.00 remaining")
-		rv.HeroCycleStat = firstNonEmpty(v.CycleSchedule, rv.NextDisplay)
-		if !populateCockpitFromUsageLines(rv, v, used) {
-			pct := 100.0
-			if v.GaugePercent >= 0 {
-				pct = v.GaugePercent
-			}
-			tone := toneFromPercent(pct, used)
-			if rv.Depleted || isDepleted(pct, used) || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
-				tone = "crit"
-			}
-			title := "QUOTA REMAINING"
-			if used {
-				title = "QUOTA USED"
-			}
-			rv.TeamBudget = MetricDeckCard{
-				Title:    title,
-				Percent:  pct,
-				PctStr:   fmt.Sprintf("%.1f%%", pct),
-				Tone:     tone,
-				SubLeft:  firstNonEmpty(v.Summary, "Active plan"),
-				SubRight: firstNonEmpty(rv.NextDisplay, "current cycle"),
-			}
-			rv.BillingCycle = MetricDeckCard{
-				Title:    "BILLING CYCLE",
-				Percent:  math.Max(5.0, 100.0-pct),
-				PctStr:   fmt.Sprintf("%.1f%%", math.Max(5.0, 100.0-pct)),
-				Tone:     "lime",
-				SubLeft:  firstNonEmpty(v.CycleSchedule, "Monthly quota"),
-				SubRight: firstNonEmpty(rv.NextDisplay, "in cycle"),
-			}
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "claude-4.5-opus", Percent: 50, PctStr: "50%", CostStr: "Active", Color: "#a78bfa"},
-				{Name: "composer-1.5", Percent: 30, PctStr: "30%", CostStr: "Active", Color: "#fb923c"},
-				{Name: "gpt-5.2", Percent: 20, PctStr: "20%", CostStr: "Active", Color: "#38bdf8"},
-			},
-			ChartSVG: generateAreaChartSVG(0),
-			MetaText: "trend · Cursor IDE telemetry",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "Composer", Percent: 65, PctStr: "65%", ReqStr: "Active", Color: "#a78bfa"},
-				{Name: "Tab Autocomplete", Percent: 35, PctStr: "35%", ReqStr: "Active", Color: "#38bdf8"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+220 added",
-			Removed:      "-85 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(0),
-			MetaText:     "Cursor project worktree",
-		}
-
-	case strings.HasPrefix(v.AccountID, "opencode"):
-		rv.HeroMeta = fmt.Sprintf("opencode · %s · %s", firstNonEmpty(v.Detail, "OpenCode Go"), v.AccountID)
-		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, "OpenCode Go (70 models)")
-		rv.HeroCycleStat = firstNonEmpty(v.CycleSchedule, rv.NextDisplay)
-		if !populateCockpitFromUsageLines(rv, v, used) {
-			pct := 100.0
-			if v.GaugePercent >= 0 {
-				pct = v.GaugePercent
-			}
-			tone := toneFromPercent(pct, used)
-			if rv.Depleted || isDepleted(pct, used) || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
-				tone = "crit"
-			}
-			title := "5-HOUR LIMIT"
-			if used {
-				title = "5-HOUR USED"
-			}
-			rv.TeamBudget = MetricDeckCard{
-				Title:    title,
-				Percent:  pct,
-				PctStr:   fmt.Sprintf("%.1f%%", pct),
-				Tone:     tone,
-				SubLeft:  firstNonEmpty(v.Summary, "Active quota"),
-				SubRight: firstNonEmpty(rv.NextDisplay, "rolling window"),
-			}
-			rv.BillingCycle = MetricDeckCard{
-				Title:    "WEEKLY / MONTHLY",
-				Percent:  math.Max(10.0, math.Min(100.0, pct*0.85)),
-				PctStr:   fmt.Sprintf("%.1f%%", math.Max(10.0, math.Min(100.0, pct*0.85))),
-				Tone:     "lime",
-				SubLeft:  firstNonEmpty(v.CycleSchedule, "OpenCode Go"),
-				SubRight: firstNonEmpty(rv.NextDisplay, "7d reset"),
-			}
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "claude-fable-5", Percent: 55, PctStr: "55%", CostStr: "Included", Color: "#a78bfa"},
-				{Name: "claude-fable-5-1", Percent: 30, PctStr: "30%", CostStr: "Included", Color: "#38bdf8"},
-				{Name: "claude-opus-4-6", Percent: 15, PctStr: "15%", CostStr: "Included", Color: "#4ade80"},
-			},
-			ChartSVG: generateAreaChartSVG(1),
-			MetaText: "trend · OpenCode Go model burn",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "OpenCode CLI", Percent: 85, PctStr: "85%", ReqStr: "Active", Color: "#a78bfa"},
-				{Name: "Subagents", Percent: 15, PctStr: "15%", ReqStr: "Tasks", Color: "#38bdf8"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+310 added",
-			Removed:      "-140 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(1),
-			MetaText:     "OpenCode sessions",
-		}
-
-	case strings.HasPrefix(v.AccountID, "antigravity"):
-		rv.HeroMeta = fmt.Sprintf("antigravity · %s · Google DeepMind", v.AccountID)
-		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, v.Message, "CLI Runtime Active")
-		rv.HeroCycleStat = firstNonEmpty(v.CycleSchedule, "Local Container Fleet")
-		tone := "green"
-		if v.StatusBadge == "AUTH" {
-			tone = "amber"
-		} else if rv.Depleted || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
-			tone = "crit"
-		}
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "SESSION STATUS",
-			Percent:  100.0,
-			PctStr:   "100.0%",
-			Tone:     tone,
-			SubLeft:  v.AccountID,
-			SubRight: v.Status,
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "CONTAINER FLEET",
-			Percent:  80.0,
-			PctStr:   "80.0%",
-			Tone:     "lime",
-			SubLeft:  "box-orchestrator",
-			SubRight: "tmux ready",
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "gemini-3.8-flash", Percent: 65, PctStr: "65%", CostStr: "Active", Color: "#38bdf8"},
-				{Name: "gemini-3.8-pro", Percent: 35, PctStr: "35%", CostStr: "Active", Color: "#a78bfa"},
-			},
-			ChartSVG: generateAreaChartSVG(2),
-			MetaText: "trend · Antigravity AI agent compute",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "Antigravity CLI", Percent: 75, PctStr: "75%", ReqStr: "Fleet Pane", Color: "#38bdf8"},
-				{Name: "IDE Extension", Percent: 25, PctStr: "25%", ReqStr: "Desktop", Color: "#a78bfa"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+420 added",
-			Removed:      "-150 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(2),
-			MetaText:     "Autonomous agent work",
-		}
-
-	case strings.HasPrefix(v.AccountID, "codex"):
-		rv.HeroMeta = fmt.Sprintf("openai · %s · dev@acme-corp.dev", firstNonEmpty(v.Detail, "OpenAI Codex CLI"))
-		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, "$11.40 today")
-		nextDisp := strings.TrimSpace(rv.NextDisplay)
-		if v.CycleSchedule != "" {
-			rv.HeroCycleStat = v.CycleSchedule
-		} else if nextDisp != "" && nextDisp != "—" && nextDisp != "–" && nextDisp != "-" {
-			rv.HeroCycleStat = "Resets in " + nextDisp
+	provider := firstNonEmpty(strings.TrimSpace(v.ProviderName), strings.TrimSpace(v.ProviderID))
+	if detail := strings.TrimSpace(v.Detail); detail != "" && !strings.EqualFold(detail, provider) {
+		if provider == "" {
+			provider = detail
 		} else {
-			rv.HeroCycleStat = "Daily rolling window"
+			provider = provider + " · " + detail
 		}
-		pct := 22.8
-		tone := "green"
-		if rv.Depleted || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
-			tone = "crit"
-		}
-		rv.TeamBudget = MetricDeckCard{
-			Title:    "DAILY SPEND",
-			Percent:  pct,
-			PctStr:   "22.8%",
-			Tone:     tone,
-			SubLeft:  firstNonEmpty(v.Summary, "$11.40 today"),
-			SubRight: "7d $48.20 spend",
-		}
-		rv.BillingCycle = MetricDeckCard{
-			Title:    "TOKEN VELOCITY",
-			Percent:  51.6,
-			PctStr:   "516k tok",
-			Tone:     "lime",
-			SubLeft:  "420k in / 96k out",
-			SubRight: "today",
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "gpt-5.1-codex", Percent: 100, PctStr: "100%", CostStr: "$11.40", Color: "#10a37f"},
-			},
-			ChartSVG: generateAreaChartSVG(3),
-			MetaText: "trend · daily by model · OpenAI Codex",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "Codex CLI", Percent: 80, PctStr: "80%", ReqStr: "Active", Color: "#10a37f"},
-				{Name: "API Runner", Percent: 20, PctStr: "20%", ReqStr: "Active", Color: "#38bdf8"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+260 added",
-			Removed:      "-75 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(3),
-			MetaText:     "Codex code synthesis sessions",
-		}
+	}
+	rv.HeroMeta = provider
 
-	case strings.HasPrefix(v.AccountID, "command"):
-		plan := "GOAT"
-		if strings.TrimSpace(v.Detail) != "" && !strings.HasPrefix(strings.TrimSpace(v.Detail), "$") {
-			plan = v.Detail
-		}
-		rv.HeroMeta = fmt.Sprintf("command-code · %s · dev@acme-corp.dev", plan)
-		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, "$34.16 / $70.00 remaining")
-		nextDisp := strings.TrimSpace(rv.NextDisplay)
-		if v.CycleSchedule != "" {
-			rv.HeroCycleStat = v.CycleSchedule
-		} else if nextDisp != "" && nextDisp != "—" && nextDisp != "–" && nextDisp != "-" {
-			rv.HeroCycleStat = "Resets in " + nextDisp
-		} else {
-			rv.HeroCycleStat = "Weekly 80.0% rem"
-		}
+	rv.HeroPrimaryStat = rv.SummaryDisplay
+	if rv.HeroPrimaryStat == "" {
+		rv.HeroPrimaryStat = strings.TrimSpace(v.Summary)
+	}
 
-		var monthlyLine, weeklyLine *usageLine
-		for i := range rv.Lines {
-			lbl := strings.ToLower(rv.Lines[i].Label + " " + rv.Lines[i].Short)
-			if strings.Contains(lbl, "month") && monthlyLine == nil {
-				monthlyLine = &rv.Lines[i]
-			} else if (strings.Contains(lbl, "week") || strings.Contains(lbl, "5h") || strings.Contains(lbl, "hour")) && weeklyLine == nil {
-				weeklyLine = &rv.Lines[i]
-			}
-		}
-
-		if monthlyLine != nil {
-			pct0 := 0.0
-			pctStr0 := "0.0%"
-			if monthlyLine.Pct != nil {
-				pct0 = *monthlyLine.Pct
-				pctStr0 = fmt.Sprintf("%.1f%%", pct0)
-			} else if monthlyLine.Value != "" {
-				pctStr0 = monthlyLine.Value
-				pct0 = 100.0
-			}
-			tone0 := monthlyLine.Tone
-			if isDepleted(pct0, used) || rv.Depleted || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
-				tone0 = "crit"
-			}
-			if tone0 == "" {
-				tone0 = toneFromPercent(pct0, used)
-			}
-			rv.TeamBudget = MetricDeckCard{
-				Title:    "MONTHLY CREDITS",
-				Percent:  pct0,
-				PctStr:   pctStr0,
-				Tone:     tone0,
-				SubLeft:  firstNonEmpty(monthlyLine.Value, "$35.84 / $70.00"),
-				SubRight: firstNonEmpty(monthlyLine.ResetIn, monthlyLine.Hint, rv.NextDisplay, "$34.16 remaining"),
-			}
-
-			if weeklyLine != nil {
-				pct1 := 0.0
-				pctStr1 := "0.0%"
-				if weeklyLine.Pct != nil {
-					pct1 = *weeklyLine.Pct
-					pctStr1 = fmt.Sprintf("%.1f%%", pct1)
-				} else if weeklyLine.Value != "" {
-					pctStr1 = weeklyLine.Value
-					pct1 = 100.0
-				}
-				tone1 := weeklyLine.Tone
-				if weeklyLine.Pct != nil && isDepleted(*weeklyLine.Pct, used) {
-					tone1 = "crit"
-				}
-				if tone1 == "" {
-					tone1 = toneFromPercent(pct1, used)
-				}
-				rv.BillingCycle = MetricDeckCard{
-					Title:    "WEEKLY ALLOWANCE",
-					Percent:  pct1,
-					PctStr:   pctStr1,
-					Tone:     tone1,
-					SubLeft:  firstNonEmpty(weeklyLine.Value, "7d rolling window"),
-					SubRight: firstNonEmpty(weeklyLine.ResetIn, weeklyLine.Hint, rv.NextDisplay, "80.0% remaining"),
-				}
-			} else {
-				rv.BillingCycle = MetricDeckCard{
-					Title:    "WEEKLY ALLOWANCE",
-					Percent:  80.0,
-					PctStr:   "80.0%",
-					Tone:     "lime",
-					SubLeft:  "7d rolling window",
-					SubRight: "80.0% remaining",
-				}
-			}
-		} else {
-			rv.TeamBudget = MetricDeckCard{
-				Title:    "MONTHLY CREDITS",
-				Percent:  48.8,
-				PctStr:   "48.8%",
-				Tone:     "green",
-				SubLeft:  "$35.84 / $70.00",
-				SubRight: "$34.16 remaining",
-			}
-			rv.BillingCycle = MetricDeckCard{
-				Title:    "WEEKLY ALLOWANCE",
-				Percent:  80.0,
-				PctStr:   "80.0%",
-				Tone:     "lime",
-				SubLeft:  "7d rolling window",
-				SubRight: "80.0% remaining",
-			}
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "command-r-plus", Percent: 65, PctStr: "65%", CostStr: "$23.30", Color: "#a78bfa"},
-				{Name: "command-r", Percent: 35, PctStr: "35%", CostStr: "$12.54", Color: "#38bdf8"},
-			},
-			ChartSVG: generateAreaChartSVG(4),
-			MetaText: "trend · Command Code (GOAT) compute",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "Command CLI", Percent: 85, PctStr: "85%", ReqStr: "Fleet", Color: "#a78bfa"},
-				{Name: "Subagents", Percent: 15, PctStr: "15%", ReqStr: "Tasks", Color: "#38bdf8"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+340 added",
-			Removed:      "-110 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(4),
-			MetaText:     "1.4M tokens · Command Code workspace",
-		}
-
+	next := strings.TrimSpace(rv.NextDisplay)
+	switch next {
+	case "", "—", "–", "-":
+		rv.HeroCycleStat = strings.TrimSpace(v.CycleSchedule)
 	default:
-		rv.HasCockpitCards = true
-		rv.HeroPrimaryStat = firstNonEmpty(v.Summary, "$0.00 remaining")
-		cycleStat := strings.TrimSpace(v.CycleSchedule)
-		if cycleStat == "" {
-			nextDisp := strings.TrimSpace(rv.NextDisplay)
-			if nextDisp != "" && nextDisp != "—" && nextDisp != "–" && nextDisp != "-" {
-				cycleStat = "Resets in " + nextDisp
-			} else {
-				cycleStat = "Rolling window"
-			}
-		}
-		rv.HeroCycleStat = cycleStat
-		if !v.HasGauge && v.GaugePercent <= 0 {
-			subRight := strings.TrimSpace(rv.NextDisplay)
-			if subRight == "—" || subRight == "–" || subRight == "-" {
-				subRight = ""
-			}
-			rv.TeamBudget = MetricDeckCard{
-				Title:    "ACTIVITY STATUS",
-				Percent:  100.0,
-				PctStr:   "Active",
-				Tone:     "ok",
-				SubLeft:  "Current window",
-				SubRight: subRight,
-			}
-			rv.BillingCycle = MetricDeckCard{
-				Title:    "CYCLE STATUS",
-				Percent:  100.0,
-				PctStr:   "Active",
-				Tone:     "ok",
-				SubLeft:  firstNonEmpty(v.CycleSchedule, "Active tier"),
-				SubRight: subRight,
-			}
-		} else if !populateCockpitFromUsageLines(rv, v, used) {
-			pct := 50.0
-			if v.GaugePercent >= 0 {
-				pct = v.GaugePercent
-			}
-			subRight := strings.TrimSpace(rv.NextDisplay)
-			if subRight == "—" || subRight == "–" || subRight == "-" {
-				subRight = ""
-			}
-			title := "USAGE QUOTA"
-			if used {
-				title = "QUOTA USED"
-			} else {
-				title = "QUOTA REMAINING"
-			}
-			pctStr := fmt.Sprintf("%.1f%%", pct)
-			gaugePct := pct
-			tone := toneFromPercent(pct, used)
-			if rv.Depleted || isDepleted(pct, used) || strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED" {
-				tone = "crit"
-			}
-			billingPctStr := fmt.Sprintf("%.1f%%", math.Min(100, pct*1.1))
-			billingGaugePct := math.Min(100, pct*1.1)
-			billingTone := "lime"
-			rv.TeamBudget = MetricDeckCard{
-				Title:    title,
-				Percent:  gaugePct,
-				PctStr:   pctStr,
-				Tone:     tone,
-				SubLeft:  "Current window",
-				SubRight: subRight,
-			}
-			rv.BillingCycle = MetricDeckCard{
-				Title:    "CYCLE STATUS",
-				Percent:  billingGaugePct,
-				PctStr:   billingPctStr,
-				Tone:     billingTone,
-				SubLeft:  firstNonEmpty(v.CycleSchedule, "Active tier"),
-				SubRight: subRight,
-			}
-		}
-		rv.ModelBurn = ModelBurnDeckCard{
-			HasData: true,
-			Segments: []ModelSegment{
-				{Name: "Primary Model", Percent: 70, PctStr: "70%", CostStr: "$1.00", Color: "#a78bfa"},
-				{Name: "Secondary Model", Percent: 30, PctStr: "30%", CostStr: "$0.45", Color: "#38bdf8"},
-			},
-			ChartSVG: generateAreaChartSVG(0),
-			MetaText: "trend · telemetry series",
-		}
-		rv.Clients = ClientsDeckCard{
-			HasData: true,
-			Segments: []ClientSegment{
-				{Name: "Primary Client", Percent: 80, PctStr: "80%", ReqStr: "100 req", Color: "#a78bfa"},
-				{Name: "Secondary Client", Percent: 20, PctStr: "20%", ReqStr: "25 req", Color: "#38bdf8"},
-			},
-		}
-		rv.CodeStats = CodeStatsDeckCard{
-			HasData:      true,
-			Added:        "+100 added",
-			Removed:      "-50 removed",
-			EqualizerSVG: generateCodeEqualizerSVG(0),
-			MetaText:     "Active repository files",
-		}
+		rv.HeroCycleStat = "Resets in " + next
 	}
 }
 
-func generateAreaChartSVG(seed int) template.HTML {
-	points := []float64{
-		12, 14, 18, 15, 20, 26, 18, 14, 15, 18, 16, 15, 14, 16, 17, 16,
-		15, 14, 15, 17, 18, 16, 15, 16, 18, 22, 28, 35, 30, 24, 28, 32,
-		25, 22, 20, 18, 20, 22, 21, 23, 22, 24, 28, 32, 28, 24, 26, 28,
-		22, 20, 22, 24, 23, 21, 20, 19, 18, 17, 18, 18,
-	}
-	if seed > 0 {
-		for i := range points {
-			shift := math.Sin(float64(i+seed)*0.5) * 4
-			points[i] = math.Max(8, points[i]+shift)
-		}
-	}
-	w := 600
-	h := 70
-	maxVal := 45.0
-	step := float64(w) / float64(len(points)-1)
-
-	var pathD strings.Builder
-	var areaD strings.Builder
-
-	for i, v := range points {
-		x := float64(i) * step
-		y := float64(h) - (v/maxVal)*float64(h-12) - 4
-		if i == 0 {
-			pathD.WriteString(fmt.Sprintf("M %.1f %.1f", x, y))
-			areaD.WriteString(fmt.Sprintf("M %.1f %.1f L %.1f %.1f", x, float64(h), x, y))
-		} else {
-			pathD.WriteString(fmt.Sprintf(" L %.1f %.1f", x, y))
-			areaD.WriteString(fmt.Sprintf(" L %.1f %.1f", x, y))
-		}
-	}
-	areaD.WriteString(fmt.Sprintf(" L %.1f %.1f Z", float64(w), float64(h)))
-
-	gradID := fmt.Sprintf("burnGrad_%d", seed)
-	svg := fmt.Sprintf(`<svg viewBox="0 0 %d %d" class="burn-svg-chart" preserveAspectRatio="none">
-		<defs>
-			<linearGradient id="%s" x1="0" y1="0" x2="0" y2="1">
-				<stop offset="0%%" stop-color="#38bdf8" stop-opacity="0.35"/>
-				<stop offset="100%%" stop-color="#38bdf8" stop-opacity="0.0"/>
-			</linearGradient>
-		</defs>
-		<path d="%s" fill="url(#%s)"/>
-		<path d="%s" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
-	</svg>`, w, h, gradID, areaD.String(), gradID, pathD.String())
-
-	return template.HTML(svg)
-}
-
-func generateCodeEqualizerSVG(seed int) template.HTML {
-	w := 340
-	h := 60
-	axisY := 32
-
-	addHeights := []int{
-		6, 12, 4, 8, 16, 22, 14, 8, 4, 10, 12, 6, 10, 6, 8, 14, 18, 10, 4, 6, 8, 12, 10, 14, 10, 6, 8, 12, 10, 16, 20, 10, 4, 6,
-	}
-	delHeights := []int{
-		4, 8, 6, 12, 16, 10, 6, 14, 10, 4, 12, 16, 6, 10, 14, 8, 6, 10, 16, 12, 6, 4, 8, 12, 14, 10, 6, 12, 8, 4, 10, 14, 8, 4,
-	}
-
-	numBars := len(addHeights)
-	barW := 3
-	gap := 9
-	startX := 12
-
-	var bars strings.Builder
-	bars.WriteString(fmt.Sprintf(`<line x1="8" y1="%d" x2="%d" y2="%d" stroke="#334155" stroke-width="1"/>`, axisY, w-8, axisY))
-
-	for i := 0; i < numBars; i++ {
-		x := startX + i*gap
-		addH := addHeights[i]
-		delH := delHeights[i]
-		if seed > 0 {
-			addH = int(math.Max(2, float64(addH)+(math.Sin(float64(i+seed))*3)))
-			delH = int(math.Max(2, float64(delH)+(math.Cos(float64(i+seed))*3)))
-		}
-
-		addY := axisY - addH - 1
-		bars.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" rx="1" fill="#4ade80"/>`, x, addY, barW, addH))
-
-		delY := axisY + 2
-		bars.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" rx="1" fill="#f87171"/>`, x, delY, barW, delH))
-	}
-
-	svg := fmt.Sprintf(`<svg viewBox="0 0 %d %d" class="equalizer-svg-chart" preserveAspectRatio="none">%s</svg>`, w, h, bars.String())
-	return template.HTML(svg)
-}
-
-func calculateGlobalStats(views []AccountView, env Envelope) GlobalStats {
-	total := len(views)
-	if total == 0 {
+// calculateGlobalStats derives the KPI banner from concrete quota windows:
+// fleet health, accounts at limit, the tightest window and average headroom.
+// Every value comes from the collected snapshots; nothing is fabricated.
+func calculateGlobalStats(views []renderView, used bool) GlobalStats {
+	if len(views) == 0 {
 		return GlobalStats{
-			Health:        "100%",
-			HealthTag:     "Ready",
-			HealthTone:    "ok",
-			HealthNote:    "Waiting for agents",
-			TokenVelocity: "0",
-			TokenNote:     "No active streams",
-			Spend:         "$0.00",
-			SpendNote:     "Active billing cycle",
-			CacheHit:      "0%",
-			CacheNote:     "No requests recorded",
+			Health: "—", HealthTag: "Idle", HealthTone: "ok", HealthNote: "No accounts configured",
+			AtLimit: "0", AtLimitTag: "All clear", AtLimitTone: "ok", AtLimitNote: "No quota windows tracked",
+			Tightest: "—", TightestTag: "Idle", TightestTone: "ok", TightestNote: "No quota windows tracked",
+			Headroom: "—", HeadroomLabel: headroomLabel(used), HeadroomNote: "No quota windows tracked", HeadroomTone: "ok",
 		}
 	}
 
+	total := len(views)
 	healthy := 0
-	for _, v := range views {
+	atLimit := 0
+	var limitNames []string
+	for i := range views {
+		v := &views[i]
 		badge := strings.ToUpper(v.StatusBadge)
 		stat := strings.ToLower(v.Status)
-		if !strings.Contains(badge, "CRIT") && !strings.Contains(badge, "WARN") && !strings.Contains(stat, "err") && !strings.Contains(stat, "limit") {
+		isLimit := v.Depleted || strings.Contains(badge, "LIMIT") || strings.Contains(stat, "limit")
+		isDegraded := strings.Contains(badge, "CRIT") || strings.Contains(badge, "WARN") || strings.Contains(stat, "err") || isLimit
+		if !isDegraded {
 			healthy++
 		}
+		if isLimit {
+			atLimit++
+			if len(limitNames) < 3 {
+				limitNames = append(limitNames, v.AccountID)
+			}
+		}
 	}
+
+	windowCount := 0
+	sum := 0.0
+	tightest := 0.0
+	tightestName := ""
+	for i := range views {
+		v := &views[i]
+		for _, l := range v.Lines {
+			if l.Pct == nil {
+				continue
+			}
+			pct := clampPctVal(*l.Pct)
+			if windowCount == 0 || isTighter(pct, tightest, used) {
+				tightest = pct
+				tightestName = v.AccountID
+				if win := firstNonEmpty(l.Short, l.Label); win != "" {
+					tightestName += " · " + win
+				}
+			}
+			windowCount++
+			sum += pct
+		}
+	}
+
 	healthPct := float64(healthy) / float64(total) * 100
 	healthTone := "ok"
 	healthTag := "Optimal"
@@ -2727,18 +1996,64 @@ func calculateGlobalStats(views []AccountView, env Envelope) GlobalStats {
 		healthTag = "Attention"
 	}
 
-	return GlobalStats{
+	stats := GlobalStats{
 		Health:        fmt.Sprintf("%.1f%%", healthPct),
 		HealthTag:     healthTag,
 		HealthTone:    healthTone,
 		HealthNote:    fmt.Sprintf("%d of %d agents well below burst limits", healthy, total),
-		TokenVelocity: "3.48M",
-		TokenNote:     "+14.2% vs yesterday · Peak: 14:00 UTC",
-		Spend:         "$242.30",
-		SpendNote:     "of $500.00 ceiling · 18 days left",
-		CacheHit:      "88.4%",
-		CacheNote:     "Prompt caching saved $68.40",
+		AtLimit:       strconv.Itoa(atLimit),
+		AtLimitTone:   "ok",
+		AtLimitTag:    "All clear",
+		AtLimitNote:   "All accounts have headroom",
+		Tightest:      "—",
+		TightestTag:   "Idle",
+		TightestTone:  "ok",
+		TightestNote:  "No quota windows tracked",
+		Headroom:      "—",
+		HeadroomLabel: headroomLabel(used),
+		HeadroomNote:  "No quota windows tracked",
+		HeadroomTone:  "ok",
 	}
+
+	if atLimit > 0 {
+		stats.AtLimitTone = "crit"
+		stats.AtLimitTag = "At limit"
+		note := strings.Join(limitNames, ", ")
+		if atLimit > len(limitNames) {
+			note = fmt.Sprintf("%s + %d more", note, atLimit-len(limitNames))
+		}
+		stats.AtLimitNote = note
+	}
+
+	if windowCount > 0 {
+		stats.Tightest = fmt.Sprintf("%d%%", int(math.Round(tightest)))
+		stats.TightestNote = tightestName
+		stats.TightestTone = toneFromPercent(tightest, used)
+		stats.TightestTag = stats.TightestTone
+
+		avg := sum / float64(windowCount)
+		stats.Headroom = fmt.Sprintf("%d%%", int(math.Round(avg)))
+		stats.HeadroomNote = fmt.Sprintf("across %d quota windows", windowCount)
+		stats.HeadroomTone = toneFromPercent(avg, used)
+	}
+
+	return stats
+}
+
+// isTighter reports whether pct is worse than current: lower in remaining
+// mode, higher in used mode.
+func isTighter(pct, current float64, used bool) bool {
+	if used {
+		return pct > current
+	}
+	return pct < current
+}
+
+func headroomLabel(used bool) string {
+	if used {
+		return "Average Burn"
+	}
+	return "Average Headroom"
 }
 
 func avatarFor(providerID, accountID string) (text, color, bg string) {
@@ -2786,13 +2101,18 @@ func isCardAlert(badge, status string) bool {
 }
 
 func bentoSpanFor(v AccountView, rows []bentoRow, isAlert bool) string {
-	hasSpark := len(v.DailyCost) > 1
-	hasManyRows := len(rows) >= 3
-	if isAlert || (hasSpark && len(rows) >= 1) || hasManyRows {
-		return "wide"
+	hasGauges := false
+	for _, r := range rows {
+		if r.Pct != nil {
+			hasGauges = true
+			break
+		}
 	}
-	if len(rows) <= 1 && !hasSpark {
+	if len(rows) == 0 || !hasGauges {
 		return "compact"
+	}
+	if isAlert || len(rows) >= 3 {
+		return "wide"
 	}
 	return "standard"
 }
@@ -2869,22 +2189,46 @@ func cleanQuotaLabel(pill, label string) string {
 		l = p
 	}
 
+	// Strip trailing "remaining" or "used" (e.g. "Five Hour Limit Remaining")
+	lLower := strings.ToLower(l)
+	for _, suff := range []string{" remaining", " used"} {
+		if strings.HasSuffix(lLower, suff) {
+			l = strings.TrimSpace(l[:len(l)-len(suff)])
+			lLower = strings.ToLower(l)
+			break
+		}
+	}
+
 	// If label duplicates pill (e.g. pill="5h", label="5h"), replace with human-readable name.
 	if strings.EqualFold(p, l) {
 		return humanReadableQuotaName(p)
 	}
 
-	// If label starts with pill prefix, strip it cleanly.
+	// If label starts with pill prefix or window-word prefix corresponding to the pill,
+	// strip it cleanly to eliminate stutter like [5H] 5-Hour Limit or [5H] Five Hour Limit.
 	pLower := strings.ToLower(p)
-	lLower := strings.ToLower(l)
-	if pLower != "" && strings.HasPrefix(lLower, pLower) {
-		remainder := l[len(p):]
-		remainder = strings.TrimLeft(remainder, " -_:·/")
-		remainder = strings.TrimSpace(remainder)
-		if remainder != "" {
-			return remainder
+	prefixes := []string{pLower}
+	switch pLower {
+	case "5h":
+		prefixes = append(prefixes, "5-hour", "5 hour", "5-hr", "5 hr")
+	case "24h":
+		prefixes = append(prefixes, "24-hour", "24 hour", "24-hr", "24 hr")
+	case "7d":
+		prefixes = append(prefixes, "7-day", "7 day")
+	case "30d":
+		prefixes = append(prefixes, "30-day", "30 day")
+	}
+
+	for _, pfx := range prefixes {
+		if pfx != "" && strings.HasPrefix(lLower, pfx) {
+			remainder := l[len(pfx):]
+			remainder = strings.TrimLeft(remainder, " -_:·/")
+			remainder = strings.TrimSpace(remainder)
+			if remainder != "" {
+				return remainder
+			}
+			return humanReadableQuotaName(p)
 		}
-		return humanReadableQuotaName(p)
 	}
 
 	return l

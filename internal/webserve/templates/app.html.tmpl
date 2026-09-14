@@ -8,13 +8,13 @@
       </div>
       <span id="fetching-header" class="fetching"><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>
       <span class="spacer"></span>
-      <nav class="layout-nav center-tabs" aria-label="Layout view">{{range .Layouts}}<button type="button" class="layout-btn{{if eq .ID $.Layout.ID}} active{{end}}" data-layout="{{.ID}}" hx-post="actions/layout" hx-vals='{"layout":"{{.ID}}"}' title="{{.Hint}}"><span class="layout-icon">{{.Icon}}</span> <span class="layout-label">{{.Label}}</span></button>{{end}}</nav>
+      <nav class="layout-nav center-tabs" aria-label="Layout view">{{range .Layouts}}<button type="button" class="layout-btn{{if eq .ID $.Layout.ID}} active{{end}}" data-layout="{{.ID}}" hx-post="actions/layout" hx-vals='{"layout":"{{.ID}}"}' title="{{.Hint}}" aria-pressed="{{if eq .ID $.Layout.ID}}true{{else}}false{{end}}"><span class="layout-icon">{{.Icon}}</span> <span class="layout-label">{{.Label}}</span></button>{{end}}</nav>
       <div class="right-controls">
-        <div class="search-box{{if .Filtered}} has-query{{end}}" title="Filter providers (/)">
-          <span class="search-kbd" onclick="document.getElementById('footer-btn-filter').click()">/</span>
-          <span class="search-text" onclick="document.getElementById('footer-btn-filter').click()">{{if .Filtered}}{{.Filter}}{{else}}filter providers…{{end}}</span>
+        <div class="search-box{{if .Filtered}} has-query{{end}}" id="search-box" title="Filter providers (/)" role="button" tabindex="0" aria-label="Filter providers (/)">
+          <span class="search-kbd">/</span>
+          <span class="search-text">{{if .Filtered}}{{.Filter}}{{else}}filter providers…{{end}}</span>
           {{if .Filtered}}
-          <button type="button" class="btn-search-clear" onclick="event.stopPropagation();var inp=document.getElementById('filter-input');if(inp){inp.value='';htmx.trigger(inp,'input');}" title="Clear filter" aria-label="Clear filter">✕</button>
+          <button type="button" class="btn-search-clear" id="btn-search-clear" title="Clear filter" aria-label="Clear filter">✕</button>
           {{end}}
         </div>
         <span class="header-meta"><span class="meta-icon">⊞</span> {{len .Views}} agents{{if .Filtered}} (filtered){{end}} · {{.Layout.Label}} · {{.Layout.Hint}}</span>
@@ -28,29 +28,29 @@
     <main class="panel" aria-label="{{.Layout.Hint}}">
       <div id="panel"><span id="fetching-detail" class="fetching"><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>{{if .HasData}}<div class="stats-banner">
         <div class="stat-box">
-          <div class="stat-lab">System Pool Health</div>
+          <div class="stat-lab">Fleet Health</div>
           <div class="stat-val">{{.Stats.Health}} <span class="health-tag tag-{{.Stats.HealthTone}}">{{.Stats.HealthTag}}</span></div>
           <div class="stat-note">{{.Stats.HealthNote}}</div>
         </div>
         <div class="stat-box">
-          <div class="stat-lab">24h Token Velocity</div>
-          <div class="stat-val mono">{{.Stats.TokenVelocity}} <span class="stat-unit">tok</span></div>
-          <div class="stat-note">{{.Stats.TokenNote}}</div>
+          <div class="stat-lab">Accounts At Limit</div>
+          <div class="stat-val">{{.Stats.AtLimit}} <span class="health-tag tag-{{.Stats.AtLimitTone}}">{{.Stats.AtLimitTag}}</span></div>
+          <div class="stat-note">{{.Stats.AtLimitNote}}</div>
         </div>
         <div class="stat-box">
-          <div class="stat-lab">Active Month Spend</div>
-          <div class="stat-val mono">{{.Stats.Spend}}</div>
-          <div class="stat-note">{{.Stats.SpendNote}}</div>
+          <div class="stat-lab">Tightest Window</div>
+          <div class="stat-val mono">{{.Stats.Tightest}}</div>
+          <div class="stat-note">{{.Stats.TightestNote}}</div>
         </div>
         <div class="stat-box">
-          <div class="stat-lab">Cache Hit Efficiency</div>
-          <div class="stat-val mono">{{.Stats.CacheHit}}</div>
-          <div class="stat-note">{{.Stats.CacheNote}}</div>
+          <div class="stat-lab">{{.Stats.HeadroomLabel}}</div>
+          <div class="stat-val mono">{{.Stats.Headroom}}</div>
+          <div class="stat-note">{{.Stats.HeadroomNote}}</div>
         </div>
       </div>{{end}}{{if not .HasData}}{{if .Filtered}}<div class="empty-filter-state">
         <div class="empty-filter-icon" aria-hidden="true">⊘</div>
         <div class="empty-filter-msg"><strong>No matches.</strong> No providers matching "{{.Filter}}"</div>
-        <button type="button" class="btn-clear-filter" onclick="var inp=document.getElementById('filter-input');if(inp){inp.value='';htmx.trigger(inp,'input');}" title="Clear filter query">Clear filter</button>
+        <button type="button" class="btn-clear-filter" id="btn-clear-filter" title="Clear filter query">Clear filter</button>
       </div>{{else}}<p class="dim">No providers.</p>{{end}}{{end}}{{if eq .Layout.ID "split"}}{{with .Selected}}{{template "mobilebar" (cctx $ .)}}{{template "cockpit" (cctx $ .)}}{{end}}{{else if eq .Layout.ID "matrix"}}{{template "matrix" .}}{{else if eq .Layout.ID "bento"}}{{template "bento" .}}{{else}}{{template "board" .}}{{end}}</div>
     </main>
   </div>

@@ -607,11 +607,17 @@ func (m *Model) applyDashboardConfig(dashboardCfg config.DashboardConfig, accoun
 	seen := make(map[string]bool, len(accountOrder))
 	for _, pref := range dashboardCfg.Providers {
 		id := pref.AccountID
-		if id == "" || seen[id] || !seenAccounts[id] {
+		if id == "" || seen[id] {
+			continue
+		}
+		// Visibility prefs apply even when the account is absent from this
+		// config snapshot (e.g. web dashboards whose daemon owns detection):
+		// hiding an account must stick, and unknown accounts stay visible.
+		m.providerEnabled[id] = pref.Enabled
+		if !seenAccounts[id] {
 			continue
 		}
 		seen[id] = true
-		m.providerEnabled[id] = pref.Enabled
 		order = append(order, id)
 	}
 

@@ -75,11 +75,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/themes", s.handleTheme)
 	mux.HandleFunc("/api/v1/meta", s.handleMeta)
 	mux.HandleFunc("/partial/app", s.handleAppFragment)
+	mux.HandleFunc("/partial/providers", s.handleProvidersFragment)
 	mux.HandleFunc("/inspect", s.handleInspect)
 	mux.HandleFunc("/actions/theme", s.handleThemeAction)
 	mux.HandleFunc("/actions/usage-mode", s.handleUsageModeAction)
 	mux.HandleFunc("/actions/layout", s.handleLayoutAction)
 	mux.HandleFunc("/actions/view", s.handleViewAction)
+	mux.HandleFunc("/actions/provider", s.handleProviderAction)
+	mux.HandleFunc("/actions/providers", s.handleProviderAction)
 
 	sub, err := fs.Sub(uiFS, "ui")
 	if err != nil {
