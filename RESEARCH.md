@@ -244,6 +244,33 @@ Fresh Monday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **34
 Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [github.com/getagentseal/codeburn](https://github.com/getagentseal/codeburn); [github.com/junhoyeo/tokscale](https://github.com/junhoyeo/tokscale); [github.com/Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar); [github.com/tddworks/ClaudeBar](https://github.com/tddworks/ClaudeBar); [github.com/deviffyy/OpenQuota](https://github.com/deviffyy/OpenQuota); [docs.litellm.ai spend tracking](https://docs.litellm.ai/docs/proxy/cost_tracking); [code.claude.com costs](https://code.claude.com/docs/en/costs); Cursor forum Spending/Usage threads; GitHub API star/push metadata 2026-09-14 (Europe/London).
 
 
+### Update 2026-09-15
+
+Fresh Tuesday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **34/35/36 count drift still live** (homepage meta/H2 vs README). Material day moves: **AIUsage v1.5.17**; **openusage.ai** Claude Swap / Devin / plan-badge fixes; **tokscale 4.17.0**; ccusage pricing-snapshot cadence; OpenUsage.sh deps-only since yesterday’s Codex/Crush product fix.
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **~195★**, flat) | Homepage still **“Supported providers (35)”** + hero **“34 providers, and counting.”** README/docs now firmly market **36 providers** and list **Antigravity CLI** (`agy` + `~/.gemini/antigravity-cli`) with status-line/session/quota hooks. Last pushes Mon **deps/CI only** after Sun Codex 0.153+ + Crush timestamp product fixes. | **Nearest twin** — category definition still ~1:1. Copy smell persists (34/35/36); Antigravity called out in README while site count lags. |
+| [ccusage](https://github.com/ccusage/ccusage) / [ccusage.com](https://ccusage.com/) (**~18.6k★** / 18,561; +~18) | Still the category CLI for historical daily/weekly/monthly/session/`blocks` (**no Cursor** in official source list). **Shipping today** — repeated LiteLLM pricing snapshots (through ~2026-09-15 03:21 UTC). | Best **log-history / cost-report** OSS peer; thinner live quota/rate-limit TUI + key autodetection. |
+| [Splitrail](https://github.com/Piebald-AI/splitrail) (**~223★**, flat) | Real-time cross-agent monitor + optional Cloud + MCP. Last product commit still **2026-09-11** (Grok 4.6 pricing). Quiet again. | #2 local “live monitor” peer — multi-day quiet. |
+| [AIUsage](https://github.com/juliantanx/aiusage) (**~127★**, +1) | Local web dashboard (`aiusage serve` → :3847) across 20+ tools. **v1.5.17 today** (2026-09-15 ~03:10 UTC): responsive startup (listen before parse; yield during history backfill; cache pricing); custom date ranges use **local calendar** not UTC (#62); hide Support nav item. | Rising local peer + **name collision** (AIUsage vs agentUsage) — second release in two days. |
+| [openusage.ai](https://github.com/robinebers/openusage) (**~4.2k★** / 4,162; +~4) | macOS menu-bar tracker (different product). **Shipped overnight:** Claude Swap account discovery + isolated usage (#1226); Devin weekly quota when % omitted (#1251); Claude plan badge from live Anthropic profile (#1262); null nested-model usage fix (#1261). Changelog **v0.7.12-beta.2**. | Naming collision only — do not conflate with openusage.sh; still the louder star graph. |
+| Vendor UIs | Cursor Spending/Usage, Claude `/usage`/`/cost`, OpenRouter Activity still single-vendor panes. | Fragmentation OpenUsage/agentUsage claim to fix. |
+| Helicone / Langfuse / LiteLLM | **LiteLLM** (~58.8k★ / 58,767, **pushed today**) and **Langfuse** (~34.6k★ / 34,627, **pushed today**) still active gateway/OTel FinOps. **Helicone** (~6.2k★ / 6,158) quieter since 2026-09-13. | Adjacent layers, not desktop twins. |
+| Also watch (local peers) | [getagentseal/codeburn](https://github.com/getagentseal/codeburn) (~11.0k★ / 11,024; Mon menubar quota alerts still the last product story; Tue = deps/tests/Tauri). [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) (~5.4k★ / 5,434; **v4.17.0 today**) — Cline `modelInfo` identity, Antigravity CLI log-port fix, OpenRouter version-separator pricing. [Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar) (~348★; last engine commits 2026-09-12). [planetf1/otelite](https://github.com/planetf1/otelite) (~89★, **pushed today**). | tokscale = sharpest adjacent CLI mover today; codeburn still high-star multi-tool gravity. |
+
+**Positioning refresh**
+- **OpenUsage.sh** = primary collision (34/35/36 + Antigravity README; no new product code today).
+- **ccusage** = report/parser standard (pricing snapshots still the cadence; +~18★).
+- **Splitrail** = #2 live local peer (flat/quiet).
+- **juliantanx/aiusage** = local multi-tool dashboard peer + name collision (**v1.5.17**).
+- **openusage.ai** = menu-bar naming collision still shipping hard (Claude Swap / Devin / plan badge).
+- **tokscale / codeburn** = highest-velocity adjacent local CLIs.
+- Keep Helicone / Langfuse / LiteLLM as complementary observability/gateway spend.
+
+Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) README (36 / Antigravity); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage) v1.5.17; [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [github.com/junhoyeo/tokscale](https://github.com/junhoyeo/tokscale); [github.com/getagentseal/codeburn](https://github.com/getagentseal/codeburn); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); GitHub API star/push metadata 2026-09-15 (Europe/London).
+
+
 ## Open source
 
 ### Seeded 2026-09-04
