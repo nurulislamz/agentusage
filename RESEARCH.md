@@ -271,6 +271,35 @@ Fresh Tuesday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **3
 Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) README (36 / Antigravity); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage) v1.5.17; [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [github.com/junhoyeo/tokscale](https://github.com/junhoyeo/tokscale); [github.com/getagentseal/codeburn](https://github.com/getagentseal/codeburn); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); GitHub API star/push metadata 2026-09-15 (Europe/London).
 
 
+
+### Update 2026-09-16
+
+Fresh Wednesday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **34/35 homepage vs 36 README** count drift still live. Material day moves: **ccusage** shipping hard (OpenClaw SQLite, Copilot resume, Codex GPT-6 Astra, CLI date/timezone guards); **openusage.ai Codex Swap**; **codeburn** Compare-periods / session-drawer UX; **AIUsage CodeBuddy** undercount fix; adjacent layer — **Helicone confirmed maintenance mode** (Mintlify acq.; Langfuse migration guide).
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **~196★**, +1) | Homepage still **“Supported providers (35)”** + hero **“34 providers, and counting.”**; docs/README still **36**. Last pushes still **deps/CI only** (2026-09-14); last product code still Sun Codex 0.153+ + Crush timestamp fixes. | **Nearest twin** — category definition still ~1:1. Copy smell persists; no product surface move since Mon. |
+| [ccusage](https://github.com/ccusage/ccusage) / [ccusage.com](https://ccusage.com/) (**~18.6k★** / 18,576; +~15) | Still the category CLI for historical daily/weekly/monthly/session/`blocks` (**no Cursor** in official source list; Grok Build listed on site). **Shipping today:** OpenClaw per-agent SQLite transcripts (#1727); Copilot resume history (#1724); Codex GPT-6 Astra fast multiplier (#1726); `--breakdown` in Codex/shared tables (#1725); reject bad `--timezone` / `--since`>`--until` (#1733/#1735); LiteLLM pricing snapshots. | Best **log-history / cost-report** OSS peer; thinner live quota/rate-limit TUI + key autodetection. |
+| [Splitrail](https://github.com/Piebald-AI/splitrail) (**~223★**, flat) | Real-time cross-agent monitor + optional Cloud + MCP. Last product commit still **2026-09-11** (Grok 4.6 pricing). Quiet fifth day. | #2 local “live monitor” peer — multi-day quiet. |
+| [AIUsage](https://github.com/juliantanx/aiusage) (**~128★**, +1) | Local web dashboard (`aiusage serve` → :3847) across 20+ tools. **Merged today:** CodeBuddy CLI undercount fix — count usage on `function_call` lines (was missing ~95% of DeepSeek agent requests) (#65). Still on **v1.5.17** (Tue). | Rising local peer + **name collision** (AIUsage vs agentUsage) — parser correctness shipping. |
+| [openusage.ai](https://github.com/robinebers/openusage) (**~4.2k★** / 4,173; +~11) | macOS menu-bar tracker (different product). **Shipped today:** Codex Swap account support (#1264) after Tue’s Claude Swap / Devin / plan-badge wave (v0.7.12-beta.2). | Naming collision only — do not conflate with openusage.sh; still the louder star graph. |
+| Vendor UIs | **Cursor:** Spending (`cursor.com/dashboard/spending`) + Usage still split — self-serve Usage token/“Included”-centric; USD on Spending / invoices / Admin API (forum threads still active through Aug 2026). **Claude Code:** `/usage` + `/cost` unchanged in-tool panes. **OpenRouter:** Activity / credits still API-platform-only. | Fragmentation OpenUsage/agentUsage claim to fix. |
+| Helicone / Langfuse / LiteLLM | **Helicone** (~6.2k★ / 6,159): quiet since 2026-09-11; **Langfuse’s migrate-from-Helicone guide** now states Helicone is in **maintenance mode** after **Mintlify acquisition (Mar 2026)** — services live, feature roadmap stopped; export early. **Langfuse** (~34.7k★ / 34,675, **pushed today**) — v4 Cloud cutover still **2026-11-16**. **LiteLLM** (~58.9k★ / 58,863, **pushed today**) — admin UI routing/forecast polish + active gateway spend FinOps. | Adjacent layers, not desktop twins — Helicone now a **declining** observability peer; prefer Langfuse/LiteLLM for new gateway/OTel work. |
+| Also watch (local peers) | [getagentseal/codeburn](https://github.com/getagentseal/codeburn) (~11.0k★ / 11,043; **shipping**) — Compare periods UX (#1446), session drawer (#1444), refresh without layout shift (#1445), Codex distinct-request fix (#1264). [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) (~5.4k★ / 5,447; quiet since **v4.17.0** Tue). [Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar) (~350★, +2; **Grok Bot** credential/path support merged #316). [tddworks/ClaudeBar](https://github.com/tddworks/ClaudeBar) (~1.5k★); [deviffyy/OpenQuota](https://github.com/deviffyy/OpenQuota) (~208★, quiet). | codeburn = sharpest adjacent multi-tool UI mover today; TokenBar adds Grok Bot; not yet twins on live multi-provider quota TUI + key autodetection. |
+
+**Positioning refresh**
+- **OpenUsage.sh** = primary collision (34/35/36 + Antigravity README; deps-only since Sun product fixes; +1★).
+- **ccusage** = report/parser standard (hardest ship cadence today — OpenClaw/Copilot/Codex + CLI guards).
+- **Splitrail** = #2 live local peer (flat/quiet since Fri).
+- **juliantanx/aiusage** = local multi-tool dashboard peer + name collision (CodeBuddy parser fix).
+- **openusage.ai** = menu-bar naming collision still shipping (Codex Swap after Claude Swap).
+- **codeburn / TokenBar** = highest-velocity adjacent local apps today.
+- Keep Langfuse / LiteLLM as complementary observability/gateway spend; treat **Helicone as maintenance-mode / migrate-away** adjacent, not a growing peer.
+
+Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage); [ccusage.com](https://ccusage.com/); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage) #65; [github.com/robinebers/openusage](https://github.com/robinebers/openusage) #1264; [github.com/getagentseal/codeburn](https://github.com/getagentseal/codeburn); [github.com/Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [langfuse.com migrate-from-helicone](https://langfuse.com/resources/engineering/migrate-from-helicone); [helicone.ai/blog/joining-mintlify](https://www.helicone.ai/blog/joining-mintlify); [docs.litellm.ai](https://docs.litellm.ai/); Cursor Spending/Usage help + forum threads; GitHub API star/push metadata 2026-09-16 (Europe/London).
+
+
+
 ## Open source
 
 ### Seeded 2026-09-04
