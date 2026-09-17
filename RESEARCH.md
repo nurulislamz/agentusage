@@ -300,6 +300,33 @@ Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/ope
 
 
 
+### Update 2026-09-17
+
+Fresh Thursday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **34/35 homepage vs 36 README** count drift still live. Material day moves: **ccusage** Codex **GPT Reserve → GPT-5.6 Luna** pricing + LiteLLM snapshot churn; **codeburn** Antigravity tool/bash/MCP/skills SQLite parse + overnight **Grok Bot** sessions/estimated spend; **TokenBar v1.18.0** Codex turn-count fix; **CodeZeno Usage-Monitor v2.11.29**.
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **~197★**, +1) | Homepage still **“Supported providers (35)”** + hero **“34 providers, and counting.”**; docs/README still **36**. Last pushes still **deps/CI only** (2026-09-14); last product code still Sun Codex 0.153+ + Crush timestamp fixes. | **Nearest twin** — category definition still ~1:1. Copy smell persists; no product surface move since Mon. |
+| [ccusage](https://github.com/ccusage/ccusage) / [ccusage.com](https://ccusage.com/) (**~18.6k★** / 18,593; +~17) | Still the category CLI for historical daily/weekly/monthly/session/`blocks` (**no Cursor** in official source list). **Shipped since Wed:** price Codex **GPT Reserve** as **GPT-5.6 Luna** (#1739 — clears “Missing pricing for gpt-reserve”); continuous LiteLLM pricing snapshots overnight/today; Nix CLI features (#1741). | Best **log-history / cost-report** OSS peer; thinner live quota/rate-limit TUI + key autodetection. |
+| [Splitrail](https://github.com/Piebald-AI/splitrail) (**~223★**, flat) | Real-time cross-agent monitor + optional Cloud + MCP. Last product commit still **2026-09-11** (Grok 4.6 pricing). Quiet sixth day. | #2 local “live monitor” peer — multi-day quiet. |
+| [AIUsage](https://github.com/juliantanx/aiusage) (**~128★**, flat) | Local web dashboard (`aiusage serve` → :3847) across 20+ tools. Still on **v1.5.17** + Wed’s CodeBuddy `function_call` undercount fix (#65). Quiet Thursday. | Rising local peer + **name collision** (AIUsage vs agentUsage). |
+| [openusage.ai](https://github.com/robinebers/openusage) (**~4.2k★** / 4,184; +~11) | macOS menu-bar tracker (different product). Latest product still Wed’s **Codex Swap** (#1264) after Tue’s Claude Swap / Devin wave (**v0.7.12-beta.2**). Dep churn only since. | Naming collision only — do not conflate with openusage.sh; still the louder star graph. |
+| Vendor UIs | **Cursor:** Spending (`cursor.com/dashboard/spending`) + Usage still split — self-serve Usage token/“Included”-centric; USD on Spending / invoices / Admin API. **Claude Code:** `/usage` + `/cost` unchanged in-tool panes. **OpenRouter:** Activity / credits still API-platform-only. | Fragmentation OpenUsage/agentUsage claim to fix. |
+| Helicone / Langfuse / LiteLLM | **Helicone** (~6.2k★ / 6,161): push overnight (2026-09-16) but **Langfuse migrate-from-Helicone** still frames Helicone as **maintenance mode** post-Mintlify (Mar 2026). **Langfuse** (~34.7k★ / 34,712, **pushed today**). **LiteLLM** (~59.0k★ / 58,964, **pushed today**) — gateway spend FinOps + pricing feed that ccusage snapshots. | Adjacent layers, not desktop twins — prefer Langfuse/LiteLLM for new gateway/OTel work; Helicone still migrate-away adjacent. |
+| Also watch (local peers) | [getagentseal/codeburn](https://github.com/getagentseal/codeburn) (~11.1k★ / 11,055; **shipping today**) — Antigravity SQLite **steps** parse for tools/bash/MCP/skills (#1456); overnight **Grok Bot** sessions + estimated spend + weekly allowance on all surfaces (#1462); Desktop polish (#1459). [Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar) (~352★, **v1.18.0** 16 Sep) — Codex turn-count fix for CLI **0.145+** (`item_completed`/`UserMessage` vs old `user_message`). [CodeZeno/Claude-Code-Usage-Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Monitor) (~489★, **v2.11.29** today) after Wed’s multi-account **v2.11.28**. [ItsJazii/pane](https://github.com/ItsJazii/pane) (~50★, +2) Windows tray coverage. [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) (~5.4k★; quiet since **v4.17.0**). | codeburn = sharpest adjacent multi-tool mover today (Antigravity depth + Grok Bot); TokenBar / CodeZeno = Codex/Claude account UX; not yet twins on live multi-provider quota TUI + key autodetection. |
+
+**Positioning refresh**
+- **OpenUsage.sh** = primary collision (34/35/36 + Antigravity README; deps-only since Sun product fixes; +1★).
+- **ccusage** = report/parser standard (GPT Reserve/Luna pricing + LiteLLM snapshot cadence).
+- **Splitrail** = #2 live local peer (flat/quiet since Fri).
+- **juliantanx/aiusage** = local multi-tool dashboard peer + name collision (quiet after CodeBuddy fix).
+- **openusage.ai** = menu-bar naming collision (Codex Swap still latest feature).
+- **codeburn / TokenBar / CodeZeno** = highest-velocity adjacent local apps today.
+- Keep Langfuse / LiteLLM as complementary observability/gateway spend; treat **Helicone as maintenance-mode / migrate-away** adjacent, not a growing peer.
+
+Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage) #1739; [ccusage.com](https://ccusage.com/); [github.com/juliantanx/aiusage](https://github.com/juliantanx/aiusage); [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [github.com/getagentseal/codeburn](https://github.com/getagentseal/codeburn) #1456 #1462; [github.com/Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar) v1.18.0; [github.com/CodeZeno/Claude-Code-Usage-Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Monitor); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [langfuse.com migrate-from-helicone](https://langfuse.com/resources/engineering/migrate-from-helicone); [docs.litellm.ai](https://docs.litellm.ai/); Cursor Spending/Usage help; GitHub API star/push metadata 2026-09-17 (Europe/London).
+
+
 ## Open source
 
 ### Seeded 2026-09-04
