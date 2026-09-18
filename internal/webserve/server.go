@@ -83,6 +83,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/actions/view", s.handleViewAction)
 	mux.HandleFunc("/actions/provider", s.handleProviderAction)
 	mux.HandleFunc("/actions/providers", s.handleProviderAction)
+	mux.HandleFunc("/actions/provider-order", s.handleProviderOrderAction)
 
 	sub, err := fs.Sub(uiFS, "ui")
 	if err != nil {

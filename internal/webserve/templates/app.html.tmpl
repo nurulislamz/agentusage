@@ -7,8 +7,6 @@
       </div>
       <span id="fetching-header" class="fetching"><span class="spin" aria-hidden="true">⠋</span> <span class="fetching-text">Fetching...</span></span>
       <span class="spacer"></span>
-      <nav class="layout-nav" aria-label="Layout view">{{range .Layouts}}<button type="button" class="layout-btn{{if eq .ID $.Layout.ID}} active{{end}}" data-layout="{{.ID}}" hx-post="actions/layout" hx-vals='{"layout":"{{.ID}}"}' aria-pressed="{{if eq .ID $.Layout.ID}}true{{else}}false{{end}}"><span class="layout-icon" aria-hidden="true">{{.Icon}}</span><span class="layout-label">{{.Label}}</span></button>{{end}}</nav>
-      <span class="spacer"></span>
       <div class="right-controls">
         <div class="search-box{{if .Filtered}} has-query{{end}}" id="search-box" role="button" tabindex="0" aria-label="Filter providers (/)">
           <span class="search-kbd">/</span>

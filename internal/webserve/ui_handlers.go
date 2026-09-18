@@ -17,6 +17,8 @@ const (
 	cookieFilter   = "au_filter"
 	cookieExpanded = "au_expanded"
 	cookieView     = "au_view"
+	// cookieProviderOrder stores the drag-ordered provider ids, pipe-separated.
+	cookieProviderOrder = "au_provider_order"
 )
 
 func (s *Server) cookiePath() string {
@@ -150,6 +152,7 @@ func (s *Server) handleAppFragment(w http.ResponseWriter, r *http.Request) {
 		Expand:          strings.TrimSpace(q.Get("expand")),
 		ExpandedAccount: readUICookie(r, cookieExpanded),
 		MobileView:      view,
+		ProviderOrder:   s.resolveProviderOrder(r),
 		Toast:           strings.TrimSpace(q.Get("toast")),
 	}
 	s.renderApp(w, r, in, q.Get("refresh") == "1", q.Get("focus"))
@@ -178,6 +181,7 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request) {
 		Account:         account,
 		ExpandedAccount: readUICookie(r, cookieExpanded),
 		MobileView:      "detail",
+		ProviderOrder:   s.resolveProviderOrder(r),
 		Auth:            s.AuthEnabled(),
 		Now:             time.Now(),
 	})
@@ -274,6 +278,35 @@ func (s *Server) handleViewAction(w http.ResponseWriter, r *http.Request) {
 	}
 	s.setUICookie(w, cookieView, view)
 	s.renderAppEnv(w, r, s.envelopeOrError(), "", "", view)
+}
+
+// handleProviderOrderAction stores the drag-reordered provider ids.
+func (s *Server) handleProviderOrderAction(w http.ResponseWriter, r *http.Request) {
+	if !s.requireUIAction(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	raw := strings.TrimSpace(r.FormValue("order"))
+	ids := make([]string, 0, 8)
+	seen := map[string]bool{}
+	for _, id := range strings.Split(raw, "|") {
+		id = strings.TrimSpace(id)
+		if id != "" && !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "empty order"})
+		return
+	}
+	s.setUICookie(w, cookieProviderOrder, strings.Join(ids, "|"))
+	s.renderAppEnv(w, r, s.envelopeOrError(), "Provider order saved", "", "")
+}
+
+// resolveProviderOrder returns the stored provider-id order, if any.
+func (s *Server) resolveProviderOrder(r *http.Request) string {
+	return strings.TrimSpace(readUICookie(r, cookieProviderOrder))
 }
 
 func cycleLayoutID(current string, ids []layoutMeta) string {
@@ -472,6 +505,7 @@ func (s *Server) renderAppEnv(w http.ResponseWriter, r *http.Request, env Envelo
 		Account:         account,
 		ExpandedAccount: readUICookie(r, cookieExpanded),
 		MobileView:      view,
+		ProviderOrder:   s.resolveProviderOrder(r),
 		Toast:           toast,
 	}
 	if in.Layout == "" {
