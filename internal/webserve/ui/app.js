@@ -462,6 +462,75 @@
       startY = null;
     });
   })();
+  (function pullToRefresh() {
+    if (!("ontouchstart" in window) || !window.matchMedia("(pointer: coarse)").matches) return;
+    const TRIGGER = 96;
+    const MAX_SHIFT = 110;
+    const RESIST = 0.35;
+    const indicator = document.createElement("div");
+    indicator.className = "pull-indicator";
+    indicator.setAttribute("aria-hidden", "true");
+    indicator.innerHTML = '<span class="pull-spin">↻</span><span class="pull-label">Pull to refresh</span>';
+    document.body.appendChild(indicator);
+    const label = indicator.querySelector(".pull-label");
+    let panel = null, startY = 0, startX = 0, engaged = false, pulled = 0;
+
+    const reset = () => {
+      indicator.classList.remove("busy", "show", "over");
+      label.textContent = "Pull to refresh";
+    };
+    document.addEventListener("htmx:afterSwap", reset);
+    document.addEventListener("htmx:responseError", reset);
+
+    const onMove = (ev) => {
+      if (!panel) return;
+      const t = ev.touches[0];
+      const dy = t.clientY - startY;
+      if (!engaged) {
+        if (dy <= 8 || Math.abs(t.clientX - startX) > dy) return;
+        engaged = true;
+        indicator.classList.add("show");
+      }
+      ev.preventDefault();
+      pulled = dy;
+      panel.style.transform = "translateY(" + Math.min(Math.max(dy * RESIST, 0), MAX_SHIFT).toFixed(1) + "px)";
+      const over = dy >= TRIGGER;
+      indicator.classList.toggle("over", over);
+      label.textContent = over ? "Release to refresh" : "Pull to refresh";
+    };
+    const onEnd = () => {
+      const el = panel;
+      const fire = engaged && pulled >= TRIGGER;
+      panel = null; engaged = false; pulled = 0;
+      if (!el) return;
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+      el.style.transition = "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)";
+      el.style.transform = "";
+      setTimeout(() => { el.style.transition = ""; }, 220);
+      if (fire) {
+        indicator.classList.add("busy");
+        label.textContent = "Refreshing…";
+        click("key-refresh-all");
+      }
+    };
+    document.addEventListener("touchstart", (ev) => {
+      if (ev.touches.length !== 1 || panel) return;
+      let el = ev.touches[0].target;
+      for (; el && el !== document.body; el = el.parentElement) {
+        if (el.closest("#inspect-modal")) return;
+        const ov = getComputedStyle(el).overflowY;
+        if (ov === "auto" || ov === "scroll") { panel = el; break; }
+      }
+      if (!panel || panel.scrollTop > 0) { panel = null; return; }
+      startY = ev.touches[0].clientY;
+      startX = ev.touches[0].clientX;
+      panel.addEventListener("touchmove", onMove, { passive: false });
+      panel.addEventListener("touchend", onEnd, { passive: true });
+      panel.addEventListener("touchcancel", onEnd, { passive: true });
+    }, { passive: true });
+  })();
 
   ensureScrollContainer();
   syncTheme();

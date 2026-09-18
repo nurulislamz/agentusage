@@ -886,6 +886,37 @@ code { color: var(--accent); }
 #fetching-detail { margin-bottom: var(--space-2); }
 .hero .fetching { display: none; }
 
+/* Pull-to-refresh pill (touch devices only; shown during the gesture) */
+.pull-indicator {
+  position: fixed;
+  top: calc(var(--topbar-h) + 10px);
+  left: 50%;
+  transform: translate(-50%, -10px);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--mantle) 92%, transparent);
+  backdrop-filter: blur(12px);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+  z-index: 40;
+}
+.pull-indicator.show { opacity: 1; transform: translate(-50%, 0); }
+.pull-indicator.over { color: var(--accent); border-color: var(--accent); }
+.pull-indicator.busy .pull-spin { animation: pull-rotate 0.9s linear infinite; }
+.pull-indicator.busy { color: var(--fg-2); border-color: var(--hairline); }
+@keyframes pull-rotate {
+  to { transform: rotate(360deg); }
+}
+
 /* ==========================================================================
    Overlays: filter bar, modals, status bar, splash, empty
    ========================================================================== */
