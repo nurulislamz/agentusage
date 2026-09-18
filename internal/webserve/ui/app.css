@@ -604,9 +604,31 @@ code { color: var(--accent); }
 .agent-head .pill, .strip-id .pill { margin-left: auto; }
 
 .provider-group-box { display: flex; flex-direction: column; gap: var(--space-3); }
-.provider-group-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0 var(--space-1); }
-.provider-drag-handle { cursor: grab; color: var(--muted); font-size: 13px; letter-spacing: -2px; padding: 4px 2px; border-radius: 6px; user-select: none; opacity: 0.55; transition: opacity var(--motion-fast) var(--ease), background-color var(--motion-fast) var(--ease); }
-.provider-group-header:hover .provider-drag-handle { opacity: 1; background: var(--tint-fill); }
+.provider-group-header { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-1); }
+.provider-group-title { flex: 1; }
+.provider-drag-handle {
+  cursor: grab;
+  display: inline-grid;
+  grid-template-columns: repeat(2, 4px);
+  gap: 4px;
+  padding: 8px 8px;
+  border-radius: 8px;
+  color: var(--fg);
+  user-select: none;
+  align-self: center;
+  background: var(--tint-fill);
+  transition: background-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+.provider-drag-handle i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  display: block;
+  opacity: 0.9;
+}
+.provider-group-header:hover { cursor: grab; }
+.provider-group-header:hover .provider-drag-handle { background: var(--tint-hover, var(--hairline)); color: var(--fg); }
 .provider-group-header[draggable="true"]:active { cursor: grabbing; }
 .provider-group-box.dragging { opacity: 0.55; transform: scale(0.99); }
 .provider-group-box { transition: opacity var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease); }
