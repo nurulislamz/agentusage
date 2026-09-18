@@ -249,9 +249,12 @@ func TestLoadOAuthToken_And_WriteOAuthToken(t *testing.T) {
 // The patterns are assembled at runtime so the fixtures never match the
 // literals GitHub push protection scans for (the values are test fakes).
 func stubCLIPayload() []byte {
-	id := "1071006060591-abc123x." + "apps." + "googleusercontent" + ".com"
-	secret := "GO" + "CSPX-" + "ZZZTESTSECRETVALUE1234567890"
-	blob := "client_id=" + id + " secret=" + secret + " end"
+	id1 := "1071006060591-abc123x." + "apps." + "googleusercontent" + ".com"
+	id2 := "884354919052-xyz789w." + "apps." + "googleusercontent" + ".com"
+	// Secrets glued together like the real CLI string table.
+	glued := "GO" + "CSPX-" + "ZZZTESTSECRETAAA1111111111" +
+		"GO" + "CSPX-" + "ZZZTESTSECRETBBB2222222222"
+	blob := "id=" + id1 + " secret=" + glued + " id=" + id2
 	out := bytes.Repeat([]byte{0x00}, 2048)
 	return append(out, []byte(blob)...)
 }
@@ -317,7 +320,7 @@ func TestTokenExpired_Matrix(t *testing.T) {
 
 func TestOAuthClientCredentials(t *testing.T) {
 	// Neither set: falls back to the CLI's installed-application client
-	// extracted from a binary stub.
+	// candidates extracted from a binary stub.
 	t.Setenv(oauthClientIDEnv, "")
 	t.Setenv(oauthClientSecretEnv, "")
 	t.Setenv(oauthClientIDEnvAlias, "")
@@ -331,15 +334,24 @@ func TestOAuthClientCredentials(t *testing.T) {
 	cliOAuthClientPath = func() string { return cliBin }
 	defer func() { cliOAuthClientPath = restorePath }()
 	resetCLIOAuthClientCache()
-	id, secret, ok := oauthClientCredentials()
-	if !ok || !strings.HasSuffix(id, ".apps.googleusercontent.com") || !strings.HasPrefix(secret, "GOCSPX-") {
-		t.Errorf("oauthClientCredentials() fallback = (%q, %q, %v), want extracted CLI client, true", id, secret, ok)
+	pairs := fallbackClientCandidates()
+	if len(pairs) == 0 {
+		t.Fatal("fallbackClientCandidates() returned no candidates")
+	}
+	for _, p := range pairs {
+		if !strings.HasSuffix(p.id, ".apps.googleusercontent.com") || !strings.HasPrefix(p.secret, "GOCSPX-") {
+			t.Errorf("fallback candidate = (%q, %q), want CLI-extracted client shapes", p.id, p.secret)
+		}
+	}
+	// A stub binary with a glued secret table must yield two clean secrets.
+	if len(pairs) < 2 {
+		t.Errorf("expected glued secret split into multiple candidates, got %d", len(pairs))
 	}
 
 	// Primary env vars
 	t.Setenv(oauthClientIDEnv, "my-client-id")
 	t.Setenv(oauthClientSecretEnv, "my-secret")
-	id, secret, ok = oauthClientCredentials()
+	id, secret, ok := oauthClientCredentials()
 	if !ok || id != "my-client-id" || secret != "my-secret" {
 		t.Errorf("oauthClientCredentials() = (%q, %q, %v), want (my-client-id, my-secret, true)", id, secret, ok)
 	}

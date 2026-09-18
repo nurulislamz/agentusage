@@ -37,12 +37,12 @@ const (
 	// enterprise clients.
 )
 
-// cliOAuthClientOnce caches the extracted CLI OAuth client.
+// cliOAuthClientCandidates caches the OAuth client pairs extracted from the
+// CLI binary. The binary ships two clients and the secrets sit adjacent in
+// its string table, so id↔secret pairing is ambiguous — the working pair is
+// discovered by probing the token endpoint at refresh time.
 var cliOAuthClientOnce sync.Once
-var cliOAuthClient struct {
-	id, secret string
-	ok         bool
-}
+var cliOAuthClientCandidates []struct{ id, secret string }
 
 // cliOAuthClientPath returns the antigravity CLI binary to scan for the
 // embedded installed-application OAuth client. Tests override this.
@@ -56,24 +56,59 @@ var cliOAuthClientPath = func() string {
 	return ""
 }
 
-// extractCLIOAuthClient scans a binary for the installed-application OAuth
-// client the antigravity CLI ships with. The values are public — they are
-// distributed inside the CLI binary — but they are deliberately not embedded
-// in this repository to stay clear of GitHub push protection.
-func extractCLIOAuthClient(path string) (clientID, clientSecret string, ok bool) {
+// extractCLIOAuthClientCandidates scans a binary for ALL installed-application
+// OAuth client ids and secrets the antigravity CLI ships with. The values are
+// public — they are distributed inside the CLI binary — but they are
+// deliberately not embedded in this repository to stay clear of GitHub push
+// protection. Secret strings sit adjacent in the binary's table, so a naive
+// regex can swallow two secrets into one match; every plausible value is kept
+// as a candidate and the correct pairing is discovered at refresh time.
+func extractCLIOAuthClientCandidates(path string) []struct{ id, secret string } {
 	if strings.TrimSpace(path) == "" {
-		return "", "", false
+		return nil
 	}
 	data, err := os.ReadFile(path)
 	if err != nil || len(data) < 1024 {
-		return "", "", false
+		return nil
 	}
-	id := regexp.MustCompile(`\d{10,14}-[a-z0-9]+\.apps\.googleusercontent\.com`).Find(data)
-	secret := regexp.MustCompile(`GOCSPX-[A-Za-z0-9_-]{10,60}`).Find(data)
-	if id == nil || secret == nil {
-		return "", "", false
+	idRe := regexp.MustCompile(`\d{10,14}-[a-z0-9]+\.apps\.googleusercontent\.com`)
+	secretRe := regexp.MustCompile(`GOCSPX-[A-Za-z0-9_-]{20,60}`)
+	var ids, secrets []string
+	for _, m := range idRe.FindAllString(string(data), -1) {
+		if !containsID(ids, m) {
+			ids = append(ids, m)
+		}
 	}
-	return string(id), string(secret), true
+	// Secrets sit adjacent in the string table, so a naive regex can swallow
+	// two secrets into one match. Split every match on each "GOCSPX-" marker.
+	for _, raw := range secretRe.FindAllString(string(data), -1) {
+		for {
+			next := strings.Index(raw[7:], "GOCSPX-")
+			if next < 0 {
+				break
+			}
+			secrets = append(secrets, raw[:7+next])
+			raw = raw[7+next:]
+		}
+		secrets = append(secrets, raw)
+	}
+	var pairs []struct{ id, secret string }
+	for _, id := range ids {
+		for _, s := range secrets {
+			pairs = append(pairs, struct{ id, secret string }{id, s})
+		}
+	}
+	return pairs
+}
+
+// containsID reports whether ids already contains id.
+func containsID(ids []string, id string) bool {
+	for _, v := range ids {
+		if v == id {
+			return true
+		}
+	}
+	return false
 }
 
 // resetCLIOAuthClientCache drops the cached extracted client (tests only).
@@ -81,14 +116,19 @@ func resetCLIOAuthClientCache() {
 	cliOAuthClientOnce = sync.Once{}
 }
 
-// fallbackOAuthClient returns the CLI's embedded OAuth client, extracted
-// once from the local antigravity CLI binary.
-func fallbackOAuthClient() (clientID, clientSecret string, ok bool) {
+// rememberCLIOAuthClient pins the discovered working (id, secret) pair so
+// subsequent refreshes skip the probe.
+func rememberCLIOAuthClient(id, secret string) {
+	cliOAuthClientCandidates = []struct{ id, secret string }{{id, secret}}
+}
+
+// fallbackOAuthClient returns the CLI's embedded OAuth client candidates,
+// extracted once from the local antigravity CLI binary.
+func fallbackOAuthClient() []struct{ id, secret string } {
 	cliOAuthClientOnce.Do(func() {
-		cliOAuthClient.id, cliOAuthClient.secret, cliOAuthClient.ok =
-			extractCLIOAuthClient(cliOAuthClientPath())
+		cliOAuthClientCandidates = extractCLIOAuthClientCandidates(cliOAuthClientPath())
 	})
-	return cliOAuthClient.id, cliOAuthClient.secret, cliOAuthClient.ok
+	return cliOAuthClientCandidates
 }
 
 // AuthError represents an authentication condition requiring user action (non-retryable).
@@ -359,6 +399,10 @@ func tokenExpired(tok oauthToken, now time.Time) bool {
 // explicit env vars first, then the CLI's own installed-application client
 // extracted from the local CLI binary, so a default install can always
 // refresh tokens.
+// oauthClientCredentials resolves the Google OAuth client for token refresh:
+// explicit env vars first, then the CLI's installed-application client
+// extracted from the local CLI binary. With candidates, the caller probes
+// each pair against the token endpoint (invalid_client = wrong pairing).
 func oauthClientCredentials() (clientID, clientSecret string, ok bool) {
 	clientID = strings.TrimSpace(os.Getenv(oauthClientIDEnv))
 	if clientID == "" {
@@ -369,14 +413,73 @@ func oauthClientCredentials() (clientID, clientSecret string, ok bool) {
 		clientSecret = strings.TrimSpace(os.Getenv(oauthClientSecretEnvAlias))
 	}
 	if clientID == "" || clientSecret == "" {
-		return fallbackOAuthClient()
+		pairs := fallbackOAuthClient()
+		if len(pairs) == 0 {
+			return "", "", false
+		}
+		return pairs[0].id, pairs[0].secret, true
 	}
 	return clientID, clientSecret, true
 }
 
+// fallbackClientCandidates returns every (id, secret) pair extracted from the
+// CLI binary; the working pair is discovered by probing (invalid_client = wrong pair).
+// Env vars override; a previously-discovered working pair goes first.
+func fallbackClientCandidates() []struct{ id, secret string } {
+	clientID := strings.TrimSpace(os.Getenv(oauthClientIDEnv))
+	if clientID == "" {
+		clientID = strings.TrimSpace(os.Getenv(oauthClientIDEnvAlias))
+	}
+	clientSecret := strings.TrimSpace(os.Getenv(oauthClientSecretEnv))
+	if clientSecret == "" {
+		clientSecret = strings.TrimSpace(os.Getenv(oauthClientSecretEnvAlias))
+	}
+	if clientID != "" && clientSecret != "" {
+		return []struct{ id, secret string }{{clientID, clientSecret}}
+	}
+	candidates := fallbackOAuthClient()
+	if len(cliOAuthClientCandidates) == 1 && len(candidates) > 1 {
+		// A remembered working pair: probe it first, then the rest.
+		working := cliOAuthClientCandidates[0]
+		rest := make([]struct{ id, secret string }, 0, len(candidates))
+		rest = append(rest, working)
+		for _, p := range candidates {
+			if p != working {
+				rest = append(rest, p)
+			}
+		}
+		return rest
+	}
+	return candidates
+}
+
+// refreshAccessToken refreshes via the token endpoint, probing extracted
+// candidate pairs when the pairing is ambiguous. invalid_client marks a
+// wrong pair (try the next); anything else fails normally. The first pair
+// that refreshes successfully is remembered for future refreshes.
 func refreshAccessToken(ctx context.Context, refreshToken string, client *http.Client) (oauthToken, error) {
-	clientID, clientSecret, _ := oauthClientCredentials()
-	return refreshAccessTokenWithBackoff(ctx, refreshToken, client, clientID, clientSecret)
+	pairs := fallbackClientCandidates()
+	if len(pairs) == 0 {
+		return oauthToken{}, &AuthError{
+			Reason:  "unconfigured_client",
+			Message: fmt.Sprintf("oauth client not configured (%s / %s)", oauthClientIDEnv, oauthClientSecretEnv),
+		}
+	}
+	var lastErr error
+	for _, pair := range pairs {
+		tok, err := refreshAccessTokenWithBackoff(ctx, refreshToken, client, pair.id, pair.secret)
+		if err == nil {
+			rememberCLIOAuthClient(pair.id, pair.secret)
+			return tok, nil
+		}
+		var authErr *AuthError
+		if errors.As(err, &authErr) && authErr.Reason == "invalid_client" {
+			lastErr = err
+			continue // wrong client pairing — try the next candidate
+		}
+		return oauthToken{}, err
+	}
+	return oauthToken{}, lastErr
 }
 
 func refreshAccessTokenWithBackoff(ctx context.Context, refreshToken string, client *http.Client, clientID, clientSecret string) (oauthToken, error) {
@@ -541,8 +644,7 @@ func ensureAccessToken(ctx context.Context, acct core.AccountConfig, client *htt
 		}
 	}
 
-	clientID, clientSecret, _ := oauthClientCredentials()
-	newTok, refreshErr := refreshAccessTokenWithBackoff(ctx, refreshTok, client, clientID, clientSecret)
+	newTok, refreshErr := refreshAccessToken(ctx, refreshTok, client)
 	if refreshErr != nil {
 		return "", path, false, refreshErr
 	}
