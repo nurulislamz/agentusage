@@ -240,9 +240,11 @@ type renderInput struct {
 	ExpandedAccount string
 	// MobileView is the split-layout mobile state: detail or roster.
 	MobileView string
-	Toast      string
-	Auth       bool
-	Now        time.Time
+	// ProviderOrder is the stored provider-id order for drag-reorder.
+	ProviderOrder string
+	Toast         string
+	Auth          bool
+	Now           time.Time
 }
 
 const (
@@ -327,7 +329,7 @@ func buildRenderModel(env Envelope, in renderInput) renderModel {
 		sel := m.Views[m.SelectedIndex]
 		m.Selected = &sel
 	}
-	m.Groups = groupRenderViews(m.Views)
+	m.Groups = groupRenderViews(m.Views, in.ProviderOrder)
 	m.Stats = calculateGlobalStats(m.Views, used)
 	m.FleetNote = fleetNote(m.Views)
 	return m
@@ -538,7 +540,7 @@ func buildRenderView(v AccountView, index int, used bool, now time.Time) renderV
 	return rv
 }
 
-func groupRenderViews(views []renderView) []renderGroup {
+func groupRenderViews(views []renderView, providerOrder string) []renderGroup {
 	var groups []renderGroup
 	index := map[string]int{}
 	for _, v := range views {
@@ -572,6 +574,41 @@ func groupRenderViews(views []renderView) []renderGroup {
 		}
 		balanceBentoGroupSpans(groups[i].Items)
 	}
+	return sortProviderGroups(groups, providerOrder)
+}
+
+// sortProviderGroups sorts provider groups by the stored drag order; ids
+// absent from the stored order keep first-seen order after the known ones.
+func sortProviderGroups(groups []renderGroup, providerOrder string) []renderGroup {
+	order := strings.TrimSpace(providerOrder)
+	if order == "" {
+		return groups
+	}
+	rank := map[string]int{}
+	for _, pid := range strings.Split(order, "|") {
+		pid = strings.TrimSpace(pid)
+		if pid != "" {
+			rank[strings.ToLower(pid)] = len(rank)
+		}
+	}
+	if len(rank) == 0 {
+		return groups
+	}
+	sort.SliceStable(groups, func(i, j int) bool {
+		ri, oki := rank[strings.ToLower(groups[i].ProviderID)]
+		rj, okj := rank[strings.ToLower(groups[j].ProviderID)]
+		// Unknown ids sort after known ones, keeping first-seen order.
+		if !oki && !okj {
+			return false
+		}
+		if !oki {
+			return false
+		}
+		if !okj {
+			return true
+		}
+		return ri < rj
+	})
 	return groups
 }
 
@@ -1271,8 +1308,9 @@ func summaryDisplay(summary string) string {
 // collapseUsageLines reduces usage lines to one row per quota window. It is
 // the single collapse for every board projection (matrix, bento, bars,
 // dials, strips): antigravity's Gemini + Claude "5-Hour Limit" siblings
-// collapse to the tightest window; cursor's Included/Auto/API plan buckets
-// are one monthly usage limit; distinct windows stay separate.
+// collapse to the tightest window; distinct windows stay separate.
+// Cursor keeps its three usage metrics (Included / Auto / API) because they
+// are distinct buckets, but they share one reset timer.
 func collapseUsageLines(v AccountView, lines []usageLine, used bool) []usageLine {
 	order := []string{}
 	byWindow := map[string]int{}
@@ -1318,10 +1356,11 @@ func collapseUsageLines(v AccountView, lines []usageLine, used bool) []usageLine
 			l.ResetIn = resets[i]
 		}
 		l.Urgent = urgents[i]
-		if strings.EqualFold(strings.TrimSpace(v.ProviderID), "cursor") {
-			// Cursor works off a single monthly usage limit; give the
-			// surviving row one clear name instead of the plan-bucket label.
-			l.Label, l.Short = "Monthly Usage Limit", "30d"
+		if strings.EqualFold(strings.TrimSpace(v.ProviderID), "cursor") && l.ResetIn == "" {
+			// Cursor's one billing reset applies to every usage bucket.
+			if next := nextResetDisplay(v); next != "" {
+				l.ResetIn = next
+			}
 		}
 		out = append(out, l)
 	}
@@ -1599,13 +1638,10 @@ func bentoRows(lines []usageLine, used bool) []bentoRow {
 }
 
 // bentoWindowKey buckets a usage line by quota window so duplicate bars from
-// sibling model families collapse into a single tile row. Cursor works off a
-// single monthly usage limit, so all of its plan buckets (Included / Auto /
-// API) share one "monthly" key.
+// sibling model families collapse into a single tile row. Cursor has a
+// single reset timer but three distinct usage metrics, so its plan buckets
+// key on identity like every other provider.
 func bentoWindowKey(l usageLine, providerID string) string {
-	if strings.EqualFold(strings.TrimSpace(providerID), "cursor") {
-		return "monthly"
-	}
 	// Short + Label only: Hint carries reset countdowns ("Resets in 15h 52m")
 	// whose durations would falsely match window keywords ("15h" → "5h").
 	s := normalizeWindowText(l.Short + " " + l.Label)

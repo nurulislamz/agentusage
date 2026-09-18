@@ -80,16 +80,16 @@ func demoCursor(now time.Time) core.UsageSnapshot {
 	snap.Status = core.StatusOK
 	snap.Message = "$3.45 / $20.00 · in 11d"
 	snap.Metrics = map[string]core.Metric{
-		"quota":         {Used: f64(17.25), Limit: f64(100.0), Remaining: f64(82.75), Unit: "%"},
-		"plan_spend":    {Used: f64(3.45), Limit: f64(20.00), Remaining: f64(16.55), Unit: "USD"},
-		"team_budget":   {Used: f64(1572.00), Limit: f64(3600.00), Remaining: f64(2028.00), Unit: "USD"},
-		"billing_cycle": {Used: f64(48.7), Limit: f64(100.0), Remaining: f64(51.3), Unit: "%"},
-		"today_cost":    {Used: f64(3.45), Unit: "USD", Window: "today"},
-		"requests_today": {Used: f64(412), Unit: "requests", Window: "today"},
+		"quota":                 {Used: f64(17.25), Limit: f64(100.0), Remaining: f64(82.75), Unit: "%"},
+		"plan_spend":            {Used: f64(3.45), Limit: f64(20.00), Remaining: f64(16.55), Unit: "USD"},
+		"team_budget":           {Used: f64(1572.00), Limit: f64(3600.00), Remaining: f64(2028.00), Unit: "USD"},
+		"billing_cycle":         {Used: f64(48.7), Limit: f64(100.0), Remaining: f64(51.3), Unit: "%"},
+		"today_cost":            {Used: f64(3.45), Unit: "USD", Window: "today"},
+		"requests_today":        {Used: f64(412), Unit: "requests", Window: "today"},
 		"billing_input_tokens":  {Used: f64(597100), Unit: "tokens", Window: "month"},
 		"billing_output_tokens": {Used: f64(320100), Unit: "tokens", Window: "month"},
-		"code_added":    {Used: f64(139), Unit: "lines"},
-		"code_removed":  {Used: f64(335), Unit: "lines"},
+		"code_added":            {Used: f64(139), Unit: "lines"},
+		"code_removed":          {Used: f64(335), Unit: "lines"},
 	}
 	snap.Attributes = map[string]string{
 		"plan_type":           "Pro",
