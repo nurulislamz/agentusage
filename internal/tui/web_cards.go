@@ -68,9 +68,15 @@ func projectDetailCards(
 		if strings.TrimSpace(card.Color) == "" {
 			card.Color = colorHex(sectionColor(sec.title))
 		}
-		if strings.EqualFold(sec.title, "Timers") {
+		switch {
+		case strings.EqualFold(sec.title, "Timers"):
 			card.Rows = projectTimerRows(snap, widget, now)
-		} else {
+		case strings.EqualFold(sec.id, "Info"):
+			// The web Info card needs clean label/value pairs; the TUI-rendered
+			// section lines are padded, truncated to 45 chars and lose the
+			// label/value split. Rebuild straight from the snapshot instead.
+			card.Rows = projectInfoRows(snap, widget)
+		default:
 			card.Rows = rowsFromSectionLines(sec.lines, isUsed)
 		}
 		if len(card.Rows) == 0 {
@@ -113,6 +119,52 @@ func projectTimerRows(snap core.UsageSnapshot, widget core.DashboardWidget, now 
 	}
 	sortTimerRows(rows)
 	return rows
+}
+
+// projectInfoRows rebuilds the Info card rows straight from the snapshot's
+// attributes, diagnostics and raw data: untruncated values, prettified
+// labels, one kv row per entry, with the section headings as separators.
+func projectInfoRows(snap core.UsageSnapshot, widget core.DashboardWidget) []WebDetailRow {
+	var rows []WebDetailRow
+	if len(snap.Attributes) > 0 {
+		rows = append(rows, WebDetailRow{Kind: "heading", Value: "Attributes"})
+		for _, key := range core.SortedStringKeys(snap.Attributes) {
+			rows = append(rows, infoKV(key, snap.Attributes[key]))
+		}
+	}
+	if len(snap.Diagnostics) > 0 {
+		rows = append(rows, WebDetailRow{Kind: "heading", Value: "Diagnostics"})
+		for _, key := range core.SortedStringKeys(snap.Diagnostics) {
+			rows = append(rows, infoKV(key, snap.Diagnostics[key]))
+		}
+	}
+	if len(snap.Raw) > 0 {
+		rows = append(rows, WebDetailRow{Kind: "heading", Value: "Raw Data"})
+		rendered := make(map[string]bool)
+		for _, group := range widget.RawGroups {
+			for _, key := range group.Keys {
+				value := strings.TrimSpace(snap.Raw[key])
+				if value == "" || rendered[key] {
+					continue
+				}
+				rendered[key] = true
+				rows = append(rows, infoKV(key, value))
+			}
+		}
+		for _, key := range core.SortedStringKeys(snap.Raw) {
+			if rendered[key] || strings.HasSuffix(key, "_error") {
+				continue
+			}
+			if value := strings.TrimSpace(snap.Raw[key]); value != "" {
+				rows = append(rows, infoKV(key, value))
+			}
+		}
+	}
+	return rows
+}
+
+func infoKV(key, value string) WebDetailRow {
+	return WebDetailRow{Kind: "kv", Label: prettifyKey(key), Value: smartFormatValue(strings.TrimSpace(value))}
 }
 
 func rowsFromSectionLines(lines []string, isUsedMode bool) []WebDetailRow {

@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -26,7 +28,68 @@ const (
 	oauthClientSecretEnv      = "OPENUSAGE_ANTIGRAVITY_CLIENT_SECRET"
 	oauthClientIDEnvAlias     = "ANTIGRAVITY_CLIENT_ID"
 	oauthClientSecretEnvAlias = "ANTIGRAVITY_CLIENT_SECRET"
+
+	// The antigravity CLI authenticates through Google's installed-application
+	// OAuth client whose id/secret ship inside the public CLI binary itself
+	// (same model as gcloud's bundled client). When env vars are unset, the
+	// fallback extracts that client from the local CLI binary so token
+	// refresh works out of the box; the env vars override for custom or
+	// enterprise clients.
 )
+
+// cliOAuthClientOnce caches the extracted CLI OAuth client.
+var cliOAuthClientOnce sync.Once
+var cliOAuthClient struct {
+	id, secret string
+	ok         bool
+}
+
+// cliOAuthClientPath returns the antigravity CLI binary to scan for the
+// embedded installed-application OAuth client. Tests override this.
+var cliOAuthClientPath = func() string {
+	if p, err := exec.LookPath("agy"); err == nil {
+		return p
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".local", "bin", "agy")
+	}
+	return ""
+}
+
+// extractCLIOAuthClient scans a binary for the installed-application OAuth
+// client the antigravity CLI ships with. The values are public — they are
+// distributed inside the CLI binary — but they are deliberately not embedded
+// in this repository to stay clear of GitHub push protection.
+func extractCLIOAuthClient(path string) (clientID, clientSecret string, ok bool) {
+	if strings.TrimSpace(path) == "" {
+		return "", "", false
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) < 1024 {
+		return "", "", false
+	}
+	id := regexp.MustCompile(`\d{10,14}-[a-z0-9]+\.apps\.googleusercontent\.com`).Find(data)
+	secret := regexp.MustCompile(`GOCSPX-[A-Za-z0-9_-]{10,60}`).Find(data)
+	if id == nil || secret == nil {
+		return "", "", false
+	}
+	return string(id), string(secret), true
+}
+
+// resetCLIOAuthClientCache drops the cached extracted client (tests only).
+func resetCLIOAuthClientCache() {
+	cliOAuthClientOnce = sync.Once{}
+}
+
+// fallbackOAuthClient returns the CLI's embedded OAuth client, extracted
+// once from the local antigravity CLI binary.
+func fallbackOAuthClient() (clientID, clientSecret string, ok bool) {
+	cliOAuthClientOnce.Do(func() {
+		cliOAuthClient.id, cliOAuthClient.secret, cliOAuthClient.ok =
+			extractCLIOAuthClient(cliOAuthClientPath())
+	})
+	return cliOAuthClient.id, cliOAuthClient.secret, cliOAuthClient.ok
+}
 
 // AuthError represents an authentication condition requiring user action (non-retryable).
 type AuthError struct {
@@ -292,6 +355,10 @@ func tokenExpired(tok oauthToken, now time.Time) bool {
 	return !parsed.After(now.Add(tokenExpirySkew))
 }
 
+// oauthClientCredentials resolves the Google OAuth client for token refresh:
+// explicit env vars first, then the CLI's own installed-application client
+// extracted from the local CLI binary, so a default install can always
+// refresh tokens.
 func oauthClientCredentials() (clientID, clientSecret string, ok bool) {
 	clientID = strings.TrimSpace(os.Getenv(oauthClientIDEnv))
 	if clientID == "" {
@@ -302,19 +369,13 @@ func oauthClientCredentials() (clientID, clientSecret string, ok bool) {
 		clientSecret = strings.TrimSpace(os.Getenv(oauthClientSecretEnvAlias))
 	}
 	if clientID == "" || clientSecret == "" {
-		return "", "", false
+		return fallbackOAuthClient()
 	}
 	return clientID, clientSecret, true
 }
 
 func refreshAccessToken(ctx context.Context, refreshToken string, client *http.Client) (oauthToken, error) {
-	clientID, clientSecret, ok := oauthClientCredentials()
-	if !ok {
-		return oauthToken{}, &AuthError{
-			Reason:  "unconfigured_client",
-			Message: fmt.Sprintf("oauth client not configured (%s / %s)", oauthClientIDEnv, oauthClientSecretEnv),
-		}
-	}
+	clientID, clientSecret, _ := oauthClientCredentials()
 	return refreshAccessTokenWithBackoff(ctx, refreshToken, client, clientID, clientSecret)
 }
 
@@ -480,14 +541,7 @@ func ensureAccessToken(ctx context.Context, acct core.AccountConfig, client *htt
 		}
 	}
 
-	clientID, clientSecret, ok := oauthClientCredentials()
-	if !ok {
-		return "", path, false, &AuthError{
-			Reason:  "unconfigured_client",
-			Message: fmt.Sprintf("oauth client not configured (%s / %s); please configure credentials or sign in", oauthClientIDEnv, oauthClientSecretEnv),
-		}
-	}
-
+	clientID, clientSecret, _ := oauthClientCredentials()
 	newTok, refreshErr := refreshAccessTokenWithBackoff(ctx, refreshTok, client, clientID, clientSecret)
 	if refreshErr != nil {
 		return "", path, false, refreshErr

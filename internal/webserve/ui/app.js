@@ -463,6 +463,52 @@
     });
   })();
 
+  // Provider group drag-reorder: drag a group header onto another group
+  // header to reorder; the new order posts to /actions/provider-order and
+  // persists in a cookie. Survives htmx swaps via event delegation on body.
+  (function providerDrag() {
+    let dragged = null;
+
+    const orderFromDOM = () =>
+      [...document.querySelectorAll(".provider-group-box")]
+        .map((el) => el.querySelector(".provider-group-header")?.dataset.provider)
+        .filter(Boolean)
+        .filter((id, i, arr) => arr.indexOf(id) === i);
+
+    document.body.addEventListener("dragstart", (ev) => {
+      const header = ev.target.closest?.(".provider-group-header");
+      if (!header) return;
+      dragged = header;
+      header.closest(".provider-group-box")?.classList.add("dragging");
+      try { ev.dataTransfer.setData("text/plain", header.dataset.provider || ""); } catch {}
+      ev.dataTransfer.effectAllowed = "move";
+    });
+    document.body.addEventListener("dragover", (ev) => {
+      if (!dragged) return;
+      const header = ev.target.closest?.(".provider-group-header");
+      if (!header || header === dragged) return;
+      ev.preventDefault();
+      const a = dragged.closest(".provider-group-box");
+      const b = header.closest(".provider-group-box");
+      if (a && b && a.parentElement === b.parentElement && a !== b) {
+        const box = b.getBoundingClientRect();
+        const after = ev.clientY > box.top + box.height / 2;
+        b.parentNode.insertBefore(a, after ? b.nextSibling : b);
+      }
+    });
+    document.body.addEventListener("dragend", () => {
+      document.querySelectorAll(".provider-group-box.dragging").forEach((el) => el.classList.remove("dragging"));
+      const order = orderFromDOM();
+      dragged = null;
+      if (order.length < 2) return;
+      htmx.ajax("POST", "actions/provider-order", {
+        values: { order: order.join("|") },
+        target: "#app",
+        swap: "outerHTML",
+      });
+    });
+  })();
+
   ensureScrollContainer();
   syncTheme();
   syncFilter();

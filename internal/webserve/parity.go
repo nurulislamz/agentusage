@@ -189,7 +189,7 @@ func compareAccount(
 				if chunk == "" {
 					continue
 				}
-				if !strings.Contains(tuiDetail, chunk) {
+				if !strings.Contains(tuiDetail, chunk) && !tuiContainsTruncated(tuiDetail, chunk) {
 					issues = append(issues, ParityIssue{
 						AccountID: id, Field: "row",
 						Detail: fmt.Sprintf("web %s %q missing from TUI", row.Kind, truncate(chunk, 80)),
@@ -243,4 +243,22 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "…"
+}
+
+// tuiContainsTruncated reports whether the TUI detail contains a width-capped
+// version of chunk: the TUI info renderer truncates long values to
+// maxValW-3 + "..." at its render width, so an otherwise-identical value can
+// appear shortened. The check requires a meaningful prefix so truncated
+// matches still pin real TUI content.
+func tuiContainsTruncated(tuiDetail, chunk string) bool {
+	const minKeep = 8
+	for keep := len(chunk) - 1; keep >= minKeep; keep-- {
+		if !strings.Contains(tuiDetail, chunk[:keep]) {
+			continue
+		}
+		// Accept only when the TUI truncates right here (ellipsis follows).
+		rest := tuiDetail[strings.Index(tuiDetail, chunk[:keep])+keep:]
+		return strings.HasPrefix(rest, "...") || strings.HasPrefix(rest, "…")
+	}
+	return false
 }
