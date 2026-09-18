@@ -59,15 +59,16 @@ var templateFuncs = template.FuncMap{
 	"cockpitSpark": func(p []core.TimePoint) template.HTML {
 		return firstHTML(sparkLine(p, 180, 42), sparkBars(p, 180, 42))
 	},
-	"themeVars":       themeVarsCSS,
-	"timebandPill":    timebandPill,
-	"timebandLabel":   timebandLabel,
-	"cleanQuotaLabel": cleanQuotaLabel,
-	"cleanQuotaTitle": cleanQuotaTitle,
-	"barTone":         barTone,
-	"cleanHeroCycle":  cleanHeroCycle,
-	"cctx":            func(m renderModel, v renderView) cockpitCtx { return cockpitCtx{M: m, V: v} },
-	"cardctx":         func(m renderModel, c DetailCard) cardCtx { return cardCtx{M: m, Card: c} },
+	"themeVars":        themeVarsCSS,
+	"timebandPill":     timebandPill,
+	"timebandLabel":    timebandLabel,
+	"stripResetPrefix": stripResetPrefix,
+	"cleanQuotaLabel":  cleanQuotaLabel,
+	"cleanQuotaTitle":  cleanQuotaTitle,
+	"barTone":          barTone,
+	"cleanHeroCycle":   cleanHeroCycle,
+	"cctx":             func(m renderModel, v renderView) cockpitCtx { return cockpitCtx{M: m, V: v} },
+	"cardctx":          func(m renderModel, c DetailCard) cardCtx { return cardCtx{M: m, Card: c} },
 }
 
 var pageTemplates = template.Must(template.New("agentusage").Funcs(templateFuncs).ParseFS(templateFS, "templates/*.tmpl"))

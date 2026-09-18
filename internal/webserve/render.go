@@ -114,6 +114,10 @@ type bentoRow struct {
 	Tone     string
 	Caption  string
 	Depleted bool
+	// Reset is the time-until-reset for this specific quota window
+	// ("4h12m", "2d03h"), empty when the provider reports none.
+	Reset  string
+	Urgent bool
 }
 
 type gaugeGroup struct {
@@ -133,30 +137,28 @@ type renderGroup struct {
 
 type renderView struct {
 	AccountView
-	Index            int
-	Active           bool
-	Lines            []usageLine
-	Items            []usageItem
-	Tables           []usageItem
-	Graphs           []gaugeGroup
-	Depleted         bool
-	SummaryDisplay   string
-	ResetTitle       string
-	NextDisplay      string
-	Urgent           bool
-	MatrixLines      []usageLine
-	MatrixCells      []*usageLine
-	BentoRows        []bentoRow
-	Meters           []usageLine
-	Timers           []ResetPill
-	Cards            []DetailCard
-	HasTimerFallback bool
-	FirstTone        string
-	TrendStats       []usageItem
-	RefreshedText    string
-	Expanded         bool
-	Position         int
-	Total            int
+	Index          int
+	Active         bool
+	Lines          []usageLine
+	Items          []usageItem
+	Tables         []usageItem
+	Graphs         []gaugeGroup
+	Depleted       bool
+	SummaryDisplay string
+	ResetTitle     string
+	NextDisplay    string
+	Urgent         bool
+	MatrixLines    []usageLine
+	MatrixCells    []*usageLine
+	BentoRows      []bentoRow
+	Meters         []usageLine
+	Cards          []DetailCard
+	FirstTone      string
+	TrendStats     []usageItem
+	RefreshedText  string
+	Expanded       bool
+	Position       int
+	Total          int
 
 	// Cockpit hero strip, filled from real account data.
 	HeroAccountID   string
@@ -459,20 +461,23 @@ func buildRenderView(v AccountView, index int, used bool, now time.Time) renderV
 	if strings.EqualFold(strings.TrimSpace(v.TagLabel), "usage") {
 		v.TagLabel = ""
 	}
-	lines := buildUsageLines(v, used)
-	for i := range lines {
-		if lines[i].Pct != nil {
-			lines[i].Depleted = isDepleted(*lines[i].Pct, used)
-			if lines[i].Caption == "" {
-				lines[i].Caption = percentCaption(*lines[i].Pct, used)
+	fullLines := buildUsageLines(v, used)
+	for i := range fullLines {
+		if fullLines[i].Pct != nil {
+			fullLines[i].Depleted = isDepleted(*fullLines[i].Pct, used)
+			if fullLines[i].Caption == "" {
+				fullLines[i].Caption = percentCaption(*fullLines[i].Pct, used)
 			}
 		}
 	}
+	// Board projections share one collapsed set: one bar per quota window so
+	// bars/dials/strips/matrix/bento never duplicate a window.
+	lines := collapseUsageLines(v, fullLines, used)
 	items := buildUsageItems(v, lines, used)
 	rv := renderView{
 		AccountView:   v,
 		Index:         index,
-		Lines:         lines,
+		Lines:         fullLines,
 		Items:         items,
 		Tables:        tableItems(items),
 		Graphs:        graphGroups(items, v.ProviderID),
@@ -495,12 +500,10 @@ func buildRenderView(v AccountView, index int, used bool, now time.Time) renderV
 		}
 	}
 	rv.SummaryDisplay = summaryDisplay(v.Summary)
-	rv.MatrixLines = matrixLines(v, lines)
+	rv.MatrixLines = matrixLines(v, lines, used)
 	rv.MatrixCells = matrixCells(rv.MatrixLines)
-	rv.BentoRows = bentoRows(lines)
-	rv.Timers = timerRows(v)
+	rv.BentoRows = bentoRows(lines, used)
 	rv.Cards = extraCards(v)
-	rv.HasTimerFallback = len(rv.Timers) == 0 && strings.TrimSpace(v.NextReset) != ""
 	rv.Meters = firstN(lines, 2)
 	rv.TrendStats = trendStats(v.DailyCost)
 	worstTone := "ok"
@@ -1265,44 +1268,68 @@ func summaryDisplay(summary string) string {
 	return s
 }
 
-func matrixLines(v AccountView, lines []usageLine) []usageLine {
-	if v.ProviderID == "antigravity" {
-		firstGroup := ""
-		for _, l := range lines {
-			if !isCannotRenderError(l.Label) && !isCannotRenderError(l.Value) && !isCannotRenderError(l.Short) {
-				firstGroup = l.Group
-				break
-			}
-		}
-		var out []usageLine
-		for _, l := range lines {
-			if isCannotRenderError(l.Label) || isCannotRenderError(l.Value) || isCannotRenderError(l.Short) {
-				continue
-			}
-			if l.Group != firstGroup {
-				continue
-			}
-			out = append(out, l)
-			if len(out) == 2 {
-				break
-			}
-		}
-		return out
-	}
-	seen := map[string]bool{}
-	var out []usageLine
+// collapseUsageLines reduces usage lines to one row per quota window. It is
+// the single collapse for every board projection (matrix, bento, bars,
+// dials, strips): antigravity's Gemini + Claude "5-Hour Limit" siblings
+// collapse to the tightest window; cursor's Included/Auto/API plan buckets
+// are one monthly usage limit; distinct windows stay separate.
+func collapseUsageLines(v AccountView, lines []usageLine, used bool) []usageLine {
+	order := []string{}
+	byWindow := map[string]int{}
 	for _, l := range lines {
 		if isCannotRenderError(l.Label) || isCannotRenderError(l.Value) || isCannotRenderError(l.Short) {
 			continue
 		}
-		k := strings.ToLower(strings.TrimSpace(firstNonEmpty(l.Short, l.Label)))
-		if k == "" || seen[k] {
+		key := bentoWindowKey(l, v.ProviderID)
+		if _, ok := byWindow[key]; !ok {
+			byWindow[key] = len(order)
+			order = append(order, key)
+		}
+	}
+	rows := make([]usageLine, len(order))
+	resets := make([]string, len(order))
+	urgents := make([]bool, len(order))
+	taken := make([]bool, len(order))
+	for _, l := range lines {
+		if isCannotRenderError(l.Label) || isCannotRenderError(l.Value) || isCannotRenderError(l.Short) {
 			continue
 		}
-		seen[k] = true
+		i := byWindow[bentoWindowKey(l, v.ProviderID)]
+		reset := stripResetPrefix(l.ResetIn)
+		if !taken[i] {
+			rows[i], resets[i], urgents[i], taken[i] = l, reset, l.Urgent, true
+			continue
+		}
+		// Collapse duplicates: keep the tighter bar (mode-aware) but merge the
+		// reset/urgent signal so the per-window chip still renders.
+		if cur := rows[i]; cur.Pct != nil && l.Pct != nil && isTighter(*l.Pct, *cur.Pct, used) {
+			rows[i] = l
+		}
+		resets[i] = firstNonEmpty(resets[i], reset)
+		urgents[i] = urgents[i] || l.Urgent
+	}
+	out := make([]usageLine, 0, len(order))
+	for i := range order {
+		if !taken[i] {
+			continue
+		}
+		l := rows[i]
+		if l.ResetIn == "" {
+			l.ResetIn = resets[i]
+		}
+		l.Urgent = urgents[i]
+		if strings.EqualFold(strings.TrimSpace(v.ProviderID), "cursor") {
+			// Cursor works off a single monthly usage limit; give the
+			// surviving row one clear name instead of the plan-bucket label.
+			l.Label, l.Short = "Monthly Usage Limit", "30d"
+		}
 		out = append(out, l)
 	}
 	return out
+}
+
+func matrixLines(v AccountView, lines []usageLine, used bool) []usageLine {
+	return firstN(collapseUsageLines(v, lines, used), 3)
 }
 
 // ---------------------------------------------------------------------------
@@ -1548,65 +1575,54 @@ func matrixCells(lines []usageLine) []*usageLine {
 	return cells
 }
 
-func bentoRows(lines []usageLine) []bentoRow {
-	counts := map[string]int{}
-	for _, l := range lines {
-		if isCannotRenderError(l.Label) || isCannotRenderError(l.Value) || isCannotRenderError(l.Short) {
-			continue
-		}
-		counts[strings.ToLower(firstNonEmpty(l.Short, l.Label))]++
-	}
+// bentoRows projects the collapsed board lines into bento tile rows; the
+// window collapse itself lives in collapseUsageLines.
+func bentoRows(lines []usageLine, used bool) []bentoRow {
+	collapsed := collapseUsageLines(AccountView{}, lines, used)
 	out := make([]bentoRow, 0, 3)
-	for _, l := range lines {
-		if isCannotRenderError(l.Label) || isCannotRenderError(l.Value) || isCannotRenderError(l.Short) {
-			continue
-		}
+	for _, l := range collapsed {
 		if len(out) == 3 {
 			break
 		}
-		raw := firstNonEmpty(l.Short, l.Label)
-		display := raw
-		if counts[strings.ToLower(raw)] > 1 && l.Group != "" {
-			group := strings.ToLower(l.Group)
-			switch {
-			case strings.Contains(group, "gemini"):
-				display = "G-" + raw
-			case containsAny(group, "claude", "gpt", "opus", "sonnet"):
-				display = "C-" + raw
-			default:
-				prefix := group
-				if len(prefix) > 3 {
-					prefix = prefix[:3]
-				}
-				display = strings.ToUpper(prefix) + "-" + raw
-			}
-		}
-		out = append(out, bentoRow{Label: display, Pct: l.Pct, Value: l.Value, Tone: l.Tone, Caption: l.Caption, Depleted: l.Depleted})
+		out = append(out, bentoRow{
+			Label:    l.Label,
+			Pct:      l.Pct,
+			Value:    l.Value,
+			Tone:     l.Tone,
+			Caption:  l.Caption,
+			Depleted: l.Depleted,
+			Reset:    stripResetPrefix(l.ResetIn),
+			Urgent:   l.Urgent,
+		})
 	}
 	return out
 }
 
-func timerRows(v AccountView) []ResetPill {
-	var out []ResetPill
-	seen := make(map[string]bool)
-	for _, r := range v.Resets {
-		dur := stripResetPrefix(r.Duration)
-		if dur == "" {
-			continue
-		}
-		label := strings.TrimSpace(r.Label)
-		key := strings.ToLower(label + "|" + dur)
-		if label == "" {
-			key = strings.ToLower(dur)
-		}
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		r.Duration = dur
-		out = append(out, r)
+// bentoWindowKey buckets a usage line by quota window so duplicate bars from
+// sibling model families collapse into a single tile row. Cursor works off a
+// single monthly usage limit, so all of its plan buckets (Included / Auto /
+// API) share one "monthly" key.
+func bentoWindowKey(l usageLine, providerID string) string {
+	if strings.EqualFold(strings.TrimSpace(providerID), "cursor") {
+		return "monthly"
 	}
-	return out
+	// Short + Label only: Hint carries reset countdowns ("Resets in 15h 52m")
+	// whose durations would falsely match window keywords ("15h" → "5h").
+	s := normalizeWindowText(l.Short + " " + l.Label)
+	switch {
+	case containsAny(s, "five hour", "5 hour", "5h", "rolling"):
+		return "5h"
+	case containsAny(s, "week", "7d", "seven day"):
+		return "week"
+	case containsAny(s, "month", "30d", "monthly"):
+		return "30d"
+	case containsAny(s, "day", "daily", "today"):
+		return "day"
+	case strings.Contains(s, "session"):
+		return "session"
+	}
+	// Distinct buckets (Included/Auto/API, model names) key on the identity.
+	return strings.ToLower(strings.TrimSpace(firstNonEmpty(l.Short, l.Label)))
 }
 
 func isInternalTelemetryRow(row DetailRow) bool {
@@ -1701,16 +1717,9 @@ func arcResetText(it usageItem) string {
 	if it.Kind == "rel" {
 		return it.Value
 	}
-	if s := resetCaption(it.ResetIn); s != "" {
-		return s
-	}
-	if it.Display != "" {
-		return it.Display
-	}
-	if it.Pct != nil && !it.Depleted {
-		return percentCaption(*it.Pct, it.Mode == "used")
-	}
-	return ""
+	// The reset slot shows only reset countdowns; usage captions live in the
+	// dial hub, and accounts without reset data show an em dash.
+	return resetCaption(it.ResetIn)
 }
 
 func stripOverlay(it usageItem) string {
@@ -1732,9 +1741,6 @@ func stripResetText(it usageItem) string {
 	}
 	if s := stripResetPrefix(it.ResetIn); s != "" {
 		return s
-	}
-	if it.Display != "" {
-		return it.Display
 	}
 	return "—"
 }
@@ -2148,11 +2154,11 @@ func timebandPill(it usageItem) string {
 func timebandLabel(label string) string {
 	s := strings.ToLower(label)
 	switch {
-	case strings.Contains(s, "5h") || strings.Contains(s, "5 hour") || strings.Contains(s, "5-hour"):
+	case strings.Contains(s, "5h") || strings.Contains(s, "5 hour") || strings.Contains(s, "5-hour") || strings.Contains(s, "five hour"):
 		return "5h"
 	case strings.Contains(s, "24h") || strings.Contains(s, "daily") || strings.Contains(s, "today"):
 		return "24h"
-	case strings.Contains(s, "7d") || strings.Contains(s, "weekly") || strings.Contains(s, "7 day"):
+	case strings.Contains(s, "7d") || strings.Contains(s, "weekly") || strings.Contains(s, "7 day") || strings.Contains(s, "week"):
 		return "7d"
 	case strings.Contains(s, "30d") || strings.Contains(s, "month"):
 		return "30d"

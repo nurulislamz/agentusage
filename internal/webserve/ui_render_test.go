@@ -449,8 +449,8 @@ func TestAppFragmentHonorsStoredCookies(t *testing.T) {
 	if !strings.Contains(body, `data-layout="matrix"`) || !strings.Contains(body, `class="matrix-table"`) {
 		t.Error("stored layout cookie should drive the rendered layout")
 	}
-	if !strings.Contains(body, `class="layout-btn active" data-layout="matrix"`) {
-		t.Error("stored layout should be marked active in the header")
+	if !strings.Contains(body, `id="footer-btn-layout"`) || !strings.Contains(body, "Matrix") {
+		t.Error("stored layout should be reflected by the footer views button label")
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/partial/app", nil)
@@ -744,33 +744,6 @@ func TestNonPercentageQuotaCalculations(t *testing.T) {
 			t.Errorf("table should not render orphan 'In' header")
 		}
 	})
-}
-
-func TestLayoutBtnActiveContrast(t *testing.T) {
-	srv := testServer(t, Options{Demo: true})
-	w := getHTML(t, srv, "/app.css")
-	if w.Code != http.StatusOK {
-		t.Fatalf("app.css status = %d", w.Code)
-	}
-	css := w.Body.String()
-
-	if !strings.Contains(css, ".layout-btn.active") {
-		t.Fatal("app.css missing .layout-btn.active")
-	}
-
-	for _, want := range []string{
-		"var(--fg",
-		"var(--bg",
-		"font-weight: 600",
-	} {
-		if !strings.Contains(css, want) {
-			t.Errorf("app.css .layout-btn.active missing expected high-contrast token/property %q", want)
-		}
-	}
-
-	if strings.Contains(css, ".layout-btn.active { background: var(--surface2); color: #ffffff;") {
-		t.Errorf("app.css should not use low-contrast #ffffff on var(--surface2) for .layout-btn.active")
-	}
 }
 
 func TestFilterNoMatch_PreservesAppShell(t *testing.T) {
@@ -1137,11 +1110,11 @@ func TestQuietDockControlSurfaces(t *testing.T) {
 		`id="footer-btn-mode"`,
 		`id="footer-btn-refresh"`,
 		`id="footer-btn-refresh-all"`,
+		`id="footer-btn-layout"`,
 		`id="footer-btn-providers"`,
 		`id="footer-btn-keys"`,
 		`id="footer-theme-select"`,
 		`class="header-count"`,
-		`class="layout-btn active" data-layout=`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("rendered fragment missing %q", want)
@@ -1160,7 +1133,6 @@ func TestQuietDockControlSurfaces(t *testing.T) {
 		"status-tag",
 		"header-meta",
 		"footer-btn-filter",
-		"footer-btn-layout",
 		`class="footer-right"`,
 	} {
 		if strings.Contains(html, banned) {
@@ -1194,7 +1166,6 @@ func TestQuietDockControlSurfaces(t *testing.T) {
 		".footer-btn {",
 		".footer-theme-select {",
 		".fleet-note {",
-		".layout-btn.active",
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css missing footer rule %q", want)
@@ -1344,4 +1315,229 @@ func TestCockpit_ExhaustedQuotaRendersLimitReached(t *testing.T) {
 	if !strings.Contains(remHTML, "Limit reached") {
 		t.Error("cursor 0% remaining must render the 'Limit reached' caption")
 	}
+}
+
+// TestBentoRows_CollapseDuplicateWindows pins the bento glance contract: one bar per
+// quota window. Providers that emit sibling model rows for the same window (antigravity
+// Gemini flash + pro "5-Hour Limit") collapse to the tightest bar, and the per-window
+// reset chip survives the collapse. Distinct plan buckets (Included/Auto/API) stay
+// separate, and at most three bars render.
+func TestBentoRows_CollapseDuplicateWindows(t *testing.T) {
+	tests := []struct {
+		name      string
+		used      bool
+		lines     []usageLine
+		wantRows  int
+		wantReset map[int]string
+		wantPct   map[int]float64
+	}{
+		{
+			name: "antigravity duplicate 5h collapses to tightest with reset",
+			lines: []usageLine{
+				{Label: "5-Hour Limit", Short: "5h", Group: "Gemini", Pct: f64(35), ResetIn: "4h12m"},
+				{Label: "5-Hour Limit", Short: "5h", Group: "Claude / GPT", Pct: f64(65)},
+				{Label: "Week", Short: "wk", Group: "Gemini", Pct: f64(10), ResetIn: "2d03h"},
+			},
+			used:      true,
+			wantRows:  2,
+			wantPct:   map[int]float64{0: 65, 1: 10},
+			wantReset: map[int]string{0: "4h12m", 1: "2d03h"},
+		},
+		{
+			name: "distinct plan buckets keep three rows",
+			lines: []usageLine{
+				{Label: "Included", Short: "Included", Pct: f64(100), ResetIn: "9d14h"},
+				{Label: "Auto", Short: "Auto", Pct: f64(41), ResetIn: "9d14h"},
+				{Label: "API", Short: "API", Pct: f64(0), ResetIn: "9d14h"},
+			},
+			wantRows: 3,
+		},
+		{
+			name: "duplicate collapse merges urgent and reset across siblings",
+			lines: []usageLine{
+				{Label: "5-Hour Limit", Short: "5h", Pct: f64(90), Urgent: true, ResetIn: "20m"},
+				{Label: "5-Hour Limit", Short: "5h", Pct: f64(10), ResetIn: "4h"},
+			},
+			used:      true,
+			wantRows:  1,
+			wantPct:   map[int]float64{0: 90},
+			wantReset: map[int]string{0: "20m"},
+		},
+		{
+			name: "duplicate without reset inherits sibling reset",
+			lines: []usageLine{
+				{Label: "Week", Short: "wk", Pct: f64(0)},
+				{Label: "Week", Short: "wk", Pct: f64(5), ResetIn: "1d02h"},
+			},
+			used:      true,
+			wantRows:  1,
+			wantPct:   map[int]float64{0: 5},
+			wantReset: map[int]string{0: "1d02h"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rows := bentoRows(tc.lines, tc.used)
+			if len(rows) != tc.wantRows {
+				t.Fatalf("bentoRows len = %d, want %d", len(rows), tc.wantRows)
+			}
+			for i, want := range tc.wantPct {
+				if rows[i].Pct == nil || *rows[i].Pct != want {
+					t.Errorf("row %d pct = %v, want %v", i, rows[i].Pct, want)
+				}
+			}
+			for i, want := range tc.wantReset {
+				if rows[i].Reset != want {
+					t.Errorf("row %d reset = %q, want %q", i, rows[i].Reset, want)
+				}
+			}
+		})
+	}
+}
+
+// TestBentoTile_RendersPerWindowResetChips proves the bento tile shows one reset
+// timer per quota window row, not a single foot-level hint.
+func TestBentoTile_RendersPerWindowResetChips(t *testing.T) {
+	env := Envelope{
+		Views: []AccountView{
+			{
+				Key: "oc", ProviderID: "opencode", ProviderName: "OpenCode",
+				AccountID: "opencode-nurulz", Status: "OK", StatusBadge: "OK",
+				UsageLines: []UsageLine{
+					{Label: "Five Hour Limit", Short: "5h", Percent: f64(1), Tone: "ok", ResetIn: "4h46m"},
+					{Label: "Week", Short: "wk", Percent: f64(7), Tone: "ok", ResetIn: "2d13h"},
+				},
+			},
+		},
+	}
+	html := renderFragment(t, env, renderInput{Layout: "bento"})
+	if got := strings.Count(html, `class="bento-row-reset`); got != 2 {
+		t.Errorf("bento tile reset chips = %d, want 2 (one per window)", got)
+	}
+	if !strings.Contains(html, `>4h46m</span>`) {
+		t.Error("bento tile missing 5h window reset chip 4h46m")
+	}
+	if !strings.Contains(html, `>2d13h</span>`) {
+		t.Error("bento tile missing weekly window reset chip 2d13h")
+	}
+}
+
+// TestTimebandLabel_FiveHourSpelledOut pins the pill for spelled-out window names
+// ("Five Hour Limit") so bento tiles label the 5h window correctly.
+func TestTimebandLabel_FiveHourSpelledOut(t *testing.T) {
+	cases := map[string]string{
+		"Five Hour Limit": "5h",
+		"5-Hour Limit":    "5h",
+		"Weekly Limit":    "7d",
+		"Week":            "7d",
+		"Monthly Limit":   "30d",
+		"Month":           "30d",
+	}
+	for in, want := range cases {
+		if got := timebandLabel(in); got != want {
+			t.Errorf("timebandLabel(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestMatrixLines_CollapseDuplicateWindows pins the matrix roster contract: one quota
+// column per window (antigravity's sibling "5-Hour Limit" rows collapse to the tightest),
+// with the per-window reset carried so the cell chip can render.
+func TestMatrixLines_CollapseDuplicateWindows(t *testing.T) {
+	v := AccountView{ProviderID: "antigravity", AccountID: "antigravity-x"}
+	lines := []usageLine{
+		{Label: "5-Hour Limit", Short: "5h", Group: "Gemini", Pct: f64(35), ResetIn: "4h12m"},
+		{Label: "5-Hour Limit", Short: "5h", Group: "Claude / GPT", Pct: f64(65)},
+		{Label: "Week", Short: "wk", Group: "Gemini", Pct: f64(10), ResetIn: "2d03h"},
+	}
+	out := matrixLines(v, lines, true)
+	if len(out) != 2 {
+		t.Fatalf("matrixLines len = %d, want 2 (5h + weekly)", len(out))
+	}
+	if out[0].Pct == nil || *out[0].Pct != 65 {
+		t.Errorf("collapsed 5h pct = %v, want 65 (tightest used)", out[0].Pct)
+	}
+	if out[0].ResetIn != "4h12m" {
+		t.Errorf("collapsed 5h ResetIn = %q, want 4h12m (merged from sibling)", out[0].ResetIn)
+	}
+	if out[1].Label != "Week" {
+		t.Errorf("second row = %q, want Week", out[1].Label)
+	}
+
+	cursor := []usageLine{
+		{Label: "Included", Short: "Included", Pct: f64(100)},
+		{Label: "Auto", Short: "Auto", Pct: f64(41)},
+		{Label: "API", Short: "API", Pct: f64(0)},
+	}
+	if out := matrixLines(v, cursor, true); len(out) != 3 {
+		t.Errorf("distinct plan buckets collapsed: got %d rows, want 3", len(out))
+	}
+}
+
+// TestMatrixRow_ShowsPerWindowResetChips proves each matrix quota cell carries its
+// window's reset timer (5h / weekly / monthly), not just the single NEXT RESET column.
+func TestMatrixRow_ShowsPerWindowResetChips(t *testing.T) {
+	env := Envelope{
+		Views: []AccountView{
+			{
+				Key: "oc", ProviderID: "opencode", ProviderName: "OpenCode",
+				AccountID: "opencode-nurulz", Status: "OK", StatusBadge: "OK",
+				UsageLines: []UsageLine{
+					{Label: "Five Hour Limit", Short: "5h", Percent: f64(1), Tone: "ok", ResetIn: "4h46m"},
+					{Label: "Week", Short: "wk", Percent: f64(7), Tone: "ok", ResetIn: "2d13h"},
+					{Label: "Month", Short: "mo", Percent: f64(47), Tone: "ok", ResetIn: "6d1h"},
+				},
+			},
+		},
+	}
+	html := renderFragment(t, env, renderInput{Layout: "matrix"})
+	if got := strings.Count(html, `class="matrix-cell-reset`); got != 3 {
+		t.Errorf("matrix row reset chips = %d, want 3 (one per window)", got)
+	}
+	for _, want := range []string{">4h46m<", ">2d13h<", ">6d1h<"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("matrix missing per-window reset chip %q", want)
+		}
+	}
+}
+
+func TestMatrixLines_SpendLineWithDollarLabelSurvives(t *testing.T) {
+	v := AccountView{ProviderID: "command_code", AccountID: "command_code"}
+	lines := []usageLine{
+		{Label: "Five Hour Limit Used ($0.00 / $14.00 used)", Short: "5h", Pct: f64(0), Value: "$0.00 / $14.00 used", Tone: "ok"},
+		{Label: "Weekly Limit Used ($4.96 / $35.00 used)", Short: "7d", Pct: f64(14), ResetIn: "15h54m"},
+		{Label: "Monthly Subscription Used ($69.88 / $70.00 used)", Short: "30d", Pct: f64(100), ResetIn: "4d13h", Depleted: true},
+	}
+	out := matrixLines(v, lines, true)
+	if len(out) != 3 {
+		t.Fatalf("matrixLines len = %d, want 3; rows: %+v", len(out), out)
+	}
+	if out[0].Short != "5h" {
+		t.Errorf("first row Short = %q, want 5h", out[0].Short)
+	}
+}
+
+func TestMatrixLines_ExactLiveCommandCodeLines(t *testing.T) {
+	v := AccountView{ProviderID: "command_code", AccountID: "command_code"}
+	lines := []usageLine{
+		{Label: "Five Hour Limit Used ($0.00 / $14.00 used)", Short: "5h", Pct: f64(0), Tone: "ok"},
+		{Label: "Weekly Limit Used ($4.96 / $35.00 used)", Short: "Week", Pct: f64(14.16), ResetIn: "15h52m", Hint: "⏱ Resets in 15h 52m"},
+		{Label: "Monthly Subscription Used ($69.88 / $70.00 used)", Short: "Month", Pct: f64(99.83), ResetIn: "4d13h", Group: "Subscription", Hint: "⏱ Resets in 4d 13h", Depleted: true},
+	}
+	out := matrixLines(v, lines, true)
+	if len(out) != 3 {
+		t.Fatalf("matrixLines len = %d, want 3; got shorts: %v", len(out), shortsOf(out))
+	}
+	if len(bentoRows(lines, true)) != 3 {
+		t.Fatalf("bentoRows len = %d, want 3; got shorts: %v", len(bentoRows(lines, true)), shortsOf(lines))
+	}
+}
+
+func shortsOf(lines []usageLine) []string {
+	out := make([]string, len(lines))
+	for i, l := range lines {
+		out[i] = l.Short
+	}
+	return out
 }
