@@ -353,6 +353,32 @@ Fresh Friday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **34
 
 Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage) v20.0.21–22 / #1753 #1677; [github.com/robinebers/openusage](https://github.com/robinebers/openusage) v0.7.12 / v0.7.13-beta.1; [github.com/getagentseal/codeburn](https://github.com/getagentseal/codeburn) #1469 #1436 #1472; [github.com/junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) #1346; [github.com/Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar); [github.com/CodeZeno/Claude-Code-Usage-Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Monitor); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [langfuse.com migrate-from-helicone](https://langfuse.com/resources/engineering/migrate-from-helicone); GitHub API star/push metadata 2026-09-18 (Europe/London).
 
+### Update 2026-09-19
+
+Fresh Saturday scrape (Europe/London). Twin-risk with OpenUsage.sh unchanged; **34/35 homepage vs 36 README** count drift still live. Material day moves: **ccusage v20.0.23** (Claude copied-request dedupe); **TokenBar v1.19.0 / v1.19.1** (hide unset provider tabs + merge Antigravity IDE/CLI + quota-lens history keep); **codeburn** ships **ZCode (z.ai) live quota**; **CodeZeno** jumped **v2.11.29 → v2.12.37** (widget drag/dock + Claude desktop usage restore).
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **~199★**, +2) | Homepage still **“34 providers, and counting.”**; README still **36**. Last pushes still **deps/CI only** (2026-09-14); last product code still Sun Codex 0.153+ fixes. | **Nearest twin** — category definition still ~1:1. Copy smell persists; no product surface move. |
+| [ccusage](https://github.com/ccusage/ccusage) / [ccusage.com](https://ccusage.com/) (**~18.6k★** / 18,624; +~10) | **v20.0.23** (18 Sep ~13:40 BST): **claude** dedupe copied requests across sessions (#1765). Still no Cursor in official source list. | Best **log-history / cost-report** OSS peer; thinner live quota/rate-limit TUI + key autodetection. |
+| [Splitrail](https://github.com/Piebald-AI/splitrail) (**~223★**, flat) | Last product commit still **2026-09-11** (Grok 4.6 pricing). Quiet eighth day. | #2 local “live monitor” peer — multi-day quiet. |
+| [AIUsage](https://github.com/juliantanx/aiusage) (**~129★**, flat) | Still **v1.5.17** + Wed’s CodeBuddy `function_call` undercount fix (#65). Quiet since. | Rising local peer + **name collision** (AIUsage vs agentUsage). |
+| [openusage.ai](https://github.com/robinebers/openusage) (**~4.2k★** / 4,198; +~2) | Still on **v0.7.12** + **v0.7.13-beta.1** (Thu Codex Swap). Saturday pushes are quiet / non-product. | Naming collision only — do not conflate with openusage.sh; still the louder star graph. |
+| Vendor UIs | **Cursor:** Spending + Usage still split. **Claude Code:** `/usage` + `/cost` unchanged. **OpenRouter:** Activity / credits still API-platform-only. | Fragmentation OpenUsage/agentUsage claim to fix. |
+| Helicone / Langfuse / LiteLLM | **Helicone** (~6.2k★ / 6,164): quiet since 16 Sep; Langfuse migrate-from-Helicone still frames **maintenance mode**. **Langfuse** (~34.8k★ / 34,800, pushed overnight). **LiteLLM** (~59.1k★ / 59,129, **pushed today**). | Adjacent layers — prefer Langfuse/LiteLLM for new gateway/OTel work; Helicone still migrate-away adjacent. |
+| Also watch (local peers) | [getagentseal/codeburn](https://github.com/getagentseal/codeburn) (~11.1k★ / 11,094; **shipping overnight**) — **ZCode (z.ai coding plan) live quota** in Plans sidebar + `codeburn quota` (#1347); plus $0-priced usage naming / Warp FDA freeze / Grok Bot quota harden (#1487–#1491). [Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar) (~359★; **v1.19.0** 18 Sep night + **v1.19.1** 19 Sep ~03:29 BST) — hide tabs for unset providers; merge Antigravity IDE+CLI into one tab; Quota lens keeps on-screen history when a refresh returns empty (#348/#349/#356). [CodeZeno/Claude-Code-Usage-Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Monitor) (~496★; **v2.12.37**, was **v2.11.29**) — free-drag widget + magnetic dock + Claude desktop-login usage restore (#104) across ~22 commits. [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) (~5.5k★ / 5,486) — quiet since overnight Copilot CLI `session-store.db` parser (#1346). [ItsJazii/pane](https://github.com/ItsJazii/pane) (~52★, +1). | TokenBar + CodeZeno + codeburn ZCode = highest-velocity adjacent movers overnight; tokscale flat after Fri Copilot CLI ship. |
+
+**Positioning refresh**
+- **OpenUsage.sh** = primary collision (34/35/36 + Antigravity README; deps-only since Sun product fixes).
+- **ccusage** = report/parser standard (v20.0.23 Claude copied-request dedupe on top of Thu’s Luna / Antigravity / Copilot wave).
+- **Splitrail** = #2 live local peer (flat/quiet since Fri 11 Sep).
+- **juliantanx/aiusage** = local multi-tool dashboard peer + name collision.
+- **openusage.ai** = menu-bar naming collision (Codex Swap still latest tagged).
+- **TokenBar / CodeZeno / codeburn** = highest-velocity adjacent local apps overnight (provider-tab UX; widget dock + Claude desktop; ZCode live quota).
+- Keep Langfuse / LiteLLM as complementary observability/gateway spend; treat **Helicone as maintenance-mode / migrate-away** adjacent.
+
+Sources: [openusage.sh](https://openusage.sh/); [github.com/janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [github.com/ccusage/ccusage](https://github.com/ccusage/ccusage) v20.0.23 / #1765; [github.com/robinebers/openusage](https://github.com/robinebers/openusage); [github.com/getagentseal/codeburn](https://github.com/getagentseal/codeburn) #1347; [github.com/Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar) v1.19.0 / v1.19.1; [github.com/CodeZeno/Claude-Code-Usage-Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Monitor) v2.12.37; [github.com/junhoyeo/tokscale](https://github.com/junhoyeo/tokscale); [github.com/Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail); [langfuse.com migrate-from-helicone](https://langfuse.com/resources/engineering/migrate-from-helicone); GitHub API star/push metadata 2026-09-19 (Europe/London).
+
 ## Open source
 
 ### Seeded 2026-09-04
