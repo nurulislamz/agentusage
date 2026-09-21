@@ -1041,3 +1041,53 @@ Fresh Sunday GitHub API pass (Europe/London). Category still owned by **ccusage*
 **Build takeaways:** Stay ccusage-compatible (**v20.0.23**); differentiate on live quotas + auto-detect + UX vs openusage.sh. Today's sharpest signals: **codeburn Windows menu bar / Capacity Dock + WSL roots**, **CodeZeno v2.12.39**, **toktrack archived Codex sessions**, **loongsuite-pilot multimodal/env homes**. Treat CPA-Manager-Plus as gateway-ops adjacency. Keep Langfuse/LiteLLM/Helicone complementary.
 
 Sources: GitHub API 2026-09-20 (Europe/London).
+
+### Open source — 21 Sep 2026
+
+Fresh Monday GitHub API pass (Europe/London). Category still owned by **ccusage** + the two OpenUsage brands; **codeburn** remains the loud multi-tool local tracker. **Live today:** `Nanako0129/TokenBar` (**v1.20.0** — history-row token hover + unwritable-history repair), `CodeZeno/Claude-Code-Usage-Monitor` (**v2.12.42**, climbed from Sunday’s v2.12.39, **~501★**), `ItsJazii/pane` (**v0.4.53** — weekly-limit reset notify + star prompt), `mag123c/toktrack` (**v2.17.3** — collapse byte-identical `token_count` re-emissions), `getagentseal/codeburn` (**0.9.25** correctness/energy/menu-bar/installer fixes on top of Windows Capacity Dock), `ccusage/ccusage` (continuous **models.dev** pricing snapshots — still **v20.0.23**, ~18.7k★), `alibaba/loongsuite-pilot` (**~189★**, **+2★** — prefer Codex provider response id), `semantic-craft/iOS-vibebuddy` (**v1.3.25**). openusage.ai quiet after beta; otelite still **v0.1.153**; Helicone quiet since 16 Sep.
+
+| Repo | Stars | License | Why it matters |
+|---|---:|---|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.7k | NOASSERTION | **v20.0.23** + live pricing snapshots today — stay format-compatible. |
+| [getagentseal/codeburn](https://github.com/getagentseal/codeburn) | ~11.1k | MIT | **0.9.25** — correctness/energy/menu-bar/installer fixes after Windows Capacity Dock plugins. |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.2k | MIT | openusage.ai menu-bar — Codex Swap / **v0.7.13-beta.1** still freshest multi-account UX. |
+| [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage) | ~200 | MIT | openusage.sh local multi-tool TUI + SQLite — nearest product twin (deps bumps today). |
+| [ItsJazii/pane](https://github.com/ItsJazii/pane) | ~52 | NOASSERTION | **v0.4.53 today** — weekly limit reset notify + star prompt — Windows tray OpenUsage port. |
+| [Maciek-roboblog/Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor) | ~8.7k | MIT | Real-time Claude Code usage monitor with predictions/warnings. |
+| [HermannBjorgvin/Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter) | ~2.2k | (check) | ESP32 desk dashboard — C6 AMOLED IMU auto-rotation still the recent hardware win. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~223 | MIT | Real-time cross-agent cost monitor. |
+| [juliantanx/aiusage](https://github.com/juliantanx/aiusage) | ~129 | MIT | Still **1.5.18** — CodeBuddy CLI per-request usage. |
+| [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) | ~5.5k | MIT | **Pushed today** — Xiaomi MiMo desktop sessions split from MiMo Code + stream-json parse. |
+| [Iamshankhadeep/ccseva](https://github.com/Iamshankhadeep/ccseva) | ~808 | MIT | macOS menu bar for live Claude Code usage. |
+| [ColeMurray/claude-code-otel](https://github.com/ColeMurray/claude-code-otel) | ~503 | MIT | Observability stack for Claude Code usage/perf/cost (OTel path). |
+| [CodeZeno/Claude-Code-Usage-Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Monitor) | ~501 | MIT | **v2.12.42 overnight** (from v2.12.39) — multi Claude/Codex accounts + custom refresh. |
+| [leeguooooo/claude-code-usage-bar](https://github.com/leeguooooo/claude-code-usage-bar) | ~378 | MIT | Predict profiles keyed by session config dir — statusLine quota UX. |
+| [foyzulkarim/claude-lens](https://github.com/foyzulkarim/claude-lens) | ~248 | MIT | Local dashboard: sessions, token costs, cache, tool calls, daily breakdowns. |
+| [frankchiu-dev/claude-codex-usage-dashboard](https://github.com/frankchiu-dev/claude-codex-usage-dashboard) | ~173 | MIT | Local Windows dashboard for Claude Code + Codex limits. |
+| [planetf1/otelite](https://github.com/planetf1/otelite) | ~92 | NOASSERTION | Still **v0.1.153** — storage ANALYZE + bounded ingest / drop reporting. |
+| [alibaba/loongsuite-pilot](https://github.com/alibaba/loongsuite-pilot) | ~189 | Apache-2.0 | **Pushed today** — prefer Codex provider response id; multimodal/env homes still freest (**+2★**). |
+| [seakee/CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus) | ~3.6k | MIT | Still **v1.13.1** — self-hosted CLIProxyAPI / gateway usage-cost-quota panel. |
+| [Rodiun/frugon](https://github.com/Rodiun/frugon) | ~212 | MIT | **Pushed today** — curated seed pricing refresh — local LLM bill-leak analyzer. |
+| [mag123c/toktrack](https://github.com/mag123c/toktrack) | ~190 | MIT | **v2.17.3 today** — collapse byte-identical token_count re-emissions + archived Codex sync. |
+| [Halloweedev/usagepal](https://github.com/Halloweedev/usagepal) | ~82 | MIT | OpenUsage menu-bar fork — per-provider account switcher. |
+| [Nanako0129/TokenBar](https://github.com/Nanako0129/TokenBar) | ~360 | MIT | **v1.20.0 today** — history-row token hover + unwritable-history repair — macOS quota peer. |
+| [tddworks/ClaudeBar](https://github.com/tddworks/ClaudeBar) | ~1.5k | (check) | macOS menu-bar Claude quota peer. |
+| [deviffyy/OpenQuota](https://github.com/deviffyy/OpenQuota) | ~216 | MIT | Cross-platform limits/spend tracker. |
+| [Dicklesworthstone/coding_agent_usage_tracker](https://github.com/Dicklesworthstone/coding_agent_usage_tracker) | ~87 | NOASSERTION | Single CLI for remaining quotas across Codex/Claude/Gemini/Cursor/Copilot. |
+| [sculptdotfun/viberank](https://github.com/sculptdotfun/viberank) | ~117 | MIT | Public AI-coding usage leaderboard on ccusage data. |
+| [cobra91/better-ccusage](https://github.com/cobra91/better-ccusage) | ~88 | MIT | Faster multi-provider JSONL analyzer. |
+| [851-labs/tokenmaxxing](https://github.com/851-labs/tokenmaxxing) | ~76 | MIT | Local CLI on ccusage that syncs usage socially (**+1★**). |
+| [Nihondo/AgentLimits](https://github.com/Nihondo/AgentLimits) | ~61 | MIT | macOS widgets for Codex/Claude limits + ccusage heatmap. |
+| [majiayu000/quotabar](https://github.com/majiayu000/quotabar) | ~52 | MIT | Tauri v2 menubar — six-digit tray cost tiles. |
+| [abhiunix/AgentHarbor](https://github.com/abhiunix/AgentHarbor) | ~12 | MIT | Native multi-agent rate-limit + session usage app. |
+| [semantic-craft/iOS-vibebuddy](https://github.com/semantic-craft/iOS-vibebuddy) | ~90 | MIT | **v1.3.25 today** — managed task instructions / phone stop — multi-surface tracker (**+1★**). |
+| [zhnd/lumo](https://github.com/zhnd/lumo) | ~147 | MIT | Local-first Claude Code usage/cost/session dashboard. |
+| [fschmutz/claude-usage-panel](https://github.com/fschmutz/claude-usage-panel) | ~6 | MIT | Official usage API → GNOME/macOS/statusLine + MCP get_usage (Claude + Cursor). |
+| [sylearn/AIUsage](https://github.com/sylearn/AIUsage) | ~679 | Apache-2.0 | Desktop multi-tool usage peer (docs/sponsor polish today). |
+| [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~59.3k | NOASSERTION | **Pushed today.** Gateway spend/pricing — adjacent. |
+| [langfuse/langfuse](https://github.com/langfuse/langfuse) | ~34.9k | NOASSERTION | **Pushed today.** OSS LLM observability + OTel. |
+| [Helicone/helicone](https://github.com/Helicone/helicone) | ~6.2k | Apache-2.0 | Quiet since 16 Sep. OSS LLM observability proxy. Adjacent. |
+
+**Build takeaways:** Stay ccusage-compatible (**v20.0.23**); differentiate on live quotas + auto-detect + UX vs openusage.sh. Today's sharpest signals: **TokenBar v1.20.0**, **CodeZeno v2.12.42**, **pane v0.4.53**, **toktrack v2.17.3**, **codeburn 0.9.25**. Treat CPA-Manager-Plus as gateway-ops adjacency. Keep Langfuse/LiteLLM/Helicone complementary.
+
+Sources: GitHub API 2026-09-21 (Europe/London).
