@@ -37,7 +37,12 @@ func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, car
 
 	lines := make([]WebUsageLine, 0, len(card.Rows)+len(timers))
 	claimed := make(map[string]bool)
+	currentHeading := ""
 	for _, row := range card.Rows {
+		if row.Kind == "heading" {
+			currentHeading = compactGroupTitle(row.Value)
+			continue
+		}
 		switch row.Kind {
 		case "gauge":
 			line := WebUsageLine{
@@ -54,6 +59,9 @@ func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, car
 				line.ResetIn = resetInFromHint(row.Hint)
 			}
 			line.Group = resolveUsageGroup(line, snap, widget, claimed)
+			if line.Group == "" && currentHeading != "" {
+				line.Group = currentHeading
+			}
 			lines = append(lines, line)
 		case "kv":
 			if skipUsageKV(row.Label, hasGauge) {
@@ -71,6 +79,9 @@ func projectUsageLines(snap core.UsageSnapshot, widget core.DashboardWidget, car
 				line = applyTimerToUsageLine(line, timer)
 			}
 			line.Group = resolveUsageGroup(line, snap, widget, claimed)
+			if line.Group == "" && currentHeading != "" {
+				line.Group = currentHeading
+			}
 			lines = append(lines, line)
 		}
 	}
@@ -233,10 +244,18 @@ func resolveUsageGroup(line WebUsageLine, snap core.UsageSnapshot, widget core.D
 				continue
 			}
 			m, ok := snap.Metrics[key]
-			if !ok || m.Remaining == nil {
+			if !ok {
 				continue
 			}
-			if math.Abs(*m.Remaining-*line.Percent) > 0.05 {
+			match := false
+			if m.Remaining != nil && math.Abs(*m.Remaining-*line.Percent) <= 0.05 {
+				match = true
+			} else if m.Used != nil && math.Abs(*m.Used-*line.Percent) <= 0.05 {
+				match = true
+			} else if m.Remaining != nil && math.Abs((100-*m.Remaining)-*line.Percent) <= 0.05 {
+				match = true
+			}
+			if !match {
 				continue
 			}
 			claimed[key] = true

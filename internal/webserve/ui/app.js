@@ -533,10 +533,12 @@
   })();
 
   // Provider group drag-reorder: drag a group header onto another group
-  // header to reorder; the new order posts to /actions/provider-order and
-  // persists in a cookie. Survives htmx swaps via event delegation on body.
+  // box to reorder; the new order persists in a cookie, localStorage, and settings.json.
+  // Smoothly animated with FLIP physics and non-destructive silent background persistence.
   (function providerDrag() {
     let dragged = null;
+    let isDragging = false;
+    let lastSwapTime = 0;
 
     const orderFromDOM = () =>
       [...document.querySelectorAll(".provider-group-box")]
@@ -544,38 +546,160 @@
         .filter(Boolean)
         .filter((id, i, arr) => arr.indexOf(id) === i);
 
+    // Sync from localStorage if present on initial load
+    try {
+      const saved = localStorage.getItem("au_provider_order");
+      if (saved && !document.cookie.includes("au_provider_order=")) {
+        const basePath = window.location.pathname.startsWith("/agentusage") ? "/agentusage" : "/";
+        document.cookie = `au_provider_order=${encodeURIComponent(saved)}; path=${basePath}; max-age=31536000; SameSite=Lax`;
+      }
+    } catch {}
+
     document.body.addEventListener("dragstart", (ev) => {
       const header = ev.target.closest?.(".provider-group-header");
       if (!header) return;
-      dragged = header;
-      header.closest(".provider-group-box")?.classList.add("dragging");
-      try { ev.dataTransfer.setData("text/plain", header.dataset.provider || ""); } catch {}
-      ev.dataTransfer.effectAllowed = "move";
+      const box = header.closest(".provider-group-box");
+      if (!box) return;
+
+      dragged = box;
+      isDragging = true;
+      box.classList.add("dragging");
+      document.body.classList.add("is-dragging");
+
+      try {
+        ev.dataTransfer.setData("text/plain", header.dataset.provider || "");
+        ev.dataTransfer.effectAllowed = "move";
+      } catch {}
     });
+
     document.body.addEventListener("dragover", (ev) => {
       if (!dragged) return;
-      const header = ev.target.closest?.(".provider-group-header");
-      if (!header || header === dragged) return;
       ev.preventDefault();
-      const a = dragged.closest(".provider-group-box");
-      const b = header.closest(".provider-group-box");
-      if (a && b && a.parentElement === b.parentElement && a !== b) {
-        const box = b.getBoundingClientRect();
-        const after = ev.clientY > box.top + box.height / 2;
-        b.parentNode.insertBefore(a, after ? b.nextSibling : b);
+      try { ev.dataTransfer.dropEffect = "move"; } catch {}
+
+      const targetBox = ev.target.closest?.(".provider-group-box");
+      if (!targetBox || targetBox === dragged) return;
+      if (targetBox.parentElement !== dragged.parentElement) return;
+
+      const parent = dragged.parentElement;
+      const boxes = Array.from(parent.children).filter((el) => el.classList.contains("provider-group-box"));
+      const indexA = boxes.indexOf(dragged);
+      const indexB = boxes.indexOf(targetBox);
+      if (indexA === -1 || indexB === -1 || indexA === indexB) return;
+
+      const rect = targetBox.getBoundingClientRect();
+      const isGrid = parent.classList.contains("bento-container") || parent.classList.contains("board-container");
+
+      let insertAfter = false;
+      if (isGrid) {
+        const midY = rect.top + rect.height / 2;
+        const midX = rect.left + rect.width / 2;
+        if (ev.clientY > rect.bottom - 15) {
+          insertAfter = true;
+        } else if (ev.clientY < rect.top + 15) {
+          insertAfter = false;
+        } else if (Math.abs(ev.clientY - midY) < rect.height * 0.45) {
+          insertAfter = indexA < indexB ? ev.clientX > midX : ev.clientX > rect.left + rect.width * 0.4;
+        } else {
+          insertAfter = ev.clientY > midY;
+        }
+      } else {
+        const midY = rect.top + rect.height / 2;
+        insertAfter = indexA < indexB ? ev.clientY > midY : ev.clientY > rect.top + rect.height * 0.45;
       }
+
+      const targetNode = insertAfter ? targetBox.nextSibling : targetBox;
+      if (targetNode === dragged || (insertAfter && targetBox === dragged)) return;
+
+      parent.insertBefore(dragged, targetNode);
     });
-    document.body.addEventListener("dragend", () => {
-      document.querySelectorAll(".provider-group-box.dragging").forEach((el) => el.classList.remove("dragging"));
+
+    const finishDrag = () => {
+      if (!isDragging && !dragged) return;
+      isDragging = false;
+      document.body.classList.remove("is-dragging");
+      document.querySelectorAll(".provider-group-box.dragging").forEach((el) => {
+        el.classList.remove("dragging");
+        el.style.transform = "";
+      });
+
       const order = orderFromDOM();
       dragged = null;
       if (order.length < 2) return;
-      htmx.ajax("POST", "actions/provider-order", {
-        values: { order: order.join("|") },
-        target: "#app",
-        swap: "outerHTML",
-      });
+
+      const orderStr = order.join("|");
+      try { localStorage.setItem("au_provider_order", orderStr); } catch {}
+
+      const basePath = window.location.pathname.startsWith("/agentusage") ? "/agentusage" : "/";
+      document.cookie = `au_provider_order=${encodeURIComponent(orderStr)}; path=${basePath}; max-age=31536000; SameSite=Lax`;
+
+      fetch("actions/provider-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: new URLSearchParams({ order: orderStr, silent: "1" }),
+      }).then(() => {
+        showToast("Provider order saved");
+      }).catch(() => {});
+    };
+
+    document.body.addEventListener("dragend", finishDrag);
+    document.body.addEventListener("drop", (ev) => {
+      ev.preventDefault();
+      finishDrag();
     });
+
+    // Touch support for dragging via the grip handle on touch devices
+    document.body.addEventListener("touchstart", (ev) => {
+      const handle = ev.target.closest?.(".provider-drag-handle");
+      if (!handle) return;
+      const box = handle.closest(".provider-group-box");
+      if (!box) return;
+
+      dragged = box;
+      isDragging = true;
+      box.classList.add("dragging");
+      document.body.classList.add("is-dragging");
+
+      const onTouchMove = (tev) => {
+        if (!isDragging || !dragged) return;
+        const touch = tev.touches[0];
+        if (!touch) return;
+        tev.preventDefault();
+
+        const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+        const targetBox = elem?.closest?.(".provider-group-box");
+        if (!targetBox || targetBox === dragged) return;
+        if (targetBox.parentElement !== dragged.parentElement) return;
+
+        const parent = dragged.parentElement;
+        const boxes = Array.from(parent.children).filter((el) => el.classList.contains("provider-group-box"));
+        const indexA = boxes.indexOf(dragged);
+        const indexB = boxes.indexOf(targetBox);
+        if (indexA === -1 || indexB === -1 || indexA === indexB) return;
+
+        const rect = targetBox.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        const insertAfter = indexA < indexB ? touch.clientY > midY : touch.clientY > rect.top + rect.height * 0.45;
+        const targetNode = insertAfter ? targetBox.nextSibling : targetBox;
+        if (targetNode === dragged) return;
+
+        parent.insertBefore(dragged, targetNode);
+      };
+
+      const onTouchEnd = () => {
+        window.removeEventListener("touchmove", onTouchMove);
+        window.removeEventListener("touchend", onTouchEnd);
+        window.removeEventListener("touchcancel", onTouchEnd);
+        finishDrag();
+      };
+
+      window.addEventListener("touchmove", onTouchMove, { passive: false });
+      window.addEventListener("touchend", onTouchEnd);
+      window.addEventListener("touchcancel", onTouchEnd);
+    }, { passive: true });
   })();
 
   ensureScrollContainer();

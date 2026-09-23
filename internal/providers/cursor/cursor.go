@@ -163,9 +163,6 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 					if json.Unmarshal(cfgData, &cfg) == nil && (cfg.AuthInfo.Email != "" || cfg.AuthInfo.AuthID != "") {
 						snap.Status = core.StatusOK
 						snap.Timestamp = time.Now().UTC()
-						if info, sErr := os.Stat(cfgFile); sErr == nil {
-							snap.Timestamp = info.ModTime().UTC()
-						}
 						if cfg.AuthInfo.Email != "" {
 							snap.SetAttribute("email", cfg.AuthInfo.Email)
 							snap.SetAttribute("account_email", cfg.AuthInfo.Email)
@@ -240,6 +237,7 @@ func applyLivePlanToSnapshot(snap *core.UsageSnapshot, live livePlanUsage, auth 
 		return
 	}
 	snap.EnsureMaps()
+	snap.Timestamp = time.Now().UTC()
 	setPct := func(key string, used *float64) {
 		if used == nil {
 			return
@@ -341,7 +339,11 @@ func projectSnapshot(snap *core.UsageSnapshot, payload statusLinePayload) {
 		return
 	}
 
-	snap.Timestamp = payloadReceivedAt(payload)
+	snap.Timestamp = time.Now().UTC()
+	if !payload.ReceivedAt.IsZero() {
+		snap.SetAttribute("status_line_received_at", payload.ReceivedAt.UTC().Format(time.RFC3339))
+		snap.Raw["status_line_received_at"] = payload.ReceivedAt.UTC().Format(time.RFC3339)
+	}
 	snap.Status = statusFromQuota(payload)
 
 	modelID := strings.TrimSpace(payload.Model.ID)

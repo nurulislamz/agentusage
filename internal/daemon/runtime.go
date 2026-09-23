@@ -178,6 +178,12 @@ func (r *ViewRuntime) ReadWithFallbackForWindow(ctx context.Context, timeWindow 
 // RefreshForWindow kicks a blocking daemon poll, then reads the read-model
 // with the cache bypassed so the caller sees freshly fetched snapshots.
 func (r *ViewRuntime) RefreshForWindow(ctx context.Context, timeWindow core.TimeWindow) SnapshotFrame {
+	return r.RefreshAccountForWindow(ctx, "", timeWindow)
+}
+
+// RefreshAccountForWindow kicks a blocking daemon poll for a specific account (or all accounts if empty),
+// then reads the read-model with the cache bypassed so the caller sees freshly fetched snapshots.
+func (r *ViewRuntime) RefreshAccountForWindow(ctx context.Context, accountID string, timeWindow core.TimeWindow) SnapshotFrame {
 	frame := SnapshotFrame{TimeWindow: normalizeReadModelTimeWindow(timeWindow)}
 	if r == nil {
 		return frame
@@ -187,7 +193,13 @@ func (r *ViewRuntime) RefreshForWindow(ctx context.Context, timeWindow core.Time
 		client = r.EnsureClient(ctx)
 	}
 	if client != nil {
-		if err := client.RequestPollWait(ctx); err != nil {
+		var err error
+		if accountID != "" {
+			err = client.RequestPollWaitAccount(ctx, accountID, true)
+		} else {
+			err = client.RequestPollWaitForce(ctx)
+		}
+		if err != nil {
 			r.throttledLogError(err)
 		}
 	}

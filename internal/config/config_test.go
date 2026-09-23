@@ -760,6 +760,39 @@ func TestSaveDashboardProvidersTo(t *testing.T) {
 	}
 }
 
+func TestSaveDashboardProviderOrderTo(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+
+	cfg := DefaultConfig()
+	cfg.Theme = "Nord"
+	if err := SaveTo(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	order := []string{"cursor", "antigravity", "codex", "cursor", "  ", "command_code"}
+	if err := SaveDashboardProviderOrderTo(path, order); err != nil {
+		t.Fatalf("SaveDashboardProviderOrderTo error: %v", err)
+	}
+
+	loaded, err := LoadFrom(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if loaded.Theme != "Nord" {
+		t.Errorf("theme should be preserved, got %q", loaded.Theme)
+	}
+	wantOrder := []string{"cursor", "antigravity", "codex", "command_code"}
+	if len(loaded.Dashboard.ProviderOrder) != len(wantOrder) {
+		t.Fatalf("provider_order len = %d, want %d", len(loaded.Dashboard.ProviderOrder), len(wantOrder))
+	}
+	for i, want := range wantOrder {
+		if loaded.Dashboard.ProviderOrder[i] != want {
+			t.Errorf("provider_order[%d] = %q, want %q", i, loaded.Dashboard.ProviderOrder[i], want)
+		}
+	}
+}
+
 func TestLoadFrom_DashboardViewDefaultsToSplit(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	if err := os.WriteFile(path, []byte(`{"dashboard":{"view":"unknown"}}`), 0o644); err != nil {

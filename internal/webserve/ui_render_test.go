@@ -397,6 +397,47 @@ func TestLayoutActionStoresLayoutAndRendersIt(t *testing.T) {
 	}
 }
 
+func TestProviderOrderAction_PersistsAndSupportsSilent(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+
+	// 1. Silent save from smooth drag-and-drop
+	wSilent := postForm(t, srv, "/actions/provider-order", "order=cursor|antigravity|codex&silent=1")
+	if wSilent.Code != http.StatusOK {
+		t.Fatalf("silent provider-order status = %d", wSilent.Code)
+	}
+	var cookie *http.Cookie
+	for _, c := range wSilent.Result().Cookies() {
+		if c.Name == cookieProviderOrder {
+			cookie = c
+		}
+	}
+	if cookie == nil || cookie.Value != "cursor%7Cantigravity%7Ccodex" {
+		t.Fatalf("provider order cookie = %+v", cookie)
+	}
+	if cookie.MaxAge <= 0 {
+		t.Errorf("cookie MaxAge = %d, want > 0 for persistence", cookie.MaxAge)
+	}
+	if !strings.Contains(wSilent.Body.String(), `"status":"ok"`) {
+		t.Errorf("silent response body = %q, want json status ok", wSilent.Body.String())
+	}
+
+	// 2. Standard save with rendered HTML
+	wStandard := postForm(t, srv, "/actions/provider-order", "order=antigravity|cursor")
+	if wStandard.Code != http.StatusOK {
+		t.Fatalf("standard provider-order status = %d", wStandard.Code)
+	}
+	if !strings.Contains(wStandard.Body.String(), "Provider order saved") {
+		t.Errorf("standard response should contain toast, got: %s", wStandard.Body.String())
+	}
+
+	// 3. Fallback to in-memory/config order when cookie is absent
+	req := httptest.NewRequest(http.MethodGet, "/partial/app", nil)
+	gotOrder := srv.resolveProviderOrder(req)
+	if gotOrder != "antigravity|cursor" {
+		t.Errorf("resolveProviderOrder without cookie = %q, want antigravity|cursor", gotOrder)
+	}
+}
+
 func TestAppFragmentKeepsLoadingIndicators(t *testing.T) {
 	srv := testServer(t, Options{Demo: true})
 	html := getHTML(t, srv, "/partial/app").Body.String()
@@ -1541,3 +1582,87 @@ func shortsOf(lines []usageLine) []string {
 	}
 	return out
 }
+
+func TestAntigravity_ExhaustedClaudeDoesNotDepleteGeminiAccount(t *testing.T) {
+	for _, mode := range []string{"used", "remaining"} {
+		t.Run("mode_"+mode, func(t *testing.T) {
+			usedMode := mode == "used"
+			var g5, gw, c5, cw float64
+			if usedMode {
+				g5, gw, c5, cw = 5, 61, 0, 100
+			} else {
+				g5, gw, c5, cw = 95, 39, 100, 0
+			}
+
+			env := Envelope{
+				UsageMode: mode,
+				Views: []AccountView{
+					{
+						Key: "antigravity-chaos", ProviderID: "antigravity", ProviderName: "Antigravity",
+						AccountID: "antigravity-chaos", Status: "OK", StatusBadge: "OK",
+						Detail: "Gemini 3.7 Flash (High)",
+						DetailCards: []DetailCard{
+							{Rows: []DetailRow{{Label: "Model", Value: "Gemini 3.7 Flash (High)"}}},
+						},
+						UsageLines: []UsageLine{
+							{Label: "Five Hour Limit", Short: "5h", Group: "Gemini", Percent: f64(g5), Tone: "ok", ResetIn: "4h"},
+							{Label: "Weekly Limit", Short: "Weekly", Group: "Gemini", Percent: f64(gw), Tone: "peach", ResetIn: "1d 2h"},
+							{Label: "Five Hour Limit", Short: "5h", Group: "Claude / GPT", Percent: f64(c5), Tone: "ok", ResetIn: "5h"},
+							{Label: "Weekly Limit", Short: "Weekly", Group: "Claude / GPT", Percent: f64(cw), Tone: "crit", ResetIn: "5d 14h"},
+						},
+					},
+				},
+			}
+
+			model := buildRenderModel(env, renderInput{Layout: "bento"})
+			if len(model.Views) != 1 {
+				t.Fatalf("expected 1 view, got %d", len(model.Views))
+			}
+			v := model.Views[0]
+
+			// 1. Account should NOT be marked depleted or alert
+			if v.Depleted {
+				t.Errorf("expected v.Depleted to be false, got true")
+			}
+			if v.IsAlert {
+				t.Errorf("expected v.IsAlert to be false, got true")
+			}
+
+			// 2. BentoRows must collapse duplicate windows to Gemini (active pool), NOT Claude
+			if len(v.BentoRows) != 2 {
+				t.Fatalf("expected 2 bento rows, got %d", len(v.BentoRows))
+			}
+			for _, row := range v.BentoRows {
+				if row.Depleted {
+					t.Errorf("bento row %s is depleted, expected active pool (Gemini)", row.Label)
+				}
+			}
+
+			// 3. GlobalStats KPI banner must NOT report the account at limit
+			if model.Stats.AtLimit != "0" {
+				t.Errorf("expected AtLimit to be '0', got %q", model.Stats.AtLimit)
+			}
+			if model.Stats.Tightest == "100%" || model.Stats.Tightest == "0%" {
+				t.Errorf("expected Tightest window to NOT be depleted, got %q", model.Stats.Tightest)
+			}
+
+			// 4. Cockpit graphs must contain both Gemini and Claude groups
+			if len(v.Graphs) != 2 {
+				t.Fatalf("expected 2 graph groups (Gemini and Claude), got %d", len(v.Graphs))
+			}
+			if v.Graphs[0].Title != "Gemini" {
+				t.Errorf("expected first graph group to be Gemini, got %q", v.Graphs[0].Title)
+			}
+			if v.Graphs[1].Title != "Claude / GPT" {
+				t.Errorf("expected second graph group to be Claude / GPT, got %q", v.Graphs[1].Title)
+			}
+
+			// 5. HTML fragment rendering: must not show "Limit reached" in bento
+			html := renderFragment(t, env, renderInput{Layout: "bento"})
+			if strings.Contains(html, "Limit reached") {
+				t.Errorf("bento HTML unexpectedly contains 'Limit reached'")
+			}
+		})
+	}
+}
+

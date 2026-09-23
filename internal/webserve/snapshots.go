@@ -24,8 +24,12 @@ func (c *collector) fetchSnapshots(ctx context.Context, refresh bool, accountID 
 
 	if c.source != export.SourceDirect && c.rt != nil {
 		var frame daemon.SnapshotFrame
-		if refresh && accountID == "" {
-			frame = c.rt.RefreshForWindow(ctx, tw)
+		if refresh {
+			if accountID != "" {
+				frame = c.rt.RefreshAccountForWindow(ctx, accountID, tw)
+			} else {
+				frame = c.rt.RefreshForWindow(ctx, tw)
+			}
 		} else {
 			frame = c.rt.ReadWithFallbackForWindow(ctx, tw)
 		}

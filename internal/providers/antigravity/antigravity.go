@@ -4,10 +4,13 @@ package antigravity
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -15,6 +18,7 @@ import (
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/providers/providerbase"
 	"github.com/nurulislamz/agentusage/internal/providers/shared"
+	"github.com/nurulislamz/agentusage/internal/telemetry"
 )
 
 const (
@@ -76,8 +80,28 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 	if box := boxName(acct); box != "" {
 		snap.SetAttribute("box", box)
 	}
+	statusFile := resolveStatusFilePath(acct)
+	sf, hasStatus := loadStatusFile(statusFile)
+	if hasStatus {
+		snap.Raw["status_file"] = statusFile
+		if sf.Model.DisplayName != "" {
+			snap.SetAttribute("model", sf.Model.DisplayName)
+		} else if sf.Model.ID != "" {
+			snap.SetAttribute("model", sf.Model.ID)
+		}
+		if sf.Model.ID != "" {
+			snap.SetAttribute("model_id", sf.Model.ID)
+		}
+		if sf.Email != "" {
+			snap.SetAttribute("account_email", sf.Email)
+		}
+		if sf.PlanTier != "" {
+			snap.SetAttribute("plan_tier", sf.PlanTier)
+		}
+	}
 	if model := acct.Hint("model", ""); model != "" {
 		snap.SetAttribute("model", model)
+		sf.Model.DisplayName = model
 	}
 
 	accessToken, tokenPath, tokenRefreshed, err := ensureAccessToken(ctx, acct, p.Client(), false)
@@ -148,9 +172,12 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 	}
 
 	payload := quotaPayload{
+		Model:      sf.Model,
 		Quota:      quotaMapFromSummary(summary),
 		ReceivedAt: time.Now().UTC(),
 		Product:    "antigravity",
+		PlanTier:   sf.PlanTier,
+		Email:      sf.Email,
 	}
 	if len(payload.Quota) == 0 {
 		snap.Status = core.StatusError
@@ -162,6 +189,42 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 	snap.Raw["quota_api"] = fmt.Sprintf("ok (%d buckets)", len(payload.Quota))
 	snap.Raw["quota_source"] = "retrieveUserQuotaSummary"
 	return snap, nil
+}
+
+func resolveStatusFilePath(acct core.AccountConfig) string {
+	if p := strings.TrimSpace(acct.Path("status_file", "")); p != "" {
+		return p
+	}
+	stateDir, err := telemetry.DefaultStateDir()
+	if err != nil || strings.TrimSpace(stateDir) == "" {
+		return ""
+	}
+	if box := boxName(acct); box != "" {
+		candidate := filepath.Join(stateDir, fmt.Sprintf("antigravity-%s-status.json", box))
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	candidate := filepath.Join(stateDir, "antigravity-status.json")
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+	return ""
+}
+
+func loadStatusFile(path string) (quotaPayload, bool) {
+	if strings.TrimSpace(path) == "" {
+		return quotaPayload{}, false
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return quotaPayload{}, false
+	}
+	var p quotaPayload
+	if err := json.Unmarshal(data, &p); err != nil {
+		return quotaPayload{}, false
+	}
+	return p, true
 }
 
 func retryAfterAuth401(ctx context.Context, acct core.AccountConfig, baseURL string, client *http.Client, snap *core.UsageSnapshot) (quotaSummaryResponse, error) {

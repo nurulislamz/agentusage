@@ -96,7 +96,7 @@
 {{range $i, $g := .Groups}}
 <section class="provider-group-box" style="--p:{{$g.Accent}}">
   <header class="provider-group-header" draggable="true" data-provider="{{$g.ProviderID}}">
-    <span class="provider-drag-handle" title="Drag to reorder providers"><i></i><i></i><i></i><i></i><i></i><i></i></span><div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{$g.ProviderName}}</span><span class="provider-count">{{len $g.Items}} {{if eq (len $g.Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
+    <span class="provider-drag-handle" draggable="true" title="Drag to reorder providers"><i></i><i></i><i></i><i></i><i></i><i></i></span><div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{$g.ProviderName}}</span><span class="provider-count">{{len $g.Items}} {{if eq (len $g.Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
     <div class="provider-group-meta"><span class="pill {{$g.Rollup}}">{{$g.RollupLabel}}</span></div>
   </header>
   <div class="matrix-table-wrap">
@@ -128,7 +128,7 @@
 {{range $g := .Groups}}
 <section class="provider-group-box bento-provider-group" style="--p:{{$g.Accent}}">
   <header class="provider-group-header" draggable="true" data-provider="{{$g.ProviderID}}">
-    <span class="provider-drag-handle" title="Drag to reorder providers"><i></i><i></i><i></i><i></i><i></i><i></i></span><div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{$g.ProviderName}}</span><span class="provider-count">{{len $g.Items}} {{if eq (len $g.Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
+    <span class="provider-drag-handle" draggable="true" title="Drag to reorder providers"><i></i><i></i><i></i><i></i><i></i><i></i></span><div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{$g.ProviderName}}</span><span class="provider-count">{{len $g.Items}} {{if eq (len $g.Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
     <div class="provider-group-meta"><span class="pill {{$g.Rollup}}">{{$g.RollupLabel}}</span></div>
   </header>
   <div class="bento-tiles-grid" data-count="{{len $g.Items}}">
@@ -158,7 +158,7 @@
 {{range $g := .Groups}}
 <section class="provider-group-box board-provider-group" style="--p:{{$g.Accent}}">
   <header class="provider-group-header" draggable="true" data-provider="{{$g.ProviderID}}">
-    <span class="provider-drag-handle" title="Drag to reorder providers"><i></i><i></i><i></i><i></i><i></i><i></i></span><div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{$g.ProviderName}}</span><span class="provider-count">{{len $g.Items}} {{if eq (len $g.Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
+    <span class="provider-drag-handle" draggable="true" title="Drag to reorder providers"><i></i><i></i><i></i><i></i><i></i><i></i></span><div class="provider-group-title"><span class="provider-indicator" aria-hidden="true"></span><span class="provider-name">{{$g.ProviderName}}</span><span class="provider-count">{{len $g.Items}} {{if eq (len $g.Items) 1}}AGENT{{else}}AGENTS{{end}}</span></div>
     <div class="provider-group-meta"><span class="pill {{$g.Rollup}}">{{$g.RollupLabel}}</span></div>
   </header>
   <div class="board-grid board-{{$.Layout.ID}}" data-count="{{len $g.Items}}">

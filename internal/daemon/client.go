@@ -158,21 +158,41 @@ func (c *Client) IngestHook(
 
 // RequestPoll asks the daemon to run provider Fetch() immediately.
 func (c *Client) RequestPoll(ctx context.Context) error {
-	return c.requestPoll(ctx, false)
+	return c.requestPoll(ctx, false, "", false)
 }
 
 // RequestPollWait kicks a provider poll and blocks until it finishes.
 func (c *Client) RequestPollWait(ctx context.Context) error {
-	return c.requestPoll(ctx, true)
+	return c.requestPoll(ctx, true, "", false)
 }
 
-func (c *Client) requestPoll(ctx context.Context, wait bool) error {
+// RequestPollWaitForce kicks a provider poll and blocks until it finishes, bypassing rate limit backoff.
+func (c *Client) RequestPollWaitForce(ctx context.Context) error {
+	return c.requestPoll(ctx, true, "", true)
+}
+
+// RequestPollWaitAccount kicks a provider poll for a specific account and blocks until it finishes.
+func (c *Client) RequestPollWaitAccount(ctx context.Context, accountID string, force bool) error {
+	return c.requestPoll(ctx, true, accountID, force)
+}
+
+func (c *Client) requestPoll(ctx context.Context, wait bool, accountID string, force bool) error {
 	if c == nil || strings.TrimSpace(c.SocketPath) == "" {
 		return fmt.Errorf("daemon client is not configured")
 	}
 	path := "http://unix/v1/poll"
+	q := url.Values{}
 	if wait {
-		path += "?wait=1"
+		q.Set("wait", "1")
+	}
+	if force {
+		q.Set("force", "1")
+	}
+	if accountID != "" {
+		q.Set("account_id", accountID)
+	}
+	if encoded := q.Encode(); encoded != "" {
+		path += "?" + encoded
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, path, nil)
 	if err != nil {

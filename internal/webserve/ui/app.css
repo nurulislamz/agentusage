@@ -608,6 +608,7 @@ code { color: var(--accent); }
 .provider-group-title { flex: 1; }
 .provider-drag-handle {
   cursor: grab;
+  touch-action: none;
   display: inline-grid;
   grid-template-columns: repeat(2, 4px);
   gap: 4px;
@@ -629,9 +630,28 @@ code { color: var(--accent); }
 }
 .provider-group-header:hover { cursor: grab; }
 .provider-group-header:hover .provider-drag-handle { background: var(--tint-hover, var(--hairline)); color: var(--fg); }
-.provider-group-header[draggable="true"]:active { cursor: grabbing; }
-.provider-group-box.dragging { opacity: 0.55; transform: scale(0.99); }
-.provider-group-box { transition: opacity var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease); }
+.provider-group-header[draggable="true"]:active,
+.provider-drag-handle:active { cursor: grabbing; }
+.provider-group-box.dragging {
+  opacity: 0.38;
+  transform: scale(0.985);
+  filter: grayscale(0.2);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+.provider-group-box {
+  transition: opacity var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+}
+body.is-dragging {
+  cursor: grabbing !important;
+  user-select: none;
+}
+body.is-dragging .provider-group-box {
+  transition: none !important;
+  pointer-events: auto;
+}
+body.is-dragging .provider-group-box * {
+  pointer-events: none !important;
+}
 .provider-group-title { display: flex; align-items: baseline; gap: var(--space-2); }
 .provider-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--p, var(--accent)); }
 .provider-name {

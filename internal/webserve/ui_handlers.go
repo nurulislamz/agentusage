@@ -22,17 +22,22 @@ const (
 )
 
 func (s *Server) cookiePath() string {
-	if s.basePath == "" {
+	if s.basePath == "" || s.basePath == "/" {
 		return "/"
 	}
-	return s.basePath + "/"
+	return strings.TrimRight(s.basePath, "/")
 }
 
 func (s *Server) setUICookie(w http.ResponseWriter, name, value string) {
+	maxAge := 365 * 24 * 3600
+	if value == "" {
+		maxAge = -1
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     name,
 		Value:    url.QueryEscape(value),
 		Path:     s.cookiePath(),
+		MaxAge:   maxAge,
 		SameSite: http.SameSiteLaxMode,
 		HttpOnly: true,
 	})
@@ -155,7 +160,14 @@ func (s *Server) handleAppFragment(w http.ResponseWriter, r *http.Request) {
 		ProviderOrder:   s.resolveProviderOrder(r),
 		Toast:           strings.TrimSpace(q.Get("toast")),
 	}
-	s.renderApp(w, r, in, q.Get("refresh") == "1", q.Get("focus"))
+	focus := strings.TrimSpace(q.Get("focus"))
+	if focus == "" {
+		focus = strings.TrimSpace(q.Get("account_id"))
+	}
+	if focus == "" {
+		focus = strings.TrimSpace(q.Get("account"))
+	}
+	s.renderApp(w, r, in, q.Get("refresh") == "1", focus)
 }
 
 func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request) {
@@ -167,6 +179,9 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	account := strings.TrimSpace(r.URL.Query().Get("account"))
+	if account == "" {
+		account = strings.TrimSpace(r.URL.Query().Get("account_id"))
+	}
 	if account == "" {
 		account = readUICookie(r, cookieAccount)
 	}
@@ -301,12 +316,37 @@ func (s *Server) handleProviderOrderAction(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	s.setUICookie(w, cookieProviderOrder, strings.Join(ids, "|"))
+
+	if !s.collector.demo {
+		_ = config.SaveDashboardProviderOrder(ids)
+	}
+	if s.collector != nil {
+		if s.collector.opts.Config == nil {
+			cfg := config.DefaultConfig()
+			s.collector.opts.Config = &cfg
+		}
+		s.collector.opts.Config.Dashboard.ProviderOrder = ids
+	}
+
+	if r.FormValue("silent") == "1" || r.Header.Get("HX-Target") == "none" {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "order": ids})
+		return
+	}
+
 	s.renderAppEnv(w, r, s.envelopeOrError(), "Provider order saved", "", "")
 }
 
 // resolveProviderOrder returns the stored provider-id order, if any.
 func (s *Server) resolveProviderOrder(r *http.Request) string {
-	return strings.TrimSpace(readUICookie(r, cookieProviderOrder))
+	if c := strings.TrimSpace(readUICookie(r, cookieProviderOrder)); c != "" {
+		return c
+	}
+	if s != nil && s.collector != nil && s.collector.opts.Config != nil {
+		if len(s.collector.opts.Config.Dashboard.ProviderOrder) > 0 {
+			return strings.Join(s.collector.opts.Config.Dashboard.ProviderOrder, "|")
+		}
+	}
+	return ""
 }
 
 func cycleLayoutID(current string, ids []layoutMeta) string {

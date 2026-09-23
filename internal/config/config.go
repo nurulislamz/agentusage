@@ -139,7 +139,8 @@ type DashboardConfig struct {
 	// HideCosts is the global default for suppressing monetary metrics.
 	// nil means "fall through to the plan-aware auto policy" (see
 	// core.ResolveHideCosts).
-	HideCosts *bool `json:"hide_costs,omitempty"`
+	HideCosts     *bool    `json:"hide_costs,omitempty"`
+	ProviderOrder []string `json:"provider_order,omitempty"`
 }
 
 type ExportConfig struct {
@@ -714,6 +715,26 @@ func SaveDashboardProviders(providers []DashboardProviderConfig) error {
 func SaveDashboardProvidersTo(path string, providers []DashboardProviderConfig) error {
 	return modifyConfig(path, func(cfg *Config) {
 		cfg.Dashboard.Providers = normalizeDashboardProviders(providers)
+	})
+}
+
+// SaveDashboardProviderOrder persists provider display order into the config file (read-modify-write).
+func SaveDashboardProviderOrder(order []string) error {
+	return SaveDashboardProviderOrderTo(ConfigPath(), order)
+}
+
+func SaveDashboardProviderOrderTo(path string, order []string) error {
+	clean := make([]string, 0, len(order))
+	seen := make(map[string]bool, len(order))
+	for _, item := range order {
+		item = strings.TrimSpace(item)
+		if item != "" && !seen[item] {
+			seen[item] = true
+			clean = append(clean, item)
+		}
+	}
+	return modifyConfig(path, func(cfg *Config) {
+		cfg.Dashboard.ProviderOrder = clean
 	})
 }
 

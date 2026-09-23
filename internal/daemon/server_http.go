@@ -29,8 +29,11 @@ func (s *Service) handlePoll(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	if r.URL.Query().Get("wait") == "1" {
-		s.pollProviders(r.Context())
+	wait := r.URL.Query().Get("wait") == "1"
+	force := r.URL.Query().Get("force") == "1"
+	accountID := strings.TrimSpace(r.URL.Query().Get("account_id"))
+	if wait {
+		s.pollProvidersTargeted(r.Context(), accountID, true, force)
 		writeJSON(w, http.StatusOK, map[string]any{"status": "polled"})
 		return
 	}

@@ -155,6 +155,29 @@ func (ps *PollScheduler) ShouldPoll(accountID string, hasLocalDetector bool) boo
 	return ps.now().Sub(state.lastPollAt) >= interval
 }
 
+// ShouldPollManual returns true if the account is allowed to be polled during an
+// explicit/manual poll. If force is true, all gates are bypassed. Otherwise,
+// only active rate limits block the poll.
+func (ps *PollScheduler) ShouldPollManual(accountID string, force bool) bool {
+	if force {
+		return true
+	}
+	if ps == nil {
+		return true
+	}
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	state, ok := ps.states[accountID]
+	if !ok {
+		return true
+	}
+	if !state.rateLimitUntil.IsZero() && ps.now().Before(state.rateLimitUntil) {
+		return false
+	}
+	return true
+}
+
 // RecordPoll records that a poll was executed. changed indicates whether the data
 // actually differed from the previous poll.
 func (ps *PollScheduler) RecordPoll(accountID string, changed bool) {

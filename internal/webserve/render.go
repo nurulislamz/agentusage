@@ -479,10 +479,10 @@ func buildRenderView(v AccountView, index int, used bool, now time.Time) renderV
 	rv := renderView{
 		AccountView:   v,
 		Index:         index,
-		Lines:         fullLines,
+		Lines:         lines,
 		Items:         items,
 		Tables:        tableItems(items),
-		Graphs:        graphGroups(items, v.ProviderID),
+		Graphs:        graphGroups(buildUsageItems(v, fullLines, used), v.ProviderID),
 		RefreshedText: lastRefreshedText(v, now),
 	}
 	rv.Urgent = linesContainUrgent(lines) || resetsContainUrgent(v.Resets)
@@ -526,6 +526,9 @@ func buildRenderView(v AccountView, index int, used bool, now time.Time) renderV
 	}
 	if !rv.Depleted && (strings.Contains(strings.ToUpper(v.StatusBadge), "LIMIT") || strings.ToUpper(v.Status) == "LIMITED") {
 		rv.Depleted = true
+	}
+	if v.ProviderID == "antigravity" && (strings.ToUpper(v.Status) == "OK" || strings.ToUpper(v.StatusBadge) == "OK") {
+		rv.Depleted = false
 	}
 	if rv.Depleted {
 		worstTone = "crit"
@@ -1340,11 +1343,48 @@ func collapseUsageLines(v AccountView, lines []usageLine, used bool) []usageLine
 		}
 		// Collapse duplicates: keep the tighter bar (mode-aware) but merge the
 		// reset/urgent signal so the per-window chip still renders.
-		if cur := rows[i]; cur.Pct != nil && l.Pct != nil && isTighter(*l.Pct, *cur.Pct, used) {
-			rows[i] = l
+		if cur := rows[i]; cur.Pct != nil && l.Pct != nil {
+			replaced := false
+			if v.ProviderID == "antigravity" || isAntigravityLine(l) || isAntigravityLine(cur) {
+				activePool := antigravityActivePool(v)
+				lActive := activePool != "" && poolMatches(l.Group+" "+l.Label, activePool)
+				curActive := activePool != "" && poolMatches(cur.Group+" "+cur.Label, activePool)
+				if lActive && !curActive {
+					rows[i] = l
+					replaced = true
+				} else if !lActive && curActive {
+					// keep cur
+				} else if isDepleted(*l.Pct, used) && !isDepleted(*cur.Pct, used) {
+					// Don't let a depleted secondary pool overwrite a non-depleted pool
+				} else if !isDepleted(*l.Pct, used) && isDepleted(*cur.Pct, used) {
+					// Prefer non-depleted pool over depleted pool
+					rows[i] = l
+					replaced = true
+				} else if isTighter(*l.Pct, *cur.Pct, used) {
+					rows[i] = l
+					replaced = true
+				}
+			} else if isTighter(*l.Pct, *cur.Pct, used) {
+				rows[i] = l
+				replaced = true
+			}
+			if replaced {
+				if reset != "" {
+					resets[i] = reset
+				}
+				urgents[i] = l.Urgent
+			} else {
+				if resets[i] == "" {
+					resets[i] = reset
+				}
+				if !(isAntigravityLine(l) && isDepleted(*l.Pct, used) && !isDepleted(*cur.Pct, used)) {
+					urgents[i] = urgents[i] || l.Urgent
+				}
+			}
+		} else {
+			resets[i] = firstNonEmpty(resets[i], reset)
+			urgents[i] = urgents[i] || l.Urgent
 		}
-		resets[i] = firstNonEmpty(resets[i], reset)
-		urgents[i] = urgents[i] || l.Urgent
 	}
 	out := make([]usageLine, 0, len(order))
 	for i := range order {
@@ -1659,6 +1699,48 @@ func bentoWindowKey(l usageLine, providerID string) string {
 	}
 	// Distinct buckets (Included/Auto/API, model names) key on the identity.
 	return strings.ToLower(strings.TrimSpace(firstNonEmpty(l.Short, l.Label)))
+}
+
+func isAntigravityLine(l usageLine) bool {
+	s := strings.ToLower(l.Group + " " + l.Label + " " + l.Short)
+	return strings.Contains(s, "gemini") || containsAny(s, "claude", "opus", "sonnet", "3p", "gpt")
+}
+
+func antigravityActivePool(v AccountView) string {
+	model := ""
+	for _, card := range v.DetailCards {
+		for _, row := range card.Rows {
+			if strings.EqualFold(strings.TrimSpace(row.Label), "model") {
+				model = row.Value
+				break
+			}
+		}
+		if model != "" {
+			break
+		}
+	}
+	if model == "" {
+		model = v.Detail
+	}
+	modelLower := strings.ToLower(model)
+	if containsAny(modelLower, "claude", "opus", "sonnet", "3p", "gpt") {
+		return "claude"
+	}
+	if strings.Contains(modelLower, "gemini") {
+		return "gemini"
+	}
+	return ""
+}
+
+func poolMatches(groupOrLabel, pool string) bool {
+	s := strings.ToLower(groupOrLabel)
+	switch pool {
+	case "gemini":
+		return strings.Contains(s, "gemini")
+	case "claude":
+		return containsAny(s, "claude", "opus", "sonnet", "gpt", "3p")
+	}
+	return false
 }
 
 func isInternalTelemetryRow(row DetailRow) bool {
@@ -2015,6 +2097,9 @@ func calculateGlobalStats(views []renderView, used bool) GlobalStats {
 				continue
 			}
 			pct := clampPctVal(*l.Pct)
+			if v.ProviderID == "antigravity" && !v.Depleted && isDepleted(pct, used) {
+				continue
+			}
 			if windowCount == 0 || isTighter(pct, tightest, used) {
 				tightest = pct
 				tightestName = v.AccountID

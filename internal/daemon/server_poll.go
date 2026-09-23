@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,13 +31,17 @@ func (s *Service) runPollLoop(ctx context.Context) {
 }
 
 func (s *Service) pollProviders(ctx context.Context) {
+	s.pollProvidersTargeted(ctx, "", false, false)
+}
+
+func (s *Service) pollProvidersTargeted(ctx context.Context, targetAccountID string, manual bool, force bool) {
 	if s == nil || (s.quotaIngest == nil && s.pollScheduler == nil) {
 		return
 	}
 	if s.pollScheduler == nil {
 		s.pollMu.Lock()
 		defer s.pollMu.Unlock()
-		s.doPoll(ctx)
+		s.doPollTargeted(ctx, targetAccountID, manual, force)
 		return
 	}
 
@@ -52,10 +57,14 @@ func (s *Service) pollProviders(ctx context.Context) {
 	defer s.pollScheduler.EndGeneration(genID)
 
 	execCtx := s.serviceContext(ctx)
-	s.doPoll(execCtx)
+	s.doPollTargeted(execCtx, targetAccountID, manual, force)
 }
 
 func (s *Service) doPoll(ctx context.Context) {
+	s.doPollTargeted(ctx, "", false, false)
+}
+
+func (s *Service) doPollTargeted(ctx context.Context, targetAccountID string, manual bool, force bool) {
 	s.pollMu.Lock()
 	defer s.pollMu.Unlock()
 	started := time.Now()
@@ -74,6 +83,19 @@ func (s *Service) doPoll(ctx context.Context) {
 		return
 	}
 
+	if targetAccountID != "" {
+		filtered := make([]core.AccountConfig, 0, 1)
+		for _, acct := range accounts {
+			if strings.EqualFold(acct.ID, targetAccountID) {
+				filtered = append(filtered, acct)
+				break
+			}
+		}
+		if len(filtered) > 0 {
+			accounts = filtered
+		}
+	}
+
 	type providerResult struct {
 		accountID string
 		snapshot  core.UsageSnapshot
@@ -86,7 +108,7 @@ func (s *Service) doPoll(ctx context.Context) {
 		wg.Add(1)
 		go func(account core.AccountConfig) {
 			defer wg.Done()
-			if snap := s.pollSingleAccount(ctx, account, modelNorm); snap != nil {
+			if snap := s.pollSingleAccount(ctx, account, modelNorm, manual, force); snap != nil {
 				results <- providerResult{accountID: account.ID, snapshot: *snap}
 			}
 		}(acct)
@@ -175,7 +197,7 @@ func (s *Service) skipUnchangedProvider(provider core.UsageProvider, acct core.A
 	return &snap
 }
 
-func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountConfig, modelNorm core.ModelNormalizationConfig) *core.UsageSnapshot {
+func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountConfig, modelNorm core.ModelNormalizationConfig, manual bool, force bool) *core.UsageSnapshot {
 	select {
 	case <-ctx.Done():
 		return nil
@@ -195,20 +217,31 @@ func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountCon
 
 	_, hasDetector := provider.(core.ChangeDetector)
 
-	// Adaptive backoff: skip providers that are in a backoff window.
-	if !s.pollScheduler.ShouldPoll(account.ID, hasDetector) {
-		s.pollStateMu.Lock()
-		state := s.pollState[account.ID]
-		s.pollStateMu.Unlock()
-		if state != nil && state.hasSnap {
-			return &state.lastSnap
+	if manual {
+		if !s.pollScheduler.ShouldPollManual(account.ID, force) {
+			s.pollStateMu.Lock()
+			state := s.pollState[account.ID]
+			s.pollStateMu.Unlock()
+			if state != nil && state.hasSnap {
+				return &state.lastSnap
+			}
 		}
-	}
+	} else {
+		// Adaptive backoff: skip providers that are in a backoff window.
+		if !s.pollScheduler.ShouldPoll(account.ID, hasDetector) {
+			s.pollStateMu.Lock()
+			state := s.pollState[account.ID]
+			s.pollStateMu.Unlock()
+			if state != nil && state.hasSnap {
+				return &state.lastSnap
+			}
+		}
 
-	// Check if provider data has changed since last fetch (optional interface).
-	if cached := s.skipUnchangedProvider(provider, account); cached != nil {
-		s.pollScheduler.RecordPoll(account.ID, false)
-		return cached
+		// Check if provider data has changed since last fetch (optional interface).
+		if cached := s.skipUnchangedProvider(provider, account); cached != nil {
+			s.pollScheduler.RecordPoll(account.ID, false)
+			return cached
+		}
 	}
 
 	fetchStart := time.Now()
@@ -216,7 +249,7 @@ func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountCon
 	defer cancel()
 
 	snap, fetchErr := provider.Fetch(fetchCtx, account)
-	if snap.Timestamp.IsZero() {
+	if snap.Timestamp.IsZero() || snap.Timestamp.Before(fetchStart) {
 		snap.Timestamp = s.now().UTC()
 	}
 	fetchDurationMs := time.Since(fetchStart).Milliseconds()
@@ -256,10 +289,16 @@ func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountCon
 		}
 		if snap.Status == core.StatusLimited {
 			resetAt := findResetBoundary(snap)
-			if resetAt.IsZero() || resetAt.Before(s.now()) {
-				resetAt = s.now().Add(time.Minute)
+			if !resetAt.IsZero() && resetAt.After(s.now()) {
+				maxRateLimit := s.now().Add(2 * time.Hour)
+				if resetAt.After(maxRateLimit) {
+					resetAt = maxRateLimit
+				}
+				s.pollScheduler.RecordRateLimit(account.ID, resetAt)
+			} else if resetAt.IsZero() {
+				// No specific rate limit header provided; back off for 1 minute
+				s.pollScheduler.RecordRateLimit(account.ID, s.now().Add(time.Minute))
 			}
-			s.pollScheduler.RecordRateLimit(account.ID, resetAt)
 		} else if snap.Status == core.StatusOK {
 			s.pollScheduler.ClearRateLimit(account.ID)
 		} else if snap.Status == core.StatusError {
@@ -297,10 +336,23 @@ func (s *Service) pollSingleAccount(ctx context.Context, account core.AccountCon
 	return &snap
 }
 
+func isBillingOrQuotaResetKey(key string) bool {
+	lower := strings.ToLower(key)
+	for _, term := range []string{"billing", "cycle", "month", "plan", "credit", "quota"} {
+		if strings.Contains(lower, term) {
+			return true
+		}
+	}
+	return false
+}
+
 func findResetBoundary(snap core.UsageSnapshot) time.Time {
 	var earliest time.Time
-	for _, resetAt := range snap.Resets {
+	for key, resetAt := range snap.Resets {
 		if resetAt.IsZero() {
+			continue
+		}
+		if isBillingOrQuotaResetKey(key) {
 			continue
 		}
 		if earliest.IsZero() || resetAt.Before(earliest) {

@@ -218,6 +218,9 @@ func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 	}
 	refresh := r.URL.Query().Get("refresh") == "1"
 	accountID := strings.TrimSpace(r.URL.Query().Get("account_id"))
+	if accountID == "" {
+		accountID = strings.TrimSpace(r.URL.Query().Get("account"))
+	}
 	env, err := s.collector.envelopeRefresh(refresh, accountID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})

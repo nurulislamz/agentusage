@@ -30,7 +30,12 @@ func (d *snapshotDispatcher) dispatch(frame daemon.SnapshotFrame) {
 func (d *snapshotDispatcher) refresh(ctx context.Context, rt *daemon.ViewRuntime, req tui.RefreshRequest) uint64 {
 	requestID := d.nextID.Add(1)
 	go func() {
-		frame := rt.RefreshForWindow(ctx, req.TimeWindow)
+		var frame daemon.SnapshotFrame
+		if req.AccountID != "" {
+			frame = rt.RefreshAccountForWindow(ctx, req.AccountID, req.TimeWindow)
+		} else {
+			frame = rt.RefreshForWindow(ctx, req.TimeWindow)
+		}
 		d.send(frame, requestID)
 	}()
 	return requestID
