@@ -25,7 +25,10 @@ func (s *Service) computeReadModel(
 		TimeWindow:    tw,
 	})
 	if err != nil {
-		return result, err
+		if s.shouldLog("compute_read_model_telemetry_err", 10*time.Second) {
+			s.warnf("compute_read_model_telemetry_err", "telemetry view error: %v", err)
+		}
+		result = templates
 	}
 	accounts, modelNorm, loadErr := loadAccountsAndNormFunc()
 	if loadErr == nil {
@@ -47,7 +50,7 @@ func (s *Service) computeReadModel(
 	}
 	core.Tracef("[read_model_perf] computeReadModel TOTAL: %dms (window=%s, accounts=%d, results=%d)",
 		time.Since(start).Milliseconds(), tw, len(req.Accounts), len(result))
-	return result, err
+	return result, nil
 }
 
 func (s *Service) publishReadModelSync(ctx context.Context) {

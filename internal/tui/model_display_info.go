@@ -91,6 +91,23 @@ func computeDisplayInfoRaw(snap core.UsageSnapshot, widget core.DashboardWidget,
 		info.summary = "Not supported"
 		core.Tracef("[display] %s: branch=status_unsupported", snap.ProviderID)
 		return info
+	case core.StatusUnknown:
+		if len(snap.Metrics) == 0 {
+			info.tagEmoji = "◇"
+			info.tagLabel = "N/A"
+			info.reason = "status_unknown"
+			info.summary = "Unknown"
+			core.Tracef("[display] %s: branch=status_unknown", snap.ProviderID)
+			return info
+		}
+	}
+
+	if (snap.Status == "" || snap.Status == core.StatusUnknown) && len(snap.Metrics) == 0 {
+		info.tagEmoji = "◇"
+		info.tagLabel = "N/A"
+		info.reason = "empty_snapshot"
+		info.summary = "Unknown"
+		return info
 	}
 
 	core.Tracef("[display] %s: checking metrics (%d total), has usage_five_hour=%v, has today_api_cost=%v, has spend_limit=%v",
@@ -274,13 +291,56 @@ func computeDisplayInfoRaw(snap core.UsageSnapshot, widget core.DashboardWidget,
 		info.tagLabel = "Usage"
 		info.reason = "antigravity_quota"
 
-		rem := 100.0
-		if g5h, ok := snap.Metrics["quota_gemini_5h"]; ok && g5h.Remaining != nil {
-			rem = *g5h.Remaining
-		} else if gWk, ok := snap.Metrics["quota_gemini_weekly"]; ok && gWk.Remaining != nil {
-			rem = *gWk.Remaining
-		} else if c5h, ok := snap.Metrics["quota_3p_5h"]; ok && c5h.Remaining != nil {
-			rem = *c5h.Remaining
+		modelName := strings.ToLower(snap.Attributes["model"])
+		if modelName == "" {
+			modelName = strings.ToLower(snap.Attributes["model_id"])
+		}
+		isClaude := strings.Contains(modelName, "claude") || strings.Contains(modelName, "sonnet") || strings.Contains(modelName, "opus") || strings.Contains(modelName, "3p") || strings.Contains(modelName, "gpt")
+
+		now := time.Now()
+		getMetricRem := func(keys ...string) (float64, bool) {
+			for _, k := range keys {
+				if m, ok := snap.Metrics[k]; ok && m.Remaining != nil {
+					val := *m.Remaining
+					if r, hasR := snap.Resets[k]; hasR && !r.IsZero() && r.Before(now) {
+						return 100.0, true
+					}
+					if r, hasR := snap.Resets[k+"_reset"]; hasR && !r.IsZero() && r.Before(now) {
+						return 100.0, true
+					}
+					return val, true
+				}
+			}
+			return 100.0, false
+		}
+
+		var rem float64
+		var hasMetric bool
+		if isClaude {
+			rem, hasMetric = getMetricRem("quota_claude_5h", "quota_3p_5h", "quota_claude_weekly", "quota_3p_weekly", "quota_gemini_5h", "quota_gemini_weekly")
+		} else {
+			rem, hasMetric = getMetricRem("quota_gemini_5h", "quota_gemini_weekly", "quota_claude_5h", "quota_3p_5h")
+		}
+
+		if !hasMetric {
+			if q, ok := snap.Metrics["quota"]; ok && q.Remaining != nil {
+				rem = *q.Remaining
+				if r, hasR := snap.Resets["quota"]; hasR && !r.IsZero() && r.Before(now) {
+					rem = 100.0
+				}
+				hasMetric = true
+			}
+		}
+
+		if !hasMetric {
+			if snap.Status == core.StatusUnknown || snap.Status == "" {
+				info.tagEmoji = "◇"
+				info.tagLabel = "N/A"
+				info.reason = "status_unknown"
+				info.summary = "Unknown"
+				info.gaugePercent = -1
+				return info
+			}
 		}
 
 		if isUsedMode {

@@ -180,7 +180,7 @@ func (s *Service) handleReadModel(w http.ResponseWriter, r *http.Request) {
 	computeCtx, cancel := context.WithTimeout(r.Context(), computeTimeout)
 	snapshots, err := s.computeReadModel(computeCtx, req)
 	cancel()
-	if err == nil && len(snapshots) > 0 {
+	if err == nil && len(snapshots) > 0 && SnapshotsHaveUsableData(snapshots) {
 		s.rmCache.set(cacheKey, snapshots)
 		writeJSON(w, http.StatusOK, ReadModelResponse{Snapshots: snapshots})
 		return
@@ -188,6 +188,11 @@ func (s *Service) handleReadModel(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil && s.shouldLog("read_model_cache_miss_compute_error", 8*time.Second) {
 		s.warnf("read_model_cache_miss_compute_error", "error=%v", err)
+	}
+
+	if cached, _, ok := s.rmCache.get(cacheKey); ok && len(cached) > 0 && SnapshotsHaveUsableData(cached) {
+		writeJSON(w, http.StatusOK, ReadModelResponse{Snapshots: cached})
+		return
 	}
 
 	// Re-arm the data-ingested flag so the periodic refresh loop tries

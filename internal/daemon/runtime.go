@@ -234,7 +234,16 @@ func (r *ViewRuntime) readFrame(ctx context.Context, timeWindow core.TimeWindow,
 		}
 		r.lastGoodSnapshots[frame.TimeWindow] = core.DeepCloneSnapshots(snaps)
 		r.lastGoodMu.Unlock()
+		frame.Snapshots = snaps
+		return frame
 	}
+	r.lastGoodMu.RLock()
+	if cached, ok := r.lastGoodSnapshots[frame.TimeWindow]; ok && len(cached) > 0 {
+		frame.Snapshots = core.DeepCloneSnapshots(cached)
+		r.lastGoodMu.RUnlock()
+		return frame
+	}
+	r.lastGoodMu.RUnlock()
 	frame.Snapshots = snaps
 	return frame
 }

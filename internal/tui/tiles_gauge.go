@@ -457,10 +457,12 @@ func (m Model) buildAntigravityTileGaugeLines(snap core.UsageSnapshot, innerW in
 					for resetAt.Before(now) {
 						resetAt = resetAt.Add(7 * 24 * time.Hour)
 					}
+					remaining = 100.0
 				} else if strings.Contains(label, "Five Hour") {
 					for resetAt.Before(now) {
 						resetAt = resetAt.Add(5 * time.Hour)
 					}
+					remaining = 100.0
 				}
 			}
 

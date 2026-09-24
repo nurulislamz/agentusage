@@ -33,7 +33,7 @@ func (c *collector) fetchSnapshots(ctx context.Context, refresh bool, accountID 
 		} else {
 			frame = c.rt.ReadWithFallbackForWindow(ctx, tw)
 		}
-		if len(frame.Snapshots) > 0 {
+		if len(frame.Snapshots) > 0 && daemon.SnapshotsHaveUsableData(frame.Snapshots) {
 			if c.enrich != nil {
 				c.enrich(ctx, frame.Snapshots, accountID)
 			}

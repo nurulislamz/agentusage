@@ -204,6 +204,17 @@ func buildDetailUsageSection(snap core.UsageSnapshot, widget core.DashboardWidge
 }
 
 func buildAntigravityDetailUsageSection(snap core.UsageSnapshot, innerW int, warnThresh, critThresh float64, now time.Time, isUsedMode bool) []string {
+	hasAnyQuota := false
+	for k := range snap.Metrics {
+		if strings.HasPrefix(k, "quota") {
+			hasAnyQuota = true
+			break
+		}
+	}
+	if !hasAnyQuota && (snap.Status == core.StatusUnknown || snap.Status == "") {
+		return nil
+	}
+
 	var lines []string
 
 	barW := innerW - 14
@@ -272,10 +283,12 @@ func buildAntigravityDetailUsageSection(snap core.UsageSnapshot, innerW int, war
 					for resetAt.Before(now) {
 						resetAt = resetAt.Add(7 * 24 * time.Hour)
 					}
+					remaining = 100.0
 				} else if strings.Contains(label, "Five Hour") {
 					for resetAt.Before(now) {
 						resetAt = resetAt.Add(5 * time.Hour)
 					}
+					remaining = 100.0
 				}
 			}
 

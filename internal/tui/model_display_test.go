@@ -581,3 +581,64 @@ func TestComputeDisplayInfo_BillingBlockFallbackClassifiesAsUsage(t *testing.T) 
 		t.Fatalf("detail = %q, want '$94.93 5h block'", got.detail)
 	}
 }
+
+func TestComputeDisplayInfo_EmptyUnknownSnapshot_DoesNotDefaultTo100(t *testing.T) {
+	snap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		Status:     core.StatusUnknown,
+		Metrics:    map[string]core.Metric{},
+	}
+	got := computeDisplayInfo(snap, core.DefaultDashboardWidget(), false)
+	if got.gaugePercent >= 0 {
+		t.Fatalf("expected gaugePercent < 0 for empty snapshot, got %f", got.gaugePercent)
+	}
+	if got.summary != "Unknown" {
+		t.Fatalf("expected summary 'Unknown', got %q", got.summary)
+	}
+}
+
+func TestComputeDisplayInfo_AntigravityExpiredReset_DecaysTo100(t *testing.T) {
+	staleRem := 88.0
+	snap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		Status:     core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"quota_gemini_5h": {Remaining: &staleRem, Limit: core.Float64Ptr(100), Unit: "%", Window: "5h"},
+		},
+		Resets: map[string]time.Time{
+			"quota_gemini_5h": time.Now().Add(-2 * time.Hour), // expired 2 hours ago
+		},
+	}
+	got := computeDisplayInfo(snap, core.DefaultDashboardWidget(), false)
+	if got.gaugePercent != 100.0 {
+		t.Fatalf("expected gaugePercent 100.0 for expired reset, got %f", got.gaugePercent)
+	}
+	if got.summary != "100.00%" {
+		t.Fatalf("expected summary '100.00%%', got %q", got.summary)
+	}
+}
+
+func TestComputeDisplayInfo_AntigravityModelActivePool(t *testing.T) {
+	geminiRem := 20.0
+	claudeRem := 90.0
+	snap := core.UsageSnapshot{
+		ProviderID: "antigravity",
+		Status:     core.StatusOK,
+		Attributes: map[string]string{
+			"model": "Claude 3.7 Sonnet",
+		},
+		Metrics: map[string]core.Metric{
+			"quota_gemini_5h": {Remaining: &geminiRem, Limit: core.Float64Ptr(100), Unit: "%", Window: "5h"},
+			"quota_claude_5h": {Remaining: &claudeRem, Limit: core.Float64Ptr(100), Unit: "%", Window: "5h"},
+		},
+		Resets: map[string]time.Time{
+			"quota_gemini_5h": time.Now().Add(2 * time.Hour),
+			"quota_claude_5h": time.Now().Add(3 * time.Hour),
+		},
+	}
+	got := computeDisplayInfo(snap, core.DefaultDashboardWidget(), false)
+	if got.gaugePercent != 90.0 {
+		t.Fatalf("expected gaugePercent 90.0 for Claude active pool, got %f", got.gaugePercent)
+	}
+}
+
