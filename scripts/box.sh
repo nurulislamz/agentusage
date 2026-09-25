@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create / list / remove multi-account box profiles (agy-box, agent-box, opencode-box).
+# Create / list / remove multi-account box profiles (agy-box, agent-box, opencode-box, codex-box).
 # Installs the bundled CLI into ~/.local/bin when missing, then runs it.
 set -euo pipefail
 
@@ -22,6 +22,8 @@ Kinds:
                 aliases: agy, antigravity
   opencode-box  OpenCode boxes (~/.opencode-containers)
                 aliases: opencode
+  codex-box     OpenAI Codex boxes (~/.codex-containers)
+                aliases: codex
 EOF
 }
 
@@ -43,6 +45,9 @@ resolve_kind() {
     opencode-box | opencode)
       printf '%s\n' opencode-box
       ;;
+    codex-box | codex)
+      printf '%s\n' codex-box
+      ;;
     *)
       return 1
       ;;
@@ -51,7 +56,7 @@ resolve_kind() {
 
 need_kind() {
   local kind
-  kind="$(resolve_kind "${1:-}")" || die "unknown box kind '${1:-}' (try agent-box, agy-box, opencode-box)"
+  kind="$(resolve_kind "${1:-}")" || die "unknown box kind '${1:-}' (try agent-box, agy-box, opencode-box, codex-box)"
   printf '%s\n' "$kind"
 }
 
@@ -126,7 +131,7 @@ cmd_list() {
   local raw="${1:-}" kind cli
   if [ -z "$raw" ]; then
     local any=0
-    for kind in agent-box agy-box opencode-box; do
+    for kind in agent-box agy-box opencode-box codex-box; do
       if [ -f "$(scripts_dir)/$kind" ]; then
         any=1
         echo "==> $kind"

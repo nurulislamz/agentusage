@@ -3,6 +3,7 @@ package detect
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,23 +18,84 @@ import (
 const codexOpenAIAccountID = "openai"
 
 func detectCodex(result *Result) {
+	home := homeDir()
 	bin := findBinary("codex")
-	if bin == "" {
+
+	// 1. Auto-detect all active codex-box container profiles in ~/.codex-containers
+	containersDir := filepath.Join(home, ".codex-containers")
+	hasBoxes := false
+	if dirExists(containersDir) {
+		entries, err := os.ReadDir(containersDir)
+		if err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					continue
+				}
+				boxName := entry.Name()
+				boxProfileDir := filepath.Join(containersDir, boxName)
+				boxConfigDir := filepath.Join(boxProfileDir, ".codex")
+				if !dirExists(boxConfigDir) {
+					if dirExists(filepath.Join(boxProfileDir, "sessions")) || fileExists(filepath.Join(boxProfileDir, "auth.json")) {
+						boxConfigDir = boxProfileDir
+					}
+				}
+
+				boxSessionsDir := filepath.Join(boxConfigDir, "sessions")
+				boxAuthFile := filepath.Join(boxConfigDir, "auth.json")
+				hasBoxSessions := dirExists(boxSessionsDir)
+				hasBoxAuth := fileExists(boxAuthFile)
+
+				acct := core.AccountConfig{
+					ID:           fmt.Sprintf("codex-%s", boxName),
+					Provider:     "codex",
+					Auth:         "local",
+					Binary:       bin,
+					RuntimeHints: make(map[string]string),
+				}
+				acct.SetHint("config_dir", boxConfigDir)
+				acct.SetHint("box_name", boxName)
+				if hasBoxSessions {
+					acct.SetHint("sessions_dir", boxSessionsDir)
+				}
+				if hasBoxAuth {
+					acct.SetHint("auth_file", boxAuthFile)
+					email, accountID, planType, _ := extractCodexAuth(boxAuthFile)
+					if email != "" {
+						acct.RuntimeHints["email"] = email
+					}
+					if accountID != "" {
+						acct.RuntimeHints["account_id"] = accountID
+					}
+					if planType != "" {
+						acct.RuntimeHints["plan_type"] = planType
+					}
+				}
+				addAccount(result, acct)
+				hasBoxes = true
+			}
+		}
+	}
+
+	// 2. Default single-profile Codex config dir
+	configDir := strings.TrimSpace(os.Getenv("CODEX_CONFIG_DIR"))
+	if configDir == "" {
+		configDir = filepath.Join(home, ".codex")
+	}
+
+	if !dirExists(configDir) && bin == "" && !hasBoxes {
 		return
 	}
 
-	home := homeDir()
-	configDir := filepath.Join(home, ".codex")
-
-	tool := DetectedTool{
-		Name:       "OpenAI Codex CLI",
-		BinaryPath: bin,
-		ConfigDir:  configDir,
-		Type:       "cli",
+	if bin != "" {
+		tool := DetectedTool{
+			Name:       "OpenAI Codex CLI",
+			BinaryPath: bin,
+			ConfigDir:  configDir,
+			Type:       "cli",
+		}
+		result.Tools = append(result.Tools, tool)
+		log.Printf("[detect] Found Codex CLI at %s", bin)
 	}
-	result.Tools = append(result.Tools, tool)
-
-	log.Printf("[detect] Found Codex CLI at %s", bin)
 
 	sessionsDir := filepath.Join(configDir, "sessions")
 	authFile := filepath.Join(configDir, "auth.json")
@@ -42,7 +104,6 @@ func detectCodex(result *Result) {
 	hasAuth := fileExists(authFile)
 
 	if !hasSessions && !hasAuth {
-		log.Printf("[detect] Codex CLI found but no session/auth data at expected locations")
 		return
 	}
 

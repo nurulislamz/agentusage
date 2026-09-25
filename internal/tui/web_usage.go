@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
@@ -301,7 +302,9 @@ func applyTimerToUsageLine(line WebUsageLine, timer WebDetailRow) WebUsageLine {
 }
 
 func resetInFromHint(hint string) string {
-	h := strings.TrimSpace(hint)
+	// Hints are decorated with a leading status glyph ("⏳ Resets in 11d",
+	// "⏱  Resets in 4h 25m"), so match the caption that follows it.
+	h := strings.TrimLeftFunc(strings.TrimSpace(hint), func(r rune) bool { return !unicode.IsLetter(r) })
 	lower := strings.ToLower(h)
 	for _, prefix := range []string{"resets in ", "reset in ", "in "} {
 		if strings.HasPrefix(lower, prefix) {

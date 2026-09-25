@@ -656,3 +656,49 @@ func TestWebProjectorRecentActivity(t *testing.T) {
 	}
 }
 
+// Cursor gauges carry a status-glyph reset hint ("⏳ Resets in 11d") and expose
+// no timer rows, so the usage line must recover the countdown from the hint or
+// the reset silently drops out of the strips/dials/bars boards.
+func TestProjectUsageLinesParsesGlyphPrefixedResetHints(t *testing.T) {
+	now := time.Date(2026, 9, 17, 0, 0, 0, 0, time.UTC)
+	hundred, zero := 100.0, 0.0
+	cases := []struct {
+		name string
+		hint string
+		want string
+	}{
+		{"exhausted quota hourglass", "⏳ Resets in 11d", "11d"},
+		{"healthy countdown clock", "⏱  Resets in 12d 13h", "12d 13h"},
+		{"imminent reset bolt", "⚡ Resets in 41m", "41m"},
+		{"plain hint", "Resets in 2d 13h", "2d 13h"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			snap := core.UsageSnapshot{
+				ProviderID: "cursor",
+				AccountID:  "cursor-nurulz",
+				Metrics: map[string]core.Metric{
+					"plan_percent_used": {
+						Limit: &hundred, Used: &hundred, Remaining: &zero, Unit: "%", Window: "monthly",
+					},
+				},
+				Resets: map[string]time.Time{"plan_percent_used": now.Add(11 * 24 * time.Hour)},
+			}
+			cards := []WebDetailCard{{
+				ID:    "usage",
+				Title: "Usage",
+				Rows: []WebDetailRow{{
+					Kind: "gauge", Label: "Included Used", Percent: &hundred, Hint: tc.hint, Tone: "crit",
+				}},
+			}}
+
+			lines := projectUsageLines(snap, core.DashboardWidget{}, cards, now)
+			if len(lines) != 1 {
+				t.Fatalf("lines = %#v, want exactly one", lines)
+			}
+			if got := lines[0].ResetIn; got != tc.want {
+				t.Fatalf("ResetIn = %q, want %q for hint %q", got, tc.want, tc.hint)
+			}
+		})
+	}
+}

@@ -50,7 +50,7 @@ BINDST="$WORKDIR/bin"
 trap 'rm -rf "$WORKDIR" /tmp/box_test_out.$$ /tmp/box_test_err.$$' EXIT
 
 mkdir -p "$SCRIPTS" "$BINDST"
-for kind in agent-box agy-box opencode-box; do
+for kind in agent-box agy-box opencode-box codex-box; do
   cat >"$SCRIPTS/$kind" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >"$WORKDIR/${kind}.invoked"
@@ -85,6 +85,10 @@ assert_eq "$(cat "$WORKDIR/agent-box.invoked")" "add nurulz" "cursor-box maps to
 
 assert_ok "add opencode" run_box add opencode-box work
 assert_eq "$(cat "$WORKDIR/opencode-box.invoked")" "add work" "opencode-box invoked"
+
+assert_ok "add codex alias" run_box add codex dev
+assert_eq "$(cat "$WORKDIR/codex-box.invoked")" "add dev" "codex maps to codex-box"
+assert_ok "installed codex-box" test -x "$BINDST/codex-box"
 
 # NAME env
 assert_ok "add NAME env" env PATH="$PATH" BOX_SCRIPTS_DIR="$SCRIPTS" BOX_INSTALL_DIR="$BINDST" NAME=fromenv "$BOX" add agent-box
@@ -154,13 +158,21 @@ exit 0
 EOF
 chmod +x "$FAKE_BIN/agent"
 
+cat >"$FAKE_BIN/codex" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$FAKE_BIN/codex"
+
 export BOX_TEST_LOG="$WORKDIR/bwrap.log"
 REAL_AGY_BOX="$ROOT/scripts/boxes/agy-box"
 REAL_AGENT_BOX="$ROOT/scripts/boxes/agent-box"
+REAL_CODEX_BOX="$ROOT/scripts/boxes/codex-box"
 
 # 1. Shell syntax check
 assert_ok "agy-box syntax" bash -n "$REAL_AGY_BOX"
 assert_ok "agent-box syntax" bash -n "$REAL_AGENT_BOX"
+assert_ok "codex-box syntax" bash -n "$REAL_CODEX_BOX"
 
 # 2. agy-box add does not inject statusline
 assert_ok "agy-box add devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGY_BOX" add devbox
@@ -206,6 +218,16 @@ assert_ok "agent-box launch devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" 
 assert_ok "agent-box invoked fake bwrap" test -s "$BOX_TEST_LOG"
 assert_ok "agent-box launch preserved custom statusLine command" grep -q 'custom-status-cmd' "$CURSOR_CONFIG"
 assert_fail "agent-box launch did not inject openusage statusline" grep -q 'openusage cursor statusline' "$CURSOR_CONFIG"
+
+# 6. codex-box add creates profile and .codex dir
+assert_ok "codex-box add devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_CODEX_BOX" add devbox
+assert_ok "codex-box creates .codex directory" test -d "$BOX_HOME/.codex-containers/devbox/.codex"
+
+# 7. codex-box launch invokes bwrap
+: >"$BOX_TEST_LOG"
+assert_ok "codex-box launch devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_CODEX_BOX" devbox
+assert_ok "codex-box invoked fake bwrap" test -s "$BOX_TEST_LOG"
+assert_ok "codex-box binds profile .codex" grep -q -- "$BOX_HOME/.codex-containers/devbox/.codex" "$BOX_TEST_LOG"
 
 echo
 echo "passed=$PASS failed=$FAIL"
