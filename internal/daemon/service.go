@@ -543,4 +543,3 @@ func buildStableBinary() (string, error) {
 	}
 	return filepath.Abs(outPath)
 }
-

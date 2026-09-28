@@ -83,25 +83,20 @@ func ApplyCanonicalTelemetryViewWithOptions(
 	// busy poller/checkpoint from blocking dashboard reads past their timeout.
 	db, err := openReadOnlyDB(dbPath)
 	if err != nil {
-		if IsDatabaseCorruptError(err) {
-			return snaps, nil
-		}
 		// Read-only open can fail in rare states (e.g. a WAL DB whose writer
 		// is not yet up, so -shm is absent). Fall back to a read-write handle.
 		// This path runs inside the writer process, so it adds no corruption
 		// risk beyond the previous behavior.
+		//
+		// Corrupt/malformed DBs must return an error (not empty success):
+		// callers cache on nil error, and a silent template fallback would
+		// permanently replace a previously good dashboard/history frame.
 		db, err = sql.Open("sqlite3", dbPath)
 		if err != nil {
-			if IsDatabaseCorruptError(err) {
-				return snaps, nil
-			}
 			return snaps, fmt.Errorf("open telemetry read model db: %w", err)
 		}
 		if cfgErr := configureSQLiteConnection(db); cfgErr != nil {
 			_ = db.Close()
-			if IsDatabaseCorruptError(cfgErr) {
-				return snaps, nil
-			}
 			return snaps, fmt.Errorf("configure telemetry read model db: %w", cfgErr)
 		}
 	}
@@ -111,9 +106,6 @@ func ApplyCanonicalTelemetryViewWithOptions(
 	done = trace("hydrateRootsFromLimitSnapshots")
 	merged, err := hydrateRootsFromLimitSnapshots(ctx, db, snaps)
 	if err != nil {
-		if IsDatabaseCorruptError(err) {
-			return snaps, nil
-		}
 		return snaps, err
 	}
 	done()
@@ -123,9 +115,6 @@ func ApplyCanonicalTelemetryViewWithOptions(
 	done = trace("annotateUnmappedTelemetryProviders")
 	merged, err = annotateUnmappedTelemetryProviders(ctx, db, merged, links)
 	if err != nil {
-		if IsDatabaseCorruptError(err) {
-			return snaps, nil
-		}
 		return snaps, err
 	}
 	done()

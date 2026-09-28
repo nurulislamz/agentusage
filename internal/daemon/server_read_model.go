@@ -18,16 +18,19 @@ func (s *Service) computeReadModel(
 		return map[string]core.UsageSnapshot{}, nil
 	}
 	tw := normalizeReadModelTimeWindow(req.TimeWindow)
-	result, err := telemetry.ApplyCanonicalTelemetryViewWithOptions(ctx, s.cfg.DBPath, templates, telemetry.ReadModelOptions{
+	result, telemetryErr := telemetry.ApplyCanonicalTelemetryViewWithOptions(ctx, s.cfg.DBPath, templates, telemetry.ReadModelOptions{
 		ProviderLinks: req.ProviderLinks,
 		Since:         tw.Since(),
 		TodaySince:    core.LocalMidnight(),
 		TimeWindow:    tw,
 	})
-	if err != nil {
+	if telemetryErr != nil {
 		if s.shouldLog("compute_read_model_telemetry_err", 10*time.Second) {
-			s.warnf("compute_read_model_telemetry_err", "telemetry view error: %v", err)
+			s.warnf("compute_read_model_telemetry_err", "telemetry view error: %v", telemetryErr)
 		}
+		// Keep serving poll/template gauges, but propagate the error so cache
+		// writers do not replace a good history-bearing entry with this
+		// degraded view (and so /v1/read-model can fall back to last-good).
 		result = templates
 	}
 	accounts, modelNorm, loadErr := loadAccountsAndNormFunc()
@@ -50,7 +53,7 @@ func (s *Service) computeReadModel(
 	}
 	core.Tracef("[read_model_perf] computeReadModel TOTAL: %dms (window=%s, accounts=%d, results=%d)",
 		time.Since(start).Milliseconds(), tw, len(req.Accounts), len(result))
-	return result, nil
+	return result, telemetryErr
 }
 
 func (s *Service) publishReadModelSync(ctx context.Context) {
@@ -65,7 +68,7 @@ func (s *Service) publishReadModelSync(ctx context.Context) {
 	computeCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	snapshots, err := s.computeReadModel(computeCtx, req)
-	if err == nil && len(snapshots) > 0 {
+	if err == nil && len(snapshots) > 0 && SnapshotsHaveUsableData(snapshots) {
 		s.rmCache.set(cacheKey, snapshots)
 		s.pushToExporter(computeCtx, snapshots)
 	}
@@ -89,6 +92,9 @@ func (s *Service) refreshReadModelCacheAsync(
 			if s.shouldLog("read_model_cache_refresh_error", 8*time.Second) {
 				s.warnf("read_model_cache_refresh_error", "error=%v", err)
 			}
+			return
+		}
+		if len(snapshots) == 0 || !SnapshotsHaveUsableData(snapshots) {
 			return
 		}
 		s.rmCache.set(cacheKey, snapshots)

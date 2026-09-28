@@ -195,6 +195,15 @@ func (s *Service) handleReadModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Telemetry failed (or produced empty templates) but poll enrichment may
+	// still have usable gauges. Serve them without caching so a later
+	// successful telemetry read can restore history without being overwritten.
+	if len(snapshots) > 0 && SnapshotsHaveUsableData(snapshots) {
+		s.markDataIngested()
+		writeJSON(w, http.StatusOK, ReadModelResponse{Snapshots: snapshots})
+		return
+	}
+
 	// Re-arm the data-ingested flag so the periodic refresh loop tries
 	// again instead of sticking on stale empty templates. Without this,
 	// a single failed compute can leave the read-model cache permanently
