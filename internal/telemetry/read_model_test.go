@@ -485,5 +485,3 @@ func TestApplyCanonicalTelemetryView_RepairsLegacyCodexProviderID(t *testing.T) 
 		t.Fatalf("missing codex tool metric after account repair: %+v", toolMetric)
 	}
 }
-
-

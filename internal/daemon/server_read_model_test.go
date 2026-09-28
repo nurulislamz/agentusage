@@ -1,7 +1,13 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -73,3 +79,121 @@ func TestRefreshReadModelCacheFromConfig(t *testing.T) {
 	// Should safely run and trigger async refresh without error
 	svc.refreshReadModelCacheFromConfig(context.Background())
 }
+
+func TestComputeReadModel_TelemetryFailureDoesNotPoisonCache(t *testing.T) {
+	badDB := filepath.Join(t.TempDir(), "not-a-database.db")
+	if err := os.WriteFile(badDB, []byte("this is not a sqlite database"), 0o600); err != nil {
+		t.Fatalf("write corrupt db stub: %v", err)
+	}
+
+	acct := core.AccountConfig{ID: "acct-1", Provider: "fake-prov"}
+	req := ReadModelRequest{
+		Accounts:   []ReadModelAccount{{AccountID: acct.ID, ProviderID: acct.Provider}},
+		TimeWindow: core.TimeWindow30d,
+	}
+	cacheKey := ReadModelRequestKey(req)
+
+	good := map[string]core.UsageSnapshot{
+		acct.ID: {
+			ProviderID: acct.Provider,
+			AccountID:  acct.ID,
+			Status:     core.StatusOK,
+			Metrics: map[string]core.Metric{
+				"tokens": {Used: floatPtr(42), Limit: floatPtr(100), Unit: "tokens"},
+			},
+			DailySeries: map[string][]core.TimePoint{
+				"tokens": {{Date: "2026-09-28", Value: 42}},
+			},
+		},
+	}
+
+	origLoad := loadAccountsAndNormFunc
+	origBuild := buildReadModelRequestFromConfigFunc
+	origDisabled := disabledAccountsFromConfigFunc
+	defer func() {
+		loadAccountsAndNormFunc = origLoad
+		buildReadModelRequestFromConfigFunc = origBuild
+		disabledAccountsFromConfigFunc = origDisabled
+	}()
+	loadAccountsAndNormFunc = func() ([]core.AccountConfig, core.ModelNormalizationConfig, error) {
+		return []core.AccountConfig{acct}, core.DefaultModelNormalizationConfig(), nil
+	}
+	buildReadModelRequestFromConfigFunc = func() (ReadModelRequest, error) {
+		return req, nil
+	}
+	disabledAccountsFromConfigFunc = func() map[string]bool { return map[string]bool{} }
+
+	svc := &Service{
+		cfg:          Config{DBPath: badDB},
+		rmCache:      newReadModelCache(),
+		pollState:    make(map[string]*providerPollState),
+		logThrottle:  core.NewLogThrottle(5, time.Minute),
+		providerByID: map[string]core.UsageProvider{},
+	}
+	svc.pollState[acct.ID] = &providerPollState{
+		hasSnap: true,
+		lastSnap: core.UsageSnapshot{
+			ProviderID: acct.Provider,
+			AccountID:  acct.ID,
+			Status:     core.StatusOK,
+			Timestamp:  time.Now().UTC(),
+			Metrics: map[string]core.Metric{
+				"tokens": {Used: floatPtr(7), Limit: floatPtr(100), Unit: "tokens"},
+			},
+		},
+	}
+	svc.rmCache.set(cacheKey, good)
+
+	// computeReadModel must surface the telemetry failure even when poll
+	// enrichment still yields usable gauges.
+	got, err := svc.computeReadModel(context.Background(), req)
+	if err == nil {
+		t.Fatal("computeReadModel: expected telemetry error for corrupt db, got nil")
+	}
+	if !SnapshotsHaveUsableData(got) {
+		t.Fatalf("computeReadModel degraded result should still be usable via poll overlay: %+v", got)
+	}
+	if len(got[acct.ID].DailySeries) != 0 {
+		t.Fatalf("degraded result unexpectedly kept DailySeries: %+v", got[acct.ID].DailySeries)
+	}
+
+	// publishReadModelSync must not replace the history-bearing cache entry.
+	svc.publishReadModelSync(context.Background())
+	cached, _, ok := svc.rmCache.get(cacheKey)
+	if !ok {
+		t.Fatal("cache entry missing after publishReadModelSync")
+	}
+	if len(cached[acct.ID].DailySeries["tokens"]) == 0 {
+		t.Fatalf("publishReadModelSync poisoned cache; DailySeries lost: %+v", cached[acct.ID])
+	}
+	if cached[acct.ID].Metrics["tokens"].Used == nil || *cached[acct.ID].Metrics["tokens"].Used != 42 {
+		t.Fatalf("publishReadModelSync overwrote good metrics: got %+v", cached[acct.ID].Metrics["tokens"])
+	}
+
+	// Forced refresh must serve last-good history instead of caching the
+	// history-stripped poll overlay.
+	body, _ := json.Marshal(ReadModelRequest{
+		Accounts:   req.Accounts,
+		TimeWindow: req.TimeWindow,
+		Refresh:    true,
+	})
+	httpReq := httptest.NewRequest(http.MethodPost, "/v1/read-model", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	svc.handleReadModel(w, httpReq)
+	if w.Code != http.StatusOK {
+		t.Fatalf("handleReadModel status=%d body=%s", w.Code, w.Body.String())
+	}
+	var resp ReadModelResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Snapshots[acct.ID].DailySeries["tokens"]) == 0 {
+		t.Fatalf("refresh response lost DailySeries; got %+v", resp.Snapshots[acct.ID])
+	}
+	cachedAfter, _, ok := svc.rmCache.get(cacheKey)
+	if !ok || len(cachedAfter[acct.ID].DailySeries["tokens"]) == 0 {
+		t.Fatalf("handleReadModel refresh poisoned cache: %+v", cachedAfter)
+	}
+}
+
+func floatPtr(v float64) *float64 { return &v }

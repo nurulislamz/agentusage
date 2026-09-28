@@ -165,7 +165,6 @@ func TestNewServiceManagerWithExecutable(t *testing.T) {
 	}
 }
 
-
 func TestParseLSOFFirstRecord(t *testing.T) {
 	out := "p4321\nckooky\nn/tmp/agentusage.sock\n"
 	got := parseLSOFFirstRecord(out)
