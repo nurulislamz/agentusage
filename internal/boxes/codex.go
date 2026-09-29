@@ -44,19 +44,14 @@ func resolveCodexContainersDir(baseDirs []string) string {
 
 func CreateCodexBox(ctx context.Context, name string, baseDirs ...string) (string, error) {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return "", fmt.Errorf("box name cannot be empty")
-	}
-	if strings.HasPrefix(name, "-") || strings.ContainsAny(name, " /\\:") {
-		return "", fmt.Errorf("invalid box name: %q", name)
-	}
-
 	root := resolveCodexContainersDir(baseDirs)
 	if root == "" {
 		return "", fmt.Errorf("cannot determine containers directory")
 	}
-
-	profileDir := filepath.Join(root, name)
+	profileDir, err := resolveBoxProfileDir(root, name)
+	if err != nil {
+		return "", err
+	}
 	if _, err := os.Stat(profileDir); err == nil {
 		return profileDir, fmt.Errorf("box %q already exists", name)
 	}
@@ -90,14 +85,14 @@ func CreateCodexBox(ctx context.Context, name string, baseDirs ...string) (strin
 
 func DeleteCodexBox(ctx context.Context, name string, baseDirs ...string) error {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return fmt.Errorf("box name cannot be empty")
-	}
 	root := resolveCodexContainersDir(baseDirs)
 	if root == "" {
 		return fmt.Errorf("cannot determine containers directory")
 	}
-	profileDir := filepath.Join(root, name)
+	profileDir, err := resolveBoxProfileDir(root, name)
+	if err != nil {
+		return err
+	}
 	if _, err := os.Stat(profileDir); os.IsNotExist(err) {
 		return fmt.Errorf("box %q does not exist", name)
 	}

@@ -67,19 +67,14 @@ func resolveContainersDir(baseDirs []string) string {
 
 func CreateBox(ctx context.Context, name string, baseDirs ...string) (string, error) {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return "", fmt.Errorf("box name cannot be empty")
-	}
-	if strings.HasPrefix(name, "-") || strings.ContainsAny(name, " /\\:") {
-		return "", fmt.Errorf("invalid box name: %q", name)
-	}
-
 	root := resolveContainersDir(baseDirs)
 	if root == "" {
 		return "", fmt.Errorf("cannot determine containers directory")
 	}
-
-	profileDir := filepath.Join(root, name)
+	profileDir, err := resolveBoxProfileDir(root, name)
+	if err != nil {
+		return "", err
+	}
 	if _, err := os.Stat(profileDir); err == nil {
 		return profileDir, fmt.Errorf("box %q already exists", name)
 	}
@@ -117,14 +112,14 @@ func CreateBox(ctx context.Context, name string, baseDirs ...string) (string, er
 
 func DeleteBox(ctx context.Context, name string, baseDirs ...string) error {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return fmt.Errorf("box name cannot be empty")
-	}
 	root := resolveContainersDir(baseDirs)
 	if root == "" {
 		return fmt.Errorf("cannot determine containers directory")
 	}
-	profileDir := filepath.Join(root, name)
+	profileDir, err := resolveBoxProfileDir(root, name)
+	if err != nil {
+		return err
+	}
 	if _, err := os.Stat(profileDir); os.IsNotExist(err) {
 		return fmt.Errorf("box %q does not exist", name)
 	}
@@ -290,9 +285,6 @@ func DefaultBoxRunner(ctx context.Context, box string, args ...string) (io.ReadC
 
 func LoginBoxSession(ctx context.Context, name string, opts LoginOptions) error {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return fmt.Errorf("box name cannot be empty")
-	}
 
 	timeout := opts.Timeout
 	if timeout <= 0 {
@@ -310,7 +302,11 @@ func LoginBoxSession(ctx context.Context, name string, opts LoginOptions) error 
 	if root == "" {
 		root = DefaultContainersDir()
 	}
-	tokenPath := filepath.Join(root, name, ".gemini", "antigravity-cli", "antigravity-oauth-token")
+	profileDir, err := resolveBoxProfileDir(root, name)
+	if err != nil {
+		return err
+	}
+	tokenPath := filepath.Join(profileDir, ".gemini", "antigravity-cli", "antigravity-oauth-token")
 
 	runner := opts.Runner
 	if runner == nil {

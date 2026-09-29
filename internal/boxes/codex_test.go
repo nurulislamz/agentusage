@@ -40,6 +40,12 @@ func TestCreateCodexBox_SuccessAndValidation(t *testing.T) {
 	if _, err := CreateCodexBox(context.Background(), "invalid/slash", dir); err == nil {
 		t.Errorf("expected error for name containing slash")
 	}
+	if _, err := CreateCodexBox(context.Background(), "..", dir); err == nil {
+		t.Errorf("expected error for ..")
+	}
+	if _, err := CreateCodexBox(context.Background(), ".", dir); err == nil {
+		t.Errorf("expected error for .")
+	}
 }
 
 func TestDeleteCodexBox(t *testing.T) {
