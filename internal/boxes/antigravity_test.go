@@ -44,6 +44,12 @@ func TestCreateBox_SuccessAndValidation(t *testing.T) {
 	if _, err := CreateBox(context.Background(), "invalid/slash", dir); err == nil {
 		t.Errorf("expected error for name containing slash")
 	}
+	if _, err := CreateBox(context.Background(), "..", dir); err == nil {
+		t.Errorf("expected error for ..")
+	}
+	if _, err := CreateBox(context.Background(), ".", dir); err == nil {
+		t.Errorf("expected error for .")
+	}
 }
 
 func TestDeleteBox(t *testing.T) {

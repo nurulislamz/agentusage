@@ -229,6 +229,20 @@ assert_ok "codex-box launch devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" 
 assert_ok "codex-box invoked fake bwrap" test -s "$BOX_TEST_LOG"
 assert_ok "codex-box binds profile .codex" grep -q -- "$BOX_HOME/.codex-containers/devbox/.codex" "$BOX_TEST_LOG"
 
+# 8. Path traversal: rm .. must not delete $HOME (or anything outside containers)
+SENTINEL="$BOX_HOME/do-not-delete"
+echo keep >"$SENTINEL"
+assert_fail "codex-box rm .. rejected" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_CODEX_BOX" rm ..
+assert_ok "codex-box rm .. left home intact" test -f "$SENTINEL"
+assert_fail "agy-box rm .. rejected" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_AGY_BOX" rm ..
+assert_ok "agy-box rm .. left home intact" test -f "$SENTINEL"
+assert_fail "agent-box rm .. rejected" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_AGENT_BOX" rm ..
+assert_ok "agent-box rm .. left home intact" test -f "$SENTINEL"
+assert_fail "codex-box rm . rejected" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_CODEX_BOX" rm .
+assert_ok "codex-box containers dir survived rm ." test -d "$BOX_HOME/.codex-containers"
+assert_fail "codex-box add .. rejected" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_CODEX_BOX" add ..
+assert_fail "codex-box add ../escape rejected" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_CODEX_BOX" add '../escape'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
