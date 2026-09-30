@@ -921,6 +921,77 @@ func SaveAccount(acct core.AccountConfig) error {
 	return SaveAccountTo(ConfigPath(), acct)
 }
 
+// DeleteAccount removes an account from settings.json via read-modify-write and
+// keeps a disabled dashboard entry so re-detected boxes stay hidden.
+func DeleteAccount(accountID string) error {
+	return DeleteAccountTo(ConfigPath(), accountID)
+}
+
+// DeleteAccountTo removes an account from the config file at path without
+// rewriting unrelated fields from a stale in-memory snapshot.
+func DeleteAccountTo(path, accountID string) error {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return fmt.Errorf("delete account: account id must be non-empty")
+	}
+	return modifyConfig(path, func(cfg *Config) {
+		cfg.Accounts = dropConfiguredAccount(cfg.Accounts, accountID)
+		cfg.AutoDetectedAccounts = dropConfiguredAccount(cfg.AutoDetectedAccounts, accountID)
+
+		providers := make([]DashboardProviderConfig, 0, len(cfg.Dashboard.Providers)+1)
+		for _, p := range cfg.Dashboard.Providers {
+			if strings.TrimSpace(p.AccountID) == accountID {
+				continue
+			}
+			providers = append(providers, p)
+		}
+		providers = append(providers, DashboardProviderConfig{AccountID: accountID, Enabled: false})
+		cfg.Dashboard.Providers = normalizeDashboardProviders(providers)
+	})
+}
+
+// SetAccountVisibility toggles one dashboard.providers[].enabled flag via
+// read-modify-write so concurrent edits to other provider entries survive.
+func SetAccountVisibility(accountID string, visible bool) error {
+	return SetAccountVisibilityTo(ConfigPath(), accountID, visible)
+}
+
+// SetAccountVisibilityTo toggles visibility for one account in the config file at path.
+func SetAccountVisibilityTo(path, accountID string, visible bool) error {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return fmt.Errorf("set account visibility: account id must be non-empty")
+	}
+	return modifyConfig(path, func(cfg *Config) {
+		found := false
+		for i := range cfg.Dashboard.Providers {
+			if strings.TrimSpace(cfg.Dashboard.Providers[i].AccountID) == accountID {
+				cfg.Dashboard.Providers[i].Enabled = visible
+				found = true
+				break
+			}
+		}
+		if !found {
+			cfg.Dashboard.Providers = append(cfg.Dashboard.Providers, DashboardProviderConfig{
+				AccountID: accountID,
+				Enabled:   visible,
+			})
+		}
+		cfg.Dashboard.Providers = normalizeDashboardProviders(cfg.Dashboard.Providers)
+	})
+}
+
+func dropConfiguredAccount(accounts []core.AccountConfig, accountID string) []core.AccountConfig {
+	out := make([]core.AccountConfig, 0, len(accounts))
+	for _, a := range accounts {
+		if strings.TrimSpace(a.ID) == accountID {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
 // SaveAccountTo saves an account configuration to a specific config file path.
 func SaveAccountTo(path string, acct core.AccountConfig) error {
 	accountID := strings.TrimSpace(acct.ID)

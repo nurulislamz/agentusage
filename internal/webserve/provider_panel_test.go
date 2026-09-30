@@ -4,8 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func panelViewIDs(t *testing.T, srv *Server) map[string]bool {
@@ -109,5 +115,83 @@ func TestProvidersPanel_HideShowDelete(t *testing.T) {
 	}
 	if missing := postForm(t, srv, "/actions/providers", "op=hide"); missing.Code != http.StatusBadRequest {
 		t.Errorf("missing account_id status = %d, want 400", missing.Code)
+	}
+}
+
+// TestProvidersPanel_DeleteUsesReadModifyWrite guards against the serve-process
+// bug where delete persisted a stale in-memory Config via config.Save and wiped
+// accounts/theme/links written by another process after serve started.
+func TestProvidersPanel_DeleteUsesReadModifyWrite(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("config dir is resolved from APPDATA on windows")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	path := filepath.Join(home, ".config", "agentusage", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	onDisk := config.DefaultConfig()
+	onDisk.Theme = "Nord"
+	onDisk.Accounts = []core.AccountConfig{
+		{ID: "stale-only", Provider: "openai", Auth: "api_key", APIKeyEnv: "OPENAI_API_KEY"},
+		{ID: "added-later", Provider: "anthropic", Auth: "api_key", APIKeyEnv: "ANTHROPIC_API_KEY"},
+	}
+	onDisk.Dashboard.Providers = []config.DashboardProviderConfig{
+		{AccountID: "stale-only", Enabled: true},
+		{AccountID: "added-later", Enabled: true},
+	}
+	onDisk.Telemetry.ProviderLinks = map[string]string{"codex": "added-later"}
+	if err := config.SaveTo(path, onDisk); err != nil {
+		t.Fatalf("SaveTo: %v", err)
+	}
+
+	// Serve holds the startup snapshot that never saw "added-later".
+	stale := config.DefaultConfig()
+	stale.Theme = "Gruvbox"
+	stale.Accounts = []core.AccountConfig{
+		{ID: "stale-only", Provider: "openai", Auth: "api_key", APIKeyEnv: "OPENAI_API_KEY"},
+	}
+	stale.Dashboard.Providers = []config.DashboardProviderConfig{
+		{AccountID: "stale-only", Enabled: true},
+	}
+
+	srv := testServer(t, Options{
+		Demo:   false,
+		Config: &stale,
+		Collect: func() (Envelope, error) {
+			snap := core.NewUsageSnapshot("openai", "stale-only")
+			snap.Status = core.StatusOK
+			return Envelope{Source: "test", Snapshots: []core.UsageSnapshot{snap}}, nil
+		},
+	})
+
+	delResp := postForm(t, srv, "/actions/providers", "op=delete&account_id=stale-only")
+	if delResp.Code != http.StatusOK {
+		t.Fatalf("delete status = %d body %s", delResp.Code, delResp.Body.String())
+	}
+
+	cfg, err := config.LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom: %v", err)
+	}
+	if cfg.Theme != "Nord" {
+		t.Errorf("theme = %q, want Nord — stale serve snapshot must not rewrite settings.json", cfg.Theme)
+	}
+	if cfg.Telemetry.ProviderLinks["codex"] != "added-later" {
+		t.Errorf("provider links lost: %#v", cfg.Telemetry.ProviderLinks)
+	}
+	foundAdded := false
+	for _, acct := range cfg.Accounts {
+		if acct.ID == "stale-only" {
+			t.Error("deleted account still present on disk")
+		}
+		if acct.ID == "added-later" {
+			foundAdded = true
+		}
+	}
+	if !foundAdded {
+		t.Error("account added after serve start was wiped by delete")
 	}
 }
