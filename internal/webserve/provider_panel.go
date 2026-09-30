@@ -182,6 +182,16 @@ func (s *Server) panelConfig() config.Config {
 // setAccountVisibility hides or shows one account on the dashboard and
 // persists the toggle in settings.json (dashboard.providers[].enabled).
 func (s *Server) setAccountVisibility(accountID string, visible bool) error {
+	if !s.persistDisabled() {
+		if err := config.SetAccountVisibility(accountID, visible); err != nil {
+			return err
+		}
+		if cfg, err := config.Load(); err == nil {
+			s.applyConfig(cfg)
+			return nil
+		}
+	}
+
 	cfg := s.panelConfig()
 	providers := append([]config.DashboardProviderConfig(nil), cfg.Dashboard.Providers...)
 	found := false
@@ -195,11 +205,6 @@ func (s *Server) setAccountVisibility(accountID string, visible bool) error {
 	if !found {
 		providers = append(providers, config.DashboardProviderConfig{AccountID: accountID, Enabled: visible})
 	}
-	if !s.persistDisabled() {
-		if err := config.SaveDashboardProviders(providers); err != nil {
-			return err
-		}
-	}
 	cfg.Dashboard.Providers = providers
 	s.applyConfig(cfg)
 	return nil
@@ -207,7 +212,20 @@ func (s *Server) setAccountVisibility(accountID string, visible bool) error {
 
 // deleteAccount removes an account from settings and credentials. A disabled
 // dashboard entry is kept so re-detected boxes stay hidden until restored.
+// Persistence uses read-modify-write so a long-lived serve process cannot
+// rewrite settings.json from a stale startup snapshot.
 func (s *Server) deleteAccount(accountID string) error {
+	if !s.persistDisabled() {
+		if err := config.DeleteAccount(accountID); err != nil {
+			return err
+		}
+		_ = config.DeleteCredential(accountID)
+		if cfg, err := config.Load(); err == nil {
+			s.applyConfig(cfg)
+			return nil
+		}
+	}
+
 	cfg := s.panelConfig()
 	cfg.Accounts = dropAccount(cfg.Accounts, accountID)
 	cfg.AutoDetectedAccounts = dropAccount(cfg.AutoDetectedAccounts, accountID)
@@ -221,13 +239,6 @@ func (s *Server) deleteAccount(accountID string) error {
 	}
 	providers = append(providers, config.DashboardProviderConfig{AccountID: accountID, Enabled: false})
 	cfg.Dashboard.Providers = providers
-
-	if !s.persistDisabled() {
-		if err := config.Save(cfg); err != nil {
-			return err
-		}
-		_ = config.DeleteCredential(accountID)
-	}
 	s.applyConfig(cfg)
 	return nil
 }

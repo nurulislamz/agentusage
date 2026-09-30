@@ -1580,3 +1580,113 @@ func TestSaveAccountTo_Validation(t *testing.T) {
 		t.Errorf("expected error for empty provider ID")
 	}
 }
+
+func TestDeleteAccountTo_PreservesUnrelatedFields(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+
+	initial := DefaultConfig()
+	initial.Theme = "Nord"
+	initial.Accounts = []core.AccountConfig{
+		{ID: "keep-me", Provider: "openai", Auth: "api_key", APIKeyEnv: "OPENAI_API_KEY"},
+		{ID: "remove-me", Provider: "anthropic", Auth: "api_key", APIKeyEnv: "ANTHROPIC_API_KEY"},
+	}
+	initial.AutoDetectedAccounts = []core.AccountConfig{
+		{ID: "remove-me", Provider: "anthropic"},
+		{ID: "box-keep", Provider: "codex"},
+	}
+	initial.Dashboard.Providers = []DashboardProviderConfig{
+		{AccountID: "keep-me", Enabled: true},
+		{AccountID: "remove-me", Enabled: true},
+	}
+	initial.Telemetry.ProviderLinks = map[string]string{"codex": "keep-me"}
+	if err := SaveTo(path, initial); err != nil {
+		t.Fatalf("SaveTo initial: %v", err)
+	}
+
+	if err := DeleteAccountTo(path, "remove-me"); err != nil {
+		t.Fatalf("DeleteAccountTo: %v", err)
+	}
+
+	cfg, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom: %v", err)
+	}
+	if cfg.Theme != "Nord" {
+		t.Errorf("theme = %q, want Nord (unrelated field must survive)", cfg.Theme)
+	}
+	if cfg.Telemetry.ProviderLinks["codex"] != "keep-me" {
+		t.Errorf("provider links rewritten: %#v", cfg.Telemetry.ProviderLinks)
+	}
+	if len(cfg.Accounts) != 1 || cfg.Accounts[0].ID != "keep-me" {
+		t.Fatalf("accounts = %#v, want only keep-me", cfg.Accounts)
+	}
+	if len(cfg.AutoDetectedAccounts) != 1 || cfg.AutoDetectedAccounts[0].ID != "box-keep" {
+		t.Fatalf("auto-detected = %#v, want only box-keep", cfg.AutoDetectedAccounts)
+	}
+
+	var removedEntry *DashboardProviderConfig
+	for i := range cfg.Dashboard.Providers {
+		if cfg.Dashboard.Providers[i].AccountID == "remove-me" {
+			removedEntry = &cfg.Dashboard.Providers[i]
+		}
+	}
+	if removedEntry == nil {
+		t.Fatal("deleted account must keep a disabled dashboard entry")
+	}
+	if removedEntry.Enabled {
+		t.Error("deleted account dashboard entry must be disabled")
+	}
+	if err := DeleteAccountTo(path, ""); err == nil {
+		t.Error("expected error for empty account id")
+	}
+}
+
+func TestSetAccountVisibilityTo_PreservesOtherProviderEntries(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+
+	initial := DefaultConfig()
+	initial.Dashboard.Providers = []DashboardProviderConfig{
+		{AccountID: "alpha", Enabled: true},
+		{AccountID: "beta", Enabled: true},
+	}
+	if err := SaveTo(path, initial); err != nil {
+		t.Fatalf("SaveTo: %v", err)
+	}
+
+	// Simulate a concurrent edit that added a provider entry after the caller
+	// last read config into memory.
+	if err := modifyConfig(path, func(cfg *Config) {
+		cfg.Dashboard.Providers = append(cfg.Dashboard.Providers, DashboardProviderConfig{
+			AccountID: "gamma",
+			Enabled:   false,
+		})
+	}); err != nil {
+		t.Fatalf("seed concurrent provider: %v", err)
+	}
+
+	if err := SetAccountVisibilityTo(path, "alpha", false); err != nil {
+		t.Fatalf("SetAccountVisibilityTo: %v", err)
+	}
+
+	cfg, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom: %v", err)
+	}
+	byID := map[string]bool{}
+	for _, p := range cfg.Dashboard.Providers {
+		byID[p.AccountID] = p.Enabled
+	}
+	if byID["alpha"] {
+		t.Error("alpha should be hidden")
+	}
+	if !byID["beta"] {
+		t.Error("beta visibility must be unchanged")
+	}
+	if _, ok := byID["gamma"]; !ok {
+		t.Error("concurrent gamma entry must survive visibility toggle")
+	} else if byID["gamma"] {
+		t.Error("gamma should remain disabled")
+	}
+}
