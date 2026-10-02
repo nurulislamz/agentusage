@@ -239,3 +239,48 @@ func TestSaveSession_PermissionsAndAtomic(t *testing.T) {
 		t.Errorf("expected only credentials.json in directory, found: %v", entries)
 	}
 }
+
+func TestSaveCredentialTo_CorruptFileDoesNotWipe(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "credentials.json")
+	corrupt := []byte(`{"keys":{"openai":"sk-keep-me","anthropic":"sk-also-keep"}`) // truncated JSON
+	if err := os.WriteFile(path, corrupt, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := SaveCredentialTo(path, "new-acct", "sk-new"); err == nil {
+		t.Fatal("expected SaveCredentialTo to fail on corrupt credentials.json")
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(corrupt) {
+		t.Fatalf("credentials.json was overwritten on corrupt load:\n got: %s\nwant: %s", got, corrupt)
+	}
+}
+
+func TestSaveSessionTo_CorruptFileDoesNotWipe(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "credentials.json")
+	corrupt := []byte(`{"keys":{"openai":"sk-keep-me"},"sessions":{`) // truncated JSON
+	if err := os.WriteFile(path, corrupt, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := SaveSessionTo(path, "perplexity", BrowserSession{
+		Domain:     ".perplexity.ai",
+		CookieName: "session",
+		Value:      "cookie",
+	})
+	if err == nil {
+		t.Fatal("expected SaveSessionTo to fail on corrupt credentials.json")
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(corrupt) {
+		t.Fatalf("credentials.json was overwritten on corrupt load:\n got: %s\nwant: %s", got, corrupt)
+	}
+}

@@ -125,7 +125,9 @@ func SaveCredentialTo(path, accountID, apiKey string) error {
 
 	creds, err := LoadCredentialsFrom(path)
 	if err != nil {
-		creds = Credentials{Keys: make(map[string]string)}
+		// Never treat a corrupt/unreadable credentials file as empty: writing
+		// a single new key would destroy every other stored key/session.
+		return fmt.Errorf("loading credentials: %w", err)
 	}
 
 	creds.Keys[accountID] = apiKey
@@ -181,7 +183,9 @@ func SaveSessionTo(path, accountID string, session BrowserSession) error {
 
 	creds, err := LoadCredentialsFrom(path)
 	if err != nil {
-		creds = Credentials{Keys: make(map[string]string), Sessions: make(map[string]BrowserSession)}
+		// Never treat a corrupt/unreadable credentials file as empty: writing
+		// a single new session would destroy every other stored key/session.
+		return fmt.Errorf("loading credentials: %w", err)
 	}
 	if creds.Sessions == nil {
 		creds.Sessions = make(map[string]BrowserSession)
