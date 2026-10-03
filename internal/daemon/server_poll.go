@@ -91,9 +91,16 @@ func (s *Service) doPollTargeted(ctx context.Context, targetAccountID string, ma
 				break
 			}
 		}
-		if len(filtered) > 0 {
-			accounts = filtered
+		// Unknown/stale account_id must not fall through to "poll everyone"
+		// (manual refresh always passes force=true and would bypass backoff
+		// for every provider).
+		if len(filtered) == 0 {
+			if s.shouldLog("poll_target_miss", 15*time.Second) {
+				s.infof("poll_skipped", "reason=unknown_account_id account_id=%q", targetAccountID)
+			}
+			return
 		}
+		accounts = filtered
 	}
 
 	type providerResult struct {

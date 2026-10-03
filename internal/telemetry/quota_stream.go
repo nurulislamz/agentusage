@@ -43,6 +43,12 @@ func BuildLimitSnapshotRequests(snaps map[string]core.UsageSnapshot) []IngestReq
 	out := make([]IngestRequest, 0, len(accountIDs))
 	for _, accountID := range accountIDs {
 		snap := snaps[accountID]
+		// Refuse to persist metric-less StatusOK (and similar) rows. Those used
+		// to become the newest limit_snapshot root and wipe real quota metrics
+		// during hydrate (ORDER BY occurred_at DESC).
+		if !limitSnapshotUsable(snap) {
+			continue
+		}
 
 		providerID := core.FirstNonEmpty(snap.ProviderID, "unknown")
 		effectiveAccountID := core.FirstNonEmpty(snap.AccountID, accountID, "default")

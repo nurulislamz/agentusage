@@ -767,3 +767,36 @@ func TestServer_ScheduledAndExplicitRefresh_ShareRateLimitBackoff(t *testing.T) 
 		t.Fatalf("fetchCount after rate limit expired = %d, want 2", prov.fetchCount)
 	}
 }
+
+func TestPollProvidersTargeted_UnknownAccountIDDoesNotForceAll(t *testing.T) {
+	provA := &fakeCountingProvider{}
+	provB := &fakeCountingProvider{}
+	acctA := core.AccountConfig{ID: "cursor-physics", Provider: "fake-prov"}
+	acctB := core.AccountConfig{ID: "openrouter", Provider: "fake-prov"}
+
+	origLoad := loadAccountsAndNormFunc
+	defer func() { loadAccountsAndNormFunc = origLoad }()
+	loadAccountsAndNormFunc = func() ([]core.AccountConfig, core.ModelNormalizationConfig, error) {
+		return []core.AccountConfig{acctA, acctB}, core.DefaultModelNormalizationConfig(), nil
+	}
+
+	svc := &Service{
+		providerByID:  map[string]core.UsageProvider{"fake-prov": provA},
+		pollScheduler: newPollScheduler(30 * time.Second),
+		pollState:     make(map[string]*providerPollState),
+		logThrottle:   core.NewLogThrottle(5, time.Minute),
+	}
+	// Both accounts share provider ID lookup; route B through the same fake by ID.
+	_ = provB
+	svc.providerByID["fake-prov"] = provA
+
+	svc.pollProvidersTargeted(context.Background(), "cursor-stale-or-deleted", true, true)
+	if provA.fetchCount != 0 {
+		t.Fatalf("fetchCount = %d, want 0 when targeted account_id matches nothing", provA.fetchCount)
+	}
+
+	svc.pollProvidersTargeted(context.Background(), "cursor-physics", true, true)
+	if provA.fetchCount != 1 {
+		t.Fatalf("fetchCount after matching target = %d, want 1", provA.fetchCount)
+	}
+}
