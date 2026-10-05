@@ -24,19 +24,33 @@ func ingestParsedHookLocally(
 		return resp, nil
 	}
 
-	if strings.TrimSpace(dbPath) == "" {
-		resolved, resolveErr := telemetry.DefaultDBPath()
-		if resolveErr != nil {
-			return HookResponse{}, fmt.Errorf("resolve telemetry db path: %w", resolveErr)
-		}
-		dbPath = resolved
-	}
 	if strings.TrimSpace(spoolDir) == "" {
 		resolved, resolveErr := telemetry.DefaultSpoolDir()
 		if resolveErr != nil {
 			return HookResponse{}, fmt.Errorf("resolve telemetry spool dir: %w", resolveErr)
 		}
 		spoolDir = resolved
+	}
+
+	// Spool-only must not open the SQLite store. OpenStore may unlink -shm /
+	// replace a "corrupt" DB; doing that while the daemon holds the writer
+	// silently drops hook events. EnqueueRequests only needs the spool.
+	if spoolOnly {
+		pipeline := telemetry.NewPipeline(nil, telemetry.NewSpool(spoolDir))
+		enqueued, enqueueErr := pipeline.EnqueueRequests(parsed.Requests)
+		if enqueueErr != nil {
+			return HookResponse{}, fmt.Errorf("enqueue to telemetry spool: %w", enqueueErr)
+		}
+		resp.Enqueued = enqueued
+		return resp, nil
+	}
+
+	if strings.TrimSpace(dbPath) == "" {
+		resolved, resolveErr := telemetry.DefaultDBPath()
+		if resolveErr != nil {
+			return HookResponse{}, fmt.Errorf("resolve telemetry db path: %w", resolveErr)
+		}
+		dbPath = resolved
 	}
 
 	store, err := telemetry.OpenStore(dbPath)
@@ -46,14 +60,6 @@ func ingestParsedHookLocally(
 	defer store.Close()
 
 	pipeline := telemetry.NewPipeline(store, telemetry.NewSpool(spoolDir))
-	if spoolOnly {
-		enqueued, enqueueErr := pipeline.EnqueueRequests(parsed.Requests)
-		if enqueueErr != nil {
-			return HookResponse{}, fmt.Errorf("enqueue to telemetry spool: %w", enqueueErr)
-		}
-		resp.Enqueued = enqueued
-		return resp, nil
-	}
 
 	retries := make([]telemetry.IngestRequest, 0, len(parsed.Requests))
 	var firstIngestErr error
