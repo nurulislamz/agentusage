@@ -27,8 +27,9 @@ import (
 var telemetryLog = core.NewLogger("telemetry")
 
 type Store struct {
-	db  *sql.DB
-	now func() time.Time
+	db       *sql.DB
+	now      func() time.Time
+	openLock *os.File // shared flock held while this Store is open
 }
 
 // openAndConfigureDB opens a SQLite database at the given path and applies
@@ -51,18 +52,34 @@ func OpenStore(path string) (*Store, error) {
 		return nil, fmt.Errorf("telemetry: creating DB dir: %w", err)
 	}
 
-	// Remove the shared-memory file before opening the database.
-	// After an unclean shutdown (SIGKILL, OOM, crash), the -shm file
-	// retains stale WAL frame indexes and lock counters from the dead
-	// process. If a new process opens the DB and trusts the stale -shm,
-	// it can misread WAL frames, causing duplicate page references and
-	// B-tree corruption. Removing the -shm forces SQLite to rebuild the
-	// WAL index from the checksummed WAL file, which is crash-safe.
-	// If another process holds the DB open, the file is still
-	// referenced via its inode and that process is unaffected.
-	_ = os.Remove(path + "-shm")
+	// Hold a shared flock for the Store lifetime. Destructive open recovery
+	// (unlink -shm / rename-on-corrupt) requires an exclusive upgrade, which
+	// fails while another Store still holds the shared lock.
+	//
+	// Unlinking -shm while a live writer still has it mmap'd creates a second
+	// WAL index at the same path. Cross-process writers then diverge and
+	// commits from the second opener can be silently discarded — the hook
+	// local-fallback path hit this after a daemon socket timeout.
+	openLock, err := lockStoreShared(path)
+	if err != nil {
+		return nil, err
+	}
+	lockHeld := true
+	defer func() {
+		if lockHeld {
+			unlockStore(openLock)
+		}
+	}()
+
+	exclusive := tryLockStoreExclusive(openLock)
+	if exclusive {
+		_ = os.Remove(path + "-shm")
+	}
 
 	recoverCorrupt := func(detail string) (*sql.DB, error) {
+		if !exclusive {
+			return nil, fmt.Errorf("telemetry: database corrupt (%s) while another process holds it open", detail)
+		}
 		backupPath := path + ".corrupt." + time.Now().Format("20060102T150405")
 		log.Printf("telemetry: database corrupt (%s), backing up to %s and starting fresh", detail, backupPath)
 		if err := os.Rename(path, backupPath); err != nil {
@@ -96,6 +113,10 @@ func OpenStore(path string) (*Store, error) {
 		}
 	}
 
+	if exclusive {
+		downgradeStoreLockShared(openLock)
+	}
+
 	// Reclaim disk from past corruption rotations. Each corruption event renames
 	// the DB to "<path>.corrupt.<ts>" and starts fresh; these snapshots are
 	// corrupt by definition and never read again, so they only waste disk (they
@@ -104,10 +125,12 @@ func OpenStore(path string) (*Store, error) {
 	pruneCorruptBackups(path, 1)
 
 	store := NewStore(db)
+	store.openLock = openLock
 	if err := store.Init(context.Background()); err != nil {
 		db.Close()
 		return nil, err
 	}
+	lockHeld = false
 	return store, nil
 }
 
@@ -172,10 +195,16 @@ func NewStore(db *sql.DB) *Store {
 }
 
 func (s *Store) Close() error {
-	if s == nil || s.db == nil {
+	if s == nil {
 		return nil
 	}
-	return s.db.Close()
+	var err error
+	if s.db != nil {
+		err = s.db.Close()
+	}
+	unlockStore(s.openLock)
+	s.openLock = nil
+	return err
 }
 
 // DB returns the underlying database handle for operations that need direct

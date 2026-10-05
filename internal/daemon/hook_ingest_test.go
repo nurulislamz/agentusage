@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"database/sql"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -63,18 +64,17 @@ func TestIngestHookLocally_SpoolOnly(t *testing.T) {
 		t.Fatalf("ingested = %d, want 0 in spool-only mode", resp.Ingested)
 	}
 
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
+	// Spool-only must not open/create the telemetry DB (that races a live daemon).
+	if _, err := os.Stat(dbPath); !os.IsNotExist(err) {
+		t.Fatalf("spool-only must not create telemetry DB, stat err=%v", err)
 	}
-	defer db.Close()
 
-	var eventCount int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM usage_events`).Scan(&eventCount); err != nil {
-		t.Fatalf("query usage events count: %v", err)
+	pending, err := telemetry.NewSpool(spoolDir).ReadOldest(10)
+	if err != nil {
+		t.Fatalf("read spool: %v", err)
 	}
-	if eventCount != 0 {
-		t.Fatalf("usage events count = %d, want 0 in spool-only mode", eventCount)
+	if len(pending) == 0 {
+		t.Fatal("expected spool records in spool-only mode")
 	}
 }
 
