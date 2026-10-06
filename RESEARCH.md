@@ -2301,3 +2301,36 @@ Fresh Monday GitHub API pass (Europe/London). **Live vs Sunday:** `junhoyeo/toks
 **Build takeaways:** Stay ccusage-compatible (**v20.0.26** holds). Monday's sharpest signals: **tokscale v4.18.0** adds a Copilot CLI `session-store.db` parser (good reference for agentUsage's Copilot path) and fixes cached-input double-counting; **ClaudeBar v0.5.6** pushes the provider count up again (Cline, Warp, Devin, Windsurf, JetBrains AI, OpenAI API spend, Grok) so breadth alone won't differentiate; **codeburn #1615** and **openusage #1337** both treat Cursor local dollars as estimates and prefer structured team pools — label Cursor spend as an estimate in agentUsage too. Differentiate on live quotas + auto-detect + honest pricing (ClaudeCodeUsage's "don't guess unknown models" stance is worth copying). Keep Langfuse/LiteLLM complementary; Helicone still dormant (day 19).
 
 Sources: GitHub API 2026-10-05 (Europe/London).
+
+### Open source — 6 Oct 2026
+
+Tuesday GitHub API pass (Europe/London). ccusage stays the format to be compatible with; the live-quota menu-bar layer (OpenUsage, ClaudeBar, codeburn, tokscale) keeps shipping daily. **Live since Monday:** `getagentseal/codeburn` (Mon **automatic Cursor usage sync from cursor.com** (#1637) with a status + on/off switch in the apps (#1638); Codex Flex-tier and Auto Review pricing by date; compare skips a provider whose discovery fails; this morning "explain why one session cost what it did" in CLI + app (#1645); docs note cloud Cowork tasks from 6 Oct aren't tracked locally (#1639); **~11.3k★**), `robinebers/openusage` (**v0.7.14** this morning: tokens refreshed per independent Codex home, Codex local spend restored for multiple accounts, structured Cursor team pools preferred (#1337), slow Codex history scans no longer block live quota (#1338); **~4.3k★**), `tddworks/ClaudeBar` (**v0.5.6 → v0.5.7 → v0.5.8**: leaderboard first tab, share-your-rank image rendered locally, Oh My Pi daily usage from omp session logs; **~1.5k★**), `ItsJazii/pane` (**v0.4.57** Mon evening: Codex spend from Orca-managed homes, extra session folders for usage from other machines; **~68★**), `majiayu000/quotabar` (Mon: warn when a window will run out before reset, point to another account when the headline runs low, API-equivalent value per plan; **~53★**), `851-labs/tokenmaxxing` (Mon night rejects implausible usage at ingest + overflow-safe aggregates (#143); **~78★**), `ccusage/ccusage` (pricing snapshots from models.dev/LiteLLM roughly hourly; hold **v20.0.26**; **~18.9k★**), `langfuse/langfuse` (**v4.51.0 → v4.52.0**: org usage breakdown on every deployment, AI-gateway resolution context in headers/spans; **~35.4k★**), `BerriAI/litellm` (router now prices a model group from the deployments serving it (#44732); **~60.2k★**). Quiet holds: tokscale **v4.18.0** (~5.6k★), CodeZeno monitor **v2.18.1** (~572★), Maciek-roboblog monitor **v4.0.0** (~8.7k★), splitrail **v3.10.3** (~222★), OpenQuota **v0.5.0** (~221★), janekbaraniewski/openusage **v0.25.0** (~217★), AIUsage **v0.15.22** (~707★), Helicone (quiet since 16 Sep, day 20).
+
+| Repo | Stars | License | Delta / why it matters |
+|---|---:|---|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.9k | NOASSERTION | Hold **v20.0.26**; near-hourly pricing snapshots. The de facto log/report format to stay compatible with. |
+| [getagentseal/codeburn](https://github.com/getagentseal/codeburn) | ~11.3k | MIT | **Cursor sync from cursor.com** + per-session cost explanation — now directly overlaps agentUsage's Cursor path. |
+| [Maciek-roboblog/Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor) | ~8.7k | MIT | Hold **v4.0.0** — terminal Claude burn-rate TUI. |
+| [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) | ~5.6k | MIT | Hold **v4.18.0** — multi-agent token CLI with Copilot `session-store.db` parser. |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.3k | MIT | **v0.7.14** — multi-account Codex homes, structured Cursor team pools. Closest product peer. |
+| [seakee/CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus) | ~3.7k | MIT | Hold **v1.14.3** — quota/account manager adjacent. |
+| [tddworks/ClaudeBar](https://github.com/tddworks/ClaudeBar) | ~1.5k | Apache-2.0 | **v0.5.8** — leaderboard + shareable rank; broadest provider list. |
+| [sylearn/AIUsage](https://github.com/sylearn/AIUsage) | ~707 | Apache-2.0 | Hold **v0.15.22** — multi-tool usage peer. |
+| [Nanako0129/syrtis](https://github.com/Nanako0129/syrtis) | ~405 | MIT | Hold **v2.4.0**. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~222 | MIT | Hold **v3.10.3** — fast Rust multi-agent usage tracker. |
+| [ColeMurray/claude-code-otel](https://github.com/ColeMurray/claude-code-otel) | ~511 | MIT | Dormant — OpenTelemetry + Grafana reference for a cost dashboard. |
+| [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~60.2k | NOASSERTION | Hold **v1.104.0** / **v1.105.0-rc.1** — model price table + gateway spend; adjacent. |
+| [langfuse/langfuse](https://github.com/langfuse/langfuse) | ~35.4k | NOASSERTION | **v4.52.0** — OSS LLM observability; complementary. |
+| [Helicone/helicone](https://github.com/Helicone/helicone) | ~6.2k | Apache-2.0 | Quiet since 16 Sep (day 20). Adjacent. |
+
+**Also watch**
+- [Chengjun023/agent-smith](https://github.com/Chengjun023/agent-smith) (~218★, MIT) — **new** (30 Sep): adaptive model routing plus a Codex usage monitor; fastest-growing newcomer this week.
+- [efekoca/ai-usage-tracker](https://github.com/efekoca/ai-usage-tracker) (~11★, MIT) — **new**: local Claude Code + Codex cost and plan-limit tracker for Windows.
+- [owanesh/refill](https://github.com/owanesh/refill) (~3★) — **new**: CLI that watches Codex usage and redeems banked resets automatically.
+- [anantraghunath/claude-code-usage-quota-mod](https://github.com/anantraghunath/claude-code-usage-quota-mod) (~8★, MIT) — **new**: 5-hour/weekly band above the Claude Code prompt.
+- [ItsJazii/pane](https://github.com/ItsJazii/pane) (~68★) / [majiayu000/quotabar](https://github.com/majiayu000/quotabar) (~53★, MIT) / [851-labs/tokenmaxxing](https://github.com/851-labs/tokenmaxxing) (~78★, MIT) — small but shipping daily.
+- New zero-★ Cursor menu-bar apps (for example [Tiodevs/cursor-usage-bar](https://github.com/Tiodevs/cursor-usage-bar)) keep appearing — noise floor.
+
+**Build takeaways:** codeburn pulling Cursor usage straight from cursor.com raises the bar for agentUsage's Cursor support; local-only parsing will look thin next to it, so plan an opt-in account sync and keep labelling local Cursor dollars as estimates. Multi-account and multi-machine Codex homes (OpenUsage v0.7.14, pane v0.4.57) are now table stakes. quotabar's "you'll run out before reset" warning and tokenmaxxing's "reject implausible usage at ingest" are both cheap, high-value ideas to copy. codeburn's note that cloud Cowork tasks from 6 Oct aren't in local logs is a coverage gap to document in agentUsage too.
+
+Sources: GitHub API 2026-10-06 (Europe/London).
