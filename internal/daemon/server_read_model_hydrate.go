@@ -50,6 +50,12 @@ func snapshotMoreUsableThan(candidate, current core.UsageSnapshot) bool {
 	if !snapshotHasUsableData(current) {
 		return true
 	}
+	// A newer metric-less StatusOK (e.g. Cursor cli-config email fallback)
+	// must not replace a hydrated snapshot that still carries quota Metrics/
+	// Resets. Auth/Error/Limited may still surface without quota signals.
+	if snapshotHasQuotaSignals(current) && !snapshotHasQuotaSignals(candidate) && !snapshotStatusMayReplaceQuota(candidate.Status) {
+		return false
+	}
 	if candidate.Timestamp.After(current.Timestamp) {
 		return true
 	}
@@ -63,10 +69,23 @@ func snapshotHasUsableData(snap core.UsageSnapshot) bool {
 	if snap.Status != "" && snap.Status != core.StatusUnknown {
 		return true
 	}
-	if len(snap.Metrics) > 0 || len(snap.Resets) > 0 {
+	if snapshotHasQuotaSignals(snap) {
 		return true
 	}
 	return false
+}
+
+func snapshotHasQuotaSignals(snap core.UsageSnapshot) bool {
+	return len(snap.Metrics) > 0 || len(snap.Resets) > 0
+}
+
+func snapshotStatusMayReplaceQuota(status core.Status) bool {
+	switch status {
+	case core.StatusAuth, core.StatusError, core.StatusLimited:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Service) hydrateUnknownLocalSnapshots(
