@@ -45,19 +45,47 @@ func (s *Service) pollProvidersTargeted(ctx context.Context, targetAccountID str
 		return
 	}
 
-	genID, isLeader, done := s.pollScheduler.BeginGeneration()
-	if !isLeader {
-		select {
-		case <-done:
-			return
-		case <-ctx.Done():
-			return
+	for {
+		genID, isLeader, done, leaderForce, leaderTarget := s.pollScheduler.BeginGenerationWith(force, targetAccountID)
+		if !isLeader {
+			select {
+			case <-done:
+				// Non-force wait=1 may ride a periodic generation (existing
+				// coalescing). Force / differently-scoped requests must not:
+				// a periodic leader can skip accounts via backoff/rate-limit,
+				// and a targeted leader does not cover "all accounts".
+				if pollFollowerSatisfiedBy(force, targetAccountID, leaderForce, leaderTarget) {
+					return
+				}
+				continue
+			case <-ctx.Done():
+				return
+			}
 		}
-	}
-	defer s.pollScheduler.EndGeneration(genID)
 
-	execCtx := s.serviceContext(ctx)
-	s.doPollTargeted(execCtx, targetAccountID, manual, force)
+		execCtx := s.serviceContext(ctx)
+		s.doPollTargeted(execCtx, targetAccountID, manual, force)
+		s.pollScheduler.EndGeneration(genID)
+		return
+	}
+}
+
+// pollFollowerSatisfiedBy reports whether an in-flight/just-finished leader
+// generation already performed the work a follower requested.
+func pollFollowerSatisfiedBy(force bool, target string, leaderForce bool, leaderTarget string) bool {
+	if force && !leaderForce {
+		return false
+	}
+	// Follower wants every account; a targeted leader is incomplete.
+	if target == "" && leaderTarget != "" {
+		return false
+	}
+	// Follower wants one account; a different targeted leader is incomplete.
+	// An empty leader target covers all accounts.
+	if target != "" && leaderTarget != "" && !strings.EqualFold(target, leaderTarget) {
+		return false
+	}
+	return true
 }
 
 func (s *Service) doPoll(ctx context.Context) {

@@ -314,3 +314,60 @@ func TestPollScheduler_GenerationCoalescing(t *testing.T) {
 	}
 	ps.EndGeneration(genID3)
 }
+
+func TestPollScheduler_BeginGenerationWith_RecordsForceAndTarget(t *testing.T) {
+	ps := newPollScheduler(30 * time.Second)
+
+	genID, isLeader, done, leaderForce, leaderTarget := ps.BeginGenerationWith(true, "acct-a")
+	if !isLeader || genID == 0 {
+		t.Fatalf("leader genID=%d isLeader=%v", genID, isLeader)
+	}
+	if !leaderForce || leaderTarget != "acct-a" {
+		t.Fatalf("leader meta force=%v target=%q, want true/acct-a", leaderForce, leaderTarget)
+	}
+
+	genID2, isLeader2, done2, followerForce, followerTarget := ps.BeginGenerationWith(false, "")
+	if isLeader2 || genID2 != genID {
+		t.Fatalf("follower genID=%d isLeader=%v, want %d/false", genID2, isLeader2, genID)
+	}
+	if done2 != done {
+		t.Fatal("follower must share leader done channel")
+	}
+	if !followerForce || followerTarget != "acct-a" {
+		t.Fatalf("follower saw force=%v target=%q, want leader meta true/acct-a", followerForce, followerTarget)
+	}
+
+	ps.EndGeneration(genID)
+	select {
+	case <-done:
+	default:
+		t.Fatal("done should be closed after EndGeneration")
+	}
+}
+
+func TestPollFollowerSatisfiedBy(t *testing.T) {
+	tests := []struct {
+		name         string
+		force        bool
+		target       string
+		leaderForce  bool
+		leaderTarget string
+		want         bool
+	}{
+		{name: "non-force rides periodic", force: false, target: "", leaderForce: false, leaderTarget: "", want: true},
+		{name: "force rejected by periodic", force: true, target: "", leaderForce: false, leaderTarget: "", want: false},
+		{name: "force rides force-all", force: true, target: "", leaderForce: true, leaderTarget: "", want: true},
+		{name: "force-all rejected by targeted force", force: true, target: "", leaderForce: true, leaderTarget: "a", want: false},
+		{name: "targeted force rides force-all", force: true, target: "a", leaderForce: true, leaderTarget: "", want: true},
+		{name: "targeted force rejected by other target", force: true, target: "a", leaderForce: true, leaderTarget: "b", want: false},
+		{name: "targeted force rides same target", force: true, target: "a", leaderForce: true, leaderTarget: "a", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := pollFollowerSatisfiedBy(tt.force, tt.target, tt.leaderForce, tt.leaderTarget)
+			if got != tt.want {
+				t.Fatalf("pollFollowerSatisfiedBy(...) = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
