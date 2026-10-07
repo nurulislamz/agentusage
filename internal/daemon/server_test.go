@@ -570,6 +570,169 @@ func TestServer_SimultaneousRefreshes_CoalescedGenerationAndSharedCompletion(t *
 	}
 }
 
+func TestServer_ForcePollRetriesAfterNonForceGeneration(t *testing.T) {
+	tempDir := t.TempDir()
+	barrier := make(chan struct{})
+	prov := &fakeCountingProvider{barrier: barrier}
+	acct := core.AccountConfig{ID: "acct-force-retry", Provider: "fake-prov"}
+
+	origLoad := loadAccountsAndNormFunc
+	origBuild := buildReadModelRequestFromConfigFunc
+	origDisabled := disabledAccountsFromConfigFunc
+	defer func() {
+		loadAccountsAndNormFunc = origLoad
+		buildReadModelRequestFromConfigFunc = origBuild
+		disabledAccountsFromConfigFunc = origDisabled
+	}()
+
+	loadAccountsAndNormFunc = func() ([]core.AccountConfig, core.ModelNormalizationConfig, error) {
+		return []core.AccountConfig{acct}, core.DefaultModelNormalizationConfig(), nil
+	}
+	buildReadModelRequestFromConfigFunc = func() (ReadModelRequest, error) {
+		return ReadModelRequest{
+			Accounts:   []ReadModelAccount{{AccountID: acct.ID, ProviderID: acct.Provider}},
+			TimeWindow: core.TimeWindow30d,
+		}, nil
+	}
+	disabledAccountsFromConfigFunc = func() map[string]bool { return map[string]bool{} }
+
+	svc := &Service{
+		cfg:           Config{DBPath: filepath.Join(tempDir, "empty.db")},
+		providerByID:  map[string]core.UsageProvider{"fake-prov": prov},
+		pollScheduler: newPollScheduler(30 * time.Second),
+		rmCache:       newReadModelCache(),
+		pollState:     make(map[string]*providerPollState),
+		pollKick:      make(chan struct{}, 1),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 2)
+
+	// Periodic (non-force) poll becomes the generation leader and blocks in Fetch.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		svc.pollProviders(ctx)
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	// Overlapping force refresh (what web Refresh / Refresh All send).
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		req := httptest.NewRequest(http.MethodPost, "/v1/poll?wait=1&force=1", nil)
+		w := httptest.NewRecorder()
+		svc.handlePoll(w, req)
+		if w.Code != http.StatusOK {
+			errCh <- fmt.Errorf("force poll status=%d", w.Code)
+		}
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	prov.mu.Lock()
+	during := prov.fetchCount
+	prov.mu.Unlock()
+	if during != 1 {
+		t.Fatalf("expected 1 in-flight fetch while coalesced, got %d", during)
+	}
+
+	close(barrier)
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatalf("goroutine error: %v", err)
+	}
+
+	prov.mu.Lock()
+	total := prov.fetchCount
+	prov.mu.Unlock()
+	// Force must re-lead after the non-force generation ends; otherwise Refresh
+	// returns "polled" without bypassing backoff/rate-limit skips.
+	if total != 2 {
+		t.Fatalf("expected force poll to fetch again after periodic generation, got %d fetches", total)
+	}
+}
+
+func TestServer_ConcurrentForcePollsStillCoalesce(t *testing.T) {
+	tempDir := t.TempDir()
+	barrier := make(chan struct{})
+	prov := &fakeCountingProvider{barrier: barrier}
+	acct := core.AccountConfig{ID: "acct-force-coalesce", Provider: "fake-prov"}
+
+	origLoad := loadAccountsAndNormFunc
+	origBuild := buildReadModelRequestFromConfigFunc
+	origDisabled := disabledAccountsFromConfigFunc
+	defer func() {
+		loadAccountsAndNormFunc = origLoad
+		buildReadModelRequestFromConfigFunc = origBuild
+		disabledAccountsFromConfigFunc = origDisabled
+	}()
+
+	loadAccountsAndNormFunc = func() ([]core.AccountConfig, core.ModelNormalizationConfig, error) {
+		return []core.AccountConfig{acct}, core.DefaultModelNormalizationConfig(), nil
+	}
+	buildReadModelRequestFromConfigFunc = func() (ReadModelRequest, error) {
+		return ReadModelRequest{
+			Accounts:   []ReadModelAccount{{AccountID: acct.ID, ProviderID: acct.Provider}},
+			TimeWindow: core.TimeWindow30d,
+		}, nil
+	}
+	disabledAccountsFromConfigFunc = func() map[string]bool { return map[string]bool{} }
+
+	svc := &Service{
+		cfg:           Config{DBPath: filepath.Join(tempDir, "empty.db")},
+		providerByID:  map[string]core.UsageProvider{"fake-prov": prov},
+		pollScheduler: newPollScheduler(30 * time.Second),
+		rmCache:       newReadModelCache(),
+		pollState:     make(map[string]*providerPollState),
+		pollKick:      make(chan struct{}, 1),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 2)
+
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodPost, "/v1/poll?wait=1&force=1", nil).WithContext(ctx)
+			w := httptest.NewRecorder()
+			svc.handlePoll(w, req)
+			if w.Code != http.StatusOK {
+				errCh <- fmt.Errorf("force poll status=%d", w.Code)
+			}
+		}()
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	prov.mu.Lock()
+	during := prov.fetchCount
+	prov.mu.Unlock()
+	if during != 1 {
+		t.Fatalf("expected overlapping force polls to share one fetch, got %d", during)
+	}
+
+	close(barrier)
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatalf("goroutine error: %v", err)
+	}
+
+	prov.mu.Lock()
+	total := prov.fetchCount
+	prov.mu.Unlock()
+	if total != 1 {
+		t.Fatalf("expected concurrent force polls to remain coalesced, got %d fetches", total)
+	}
+}
+
 func TestServer_DeterministicFreshness_FakeClock_And_LastErrorRetained(t *testing.T) {
 	tempDir := t.TempDir()
 	t0 := time.Date(2026, 9, 6, 10, 0, 0, 0, time.UTC)

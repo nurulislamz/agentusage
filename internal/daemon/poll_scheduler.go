@@ -10,8 +10,10 @@ import (
 )
 
 type pollGeneration struct {
-	id   uint64
-	done chan struct{}
+	id     uint64
+	done   chan struct{}
+	force  bool
+	target string // empty means all enabled accounts
 }
 
 // PollScheduler manages per-provider adaptive backoff to reduce CPU usage when data
@@ -78,17 +80,26 @@ func (ps *PollScheduler) now() time.Time {
 	return time.Now()
 }
 
-func (ps *PollScheduler) BeginGeneration() (genID uint64, isLeader bool, done <-chan struct{}) {
+func (ps *PollScheduler) BeginGeneration() (uint64, bool, <-chan struct{}) {
+	genID, isLeader, done, _, _ := ps.BeginGenerationWith(false, "")
+	return genID, isLeader, done
+}
+
+// BeginGenerationWith starts (or joins) a poll generation, recording whether the
+// leader is a force poll and which account_id it targets (empty = all).
+// Followers receive the leader's force/target so they can decide whether the
+// completed generation already satisfied their request.
+func (ps *PollScheduler) BeginGenerationWith(force bool, target string) (genID uint64, isLeader bool, done <-chan struct{}, leaderForce bool, leaderTarget string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
 	if ps.activeGen != nil {
-		return ps.activeGen.id, false, ps.activeGen.done
+		return ps.activeGen.id, false, ps.activeGen.done, ps.activeGen.force, ps.activeGen.target
 	}
 	ps.genCount++
 	ch := make(chan struct{})
-	ps.activeGen = &pollGeneration{id: ps.genCount, done: ch}
-	return ps.genCount, true, ch
+	ps.activeGen = &pollGeneration{id: ps.genCount, done: ch, force: force, target: target}
+	return ps.genCount, true, ch, force, target
 }
 
 func (ps *PollScheduler) EndGeneration(genID uint64) {
