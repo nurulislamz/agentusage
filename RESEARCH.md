@@ -2369,3 +2369,38 @@ Tuesday GitHub API pass (Europe/London). ccusage stays the format to be compatib
 **Build takeaways:** codeburn pulling Cursor usage straight from cursor.com raises the bar for agentUsage's Cursor support; local-only parsing will look thin next to it, so plan an opt-in account sync and keep labelling local Cursor dollars as estimates. Multi-account and multi-machine Codex homes (OpenUsage v0.7.14, pane v0.4.57) are now table stakes. quotabar's "you'll run out before reset" warning and tokenmaxxing's "reject implausible usage at ingest" are both cheap, high-value ideas to copy. codeburn's note that cloud Cowork tasks from 6 Oct aren't in local logs is a coverage gap to document in agentUsage too.
 
 Sources: GitHub API 2026-10-06 (Europe/London).
+
+### Open source — 8 Oct 2026
+
+Thursday GitHub API pass (Europe/London), covering Wednesday and Thursday since the 6 Oct entry (no 7 Oct Open source entry was committed). ccusage stays the format to be compatible with; the live-quota menu-bar layer (OpenUsage, ClaudeBar, codeburn, tokscale, AIUsage) keeps shipping daily. **Biggest movers:** `getagentseal/codeburn` now groups usage by git repository and folds subagent sessions into their parent, `Nanako0129/syrtis` shipped **v2.5.0** with Cursor sync settings, and `Dicklesworthstone/coding_agent_usage_tracker` added Kiro and JetBrains AI providers plus an MCP server.
+
+| Repo | Stars | License | Delta / why it matters |
+|---|---:|---|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.9k | NOASSERTION | Hold **v20.0.26**; near-hourly models.dev and LiteLLM pricing snapshots. The de facto log/report format to stay compatible with. |
+| [getagentseal/codeburn](https://github.com/getagentseal/codeburn) | ~11.4k | MIT | Thu: **group projects by git repo** (#1691), per-call cwd attribution for Claude (#1689), **subagent sessions folded into parent** (#1690), signed one-click desktop/tray updates. Directly overlaps agentUsage's per-project and Cursor views. |
+| [Maciek-roboblog/Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor) | ~8.7k | MIT | Hold **v4.0.0** — terminal Claude burn-rate TUI. |
+| [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) | ~5.6k | MIT | Hold **v4.18.0** — multi-agent token CLI with Copilot `session-store.db` parser. |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.3k | MIT | Hold **v0.7.14** — multi-account Codex homes, structured Cursor team pools. Closest product peer. |
+| [seakee/CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus) | ~3.8k | MIT | **v1.14.4** — usage-snapshot fallback and query-error classification; quota/account manager adjacent. |
+| [tddworks/ClaudeBar](https://github.com/tddworks/ClaudeBar) | ~1.5k | Apache-2.0 | **v0.5.9 / v0.5.10**; main sums each day into a per-model line (#511) and starts a Windows build. Per-model daily lines are a chart we should match. |
+| [sylearn/AIUsage](https://github.com/sylearn/AIUsage) | ~711 | Apache-2.0 | **v0.15.23 / v0.15.24** — Claude subscription quota monitoring and streamlined sign-in for every provider. |
+| [Nanako0129/syrtis](https://github.com/Nanako0129/syrtis) | ~409 | MIT | **v2.5.0** — Cursor sync settings with stale-result handling; another app treating Cursor as a first-class source. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~223 | MIT | **v3.11.0** — Claude Haiku 5.5 pricing including its long-prompt bracket; a reminder that our price table needs tiered input pricing. |
+| [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~60.4k | NOASSERTION | **v1.104.2**; main makes `supports_audio_output` read its cost-map key. Its cost map is still the price source of record for many tools. |
+| [langfuse/langfuse](https://github.com/langfuse/langfuse) | ~35.5k | NOASSERTION | **v4.53.0 / v4.54.0**; Haiku 5.5 pricing, GCS export target. OTel-style cost dashboard reference. |
+| [Helicone/helicone](https://github.com/Helicone/helicone) | ~6.2k | Apache-2.0 | Quiet — proxy-based cost observability reference. |
+| [alibaba/loongsuite-pilot](https://github.com/alibaba/loongsuite-pilot) | ~199 | Apache-2.0 | Thu Qoder IDE SQLite token retry and finish-reason parsing — local-SQLite agent telemetry, same parsing problem as Cursor's state DB. |
+| [planetf1/otelite](https://github.com/planetf1/otelite) | ~96 | NOASSERTION | **v0.1.154** — fixed agent rollups double-counting stored metrics; a bug class to test for. |
+
+**Also watch**
+- [Dicklesworthstone/coding_agent_usage_tracker](https://github.com/Dicklesworthstone/coding_agent_usage_tracker) (~89★) — Wed **Kiro + JetBrains AI** providers ported from CodexBar, weekly pace line, and a `caut mcp` server so agents can query their own usage.
+- [ItsJazii/pane](https://github.com/ItsJazii/pane) (~71★) — **v0.4.58**: Codex Auto-review counted as free for ChatGPT sign-ins since 2026-10-06; a pricing rule we need too.
+- [itvincent-git/codex-usage-desktop](https://github.com/itvincent-git/codex-usage-desktop) (~46★, MIT) — **v3.13.x** preserves usage from archived Codex sessions; easy data loss to avoid.
+- [majiayu000/quotabar](https://github.com/majiayu000/quotabar) (~53★, MIT) — exposes incomplete-usage and session-source evidence; prepping 0.6 on ccstats 0.11.
+- [leeguooooo/claude-code-usage-bar](https://github.com/leeguooooo/claude-code-usage-bar) (~377★, MIT) — **v3.46.0** with signed/notarised macOS builds.
+- [fschmutz/claude-usage-panel](https://github.com/fschmutz/claude-usage-panel) (~6★, MIT) — **v3.0.0** pins ccusage for cost and keeps each account's weekly reset.
+- New this fortnight: [jaykinhoo9/codex-usage-badge](https://github.com/jaykinhoo9/codex-usage-badge) (~69★, MIT; Codex quota rings and per-chat token indicators), [efim0v/brow](https://github.com/efim0v/brow) (~52★, GPL-3.0; Claude 5-hour and weekly limits in the MacBook notch), [aka-cronos/uzzy](https://github.com/aka-cronos/uzzy) (~7★, MIT; Claude, Codex and Cursor limits in one menu bar), and [KevinLogan84/grok-cursor-usage](https://github.com/KevinLogan84/grok-cursor-usage) (~2★, MIT; Cursor and Grok plan usage with an iPhone view).
+
+**Build takeaways:** group sessions by git repository (not just cwd) and fold subagent sessions into their parent, as codeburn now does; both make per-project cost far more accurate. Add tiered long-prompt pricing and a "free under this sign-in" rule to the price table. Never drop archived sessions when rescanning, and test rollups for double-counted metrics.
+
+Sources: GitHub API and GitHub search, 2026-10-08 (Europe/London).
