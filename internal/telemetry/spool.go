@@ -1,7 +1,6 @@
 package telemetry
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -212,17 +211,23 @@ func (s *Spool) Cleanup(policy SpoolCleanupPolicy) (SpoolCleanupResult, error) {
 }
 
 func readSpoolFile(path string) (SpoolRecord, bool) {
-	f, err := os.Open(path)
+	// Spool files are single-record JSONL written by writeSpoolFile. Read the
+	// whole file rather than bufio.Scanner: the default MaxScanTokenSize is
+	// 64KiB, and hook/collector payloads (tool results, transcripts, full
+	// snapshots) routinely exceed that. Oversized lines were previously
+	// treated as malformed, left unread, then deleted by Cleanup — silent
+	// permanent loss of usage events that missed the first ingest.
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return SpoolRecord{}, false
 	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	if !scanner.Scan() {
+	line := strings.TrimSpace(string(data))
+	if line == "" {
 		return SpoolRecord{}, false
 	}
-	line := strings.TrimSpace(scanner.Text())
+	if idx := strings.IndexByte(line, '\n'); idx >= 0 {
+		line = strings.TrimSpace(line[:idx])
+	}
 	if line == "" {
 		return SpoolRecord{}, false
 	}
