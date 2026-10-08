@@ -92,6 +92,58 @@ func TestSpoolReadOldest_SkipsMalformedFile(t *testing.T) {
 	}
 }
 
+func TestSpoolReadOldest_ReadsRecordsLargerThan64KiB(t *testing.T) {
+	dir := t.TempDir()
+	s := NewSpool(dir)
+
+	// Exceed bufio.Scanner's default MaxScanTokenSize (64KiB). Append writes
+	// the full record, but the old scanner-based reader treated it as malformed.
+	big := strings.Repeat("x", 70*1024)
+	payload, err := json.Marshal(map[string]any{
+		"event": "tool_result",
+		"root":  big,
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+
+	path, err := s.Append(SpoolRecord{
+		SpoolID:       "big-hook",
+		CreatedAt:     time.Date(2026, time.February, 22, 10, 0, 0, 0, time.UTC),
+		SourceSystem:  SourceSystem("claude_code"),
+		SourceChannel: SourceChannelHook,
+		Payload:       payload,
+	})
+	if err != nil {
+		t.Fatalf("append oversized: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if info.Size() <= 64*1024 {
+		t.Fatalf("spool file size = %d, want > 64KiB to exercise the regression", info.Size())
+	}
+
+	items, err := s.ReadOldest(10)
+	if err != nil {
+		t.Fatalf("ReadOldest: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("items = %d, want 1", len(items))
+	}
+	if items[0].Record.SpoolID != "big-hook" {
+		t.Fatalf("spool id = %q, want big-hook", items[0].Record.SpoolID)
+	}
+	if len(items[0].Record.Payload) < 70*1024 {
+		t.Fatalf("payload len = %d, want >= 70KiB", len(items[0].Record.Payload))
+	}
+
+	if err := s.MarkFailed(path, "retry after busy"); err != nil {
+		t.Fatalf("MarkFailed on oversized record: %v", err)
+	}
+}
+
 func TestSpoolMarkFailed_IncrementsAttempt(t *testing.T) {
 	dir := t.TempDir()
 	s := NewSpool(dir)
