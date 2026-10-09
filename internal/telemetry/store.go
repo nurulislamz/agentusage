@@ -1012,8 +1012,11 @@ func (s *Store) PruneOrphanRawEvents(ctx context.Context, limit int) (int64, err
 }
 
 // PruneRawEventPayloads clears source_payload from old raw events to reclaim
-// disk space. All useful data has already been extracted into usage_events.
-// Keeps payloads for events newer than retentionHours.
+// disk space. This is unsafe for current analytics: language, code-stats,
+// client, and upstream_provider aggregates still json_extract fields from
+// source_payload for the hot window. Prefer PruneOldEvents (deletes rows
+// after rollup) until those dimensions are columnized. Keeps payloads for
+// events newer than retentionHours.
 func (s *Store) PruneRawEventPayloads(ctx context.Context, retentionHours int, limit int) (int64, error) {
 	if s == nil || s.db == nil || retentionHours < 0 || limit <= 0 {
 		return 0, nil
