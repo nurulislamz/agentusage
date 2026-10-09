@@ -161,12 +161,11 @@ func (s *Service) pruneTelemetryOrphans(ctx context.Context) {
 		s.infof("prune_orphan_raw_events", "removed=%d batch_size=%d", removed, pruneBatchSize)
 	}
 
-	payloadCtx, payloadCancel := context.WithTimeout(ctx, 4*time.Second)
-	defer payloadCancel()
-	pruned, pruneErr := s.store.PruneRawEventPayloads(payloadCtx, 1, pruneBatchSize)
-	if pruneErr == nil && pruned > 0 {
-		s.infof("prune_raw_payloads", "pruned=%d", pruned)
-	}
+	// Do not call PruneRawEventPayloads here. Analytics language / code-stats /
+	// client / upstream_provider aggregates still read those fields via
+	// json_extract(source_payload, ...) for the entire hot window. Clearing
+	// payloads after 1h permanently wiped those dimensions; disk reclaim for
+	// raw rows is handled by PruneOldEvents after rollup.
 }
 
 func (s *Service) runRetentionLoop(ctx context.Context) {

@@ -121,6 +121,85 @@ func TestPruneOldEventsBatchedRemovesBacklog(t *testing.T) {
 	}
 }
 
+func TestPruneRawEventPayloads_WipesAnalyticsDimensions(t *testing.T) {
+	// Regression lock: analytics language / code-stats still read file paths and
+	// line counts from usage_raw_events.source_payload. Clearing that JSON after
+	// 1h (former daemon collect-loop behavior) permanently zeroed those views
+	// for every event older than an hour.
+	_, db, store := openUsageViewRawTestStore(t)
+
+	mustIngestUsageEvent(t, store, IngestRequest{
+		SourceSystem:  SourceSystem("claude_code"),
+		SourceChannel: SourceChannelHook,
+		OccurredAt:    time.Now().UTC().Add(-90 * time.Minute),
+		ProviderID:    "anthropic",
+		AccountID:     "anthropic-main",
+		AgentName:     "claude_code",
+		EventType:     EventTypeToolUsage,
+		ToolName:      "Edit",
+		ToolCallID:    "tool-edit-1",
+		SessionID:     "sess-analytics",
+		Status:        EventStatusOK,
+		Payload: map[string]any{
+			"file":          "/workspace/internal/daemon/server.go",
+			"lines_added":   12,
+			"lines_removed": 3,
+		},
+	}, "ingest tool event with analytics payload")
+
+	// Make the raw row eligible for a 1-hour payload prune.
+	if _, err := db.Exec(`UPDATE usage_raw_events SET ingested_at = datetime('now', '-2 hours')`); err != nil {
+		t.Fatalf("backdate ingested_at: %v", err)
+	}
+
+	filter := usageFilter{ProviderIDs: []string{"anthropic"}}
+	langsBefore, err := queryLanguageAgg(context.Background(), db, filter)
+	if err != nil {
+		t.Fatalf("language agg before prune: %v", err)
+	}
+	if len(langsBefore) == 0 || langsBefore[0].Language != "go" {
+		t.Fatalf("expected go language agg before prune, got %+v", langsBefore)
+	}
+	codeBefore, err := queryCodeStatsAgg(context.Background(), db, filter)
+	if err != nil {
+		t.Fatalf("code stats before prune: %v", err)
+	}
+	if codeBefore.FilesChanged < 1 || codeBefore.LinesAdded != 12 || codeBefore.LinesRemoved != 3 {
+		t.Fatalf("expected code stats before prune, got %+v", codeBefore)
+	}
+
+	pruned, err := store.PruneRawEventPayloads(context.Background(), 1, 1000)
+	if err != nil {
+		t.Fatalf("PruneRawEventPayloads: %v", err)
+	}
+	if pruned != 1 {
+		t.Fatalf("pruned = %d, want 1", pruned)
+	}
+
+	var payload string
+	if err := db.QueryRow(`SELECT source_payload FROM usage_raw_events LIMIT 1`).Scan(&payload); err != nil {
+		t.Fatalf("read payload: %v", err)
+	}
+	if payload != "{}" {
+		t.Fatalf("source_payload = %q, want {}", payload)
+	}
+
+	langsAfter, err := queryLanguageAgg(context.Background(), db, filter)
+	if err != nil {
+		t.Fatalf("language agg after prune: %v", err)
+	}
+	if len(langsAfter) != 0 {
+		t.Fatalf("language agg should be empty after payload prune, got %+v", langsAfter)
+	}
+	codeAfter, err := queryCodeStatsAgg(context.Background(), db, filter)
+	if err != nil {
+		t.Fatalf("code stats after prune: %v", err)
+	}
+	if codeAfter.FilesChanged != 0 || codeAfter.LinesAdded != 0 || codeAfter.LinesRemoved != 0 {
+		t.Fatalf("code stats should be zero after payload prune, got %+v", codeAfter)
+	}
+}
+
 func TestPruneOldEventsCancelledContextReturnsProgress(t *testing.T) {
 	db, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), "telemetry.db"))
 	if err != nil {
