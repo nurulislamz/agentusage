@@ -414,6 +414,18 @@ func (p *Provider) enrichFromConsole(ctx context.Context, acct core.AccountConfi
 		}
 	}
 
+	// Subscription meters are independent of billing. Previously a page-scrape
+	// failure (including false-positive signed-out heuristics) discarded the
+	// subscription payload with no RPC fallback, silently dropping 5h/weekly/
+	// monthly gauges even when billing recovered.
+	if !subscription.RollingUsageOK && !subscription.WeeklyUsageOK && !subscription.MonthlyUsageOK {
+		if subRPC, err := client.QuerySubscriptionUsage(ctx, workspaceID); err == nil {
+			subscription = subRPC
+		} else if page.err != nil {
+			snap.SetDiagnostic("opencode_subscription_fallback_error", err.Error())
+		}
+	}
+
 	if billingFailed {
 		// Both the page scrape and the billing RPC fallback failed. Return
 		// the error instead of falling through to write zero-valued billing

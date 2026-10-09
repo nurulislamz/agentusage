@@ -389,14 +389,29 @@ func parseSubscriptionUsage(body []byte) (SubscriptionUsage, error) {
 
 	// Parse rolling usage.
 	if rolling, ok := usageMap["rollingUsage"].(map[string]any); ok {
-		result.RollingUsagePct = floatFieldFromMap(rolling, "usagePercent")
+		if _, has := rolling["usagePercent"]; has {
+			result.RollingUsagePct = floatFieldFromMap(rolling, "usagePercent")
+			result.RollingUsageOK = true
+		}
 		result.RollingResetSec = int(floatFieldFromMap(rolling, "resetInSec"))
 	}
 
 	// Parse weekly usage.
 	if weekly, ok := usageMap["weeklyUsage"].(map[string]any); ok {
-		result.WeeklyUsagePct = floatFieldFromMap(weekly, "usagePercent")
+		if _, has := weekly["usagePercent"]; has {
+			result.WeeklyUsagePct = floatFieldFromMap(weekly, "usagePercent")
+			result.WeeklyUsageOK = true
+		}
 		result.WeeklyResetSec = int(floatFieldFromMap(weekly, "resetInSec"))
+	}
+
+	// Parse monthly usage when present (same shape as the HTML scrape path).
+	if monthly, ok := usageMap["monthlyUsage"].(map[string]any); ok {
+		if _, has := monthly["usagePercent"]; has {
+			result.MonthlyUsagePct = floatFieldFromMap(monthly, "usagePercent")
+			result.MonthlyUsageOK = true
+		}
+		result.MonthlyResetSec = int(floatFieldFromMap(monthly, "resetInSec"))
 	}
 
 	// Parse renewAt if present.
@@ -409,7 +424,9 @@ func parseSubscriptionUsage(body []byte) (SubscriptionUsage, error) {
 		}
 	}
 
-	if result.RollingUsagePct == 0 && result.WeeklyUsagePct == 0 {
+	// usagePercent:0 is a legitimate post-reset reading — gate on presence
+	// flags, not on non-zero values.
+	if !result.RollingUsageOK && !result.WeeklyUsageOK && !result.MonthlyUsageOK {
 		return SubscriptionUsage{}, errors.New("console: subscription response missing usage fields")
 	}
 	return result, nil
@@ -422,18 +439,27 @@ func parseSubscriptionUsageFallback(text string) (SubscriptionUsage, error) {
 
 	if pct := extractDoubleFromText(text, `rollingUsage[^}]*?usagePercent\s*:\s*([0-9]+(?:\.[0-9]+)?)`); pct != nil {
 		result.RollingUsagePct = *pct
+		result.RollingUsageOK = true
 	}
 	if sec := extractIntFromText(text, `rollingUsage[^}]*?resetInSec\s*:\s*([0-9]+)`); sec != nil {
 		result.RollingResetSec = *sec
 	}
 	if pct := extractDoubleFromText(text, `weeklyUsage[^}]*?usagePercent\s*:\s*([0-9]+(?:\.[0-9]+)?)`); pct != nil {
 		result.WeeklyUsagePct = *pct
+		result.WeeklyUsageOK = true
 	}
 	if sec := extractIntFromText(text, `weeklyUsage[^}]*?resetInSec\s*:\s*([0-9]+)`); sec != nil {
 		result.WeeklyResetSec = *sec
 	}
+	if pct := extractDoubleFromText(text, `monthlyUsage[^}]*?usagePercent\s*:\s*([0-9]+(?:\.[0-9]+)?)`); pct != nil {
+		result.MonthlyUsagePct = *pct
+		result.MonthlyUsageOK = true
+	}
+	if sec := extractIntFromText(text, `monthlyUsage[^}]*?resetInSec\s*:\s*([0-9]+)`); sec != nil {
+		result.MonthlyResetSec = *sec
+	}
 
-	if result.RollingUsagePct == 0 && result.WeeklyUsagePct == 0 {
+	if !result.RollingUsageOK && !result.WeeklyUsageOK && !result.MonthlyUsageOK {
 		return SubscriptionUsage{}, errors.New("console: subscription response missing usage fields")
 	}
 	return result, nil
@@ -525,21 +551,41 @@ func (c *ConsoleClient) FetchGoUsagePage(ctx context.Context, workspaceID string
 	}
 
 	html := string(body)
-	if looksSignedOutFromHTML(html) {
+	subscription, billing := parseGoUsagePageHTML(html)
+	// Authenticated Go pages often embed the substring "login" in JS bundles
+	// and nav chrome. Only treat signed-out heuristics as fatal when the
+	// scrape also produced no usable billing/subscription payload — otherwise
+	// we discard real meters and fall through to rotating RPC IDs.
+	if looksSignedOutFromHTML(html) && !goUsagePageHasUsableData(subscription, billing) {
 		return SubscriptionUsage{}, BillingInfo{}, &ConsoleAuthError{StatusCode: 401, Body: "page indicates signed out"}
 	}
-
-	subscription, billing := parseGoUsagePageHTML(html)
 	return subscription, billing, nil
 }
 
 // looksSignedOutFromHTML checks if an HTML response indicates the user is
-// not authenticated.
+// not authenticated. Bare "login" is intentionally avoided — SPA bundles and
+// logged-in chrome commonly contain that substring.
 func looksSignedOutFromHTML(html string) bool {
 	lower := strings.ToLower(html)
-	return strings.Contains(lower, "sign in") ||
-		strings.Contains(lower, "login") ||
+	return strings.Contains(lower, "sign in to") ||
+		strings.Contains(lower, "please sign in") ||
+		strings.Contains(lower, "please log in") ||
 		strings.Contains(lower, "auth/authorize")
+}
+
+// goUsagePageHasUsableData reports whether HTML scraping recovered any
+// billing or subscription fields worth keeping.
+func goUsagePageHasUsableData(sub SubscriptionUsage, bill BillingInfo) bool {
+	if sub.RollingUsageOK || sub.WeeklyUsageOK || sub.MonthlyUsageOK {
+		return true
+	}
+	if bill.Balance != 0 || bill.MonthlyUsage != 0 || bill.MonthlyLimit != nil {
+		return true
+	}
+	if bill.CustomerID != "" || bill.SubscriptionPlan != "" || bill.HasSubscription {
+		return true
+	}
+	return false
 }
 
 // parseGoUsagePageHTML extracts billing and subscription usage data from the
