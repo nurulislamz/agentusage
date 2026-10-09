@@ -251,6 +251,80 @@ func TestFetch_BrowserSessionOnlyNoAPIKey_ConsoleFailureSurfacesAuthNotOK(t *tes
 	}
 }
 
+// TestFetch_PageScrapeFailure_StillLoadsSubscriptionViaRPC covers the case
+// where the Go usage HTML scrape fails (network / false-positive signed-out)
+// but the billing + subscription RPCs still succeed. Previously subscription
+// meters were silently dropped because only billing had an RPC fallback.
+func TestFetch_PageScrapeFailure_StillLoadsSubscriptionViaRPC(t *testing.T) {
+	origLoadStoredSession := loadStoredSession
+	origNewConsoleClient := newConsoleClient
+	t.Cleanup(func() {
+		loadStoredSession = origLoadStoredSession
+		newConsoleClient = origNewConsoleClient
+	})
+
+	loadStoredSession = func(accountID string) (config.BrowserSession, bool, error) {
+		return config.BrowserSession{
+			Value:         "test-cookie-value",
+			CookieName:    "auth",
+			SourceBrowser: "firefox",
+		}, true, nil
+	}
+
+	billingBody := loadFixture(t, "seroval_c83b78a61468.txt")
+	subscriptionBody := loadFixture(t, "seroval_7abeebee372f.txt")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/go"):
+			http.Error(w, "upstream blip", http.StatusBadGateway)
+		case r.URL.Query().Get("id") == rpcBillingInfoID || r.Header.Get("x-server-id") == rpcBillingInfoID:
+			w.Header().Set("Content-Type", "text/javascript")
+			_, _ = w.Write(billingBody)
+		case r.URL.Query().Get("id") == rpcSubscriptionID || r.Header.Get("x-server-id") == rpcSubscriptionID:
+			w.Header().Set("Content-Type", "text/javascript")
+			_, _ = w.Write(subscriptionBody)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	newConsoleClient = func(cookieValue, cookieName, workspaceID string) *ConsoleClient {
+		client := NewConsoleClient(cookieValue, cookieName, workspaceID)
+		client.baseURL = server.URL
+		return client
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	acct := core.AccountConfig{
+		ID:        "opencode-personal",
+		Provider:  "opencode",
+		APIKeyEnv: "TEST_OPENCODE_MISSING_FOR_SUB_FALLBACK",
+		BrowserCookie: &core.BrowserCookieRef{
+			Domain:        ".opencode.ai",
+			CookieName:    "auth",
+			SourceBrowser: "firefox",
+		},
+	}
+	acct.SetHint("opencode_workspace_id", "wrk_TEST123")
+
+	snap, err := New().Fetch(context.Background(), acct)
+	if err != nil {
+		t.Fatalf("Fetch error: %v", err)
+	}
+	if _, ok := snap.Metrics["console_balance"]; !ok {
+		t.Fatalf("expected console_balance from billing RPC fallback, metrics=%v", snap.Metrics)
+	}
+	rolling, ok := snap.Metrics["rolling_usage"]
+	if !ok || rolling.Used == nil || *rolling.Used != 67.5 {
+		t.Fatalf("rolling_usage = %+v, want Used=67.5 from subscription RPC fallback", rolling)
+	}
+	weekly, ok := snap.Metrics["weekly_usage"]
+	if !ok || weekly.Used == nil || *weekly.Used != 42.3 {
+		t.Fatalf("weekly_usage = %+v, want Used=42.3 from subscription RPC fallback", weekly)
+	}
+}
+
 // TestFetch_ConsoleDoubleFailure_DoesNotFabricateZeroBalance covers the case
 // where both the HTML usage-page scrape and the billing-RPC fallback fail
 // (e.g. an expired session cookie). Previously both errors were discarded

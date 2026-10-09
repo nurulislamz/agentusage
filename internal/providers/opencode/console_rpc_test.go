@@ -325,6 +325,42 @@ func TestParseSubscriptionUsageFallback(t *testing.T) {
 	}
 }
 
+func TestLooksSignedOutFromHTML_IgnoresBareLoginSubstring(t *testing.T) {
+	if looksSignedOutFromHTML(`<html><script>const loginUrl="/auth/login"</script><h1>Go Usage</h1></html>`) {
+		t.Fatal("bare 'login' in logged-in SPA chrome must not count as signed out")
+	}
+	if !looksSignedOutFromHTML(`<html><body>Please sign in to continue</body></html>`) {
+		t.Fatal("explicit 'please sign in' should count as signed out")
+	}
+}
+
+func TestFetchGoUsagePage_KeepsMetersWhenHTMLMentionsLogin(t *testing.T) {
+	html := `<html><script>const loginUrl="/auth/login";self.$R=self.$R||[];` +
+		`billing.get["wrk_x"]}=$R[1]=$R[2]($R[3]={balance:150000000,monthlyUsage:0,monthlyLimit:null,customerID:"cus_x"});` +
+		`rollingUsage:$R[4]={status:"ok",resetInSec:1800,usagePercent:33.5};` +
+		`weeklyUsage:$R[5]={status:"ok",resetInSec:200000,usagePercent:12.5};` +
+		`</script></html>`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(html))
+	}))
+	defer server.Close()
+
+	c := NewConsoleClient("test-cookie-value", "auth", "wrk_x")
+	c.baseURL = server.URL
+
+	sub, bill, err := c.FetchGoUsagePage(context.Background(), "wrk_x")
+	if err != nil {
+		t.Fatalf("FetchGoUsagePage error = %v, want nil (login substring must not discard scraped meters)", err)
+	}
+	if !sub.RollingUsageOK || sub.RollingUsagePct != 33.5 {
+		t.Fatalf("rolling = ok:%v pct:%v, want true/33.5", sub.RollingUsageOK, sub.RollingUsagePct)
+	}
+	if bill.Balance != 150000000 {
+		t.Fatalf("balance = %v, want 150000000", bill.Balance)
+	}
+}
+
 func TestParseGoUsagePageHTML_ZeroUsagePercentIsNotDroppedAsMissing(t *testing.T) {
 	html := `<html><script>self.$R=self.$R||[];` +
 		`billing.get["wrk_x"]}=$R[1]=$R[2]($R[3]={balance:0,reloadAmount:2000000000,reloadTrigger:500000000});` +
