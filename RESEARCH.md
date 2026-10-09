@@ -2437,3 +2437,40 @@ Thursday GitHub API pass (Europe/London), covering Wednesday and Thursday since 
 **Build takeaways:** group sessions by git repository (not just cwd) and fold subagent sessions into their parent, as codeburn now does; both make per-project cost far more accurate. Add tiered long-prompt pricing and a "free under this sign-in" rule to the price table. Never drop archived sessions when rescanning, and test rollups for double-counted metrics.
 
 Sources: GitHub API and GitHub search, 2026-10-08 (Europe/London).
+
+### Open source — 9 Oct 2026
+
+Friday GitHub API pass (Europe/London), covering overnight and Friday morning since the 8 Oct entry. ccusage stays the format to be compatible with; the live-quota menu-bar layer (CodexBar, OpenUsage, ClaudeBar, codeburn, tokscale, AIUsage) keeps shipping daily. **Biggest movers:** `steipete/CodexBar` is now the clear category leader at **~22.3k★** and kept adding provider plugins plus native Codex tool-activity spend inspect on main; `tddworks/ClaudeBar` shipped **v0.5.11**; `seakee/CPA-Manager-Plus` shipped **v1.14.5**; `fschmutz/claude-usage-panel` raced **v3.1 → v3.6.0** overnight.
+
+| Repo | Stars | License | Delta / why it matters |
+|---|---:|---|---|
+| [steipete/CodexBar](https://github.com/steipete/CodexBar) | ~22.3k | MIT | Tag still **v0.73.0**; Fri main adds providers **Cosmic AI, Aerostack, Sail Research, Sofya** plus **Tavily, Exa, Linkup, TinyApi**, and spend can **inspect native Codex session tool activity**. Largest local quota tracker by far (macOS-first); agentUsage's lane stays terminal-first + cross-platform + API-key/gateway coverage. |
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | ~18.9k | NOASSERTION | Hold **v20.0.26**; near-hourly models.dev and LiteLLM pricing snapshots (Fri morning stream continuing). The de facto log/report format to stay compatible with. |
+| [getagentseal/codeburn](https://github.com/getagentseal/codeburn) | ~11.4k | MIT | Thu after the git-repo grouping work: **project links put a folder in a repo project** (#1695), Cursor import clears covered days on a new build's first run (#1698), one timezone per daily cache (#1696), bundled LiteLLM price refresh, subagent fold follow-ups. Direct overlap with agentUsage's per-project and Cursor views. |
+| [Maciek-roboblog/Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor) | ~8.7k | MIT | Hold **v4.0.0** — terminal Claude burn-rate TUI. |
+| [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) | ~5.6k | MIT | Hold **v4.18.0** — multi-agent token CLI with Copilot `session-store.db` parser. |
+| [robinebers/openusage](https://github.com/robinebers/openusage) | ~4.3k | MIT | Hold **v0.7.14** — multi-account Codex homes, structured Cursor team pools. Closest product peer by design. |
+| [seakee/CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus) | ~3.8k | MIT | **v1.14.5** (Fri): fixes Codex reset-credit counts disappearing/stale after quota refresh; supports keyless OpenAI-compatible providers. Quota/account manager adjacent. |
+| [tddworks/ClaudeBar](https://github.com/tddworks/ClaudeBar) | ~1.5k | Apache-2.0 | **v0.5.11** (Fri): Codex login from **macOS Keychain** (not only `~/.codex/auth.json`); leaderboard tab keeps last board on refresh; **30-day chart split by model** (cost/tokens/cache). Per-model daily lines are a chart we should match; Keychain auth is a real Codex discovery path. |
+| [sylearn/AIUsage](https://github.com/sylearn/AIUsage) | ~714 | Apache-2.0 | Hold **v0.15.24**; Thu: show reset Claude subscription windows as full instead of hiding them — a display rule worth copying. |
+| [Nanako0129/syrtis](https://github.com/Nanako0129/syrtis) | ~410 | MIT | Hold **v2.5.0** — Cursor sync settings with stale-result handling. |
+| [Piebald-AI/splitrail](https://github.com/Piebald-AI/splitrail) | ~223 | MIT | Hold **v3.11.0** — Claude Haiku 5.5 long-prompt pricing reminder. |
+| [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~60.4k | NOASSERTION | Hold **v1.104.2**; **v1.105.0-rc.3** / **v1.106.0-dev.2** on the RC line. Cost map still the price source of record for many tools. |
+| [langfuse/langfuse](https://github.com/langfuse/langfuse) | ~35.6k | NOASSERTION | **v4.55.0** (Thu): zero-vuln Docker base + FIPS mode, skills import from files/ZIPs, topics summary rework. OTel-style cost dashboard reference. |
+| [Helicone/helicone](https://github.com/Helicone/helicone) | ~6.2k | Apache-2.0 | Quiet since 16 Sep. Adjacent proxy-based cost observability. |
+| [akitaonrails/ai-usagebar](https://github.com/akitaonrails/ai-usagebar) | ~631 | MIT | **v1.34.0** (Thu): Copilot named accounts, OS certificate store, Spanish UI. Rust waybar/menu-bar peer inspired by ClaudeBar/CodexBar. |
+| [Chengjun023/agent-smith](https://github.com/Chengjun023/agent-smith) | ~509 | MIT | Stars **~218 → ~509** this week — adaptive model routing + Codex usage monitor; fastest-growing newcomer to watch. |
+
+**Also watch**
+- [Dicklesworthstone/coding_agent_usage_tracker](https://github.com/Dicklesworthstone/coding_agent_usage_tracker) (~89★) — Rust CLI port of CodexBar (`caut`); agent-readable JSON/Markdown + MCP still table stakes.
+- [fschmutz/claude-usage-panel](https://github.com/fschmutz/claude-usage-panel) (~6★, MIT) — overnight **v3.1.0 → v3.6.0**: "waiting on you" badge for permission/question/idle sessions, pause/resume every Claude Code session, release path gated on green CI. Small repo, sharp UX ideas.
+- [leeguooooo/claude-code-usage-bar](https://github.com/leeguooooo/claude-code-usage-bar) (~378★, MIT) — **v3.46.1**: `cs doctor` shows auto-upgrade / latest; failed refresh keeps last good per-model limits.
+- [majiayu000/quotabar](https://github.com/majiayu000/quotabar) (~53★, MIT) — connected published **ccstats 0.11**, preparing QuotaBar **0.6**.
+- [ItsJazii/pane](https://github.com/ItsJazii/pane) (~71★) — hold **v0.4.58** (Codex Auto-review free under ChatGPT sign-in since 2026-10-06).
+- [itvincent-git/codex-usage-desktop](https://github.com/itvincent-git/codex-usage-desktop) (~47★, MIT) — hold **app-v3.13.2**; preserve archived session usage.
+- [alibaba/loongsuite-pilot](https://github.com/alibaba/loongsuite-pilot) (~200★, Apache-2.0) — still shipping Qoder IDE SQLite token parsing; same problem class as Cursor's state DB.
+- Micro Cursor/Claude menu-bar apps keep spawning — noise floor next to CodexBar's breadth.
+
+**Build takeaways:** treat CodexBar as the macOS ceiling to differentiate against (terminal + Linux/Windows + API keys/gateways). Match ClaudeBar's per-model daily chart and discover Codex auth from the Keychain as well as `auth.json`. Keep Cursor local dollars labelled as estimates; copy codeburn's project-link and first-run import clear. AIUsage's "reset windows show as full, not hidden" is a cheap honesty fix. Never blank limit UI on a single failed refresh (claude-code-usage-bar / ClaudeBar pattern).
+
+Sources: GitHub API and GitHub search, 2026-10-09 (Europe/London).
