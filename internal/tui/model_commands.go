@@ -166,7 +166,7 @@ func (m Model) validateKeyCmd(accountID, providerID, apiKey string) tea.Cmd {
 			return validateKeyResultMsg{AccountID: accountID, Valid: false, Error: "validation service unavailable"}
 		}
 		valid, errMsg := m.services.ValidateAPIKey(accountID, providerID, apiKey)
-		return validateKeyResultMsg{AccountID: accountID, Valid: valid, Error: errMsg}
+		return validateKeyResultMsg{AccountID: accountID, APIKey: apiKey, Valid: valid, Error: errMsg}
 	}
 }
 

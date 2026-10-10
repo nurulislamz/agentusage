@@ -433,7 +433,7 @@ func (m Model) handleSnapshotsMsg(msg SnapshotsMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleValidateKeyResultMsg(msg validateKeyResultMsg) (tea.Model, tea.Cmd) {
 	if msg.Valid {
 		m.settings.apiKeyStatus = "valid ✓ — saving..."
-		return m, m.saveCredentialCmd(msg.AccountID, m.settings.apiKeyInput)
+		return m, m.saveCredentialCmd(msg.AccountID, msg.APIKey)
 	}
 	m.settings.apiKeyStatus = "invalid ✗"
 	if msg.Error != "" {

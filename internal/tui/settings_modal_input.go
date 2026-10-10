@@ -223,12 +223,18 @@ func (m Model) handleAPIKeyEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.settings.apiKeyStatus = "validating..."
 		return m, m.validateKeyCmd(id, providerID, m.settings.apiKeyInput)
 	case "backspace":
+		if m.settings.apiKeyStatus == "validating..." {
+			return m, nil
+		}
 		if len(m.settings.apiKeyInput) > 0 {
 			m.settings.apiKeyInput = m.settings.apiKeyInput[:len(m.settings.apiKeyInput)-1]
 		}
 		m.settings.apiKeyStatus = ""
 		return m, nil
 	default:
+		if m.settings.apiKeyStatus == "validating..." {
+			return m, nil
+		}
 		if msg.Type == tea.KeyRunes {
 			m.settings.apiKeyInput += string(msg.Runes)
 			m.settings.apiKeyStatus = ""

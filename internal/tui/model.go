@@ -469,6 +469,7 @@ type providerConsoleOpenedMsg struct {
 
 type validateKeyResultMsg struct {
 	AccountID string
+	APIKey    string
 	Valid     bool
 	Error     string
 }
@@ -1024,9 +1025,14 @@ func (m Model) dashboardConfigProviders() []config.DashboardProviderConfig {
 	ids := m.settingsIDs()
 	out := make([]config.DashboardProviderConfig, 0, len(ids))
 	for _, id := range ids {
+		var hideCosts *bool
+		if m.hideCostsByAccount != nil {
+			hideCosts = m.hideCostsByAccount[id]
+		}
 		out = append(out, config.DashboardProviderConfig{
 			AccountID: id,
 			Enabled:   m.isProviderEnabled(id),
+			HideCosts: hideCosts,
 		})
 	}
 	return out
