@@ -897,6 +897,40 @@ Other movement since Thu:
 
 Sources: [steipete/CodexBar commits](https://github.com/steipete/CodexBar/commits); [tddworks/ClaudeBar v0.5.11](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.11); [getagentseal/codeburn commits](https://github.com/getagentseal/codeburn/commits); [VincentShipsIt/meterbar.dev nightly](https://github.com/VincentShipsIt/meterbar.dev/releases/tag/nightly); [ccusage/ccusage](https://github.com/ccusage/ccusage); [langfuse/langfuse v4.55.0](https://github.com/langfuse/langfuse/releases/tag/v4.55.0); [BerriAI/litellm releases](https://github.com/BerriAI/litellm/releases); [majiayu000/quotabar](https://github.com/majiayu000/quotabar); [janekbaraniewski/openusage](https://github.com/janekbaraniewski/openusage); [Nanako0129/syrtis](https://github.com/Nanako0129/syrtis); [Helicone/helicone](https://github.com/Helicone/helicone); web search + GitHub API 2026-10-09 (Europe/London).
 
+### Update 2026-10-10
+
+Fresh Saturday scrape (Europe/London / BST), compared with Fri 9 Oct. **CodexBar** shipped **[v0.74.0](https://github.com/steipete/CodexBar/releases/tag/v0.74.0)** (~09:49 BST) with multi-account quota widgets + Ollama balance; **Syrtis** jumped **v2.5.0 → [v2.7.0](https://github.com/Nanako0129/syrtis/releases/tag/v2.7.0)** (Grok Bot tab + Antigravity OAuth quota); **ClaudeBar** **[v0.5.12](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.12)**; **ccusage** **[v20.0.28](https://github.com/ccusage/ccusage/releases/tag/v20.0.28)**; **Langfuse** **[v4.56.0](https://github.com/langfuse/langfuse/releases/tag/v4.56.0)**.
+
+Other movement since Fri:
+- **[CodexBar](https://github.com/steipete/CodexBar)** **[v0.74.0](https://github.com/steipete/CodexBar/releases/tag/v0.74.0)**: Accounts widget (4/8 quotas), Ollama `/api/balance`, Linux `cursor-agent` login, Notion/JetBrains credit polish, native Codex tool-activity spend (carried from Fri main). Stars **22,333→22,356**.
+- **[Syrtis](https://github.com/Nanako0129/syrtis)** **[v2.7.0](https://github.com/Nanako0129/syrtis/releases/tag/v2.7.0)** (~03:13 BST): Grok Bot usage moved off the Cursor tab onto **Grok Build & Bot**; Antigravity main card can read a captured account's quota via OAuth instead of always running `agy`. Stars **410→411**.
+- **[ClaudeBar](https://github.com/tddworks/ClaudeBar)** **[v0.5.12](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.12)** (~08:09 BST): Claude Code card collapses finished sessions into counts; session titles (`/rename`); custom popover title; 30-day chart paint fix. **1,532★**.
+- **[ccusage](https://github.com/ccusage/ccusage)** **[v20.0.28](https://github.com/ccusage/ccusage/releases/tag/v20.0.28)** (overnight) + ongoing models.dev / LiteLLM pricing snapshots. **18,928→18,943★**.
+- **[codeburn](https://github.com/getagentseal/codeburn)** Sat morning: Cursor/JSON menubar no longer waits on cursor.com; Devin/Codex/model-name perf; plan wording + estimate `~` markers. **11,361→11,370★**. Tag still **mac-v0.9.25**.
+- **[openusage.ai](https://github.com/robinebers/openusage)** main (still tagged **v0.7.14**): Keychain auth-prompt fix; Claude reset grants hourly; Codex auto-review free from 6 Oct; OpenCode 1 auth.json; Ollama `/api/balance`. **4,335→4,336★**.
+- **[tokscale](https://github.com/junhoyeo/tokscale)** maps Claude 5.5 reasoning tiers/aliases; still **v4.18.0**. **5,644→5,651★**.
+- **[pane](https://github.com/ItsJazii/pane)** **[v0.4.59](https://github.com/ItsJazii/pane/releases/tag/v0.4.59)** (Fri): provider count in intros. **71→73★**.
+- **[Langfuse](https://github.com/langfuse/langfuse)** **[v4.56.0](https://github.com/langfuse/langfuse/releases/tag/v4.56.0)** (Fri): ClickHouse spend alerts, session tool-preview highlighting, eval decision-model revamp. **35,560→35,590★**.
+- **[LiteLLM](https://github.com/BerriAI/litellm)** Latest stable still **v1.104.2**; prereleases through **v1.106.0-dev.3**. **60,422→60,827★**.
+- **[Helicone](https://github.com/Helicone/helicone)** push overnight; **6,210→6,212★**.
+- Holding: **OpenUsage.sh** **v0.25.0**, **220★** (+2), quiet since Mon; **MeterBar** **v1.9.0** / **8★** (no new commits Sat); **QuotaBar** still preparing **0.6**, **53★**; **Splitrail** **223★**; **CodeZeno** **588★** (+7); **caut** **89★**.
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [CodexBar](https://github.com/steipete/CodexBar) (**22,356★**) | **v0.74.0**: multi-account quota widget; Ollama balance; Linux cursor-agent. | Largest local quota tracker; macOS-first. Terminal + API-key coverage still the open lane. |
+| [Syrtis](https://github.com/Nanako0129/syrtis) (**411★**) | **v2.7.0**: Grok Bot tab; Antigravity captured-OAuth quotas. | Server-side / menu-bar Cursor+Grok numbers — watch attribution model. |
+| [caut](https://github.com/Dicklesworthstone/coding_agent_usage_tracker) (**89★**) | Quiet. | Direct terminal peer. |
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **220★**) | Quiet; **v0.25.0**. | Nearest twin by design. |
+| [ccusage](https://github.com/ccusage/ccusage) (**18,943★**) / [tokscale](https://github.com/junhoyeo/tokscale) (**5,651★**) / [Splitrail](https://github.com/Piebald-AI/splitrail) (**223★**) | ccusage **v20.0.28** + pricing snaps; tokscale Claude 5.5 map. | Log-parser and pricing references. |
+| [codeburn](https://github.com/getagentseal/codeburn) (**11,370★**) | Cursor menubar latency + estimate/plan polish. | Project-level attribution to match. |
+| [openusage.ai](https://github.com/robinebers/openusage) (**4,336★**) | Ollama balance + Keychain/Codex/OpenCode fixes on main; tag **v0.7.14**. | macOS menu-bar subscription twin. |
+| [ClaudeBar](https://github.com/tddworks/ClaudeBar) (**1,532★**) / [QuotaBar](https://github.com/majiayu000/quotabar) (**53★**) / [MeterBar](https://github.com/VincentShipsIt/meterbar.dev) (**8★**) / [pane](https://github.com/ItsJazii/pane) (**73★**) / [CodeZeno](https://github.com/CodeZeno/Claude-Code-Usage-Monitor) (**588★**) | ClaudeBar **v0.5.12**; pane **v0.4.59**; others hold. | Niche menu-bar / Claude monitors. |
+| [Langfuse](https://github.com/langfuse/langfuse) (**35,590★**) / [Helicone](https://github.com/Helicone/helicone) (**6,212★**) / [LiteLLM](https://github.com/BerriAI/litellm) (**60,827★**) | Langfuse **v4.56.0** spend alerts; LiteLLM stable **v1.104.2**. | Cloud observability / gateway layer — complementary, not desktop twins. |
+
+**Takeaway:** Weekend heat is in **menu-bar quota UIs** (CodexBar 0.74, Syrtis 2.7, ClaudeBar 0.5.12) plus ccusage's patch release. OpenUsage.sh remains the closest terminal twin and is still quiet — agentUsage's wedge stays **local multi-tool autodetection + live quotas in the terminal**, not another macOS menu bar.
+
+Sources: [CodexBar v0.74.0](https://github.com/steipete/CodexBar/releases/tag/v0.74.0); [Syrtis v2.7.0](https://github.com/Nanako0129/syrtis/releases/tag/v2.7.0); [ClaudeBar v0.5.12](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.12); [ccusage v20.0.28](https://github.com/ccusage/ccusage/releases/tag/v20.0.28); [Langfuse v4.56.0](https://github.com/langfuse/langfuse/releases/tag/v4.56.0); [pane v0.4.59](https://github.com/ItsJazii/pane/releases/tag/v0.4.59); GitHub API stars/commits 2026-10-10 (Europe/London).
+
 ## Open source
 
 ### Seeded 2026-09-04
