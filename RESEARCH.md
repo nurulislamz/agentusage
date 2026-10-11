@@ -931,6 +931,41 @@ Other movement since Fri:
 
 Sources: [CodexBar v0.74.0](https://github.com/steipete/CodexBar/releases/tag/v0.74.0); [Syrtis v2.7.0](https://github.com/Nanako0129/syrtis/releases/tag/v2.7.0); [ClaudeBar v0.5.12](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.12); [ccusage v20.0.28](https://github.com/ccusage/ccusage/releases/tag/v20.0.28); [Langfuse v4.56.0](https://github.com/langfuse/langfuse/releases/tag/v4.56.0); [pane v0.4.59](https://github.com/ItsJazii/pane/releases/tag/v0.4.59); GitHub API stars/commits 2026-10-10 (Europe/London).
 
+### Update 2026-10-11
+
+Fresh Sunday scrape (Europe/London / BST), compared with Sat 10 Oct. Overnight/Sunday movers: **ClaudeBar [v0.5.13](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.13)** (~05:17 BST) All-providers pill; **ccusage [v20.0.29](https://github.com/ccusage/ccusage/releases/tag/v20.0.29)** (~00:41 BST); **codeburn [v0.9.27](https://github.com/getagentseal/codeburn/releases/tag/v0.9.27)** / **[mac-v0.9.27](https://github.com/getagentseal/codeburn/releases/tag/mac-v0.9.27)** (~08:43 BST) one-click multi-surface updates; **OpenUsage.sh [v0.26.0](https://github.com/janekbaraniewski/openusage/releases/tag/v0.26.0)** (Sat ~22:26 BST). **CodexBar** still tagged **v0.74.0** with Sunday main polish (Replicate glyph, hover-highlight setting).
+
+Other movement since Sat:
+- **[CodexBar](https://github.com/steipete/CodexBar)** still **[v0.74.0](https://github.com/steipete/CodexBar/releases/tag/v0.74.0)**; Sunday merges for Replicate provider icon + disable menu-card hover highlight. Stars **22,356→22,377**.
+- **[ClaudeBar](https://github.com/tddworks/ClaudeBar)** **[v0.5.13](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.13)**: removes Overview Mode; adds **All** pill (every provider on one page, first-to-exhaust quota card). **1,532→1,533★**.
+- **[ccusage](https://github.com/ccusage/ccusage)** **[v20.0.29](https://github.com/ccusage/ccusage/releases/tag/v20.0.29)**: Antigravity ACP conversation discovery by default; Codex GPT-6 Sol/Luna fast multipliers + OpenAI Flex usage accounting. **18,943→18,958★**.
+- **[codeburn](https://github.com/getagentseal/codeburn)** **v0.9.25 → [v0.9.27](https://github.com/getagentseal/codeburn/releases/tag/v0.9.27)** (also mac/windows/desktop tags): `codeburn update` one-clicks CLI + menubar + desktop; desktop self-update + companions; menubar update pill every 6h. **11,370→11,377★**.
+- **[OpenUsage.sh](https://github.com/janekbaraniewski/openusage)** **v0.25.0 → [v0.26.0](https://github.com/janekbaraniewski/openusage/releases/tag/v0.26.0)**: Claude Code multi-line stream merge; OpenCode rolling/weekly/monthly quota via console scrape; Command Code provider; Claude Code incremental aggregate. **220→221★**.
+- **[openusage.ai](https://github.com/robinebers/openusage)** still **[v0.7.14](https://github.com/robinebers/openusage/releases/tag/v0.7.14)**; Sunday push on main. **4,336→4,341★**.
+- **[Syrtis](https://github.com/Nanako0129/syrtis)** still **[v2.7.0](https://github.com/Nanako0129/syrtis/releases/tag/v2.7.0)**; **411★** flat.
+- **[tokscale](https://github.com/junhoyeo/tokscale)** still **v4.18.0**; **5,651→5,656★**.
+- **[pane](https://github.com/ItsJazii/pane)** still **v0.4.59**; **73★** flat.
+- **[Langfuse](https://github.com/langfuse/langfuse)** still **[v4.56.0](https://github.com/langfuse/langfuse/releases/tag/v4.56.0)**; **35,590→35,635★**.
+- **[LiteLLM](https://github.com/BerriAI/litellm)** Latest stable still **v1.104.2**; prereleases through **v1.106.0-dev.3**. **60,827→60,945★**.
+- **[Helicone](https://github.com/Helicone/helicone)** **6,212→6,211★** (−1); no new release tag.
+- Holding: **MeterBar** **v1.9.0** / **8★**; **QuotaBar** **53★** (tag still **v0.5.9**, Sunday push); **Splitrail** **223★** / **v3.11.1**; **CodeZeno** **588→589★**; **caut** **89★**.
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [CodexBar](https://github.com/steipete/CodexBar) (**22,377★**, +21) | Still **v0.74.0**; Replicate icon + hover setting on main. | Largest local quota tracker; macOS-first. Terminal + API-key coverage still the open lane. |
+| [Syrtis](https://github.com/Nanako0129/syrtis) (**411★**) | Flat **v2.7.0**. | Server-side / menu-bar Cursor+Grok numbers — watch attribution model. |
+| [caut](https://github.com/Dicklesworthstone/coding_agent_usage_tracker) (**89★**) | Quiet. | Direct terminal peer. |
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **221★**, +1) | **v0.26.0**: OpenCode quotas, Command Code provider, Claude stream/aggregate fixes. | Nearest twin by design — woke up after a quiet stretch. |
+| [ccusage](https://github.com/ccusage/ccusage) (**18,958★**, +15) / [tokscale](https://github.com/junhoyeo/tokscale) (**5,656★**, +5) / [Splitrail](https://github.com/Piebald-AI/splitrail) (**223★**) | ccusage **v20.0.29** Antigravity ACP + Codex Flex/GPT-6 multipliers; tokscale flat tag. | Log-parser and pricing references. |
+| [codeburn](https://github.com/getagentseal/codeburn) (**11,377★**, +7) | **mac-v0.9.27** one-click multi-surface updates. | Project-level attribution to match. |
+| [openusage.ai](https://github.com/robinebers/openusage) (**4,341★**, +5) | Tag still **v0.7.14**; main active. | macOS menu-bar subscription twin. |
+| [ClaudeBar](https://github.com/tddworks/ClaudeBar) (**1,533★**) / [QuotaBar](https://github.com/majiayu000/quotabar) (**53★**) / [MeterBar](https://github.com/VincentShipsIt/meterbar.dev) (**8★**) / [pane](https://github.com/ItsJazii/pane) (**73★**) / [CodeZeno](https://github.com/CodeZeno/Claude-Code-Usage-Monitor) (**589★**, +1) | ClaudeBar **v0.5.13** All-providers pill; others hold. | Niche menu-bar / Claude monitors. |
+| [Langfuse](https://github.com/langfuse/langfuse) (**35,635★**, +45) / [Helicone](https://github.com/Helicone/helicone) (**6,211★**, −1) / [LiteLLM](https://github.com/BerriAI/litellm) (**60,945★**, +118) | Langfuse tag flat; LiteLLM stable still **v1.104.2**. | Cloud observability / gateway layer — complementary, not desktop twins. |
+
+**Takeaway:** Sunday heat is **ClaudeBar's All-providers view**, **codeburn's one-click updater**, **ccusage 20.0.29**, and **OpenUsage.sh waking to v0.26.0**. Menu-bar quota UIs keep shipping; the closest terminal twin (OpenUsage.sh) moved again — agentUsage's wedge stays **local multi-tool autodetection + live quotas in the terminal**, not another macOS menu bar.
+
+Sources: [ClaudeBar v0.5.13](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.13); [ccusage v20.0.29](https://github.com/ccusage/ccusage/releases/tag/v20.0.29); [codeburn v0.9.27](https://github.com/getagentseal/codeburn/releases/tag/v0.9.27); [OpenUsage.sh v0.26.0](https://github.com/janekbaraniewski/openusage/releases/tag/v0.26.0); [CodexBar](https://github.com/steipete/CodexBar); GitHub API stars/releases/commits 2026-10-11 (Europe/London).
+
 ## Open source
 
 ### Seeded 2026-09-04
