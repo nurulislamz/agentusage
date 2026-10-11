@@ -4,8 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/nurulislamz/agentusage/internal/config"
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func panelViewIDs(t *testing.T, srv *Server) map[string]bool {
@@ -109,5 +115,96 @@ func TestProvidersPanel_HideShowDelete(t *testing.T) {
 	}
 	if missing := postForm(t, srv, "/actions/providers", "op=hide"); missing.Code != http.StatusBadRequest {
 		t.Errorf("missing account_id status = %d, want 400", missing.Code)
+	}
+}
+
+// Hide/show must RMW a single Enabled bit. Persisting the serve process's
+// stale in-memory dashboard.providers list would wipe concurrent TUI edits.
+func TestSetAccountVisibility_PreservesConcurrentProviderEdits(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("config dir is resolved from APPDATA on windows")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	path := filepath.Join(home, ".config", "agentusage", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	hide := true
+	onDisk := config.DefaultConfig()
+	onDisk.Theme = "Nord"
+	onDisk.Accounts = []core.AccountConfig{
+		{ID: "cursor-ide", Provider: "cursor"},
+		{ID: "work-openai", Provider: "openai"},
+	}
+	onDisk.Dashboard.Providers = []config.DashboardProviderConfig{
+		{AccountID: "cursor-ide", Enabled: true},
+		{AccountID: "work-openai", Enabled: false, HideCosts: &hide},
+	}
+	if err := config.SaveTo(path, onDisk); err != nil {
+		t.Fatal(err)
+	}
+
+	// Serve still holds the pre-TUI snapshot: work-openai visible, no hide_costs.
+	stale := config.DefaultConfig()
+	stale.Accounts = append([]core.AccountConfig(nil), onDisk.Accounts...)
+	stale.Dashboard.Providers = []config.DashboardProviderConfig{
+		{AccountID: "cursor-ide", Enabled: true},
+		{AccountID: "work-openai", Enabled: true},
+	}
+	srv := testServer(t, Options{
+		Demo: false,
+		Config: &stale,
+		Collect: func() (Envelope, error) {
+			return Envelope{Source: "test", Snapshots: []core.UsageSnapshot{
+				{ProviderID: "cursor", AccountID: "cursor-ide", Status: core.StatusOK},
+				{ProviderID: "openai", AccountID: "work-openai", Status: core.StatusOK},
+			}}, nil
+		},
+	})
+
+	hideResp := postForm(t, srv, "/actions/providers", "op=hide&account_id=cursor-ide")
+	if hideResp.Code != http.StatusOK {
+		t.Fatalf("hide status = %d body=%s", hideResp.Code, hideResp.Body.String())
+	}
+
+	loaded, err := config.LoadFrom(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Theme != "Nord" {
+		t.Errorf("theme = %q, want Nord", loaded.Theme)
+	}
+	byID := map[string]config.DashboardProviderConfig{}
+	for _, p := range loaded.Dashboard.Providers {
+		byID[p.AccountID] = p
+	}
+	if byID["cursor-ide"].Enabled {
+		t.Error("cursor-ide should be hidden on disk")
+	}
+	work := byID["work-openai"]
+	if work.Enabled {
+		t.Error("concurrent work-openai hide was wiped")
+	}
+	if work.HideCosts == nil || !*work.HideCosts {
+		t.Error("concurrent work-openai hide_costs was wiped")
+	}
+	mem := srv.collector.opts.Config
+	if mem == nil {
+		t.Fatal("expected in-memory config after hide")
+	}
+	for _, p := range mem.Dashboard.Providers {
+		if p.AccountID == "work-openai" {
+			if p.Enabled {
+				t.Error("in-memory config should refresh work-openai as hidden")
+			}
+			if p.HideCosts == nil || !*p.HideCosts {
+				t.Error("in-memory config should refresh work-openai hide_costs")
+			}
+		}
+		if p.AccountID == "cursor-ide" && p.Enabled {
+			t.Error("in-memory cursor-ide should be hidden")
+		}
 	}
 }

@@ -841,6 +841,38 @@ func SaveDashboardProviderHideCostsTo(path string, accountID string, hide *bool)
 	})
 }
 
+// SaveDashboardProviderEnabled persists one account's dashboard visibility
+// (dashboard.providers[].enabled) via read-modify-write. Other provider rows
+// and fields (including hide_costs) on disk are left untouched.
+//
+// If no DashboardProviderConfig exists for accountID yet, one is appended.
+func SaveDashboardProviderEnabled(accountID string, enabled bool) error {
+	return SaveDashboardProviderEnabledTo(ConfigPath(), accountID, enabled)
+}
+
+func SaveDashboardProviderEnabledTo(path string, accountID string, enabled bool) error {
+	accountID = normalizeAccountID(accountID)
+	if accountID == "" {
+		return fmt.Errorf("save dashboard provider enabled: account_id must be non-empty")
+	}
+	return modifyConfig(path, func(cfg *Config) {
+		found := false
+		for i := range cfg.Dashboard.Providers {
+			if cfg.Dashboard.Providers[i].AccountID == accountID {
+				cfg.Dashboard.Providers[i].Enabled = enabled
+				found = true
+				break
+			}
+		}
+		if !found {
+			cfg.Dashboard.Providers = append(cfg.Dashboard.Providers, DashboardProviderConfig{
+				AccountID: accountID,
+				Enabled:   enabled,
+			})
+		}
+	})
+}
+
 // SaveAutoDetected persists auto-detected accounts into the config file (read-modify-write).
 func SaveAutoDetected(accounts []core.AccountConfig) error {
 	return SaveAutoDetectedTo(ConfigPath(), accounts)

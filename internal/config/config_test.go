@@ -713,6 +713,73 @@ func TestLoadFrom_DashboardProviders(t *testing.T) {
 	}
 }
 
+func TestSaveDashboardProviderEnabledTo_PreservesOtherRows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+
+	hide := true
+	cfg := DefaultConfig()
+	cfg.Theme = "Nord"
+	cfg.Dashboard.Providers = []DashboardProviderConfig{
+		{AccountID: "cursor-ide", Enabled: true},
+		{AccountID: "work-openai", Enabled: false, HideCosts: &hide},
+	}
+	if err := SaveTo(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := SaveDashboardProviderEnabledTo(path, "cursor-ide", false); err != nil {
+		t.Fatalf("SaveDashboardProviderEnabledTo: %v", err)
+	}
+
+	loaded, err := LoadFrom(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Theme != "Nord" {
+		t.Errorf("theme = %q, want Nord", loaded.Theme)
+	}
+	if len(loaded.Dashboard.Providers) != 2 {
+		t.Fatalf("providers len = %d, want 2", len(loaded.Dashboard.Providers))
+	}
+	byID := map[string]DashboardProviderConfig{}
+	for _, p := range loaded.Dashboard.Providers {
+		byID[p.AccountID] = p
+	}
+	if byID["cursor-ide"].Enabled {
+		t.Error("cursor-ide should be hidden")
+	}
+	work := byID["work-openai"]
+	if work.Enabled {
+		t.Error("work-openai enabled should stay false")
+	}
+	if work.HideCosts == nil || !*work.HideCosts {
+		t.Error("work-openai hide_costs should be preserved")
+	}
+
+	if err := SaveDashboardProviderEnabledTo(path, "new-box", false); err != nil {
+		t.Fatalf("append enabled row: %v", err)
+	}
+	loaded, err = LoadFrom(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, p := range loaded.Dashboard.Providers {
+		if p.AccountID == "new-box" {
+			found = true
+			if p.Enabled {
+				t.Error("new-box should be appended disabled")
+			}
+		}
+	}
+	if !found {
+		t.Error("expected new-box row to be appended")
+	}
+	if err := SaveDashboardProviderEnabledTo(path, "  ", true); err == nil {
+		t.Error("empty account_id should error")
+	}
+}
+
 func TestSaveDashboardProvidersTo(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 
