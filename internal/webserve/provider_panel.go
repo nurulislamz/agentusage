@@ -1,6 +1,7 @@
 package webserve
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -181,7 +182,25 @@ func (s *Server) panelConfig() config.Config {
 
 // setAccountVisibility hides or shows one account on the dashboard and
 // persists the toggle in settings.json (dashboard.providers[].enabled).
+//
+// Persistence must only flip that one Enabled bit via RMW. Replacing the whole
+// dashboard.providers slice from the serve process's in-memory startup config
+// would wipe concurrent edits (hide_costs, other visibility rows) written by
+// the TUI or another agentusage process after serve started.
 func (s *Server) setAccountVisibility(accountID string, visible bool) error {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return fmt.Errorf("account_id must be non-empty")
+	}
+	if !s.persistDisabled() {
+		if err := config.SaveDashboardProviderEnabled(accountID, visible); err != nil {
+			return err
+		}
+		if loaded, err := config.Load(); err == nil {
+			s.applyConfig(loaded)
+			return nil
+		}
+	}
 	cfg := s.panelConfig()
 	providers := append([]config.DashboardProviderConfig(nil), cfg.Dashboard.Providers...)
 	found := false
@@ -194,11 +213,6 @@ func (s *Server) setAccountVisibility(accountID string, visible bool) error {
 	}
 	if !found {
 		providers = append(providers, config.DashboardProviderConfig{AccountID: accountID, Enabled: visible})
-	}
-	if !s.persistDisabled() {
-		if err := config.SaveDashboardProviders(providers); err != nil {
-			return err
-		}
 	}
 	cfg.Dashboard.Providers = providers
 	s.applyConfig(cfg)
