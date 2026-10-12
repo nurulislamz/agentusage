@@ -966,6 +966,45 @@ Other movement since Sat:
 
 Sources: [ClaudeBar v0.5.13](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.13); [ccusage v20.0.29](https://github.com/ccusage/ccusage/releases/tag/v20.0.29); [codeburn v0.9.27](https://github.com/getagentseal/codeburn/releases/tag/v0.9.27); [OpenUsage.sh v0.26.0](https://github.com/janekbaraniewski/openusage/releases/tag/v0.26.0); [CodexBar](https://github.com/steipete/CodexBar); GitHub API stars/releases/commits 2026-10-11 (Europe/London).
 
+### Update 2026-10-12
+
+Fresh Monday scrape (Europe/London / BST), compared with Sun 11 Oct. Releases since Sunday's note: **CodexBar [v0.74.1](https://github.com/steipete/CodexBar/releases/tag/v0.74.1)** (Sun ~22:37 BST), **ClaudeBar [v0.5.14](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.14)** (Sun ~12:15 BST), **QuotaBar [v0.6.0](https://github.com/majiayu000/quotabar/releases/tag/v0.6.0)** (Sun ~17:26 BST), **openusage.ai [v0.7.15-beta.1](https://github.com/robinebers/openusage/releases/tag/v0.7.15-beta.1)** (Mon ~07:49 BST), **OpenUsage.sh [v0.26.1](https://github.com/janekbaraniewski/openusage/releases/tag/v0.26.1)** (Sun ~10:08 BST), **ccusage [v20.0.30](https://github.com/ccusage/ccusage/releases/tag/v20.0.30)** (Sun ~22:28 BST) and **LiteLLM stable [v1.105.0](https://github.com/BerriAI/litellm/releases/tag/v1.105.0)** (Sun ~10:53 BST). Search also found three **terminal quota tools** not yet in this file: **llmquota**, **agent-quota** and **quotas**.
+
+Other movement since Sun:
+- **[CodexBar](https://github.com/steipete/CodexBar)** **v0.74.1**: Codex conversation titles in the Cost menu; xAI live remaining-credit estimate from the invoice preview; cached-input reuse in the session performance strip; memory fixes for big Codex histories; Command Code Go v1 $10 grant. Monday main adds Kimi Desktop current-session discovery. **22,377→22,409★**.
+- **[ClaudeBar](https://github.com/tddworks/ClaudeBar)** **v0.5.14**: new **Cloudflare AI** provider (Workers AI neurons vs free 10k, AI Gateway tokens, overage estimate, last invoice); full leaderboard data export; Monday leaderboard key-portability work. **1,533→1,534★**.
+- **[QuotaBar](https://github.com/majiayu000/quotabar)** **v0.5.9 → v0.6.0**: Codex weekly capacity shown as GPT-6.1 Sol; ccstats 0.11 SDK; **run-out-before-reset forecast**; hints at another connected account with more quota; optional subscription value report. **53★**.
+- **[openusage.ai](https://github.com/robinebers/openusage)** **v0.7.15-beta.1**: first-launch welcome that asks for permissions only after you pick providers; Keychain repeat-popup fix; Cursor spend history fetched day by day per account; Ollama `/api/balance`. **4,341→4,347★**.
+- **[OpenUsage.sh](https://github.com/janekbaraniewski/openusage)** **v0.26.1**: dependency bumps + flaky-test fixes only. **221→222★**.
+- **[ccusage](https://github.com/ccusage/ccusage)** **v20.0.30** ("no significant changes") + near-hourly models.dev pricing snapshots. **18,958→18,977★**.
+- **[Splitrail](https://github.com/Piebald-AI/splitrail)** Sunday main: **localhost web usage dashboard** plus sessions/breakdown views (tag still **v3.11.1**). **223★**.
+- **[tokscale](https://github.com/junhoyeo/tokscale)** Sunday main: TUI session-detail inspector, configurable Cursor sync timeout, Codex zstd transcripts, Hermes reasoning tokens no longer double-billed (tag still **v4.18.0**). **5,656→5,665★**.
+- **[codeburn](https://github.com/getagentseal/codeburn)** VS Code extension **1.0.2** bundling CLI 0.9.27. **11,377→11,404★**.
+- **[Langfuse](https://github.com/langfuse/langfuse)** Monday main: gateway API-key expiration; sub-cent dashboard costs no longer shown as $0.00 (tag still **v4.56.0**). **35,635→35,681★**.
+- **[LiteLLM](https://github.com/BerriAI/litellm)** stable **v1.104.2 → v1.105.0** (also **v1.104.3**, **v1.106.0-rc.1**); Rust-native OpenRouter / Bedrock messages on main. **60,945→61,028★**.
+- Holding: **Syrtis** **v2.7.0** / **412★**; **Helicone** **6,213★**; **pane** **v0.4.59** / **74★**; **CodeZeno** **597★**; **MeterBar** **v1.9.0** + nightly / **8★**; **caut** **89★** (quiet since 7 Oct).
+- **New to this file:**
+  - **[llmquota](https://github.com/0xNyk/llmquota)** (**55★**, TypeScript, **v0.2.1**): terminal "roster" TUI for Claude Code / Codex / Cursor / Grok / Hermes. Reads local auth (incl. Cursor `state.vscdb`), shows plan, % used and reset, and `who` / `hop` picks the CLI with the most headroom; `--json` for statuslines. Closest new terminal twin to agentUsage.
+  - **[agent-quota](https://github.com/Halven08/agent-quota)** (**1★**, Rust, **v0.5.0**): local-first CLI + library for Codex and Claude Code quota windows, multi-profile, JSON/NDJSON, `watch`. Its Claude probe sends a 1-token message, which can itself touch quota.
+  - **[quotas](https://github.com/clankercode/quotas)** (**2★**, Rust, **v0.11.0**): TUI / JSON / statusline for Claude, Codex, Cursor, Grok, OpenRouter, with multi-profile autodetect (`~/.claude-*`, `~/.codex-*`) and Codex banked reset credits.
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [CodexBar](https://github.com/steipete/CodexBar) (**22,409★**, +32) | **v0.74.1**: Codex titles, xAI credit estimate, cache-reuse stats; Kimi on main. | Largest local quota tracker; macOS-first. |
+| [llmquota](https://github.com/0xNyk/llmquota) (**55★**, new) | First logged; TUI + next-usable CLI picker. | **Direct terminal twin**: watch closely. |
+| [quotas](https://github.com/clankercode/quotas) (**2★**, new) / [agent-quota](https://github.com/Halven08/agent-quota) (**1★**, new) / [caut](https://github.com/Dicklesworthstone/coding_agent_usage_tracker) (**89★**) | First logged / quiet. | Small Rust terminal peers; multi-profile autodetect is table stakes. |
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **222★**) | **v0.26.1** maintenance. | Nearest twin by design. |
+| [QuotaBar](https://github.com/majiayu000/quotabar) (**53★**) | **v0.6.0**: run-out forecast, cross-account hint. | Forecast + "switch account" is a feature to match. |
+| [ccusage](https://github.com/ccusage/ccusage) (**18,977★**) / [tokscale](https://github.com/junhoyeo/tokscale) (**5,665★**) / [Splitrail](https://github.com/Piebald-AI/splitrail) (**223★**) | ccusage **v20.0.30**; tokscale TUI inspector; Splitrail localhost web dashboard. | Log-parser references; Splitrail now also ships a local dashboard. |
+| [codeburn](https://github.com/getagentseal/codeburn) (**11,404★**) | VS Code ext **1.0.2**. | Project-level attribution to match. |
+| [openusage.ai](https://github.com/robinebers/openusage) (**4,347★**) | **v0.7.15-beta.1** onboarding + Cursor per-day spend. | macOS menu-bar subscription twin. |
+| [ClaudeBar](https://github.com/tddworks/ClaudeBar) (**1,534★**) / [Syrtis](https://github.com/Nanako0129/syrtis) (**412★**) / [MeterBar](https://github.com/VincentShipsIt/meterbar.dev) (**8★**) / [pane](https://github.com/ItsJazii/pane) (**74★**) / [CodeZeno](https://github.com/CodeZeno/Claude-Code-Usage-Monitor) (**597★**) | ClaudeBar **v0.5.14** Cloudflare AI; others hold. | Niche menu-bar / Claude monitors. |
+| [Langfuse](https://github.com/langfuse/langfuse) (**35,681★**) / [Helicone](https://github.com/Helicone/helicone) (**6,213★**) / [LiteLLM](https://github.com/BerriAI/litellm) (**61,028★**) | LiteLLM stable **v1.105.0**; Langfuse key expiry + sub-cent costs. | Cloud observability / gateway layer: complementary. |
+
+**Takeaway:** The terminal lane is getting company: **llmquota** is a real TUI twin (multi-CLI quotas + "which tool has headroom now"), and two small Rust tools (quotas, agent-quota) do multi-profile quota checks. Menu-bar apps keep adding providers (Cloudflare AI, xAI credit, Kimi) and forecasting (QuotaBar). agentUsage's edge has to be **breadth of autodetection (IDEs + CLIs + raw API keys) plus spend and quotas in one terminal view**, and a run-out forecast now looks like table stakes.
+
+Sources: [CodexBar v0.74.1](https://github.com/steipete/CodexBar/releases/tag/v0.74.1); [ClaudeBar v0.5.14](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.14); [QuotaBar v0.6.0](https://github.com/majiayu000/quotabar/releases/tag/v0.6.0); [openusage.ai v0.7.15-beta.1](https://github.com/robinebers/openusage/releases/tag/v0.7.15-beta.1); [OpenUsage.sh v0.26.1](https://github.com/janekbaraniewski/openusage/releases/tag/v0.26.1); [ccusage v20.0.30](https://github.com/ccusage/ccusage/releases/tag/v20.0.30); [LiteLLM v1.105.0](https://github.com/BerriAI/litellm/releases/tag/v1.105.0); [llmquota](https://github.com/0xNyk/llmquota); [agent-quota](https://github.com/Halven08/agent-quota); [quotas changelog](https://github.com/clankercode/quotas/blob/master/CHANGELOG.md); GitHub API stars/releases/commits 2026-10-12 (Europe/London).
+
 ## Open source
 
 ### Seeded 2026-09-04
