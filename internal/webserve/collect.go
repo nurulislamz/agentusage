@@ -216,6 +216,20 @@ func (c *collector) setConfig(cfg config.Config) {
 	}
 }
 
+func (c *collector) setProviderOrder(ids []string) {
+	order := append([]string(nil), ids...)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.opts.Config == nil {
+		cfg := config.DefaultConfig()
+		c.opts.Config = &cfg
+	} else {
+		cfg := *c.opts.Config
+		c.opts.Config = &cfg
+	}
+	c.opts.Config.Dashboard.ProviderOrder = order
+}
+
 func (c *collector) setTheme(theme string) {
 	theme = strings.TrimSpace(theme)
 	if theme == "" {
