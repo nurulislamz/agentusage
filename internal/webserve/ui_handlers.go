@@ -315,17 +315,16 @@ func (s *Server) handleProviderOrderAction(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "empty order"})
 		return
 	}
+	if s.collector != nil && s.collector.opts.Config != nil {
+		ids = mergeProviderOrder(ids, s.collector.opts.Config.Dashboard.ProviderOrder)
+	}
 	s.setUICookie(w, cookieProviderOrder, strings.Join(ids, "|"))
 
-	if !s.collector.demo {
+	if s.collector != nil && !s.collector.demo {
 		_ = config.SaveDashboardProviderOrder(ids)
 	}
 	if s.collector != nil {
-		if s.collector.opts.Config == nil {
-			cfg := config.DefaultConfig()
-			s.collector.opts.Config = &cfg
-		}
-		s.collector.opts.Config.Dashboard.ProviderOrder = ids
+		s.collector.setProviderOrder(ids)
 	}
 
 	if r.FormValue("silent") == "1" || r.Header.Get("HX-Target") == "none" {
@@ -347,6 +346,31 @@ func (s *Server) resolveProviderOrder(r *http.Request) string {
 		}
 	}
 	return ""
+}
+
+// mergeProviderOrder puts posted ids first and appends any previously stored
+// ids that the POST omitted. A filtered dashboard only renders a subset of
+// groups; replacing the stored order with that subset would drop the rest.
+func mergeProviderOrder(posted, existing []string) []string {
+	out := make([]string, 0, len(posted)+len(existing))
+	seen := make(map[string]bool, len(posted)+len(existing))
+	for _, id := range posted {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	for _, id := range existing {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
 }
 
 func cycleLayoutID(current string, ids []layoutMeta) string {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/nurulislamz/agentusage/internal/config"
 	"github.com/nurulislamz/agentusage/internal/core"
 	"github.com/nurulislamz/agentusage/internal/daemon"
 	"github.com/nurulislamz/agentusage/internal/export"
@@ -20,7 +21,6 @@ func (c *collector) fetchSnapshots(ctx context.Context, refresh bool, accountID 
 
 	cfg := configOrDefault(c.opts)
 	tw := core.ParseTimeWindow(cfg.Data.TimeWindow)
-	projector := tui.NewWebProjectorFromConfig(cfg)
 
 	if c.source != export.SourceDirect && c.rt != nil {
 		var frame daemon.SnapshotFrame
@@ -37,7 +37,7 @@ func (c *collector) fetchSnapshots(ctx context.Context, refresh bool, accountID 
 			if c.enrich != nil {
 				c.enrich(ctx, frame.Snapshots, accountID)
 			}
-			return projector.OrderSnapshots(frame.Snapshots), "daemon", nil
+			return snapshotsForCache(cfg, frame.Snapshots), "daemon", nil
 		}
 	}
 
@@ -49,5 +49,15 @@ func (c *collector) fetchSnapshots(ctx context.Context, refresh bool, accountID 
 	if c.enrich != nil {
 		c.enrich(ctx, snapMap, accountID)
 	}
-	return projector.OrderSnapshots(snapMap), string(resolved), nil
+	return snapshotsForCache(cfg, snapMap), string(resolved), nil
+}
+
+// snapshotsForCache keeps every fetched account in the collector cache,
+// including dashboard-hidden ones. Visibility (Enabled=false) is applied later
+// in decorate/buildViews. Filtering here would drop hidden accounts from the
+// cache, so Show could not restore them without a refetch and the providers
+// panel would lose status for hidden rows.
+func snapshotsForCache(cfg config.Config, snaps map[string]core.UsageSnapshot) []core.UsageSnapshot {
+	cfg.Dashboard.Providers = nil
+	return tui.NewWebProjectorFromConfig(cfg).OrderSnapshots(snaps)
 }

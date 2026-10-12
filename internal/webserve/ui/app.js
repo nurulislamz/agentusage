@@ -633,15 +633,18 @@
       const basePath = window.location.pathname.startsWith("/agentusage") ? "/agentusage" : "/";
       document.cookie = `au_provider_order=${encodeURIComponent(orderStr)}; path=${basePath}; max-age=31536000; SameSite=Lax`;
 
+      const headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-Requested-With": "XMLHttpRequest",
+      };
+      const token = sessionStorage.getItem(TOKEN_KEY);
+      if (token) headers.Authorization = "Bearer " + token;
       fetch("actions/provider-order", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-Requested-With": "XMLHttpRequest",
-        },
+        headers,
         body: new URLSearchParams({ order: orderStr, silent: "1" }),
-      }).then(() => {
-        showToast("Provider order saved");
+      }).then((resp) => {
+        if (resp && resp.ok) showToast("Provider order saved");
       }).catch(() => {});
     };
 

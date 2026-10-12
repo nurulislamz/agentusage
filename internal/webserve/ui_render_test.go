@@ -397,6 +397,22 @@ func TestLayoutActionStoresLayoutAndRendersIt(t *testing.T) {
 	}
 }
 
+func TestMergeProviderOrderKeepsOmittedIDs(t *testing.T) {
+	got := mergeProviderOrder(
+		[]string{"codex", "cursor"},
+		[]string{"cursor", "antigravity", "codex", "openai"},
+	)
+	want := []string{"codex", "cursor", "antigravity", "openai"}
+	if len(got) != len(want) {
+		t.Fatalf("merge len = %d, want %d (%v)", len(got), len(want), got)
+	}
+	for i, id := range want {
+		if got[i] != id {
+			t.Fatalf("merge[%d] = %q, want %q", i, got[i], id)
+		}
+	}
+}
+
 func TestProviderOrderAction_PersistsAndSupportsSilent(t *testing.T) {
 	srv := testServer(t, Options{Demo: true})
 
@@ -430,11 +446,13 @@ func TestProviderOrderAction_PersistsAndSupportsSilent(t *testing.T) {
 		t.Errorf("standard response should contain toast, got: %s", wStandard.Body.String())
 	}
 
-	// 3. Fallback to in-memory/config order when cookie is absent
+	// 3. Fallback to in-memory/config order when cookie is absent.
+	// A shorter POST is merged with the previously stored ids so a filtered
+	// drag cannot drop groups that were not in the DOM.
 	req := httptest.NewRequest(http.MethodGet, "/partial/app", nil)
 	gotOrder := srv.resolveProviderOrder(req)
-	if gotOrder != "antigravity|cursor" {
-		t.Errorf("resolveProviderOrder without cookie = %q, want antigravity|cursor", gotOrder)
+	if gotOrder != "antigravity|cursor|codex" {
+		t.Errorf("resolveProviderOrder without cookie = %q, want antigravity|cursor|codex", gotOrder)
 	}
 }
 
@@ -1665,4 +1683,3 @@ func TestAntigravity_ExhaustedClaudeDoesNotDepleteGeminiAccount(t *testing.T) {
 		})
 	}
 }
-
