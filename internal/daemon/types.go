@@ -60,8 +60,9 @@ type HealthResponse struct {
 }
 
 type cachedReadModelEntry struct {
-	snapshots map[string]core.UsageSnapshot
-	updatedAt time.Time
+	snapshots  map[string]core.UsageSnapshot
+	updatedAt  time.Time
+	generation uint64
 }
 
 type readModelCache struct {
@@ -99,50 +100,87 @@ func (c *readModelCache) set(cacheKey string, snapshots map[string]core.UsageSna
 	}
 	now := time.Now().UTC()
 	c.mu.Lock()
+	gen := uint64(1)
+	if prev, ok := c.entries[cacheKey]; ok {
+		gen = prev.generation + 1
+	}
+	c.storeLocked(cacheKey, snapshots, now, gen)
+	c.mu.Unlock()
+}
+
+// setIfGeneration stores snapshots only when the cache entry's generation is
+// still expected. Async refreshes capture the generation at start so a slower
+// compute cannot overwrite a newer publishReadModelSync / sync HTTP write.
+func (c *readModelCache) setIfGeneration(cacheKey string, snapshots map[string]core.UsageSnapshot, expected uint64) bool {
+	if cacheKey == "" || len(snapshots) == 0 {
+		return false
+	}
+	now := time.Now().UTC()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var current uint64
+	if prev, ok := c.entries[cacheKey]; ok {
+		current = prev.generation
+	}
+	if current != expected {
+		return false
+	}
+	c.storeLocked(cacheKey, snapshots, now, expected+1)
+	return true
+}
+
+func (c *readModelCache) storeLocked(cacheKey string, snapshots map[string]core.UsageSnapshot, now time.Time, gen uint64) {
 	c.entries[cacheKey] = cachedReadModelEntry{
-		snapshots: core.DeepCloneSnapshots(snapshots),
-		updatedAt: now,
+		snapshots:  core.DeepCloneSnapshots(snapshots),
+		updatedAt:  now,
+		generation: gen,
 	}
 	// Evict stale entries to prevent unbounded growth.
 	const maxEntries = 50
 	const maxAge = 5 * time.Minute
-	if len(c.entries) > maxEntries {
-		// First pass: remove stale entries.
-		for k, e := range c.entries {
-			if now.Sub(e.updatedAt) > maxAge {
-				delete(c.entries, k)
-			}
-		}
-		// If still over limit, find and remove oldest in a single pass.
-		for len(c.entries) > maxEntries {
-			oldestKey := ""
-			oldestTime := now.Add(time.Hour) // sentinel
-			for k, e := range c.entries {
-				if e.updatedAt.Before(oldestTime) {
-					oldestKey = k
-					oldestTime = e.updatedAt
-				}
-			}
-			if oldestKey == "" {
-				break
-			}
-			delete(c.entries, oldestKey)
+	if len(c.entries) <= maxEntries {
+		return
+	}
+	// First pass: remove stale entries.
+	for k, e := range c.entries {
+		if now.Sub(e.updatedAt) > maxAge {
+			delete(c.entries, k)
 		}
 	}
-	c.mu.Unlock()
+	// If still over limit, find and remove oldest in a single pass.
+	for len(c.entries) > maxEntries {
+		oldestKey := ""
+		oldestTime := now.Add(time.Hour) // sentinel
+		for k, e := range c.entries {
+			if e.updatedAt.Before(oldestTime) {
+				oldestKey = k
+				oldestTime = e.updatedAt
+			}
+		}
+		if oldestKey == "" {
+			break
+		}
+		delete(c.entries, oldestKey)
+	}
 }
 
-func (c *readModelCache) beginRefresh(cacheKey string) bool {
+// beginRefresh marks a key in-flight and returns the generation observed at
+// that moment. Callers must pass that generation to setIfGeneration.
+func (c *readModelCache) beginRefresh(cacheKey string) (uint64, bool) {
 	if cacheKey == "" {
-		return false
+		return 0, false
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.inFlight[cacheKey] {
-		return false
+		return 0, false
 	}
 	c.inFlight[cacheKey] = true
-	return true
+	var gen uint64
+	if e, ok := c.entries[cacheKey]; ok {
+		gen = e.generation
+	}
+	return gen, true
 }
 
 func (c *readModelCache) endRefresh(cacheKey string) {
