@@ -77,7 +77,8 @@ func (s *Service) refreshReadModelCacheAsync(
 	req ReadModelRequest,
 	timeout time.Duration,
 ) {
-	if !s.rmCache.beginRefresh(cacheKey) {
+	gen, ok := s.rmCache.beginRefresh(cacheKey)
+	if !ok {
 		return
 	}
 	go func() {
@@ -91,7 +92,12 @@ func (s *Service) refreshReadModelCacheAsync(
 			}
 			return
 		}
-		s.rmCache.set(cacheKey, snapshots)
+		// Drop the result when a newer sync publish (or HTTP write) landed
+		// while this compute was in flight — otherwise DailySeries/ModelUsage
+		// and hub export roll back to the pre-poll view.
+		if !s.rmCache.setIfGeneration(cacheKey, snapshots, gen) {
+			return
+		}
 		s.pushToExporter(refreshCtx, snapshots)
 	}()
 }

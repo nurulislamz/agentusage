@@ -353,17 +353,21 @@ func TestReadModelCache_OperationsAndEviction(t *testing.T) {
 	}
 
 	// 3. In-flight refresh locking
-	if !cache.beginRefresh("key1") {
+	gen, ok := cache.beginRefresh("key1")
+	if !ok {
 		t.Error("beginRefresh(\"key1\") should return true on first call")
 	}
-	if cache.beginRefresh("key1") {
+	if gen != 1 {
+		t.Errorf("beginRefresh generation = %d, want 1 after prior set", gen)
+	}
+	if _, ok := cache.beginRefresh("key1"); ok {
 		t.Error("beginRefresh(\"key1\") should return false when already in flight")
 	}
-	if cache.beginRefresh("") {
+	if _, ok := cache.beginRefresh(""); ok {
 		t.Error("beginRefresh(\"\") should return false")
 	}
 	cache.endRefresh("key1")
-	if !cache.beginRefresh("key1") {
+	if _, ok := cache.beginRefresh("key1"); !ok {
 		t.Error("beginRefresh(\"key1\") should return true after endRefresh")
 	}
 	cache.endRefresh("key1")

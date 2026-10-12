@@ -73,3 +73,80 @@ func TestRefreshReadModelCacheFromConfig(t *testing.T) {
 	// Should safely run and trigger async refresh without error
 	svc.refreshReadModelCacheFromConfig(context.Background())
 }
+
+func TestReadModelCache_SetIfGenerationRejectsStaleAsync(t *testing.T) {
+	cache := newReadModelCache()
+	stale := map[string]core.UsageSnapshot{
+		"acc1": {
+			ProviderID: "cursor",
+			AccountID:  "acc1",
+			Status:     core.StatusOK,
+			DailySeries: map[string][]core.TimePoint{
+				"cost": {{Date: "2026-10-01", Value: 1}},
+			},
+		},
+	}
+	fresh := map[string]core.UsageSnapshot{
+		"acc1": {
+			ProviderID: "cursor",
+			AccountID:  "acc1",
+			Status:     core.StatusOK,
+			DailySeries: map[string][]core.TimePoint{
+				"cost": {{Date: "2026-10-11", Value: 9}},
+			},
+			ModelUsage: []core.ModelUsageRecord{{RawModelID: "gpt"}},
+		},
+	}
+
+	cache.set("key", stale)
+	gen, ok := cache.beginRefresh("key")
+	if !ok {
+		t.Fatal("beginRefresh failed")
+	}
+	if gen != 1 {
+		t.Fatalf("generation = %d, want 1", gen)
+	}
+
+	// Sync publish lands while the async compute is still in flight.
+	cache.set("key", fresh)
+
+	if cache.setIfGeneration("key", stale, gen) {
+		t.Fatal("setIfGeneration accepted stale async result after sync publish")
+	}
+	cached, _, ok := cache.get("key")
+	if !ok {
+		t.Fatal("fresh cache entry missing")
+	}
+	points := cached["acc1"].DailySeries["cost"]
+	if len(points) != 1 || points[0].Date != "2026-10-11" {
+		t.Fatalf("cache rolled back to stale view: %+v", points)
+	}
+	if len(cached["acc1"].ModelUsage) != 1 {
+		t.Fatalf("ModelUsage wiped by stale async: %+v", cached["acc1"].ModelUsage)
+	}
+	cache.endRefresh("key")
+
+	// Unchanged generation still accepts the async write.
+	gen2, ok := cache.beginRefresh("key")
+	if !ok {
+		t.Fatal("beginRefresh after end failed")
+	}
+	newer := map[string]core.UsageSnapshot{
+		"acc1": {
+			ProviderID: "cursor",
+			AccountID:  "acc1",
+			Status:     core.StatusOK,
+			DailySeries: map[string][]core.TimePoint{
+				"cost": {{Date: "2026-10-12", Value: 3}},
+			},
+		},
+	}
+	if !cache.setIfGeneration("key", newer, gen2) {
+		t.Fatal("setIfGeneration rejected current generation")
+	}
+	cached, _, ok = cache.get("key")
+	if !ok || cached["acc1"].DailySeries["cost"][0].Date != "2026-10-12" {
+		t.Fatalf("expected async write to land, got %+v", cached["acc1"].DailySeries)
+	}
+	cache.endRefresh("key")
+}
