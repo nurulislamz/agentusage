@@ -1038,6 +1038,37 @@ Other movement since Mon:
 
 Sources: [ClaudeBar v0.5.15](https://github.com/tddworks/ClaudeBar/releases/tag/v0.5.15); [Langfuse v4.57.0](https://github.com/langfuse/langfuse/releases/tag/v4.57.0) / [v4.58.0](https://github.com/langfuse/langfuse/releases/tag/v4.58.0); [CodexBar commits](https://github.com/steipete/CodexBar/commits/main); [codeburn commits](https://github.com/getagentseal/codeburn/commits/main); [LiteLLM commits](https://github.com/BerriAI/litellm/commits/main); [quota-axi README](https://github.com/kunchenguid/quota-axi/blob/main/README.md); [usagenometer on docs.rs](https://docs.rs/crate/usagenometer/latest) + crates.io API; [tokenusage](https://github.com/hanbu97/tokenusage); GitHub API stars/releases/commits 2026-10-13 (Europe/London).
 
+### Update 2026-10-14
+
+Fresh Wednesday scrape (Europe/London / BST), compared with Tue 13 Oct. The big release is **CodexBar [v0.75.0](https://github.com/steipete/CodexBar/releases/tag/v0.75.0)** (Wed ~01:59 BST). Also out: **ccusage [v20.0.31](https://github.com/ccusage/ccusage/releases/tag/v20.0.31)**, **Claude-Code-Usage-Monitor (CodeZeno) [v2.19.4](https://github.com/CodeZeno/Claude-Code-Usage-Monitor/releases/tag/v2.19.4)** and **LiteLLM [v1.106.0-rc.2](https://github.com/BerriAI/litellm/releases/tag/v1.106.0-rc.2)**. Search found two more small Claude Code + Codex quota monitors not yet in this file: **cctop** and **Quota Watch**.
+
+Movement since Tue:
+- **[CodexBar](https://github.com/steipete/CodexBar)** **v0.75.0**: cookie-based providers now find signed-in sessions in every supported browser (not just Chrome) with bounded Keychain prompts; graphical progress-bar and stacked-bar menu layouts, short Cursor lane tags, a Cost (history window) item; Claude spend-only accounts get a real meter and reset; an **OpenAI Live Usage** window with per-minute token throughput from the Admin Usage API; new providers/balances (Parallel, fal, FLORA, Command Code, Kimi China, Charm Hyper, current JetBrains AI quota); project cost reports flag incomplete history. **22,444→22,475★**.
+- **[ccusage](https://github.com/ccusage/ccusage)** **v20.0.31**: Antigravity returns an empty report when no conversations folder exists; CI/nix fixes. **18,989→18,999★**.
+- **[CodeZeno Claude-Code-Usage-Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Monitor)** **v2.19.4** (Tue ~13:16 BST): Fable quota shown in horizontal themes; saved monitor pinned by device name. **604→608★**.
+- **[LiteLLM](https://github.com/BerriAI/litellm)** **v1.106.0-rc.2** (Wed ~00:59 BST): UI backports only; stable still **v1.105.0**. **61,122→61,211★**.
+- **[Langfuse](https://github.com/langfuse/langfuse)** still **v4.58.0**; **35,742→35,802★**. **[Helicone](https://github.com/Helicone/helicone)** **6,218★**.
+- **[quota-axi](https://github.com/kunchenguid/quota-axi)** active on main, still **v0.1.61**; **148→152★**.
+- Holding: **ClaudeBar** **v0.5.15** / **1,536★**; **codeburn** **v0.9.27** / **11,439★**; **openusage.ai** **v0.7.15-beta.1** / **4,358★**; **OpenUsage.sh** **v0.26.1** / **224★**; **tokscale** **v4.18.0** / **5,671★**; **Splitrail** **v3.11.1** / **223★**; **QuotaBar** **v0.6.0** / **53★**; **Syrtis** **v2.7.0** / **413★**; **pane** **v0.4.59** / **75★**; **MeterBar** **v1.9.0** / **8★**; **llmquota** **55★**; **quotas** **2★**; **agent-quota** **1★**; **caut** **89★**. **tokenusage** still 404 on the GitHub API.
+- **New to this file:**
+  - **[cctop](https://github.com/SauersML/cctop)** (0★, last push Jul 2026): `htop`-style live TUI for several Claude Code and Codex accounts at once; auto-detects accounts, shows 5-hour / weekly / weekly-Fable windows with reset countdowns from the same usage endpoints the official CLIs use, lists running sessions, a GitHub-style activity view, and `--once` / `--json` output. Codex shows tokens but no dollar cost.
+  - **[Quota Watch](https://github.com/lazydao/quota-watch)** (0★, Python, **v0.1.8**): Windows tray flyout plus `quota` / `quota watch` terminal dashboards and `quota --json` for Claude Code and Codex; reads the official CLIs' own sessions (talks to `codex app-server` over stdio) and stores no tokens or cookies; pace markers against elapsed time.
+
+| Product | Delta | Vs agentUsage |
+|---|---|---|
+| [CodexBar](https://github.com/steipete/CodexBar) (**22,475★**, +31) | **v0.75.0**: all-browser cookie import, OpenAI live throughput, more providers. | Largest local quota tracker; macOS-first; provider breadth keeps widening. |
+| [quota-axi](https://github.com/kunchenguid/quota-axi) (**152★**) | Main only. | Agent-facing quota feed, ~19 providers. |
+| [cctop](https://github.com/SauersML/cctop) (new) / [Quota Watch](https://github.com/lazydao/quota-watch) (new) / [llmquota](https://github.com/0xNyk/llmquota) / [usagenometer](https://docs.rs/crate/usagenometer/latest) / [quotas](https://github.com/clankercode/quotas) / [agent-quota](https://github.com/Halven08/agent-quota) / [caut](https://github.com/Dicklesworthstone/coding_agent_usage_tracker) | Two small Claude+Codex monitors added. | **Direct terminal twins**, mostly two-provider. |
+| [OpenUsage.sh](https://openusage.sh/) ([GitHub](https://github.com/janekbaraniewski/openusage), **224★**) | Quiet. | Nearest twin by design. |
+| [ccusage](https://github.com/ccusage/ccusage) (**18,999★**) / [tokscale](https://github.com/junhoyeo/tokscale) / [Splitrail](https://github.com/Piebald-AI/splitrail) | ccusage **v20.0.31** fixes. | Log-parser references. |
+| [codeburn](https://github.com/getagentseal/codeburn) (**11,439★**) | Quiet. | IDE-side attribution. |
+| [openusage.ai](https://github.com/robinebers/openusage) / [ClaudeBar](https://github.com/tddworks/ClaudeBar) / [CodeZeno](https://github.com/CodeZeno/Claude-Code-Usage-Monitor) (**608★**) / [QuotaBar](https://github.com/majiayu000/quotabar) / [Syrtis](https://github.com/Nanako0129/syrtis) / [MeterBar](https://github.com/VincentShipsIt/meterbar.dev) / [pane](https://github.com/ItsJazii/pane) | CodeZeno **v2.19.4** Fable quota in more themes. | Menu-bar / Claude monitors. |
+| [Langfuse](https://github.com/langfuse/langfuse) (**35,802★**) / [Helicone](https://github.com/Helicone/helicone) / [LiteLLM](https://github.com/BerriAI/litellm) (**61,211★**) | LiteLLM rc.2 UI backports. | Cloud observability / gateway: complementary. |
+
+**Takeaway:** CodexBar's v0.75.0 raises the bar on *how* credentials are found (every browser, minimal Keychain prompts) and adds real-time API throughput from OpenAI's Admin Usage API, so "auto-detect tools and keys" now has to include browser sessions and admin-key usage feeds, not just CLI auth files. The new small monitors (cctop, Quota Watch) both ship `--json`, reinforcing yesterday's point that a stable machine-readable feed is table stakes. agentUsage's edge remains cross-platform terminal-first breadth (IDEs + CLIs + raw API keys) with spend and quotas in one view.
+
+Sources: [CodexBar v0.75.0](https://github.com/steipete/CodexBar/releases/tag/v0.75.0); [ccusage v20.0.31](https://github.com/ccusage/ccusage/releases/tag/v20.0.31); [CodeZeno v2.19.4](https://github.com/CodeZeno/Claude-Code-Usage-Monitor/releases/tag/v2.19.4); [LiteLLM v1.106.0-rc.2](https://github.com/BerriAI/litellm/releases/tag/v1.106.0-rc.2); [cctop README](https://github.com/SauersML/cctop); [Quota Watch README](https://github.com/lazydao/quota-watch); GitHub API stars/releases/commits 2026-10-14 (Europe/London); web search 2026-10-14.
+
 ## Open source
 
 ### Seeded 2026-09-04
