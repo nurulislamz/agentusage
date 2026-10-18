@@ -253,6 +253,7 @@ func runVerify(opts webserve.Options) error {
 }
 
 func runServe(opts webserve.Options, openBrowser bool) error {
+	log.SetOutput(os.Stderr)
 	if opts.Config != nil {
 		if err := tui.LoadThemes(config.ConfigDir()); err != nil && core.DebugEnabled() {
 			log.Printf("serve: theme load: %v", err)

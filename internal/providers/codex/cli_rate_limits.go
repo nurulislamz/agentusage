@@ -110,7 +110,7 @@ func fetchCodexRateLimitsRPCProcess(ctx context.Context, acct core.AccountConfig
 
 	rpcCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(rpcCtx, binary, "-s", "read-only", "-a", "untrusted", "app-server")
+	cmd := exec.CommandContext(rpcCtx, binary, "-s", "read-only", "-a", "never", "app-server")
 	cmd.Stderr = io.Discard
 	if configDir != "" {
 		cmd.Env = append(os.Environ(), "CODEX_HOME="+configDir)

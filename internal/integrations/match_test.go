@@ -23,7 +23,7 @@ func TestMatchDetected_AccountsByProviderID(t *testing.T) {
 	detected := detect.Result{
 		Tools: []detect.DetectedTool{
 			{Name: "Claude Code CLI", BinaryPath: "/usr/bin/claude", Type: "cli"},
-			{Name: "OpenAI Codex CLI", BinaryPath: "/usr/bin/codex", Type: "cli"},
+			{Name: "Codex", BinaryPath: "/usr/bin/codex", Type: "cli"},
 		},
 		Accounts: []core.AccountConfig{
 			{ID: "claude_code", Provider: "claude_code"},
@@ -251,7 +251,7 @@ func TestMatchDetected_ToolNameMatching(t *testing.T) {
 	detected := detect.Result{
 		Tools: []detect.DetectedTool{
 			{Name: "Claude Code CLI", BinaryPath: "/usr/bin/claude", Type: "cli"},
-			{Name: "OpenAI Codex CLI", BinaryPath: "/usr/bin/codex", Type: "cli"},
+			{Name: "Codex", BinaryPath: "/usr/bin/codex", Type: "cli"},
 			{Name: "Unrelated Tool", BinaryPath: "/usr/bin/other", Type: "cli"},
 		},
 	}
@@ -269,9 +269,9 @@ func TestMatchDetected_ToolNameMatching(t *testing.T) {
 				t.Errorf("claude_code: expected tool name containing 'Claude Code', got %q", m.Tool.Name)
 			}
 		case CodexID:
-			// MatchToolNameHint is "Codex", tool Name is "OpenAI Codex CLI"
+			// MatchToolNameHint is "Codex", tool Name is "Codex"
 			if m.Tool == nil {
-				t.Error("codex: expected tool match for 'OpenAI Codex CLI' with hint 'Codex'")
+				t.Error("codex: expected tool match for 'Codex' with hint 'Codex'")
 			} else if !strings.Contains(m.Tool.Name, "Codex") {
 				t.Errorf("codex: expected tool name containing 'Codex', got %q", m.Tool.Name)
 			}

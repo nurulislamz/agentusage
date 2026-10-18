@@ -253,10 +253,12 @@
   }
   if ($("providers-close")) $("providers-close").addEventListener("click", closeProviders);
   document.addEventListener("click", (ev) => {
+    if (!ev.isTrusted) return;
     const panel = $("providers-panel");
     if (!panel || panel.hidden) return;
     const target = ev.target;
     if (target && target.closest && (target.closest("#providers-panel") || target.closest("#footer-btn-providers"))) return;
+    if (ev.composedPath && ev.composedPath().some((el) => el === panel || el.id === "footer-btn-providers")) return;
     closeProviders();
   });
 
@@ -532,99 +534,51 @@
     }, { passive: true });
   })();
 
-  // Provider group drag-reorder: drag a group header onto another group
-  // box to reorder; the new order persists in a cookie, localStorage, and settings.json.
-  // Smoothly animated with FLIP physics and non-destructive silent background persistence.
-  (function providerDrag() {
-    let dragged = null;
-    let isDragging = false;
-    let lastSwapTime = 0;
+  // Provider submenu reordering: move provider groups in the Providers & boxes
+  // submenu via drag handle (PointerEvents) or Up/Down switch buttons; the new order
+  // persists in settings.json, cookies, and localStorage, and syncs dashboard views.
+  (function providerSubmenuReorder() {
+    let activeDrag = null;
 
     const orderFromDOM = () =>
-      [...document.querySelectorAll(".provider-group-box")]
-        .map((el) => el.querySelector(".provider-group-header")?.dataset.provider)
+      [...document.querySelectorAll(".providers-group")]
+        .map((el) => el.dataset.provider)
         .filter(Boolean)
         .filter((id, i, arr) => arr.indexOf(id) === i);
 
-    // Sync from localStorage if present on initial load
-    try {
-      const saved = localStorage.getItem("au_provider_order");
-      if (saved && !document.cookie.includes("au_provider_order=")) {
-        const basePath = window.location.pathname.startsWith("/agentusage") ? "/agentusage" : "/";
-        document.cookie = `au_provider_order=${encodeURIComponent(saved)}; path=${basePath}; max-age=31536000; SameSite=Lax`;
-      }
-    } catch {}
-
-    document.body.addEventListener("dragstart", (ev) => {
-      const header = ev.target.closest?.(".provider-group-header");
-      if (!header) return;
-      const box = header.closest(".provider-group-box");
-      if (!box) return;
-
-      dragged = box;
-      isDragging = true;
-      box.classList.add("dragging");
-      document.body.classList.add("is-dragging");
-
-      try {
-        ev.dataTransfer.setData("text/plain", header.dataset.provider || "");
-        ev.dataTransfer.effectAllowed = "move";
-      } catch {}
-    });
-
-    document.body.addEventListener("dragover", (ev) => {
-      if (!dragged) return;
-      ev.preventDefault();
-      try { ev.dataTransfer.dropEffect = "move"; } catch {}
-
-      const targetBox = ev.target.closest?.(".provider-group-box");
-      if (!targetBox || targetBox === dragged) return;
-      if (targetBox.parentElement !== dragged.parentElement) return;
-
-      const parent = dragged.parentElement;
-      const boxes = Array.from(parent.children).filter((el) => el.classList.contains("provider-group-box"));
-      const indexA = boxes.indexOf(dragged);
-      const indexB = boxes.indexOf(targetBox);
-      if (indexA === -1 || indexB === -1 || indexA === indexB) return;
-
-      const rect = targetBox.getBoundingClientRect();
-      const isGrid = parent.classList.contains("bento-container") || parent.classList.contains("board-container");
-
-      let insertAfter = false;
-      if (isGrid) {
-        const midY = rect.top + rect.height / 2;
-        const midX = rect.left + rect.width / 2;
-        if (ev.clientY > rect.bottom - 15) {
-          insertAfter = true;
-        } else if (ev.clientY < rect.top + 15) {
-          insertAfter = false;
-        } else if (Math.abs(ev.clientY - midY) < rect.height * 0.45) {
-          insertAfter = indexA < indexB ? ev.clientX > midX : ev.clientX > rect.left + rect.width * 0.4;
-        } else {
-          insertAfter = ev.clientY > midY;
+    const updateButtonStates = () => {
+      const groups = document.querySelectorAll(".providers-group");
+      groups.forEach((g, idx) => {
+        const upBtn = g.querySelector('.provider-move-btn[data-move="up"]');
+        const downBtn = g.querySelector('.provider-move-btn[data-move="down"]');
+        if (upBtn) {
+          upBtn.disabled = (idx === 0);
+          upBtn.setAttribute("aria-disabled", idx === 0 ? "true" : "false");
         }
-      } else {
-        const midY = rect.top + rect.height / 2;
-        insertAfter = indexA < indexB ? ev.clientY > midY : ev.clientY > rect.top + rect.height * 0.45;
-      }
-
-      const targetNode = insertAfter ? targetBox.nextSibling : targetBox;
-      if (targetNode === dragged || (insertAfter && targetBox === dragged)) return;
-
-      parent.insertBefore(dragged, targetNode);
-    });
-
-    const finishDrag = () => {
-      if (!isDragging && !dragged) return;
-      isDragging = false;
-      document.body.classList.remove("is-dragging");
-      document.querySelectorAll(".provider-group-box.dragging").forEach((el) => {
-        el.classList.remove("dragging");
-        el.style.transform = "";
+        if (downBtn) {
+          downBtn.disabled = (idx === groups.length - 1);
+          downBtn.setAttribute("aria-disabled", idx === groups.length - 1 ? "true" : "false");
+        }
       });
+    };
 
+    const flashGroup = (el) => {
+      if (!el) return;
+      el.classList.add("moved-highlight");
+      setTimeout(() => el.classList.remove("moved-highlight"), 250);
+    };
+
+    let saveTimer = null;
+    const scheduleSaveOrder = () => {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        saveTimer = null;
+        saveOrder();
+      }, 200);
+    };
+
+    const saveOrder = () => {
       const order = orderFromDOM();
-      dragged = null;
       if (order.length < 2) return;
 
       const orderStr = order.join("|");
@@ -641,65 +595,175 @@
         },
         body: new URLSearchParams({ order: orderStr, silent: "1" }),
       }).then(() => {
-        showToast("Provider order saved");
+        if (window.htmx) {
+          window.htmx.ajax("GET", "partial/app", { target: "#app", swap: "outerHTML" });
+        }
       }).catch(() => {});
     };
 
-    document.body.addEventListener("dragend", finishDrag);
-    document.body.addEventListener("drop", (ev) => {
+    // Initial cookie sync from localStorage if needed
+    try {
+      const saved = localStorage.getItem("au_provider_order");
+      if (saved && !document.cookie.includes("au_provider_order=")) {
+        const basePath = window.location.pathname.startsWith("/agentusage") ? "/agentusage" : "/";
+        document.cookie = `au_provider_order=${encodeURIComponent(saved)}; path=${basePath}; max-age=31536000; SameSite=Lax`;
+      }
+    } catch {}
+
+    // Up / Down click handlers for quick and clean switching
+    document.body.addEventListener("click", (ev) => {
+      const btn = ev.target.closest?.(".provider-move-btn");
+      if (!btn) return;
       ev.preventDefault();
-      finishDrag();
+      ev.stopPropagation();
+
+      const group = btn.closest(".providers-group");
+      if (!group) return;
+      const dir = btn.dataset.move;
+      const parent = group.parentElement;
+      if (!parent) return;
+
+      if (dir === "up") {
+        const prev = group.previousElementSibling;
+        if (prev && prev.classList.contains("providers-group")) {
+          parent.insertBefore(group, prev);
+          flashGroup(group);
+          updateButtonStates();
+          btn.focus();
+          scheduleSaveOrder();
+        }
+      } else if (dir === "down") {
+        const next = group.nextElementSibling;
+        if (next && next.classList.contains("providers-group")) {
+          parent.insertBefore(next, group);
+          flashGroup(group);
+          updateButtonStates();
+          btn.focus();
+          scheduleSaveOrder();
+        }
+      }
     });
 
-    // Touch support for dragging via the grip handle on touch devices
-    document.body.addEventListener("touchstart", (ev) => {
+    // Keyboard ArrowUp / ArrowDown support on drag handle
+    document.body.addEventListener("keydown", (ev) => {
       const handle = ev.target.closest?.(".provider-drag-handle");
       if (!handle) return;
-      const box = handle.closest(".provider-group-box");
-      if (!box) return;
+      const group = handle.closest(".providers-group");
+      if (!group) return;
+      const parent = group.parentElement;
+      if (!parent) return;
 
-      dragged = box;
-      isDragging = true;
-      box.classList.add("dragging");
+      if (ev.key === "ArrowUp") {
+        const prev = group.previousElementSibling;
+        if (prev && prev.classList.contains("providers-group")) {
+          ev.preventDefault();
+          parent.insertBefore(group, prev);
+          handle.focus();
+          flashGroup(group);
+          updateButtonStates();
+          scheduleSaveOrder();
+        }
+      } else if (ev.key === "ArrowDown") {
+        const next = group.nextElementSibling;
+        if (next && next.classList.contains("providers-group")) {
+          ev.preventDefault();
+          parent.insertBefore(next, group);
+          handle.focus();
+          flashGroup(group);
+          updateButtonStates();
+          scheduleSaveOrder();
+        }
+      }
+    });
+
+    // PointerEvents-based dragging (works smoothly on mouse, trackpad, and touch)
+    document.body.addEventListener("pointerdown", (ev) => {
+      if (ev.button !== 0 && ev.pointerType === "mouse") return;
+      const handle = ev.target.closest?.(".provider-drag-handle");
+      if (!handle) return;
+
+      const group = handle.closest(".providers-group");
+      if (!group) return;
+      const parent = group.parentElement;
+      if (!parent) return;
+
+      ev.preventDefault();
+      try { handle.setPointerCapture(ev.pointerId); } catch {}
+
+      const initialOrder = orderFromDOM().join("|");
+      activeDrag = {
+        pointerId: ev.pointerId,
+        handle,
+        group,
+        parent,
+        initialOrder,
+        hasMoved: false,
+      };
+
+      group.classList.add("dragging");
       document.body.classList.add("is-dragging");
+    });
 
-      const onTouchMove = (tev) => {
-        if (!isDragging || !dragged) return;
-        const touch = tev.touches[0];
-        if (!touch) return;
-        tev.preventDefault();
+    document.body.addEventListener("pointermove", (ev) => {
+      if (!activeDrag || ev.pointerId !== activeDrag.pointerId) return;
 
-        const elem = document.elementFromPoint(touch.clientX, touch.clientY);
-        const targetBox = elem?.closest?.(".provider-group-box");
-        if (!targetBox || targetBox === dragged) return;
-        if (targetBox.parentElement !== dragged.parentElement) return;
+      const { group, parent } = activeDrag;
+      const groups = Array.from(parent.children).filter((el) => el.classList.contains("providers-group"));
+      const idxThis = groups.indexOf(group);
+      if (idxThis === -1) return;
 
-        const parent = dragged.parentElement;
-        const boxes = Array.from(parent.children).filter((el) => el.classList.contains("provider-group-box"));
-        const indexA = boxes.indexOf(dragged);
-        const indexB = boxes.indexOf(targetBox);
-        if (indexA === -1 || indexB === -1 || indexA === indexB) return;
+      for (let i = 0; i < groups.length; i++) {
+        const target = groups[i];
+        if (target === group) continue;
+        const rect = target.getBoundingClientRect();
+        if (ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
+          const mid = rect.top + rect.height / 2;
+          if (i < idxThis && ev.clientY < mid) {
+            parent.insertBefore(group, target);
+            activeDrag.hasMoved = true;
+            updateButtonStates();
+          } else if (i > idxThis && ev.clientY > mid) {
+            parent.insertBefore(group, target.nextElementSibling);
+            activeDrag.hasMoved = true;
+            updateButtonStates();
+          }
+          break;
+        }
+      }
+    });
 
-        const rect = targetBox.getBoundingClientRect();
-        const midY = rect.top + rect.height / 2;
-        const insertAfter = indexA < indexB ? touch.clientY > midY : touch.clientY > rect.top + rect.height * 0.45;
-        const targetNode = insertAfter ? targetBox.nextSibling : targetBox;
-        if (targetNode === dragged) return;
+    const finishPointerDrag = (ev) => {
+      if (!activeDrag) return;
+      if (ev && ev.pointerId !== activeDrag.pointerId) return;
 
-        parent.insertBefore(dragged, targetNode);
-      };
+      const { handle, group, initialOrder, hasMoved } = activeDrag;
+      try { handle.releasePointerCapture(activeDrag.pointerId); } catch {}
 
-      const onTouchEnd = () => {
-        window.removeEventListener("touchmove", onTouchMove);
-        window.removeEventListener("touchend", onTouchEnd);
-        window.removeEventListener("touchcancel", onTouchEnd);
-        finishDrag();
-      };
+      group.classList.remove("dragging");
+      document.body.classList.remove("is-dragging");
 
-      window.addEventListener("touchmove", onTouchMove, { passive: false });
-      window.addEventListener("touchend", onTouchEnd);
-      window.addEventListener("touchcancel", onTouchEnd);
-    }, { passive: true });
+      const newOrder = orderFromDOM().join("|");
+      if (hasMoved && newOrder !== initialOrder) {
+        flashGroup(group);
+        scheduleSaveOrder();
+      }
+      updateButtonStates();
+      activeDrag = null;
+    };
+
+    document.body.addEventListener("pointerup", finishPointerDrag);
+    document.body.addEventListener("pointercancel", finishPointerDrag);
+
+    // Sync button states whenever providers panel is swapped by htmx
+    document.body.addEventListener("htmx:afterSwap", (ev) => {
+      const target = ev.detail.target;
+      if (target && (target.id === "providers-content" || target.querySelector?.(".providers-group"))) {
+        updateButtonStates();
+      }
+    });
+
+    // Run once on load
+    updateButtonStates();
   })();
 
   ensureScrollContainer();

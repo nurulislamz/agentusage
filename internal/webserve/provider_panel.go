@@ -33,7 +33,7 @@ type providerPanelData struct {
 // providerPanelGroups lists every configured and auto-detected account —
 // including accounts hidden from the dashboard — so the dropdown can show,
 // hide, or remove boxes.
-func (s *Server) providerPanelGroups(env Envelope) []ProviderPanelGroup {
+func (s *Server) providerPanelGroups(env Envelope, providerOrder ...string) []ProviderPanelGroup {
 	cfg := s.panelConfig()
 
 	enabled := make(map[string]bool, len(cfg.Dashboard.Providers))
@@ -141,17 +141,58 @@ func (s *Server) providerPanelGroups(env Envelope) []ProviderPanelGroup {
 		}
 		return float64(shown) / float64(len(g.Rows))
 	}
-	sort.Slice(out, func(i, j int) bool {
-		rI := groupShownRatio(out[i])
-		rJ := groupShownRatio(out[j])
-		if rI != rJ {
-			return rI > rJ
+
+	orderStr := ""
+	if len(providerOrder) > 0 {
+		orderStr = strings.TrimSpace(providerOrder[0])
+	}
+	if orderStr == "" && len(cfg.Dashboard.ProviderOrder) > 0 {
+		orderStr = strings.Join(cfg.Dashboard.ProviderOrder, "|")
+	}
+
+	if orderStr != "" {
+		rank := make(map[string]int)
+		for _, pid := range strings.Split(orderStr, "|") {
+			pid = strings.ToLower(strings.TrimSpace(pid))
+			if pid != "" && rank[pid] == 0 {
+				rank[pid] = len(rank) + 1
+			}
 		}
-		if out[i].ProviderName != out[j].ProviderName {
-			return out[i].ProviderName < out[j].ProviderName
-		}
-		return out[i].ProviderID < out[j].ProviderID
-	})
+		sort.SliceStable(out, func(i, j int) bool {
+			ri := rank[strings.ToLower(out[i].ProviderID)]
+			rj := rank[strings.ToLower(out[j].ProviderID)]
+			if ri > 0 && rj > 0 {
+				return ri < rj
+			}
+			if ri > 0 {
+				return true
+			}
+			if rj > 0 {
+				return false
+			}
+			rI := groupShownRatio(out[i])
+			rJ := groupShownRatio(out[j])
+			if rI != rJ {
+				return rI > rJ
+			}
+			if out[i].ProviderName != out[j].ProviderName {
+				return out[i].ProviderName < out[j].ProviderName
+			}
+			return out[i].ProviderID < out[j].ProviderID
+		})
+	} else {
+		sort.Slice(out, func(i, j int) bool {
+			rI := groupShownRatio(out[i])
+			rJ := groupShownRatio(out[j])
+			if rI != rJ {
+				return rI > rJ
+			}
+			if out[i].ProviderName != out[j].ProviderName {
+				return out[i].ProviderName < out[j].ProviderName
+			}
+			return out[i].ProviderID < out[j].ProviderID
+		})
+	}
 	return out
 }
 

@@ -181,6 +181,26 @@ elif [ -d "/run/user/$(id -u)" ]; then
   RUNTIME_BIND=(--bind "/run/user/$(id -u)" "/run/user/$(id -u)")
 fi
 
+CODEX_EXTRA_BINDS=()
+if [ -d "$HOME/.codex/packages" ]; then
+  mkdir -p "$PROFILE_DIR/.codex/packages"
+  CODEX_EXTRA_BINDS+=(--ro-bind "$HOME/.codex/packages" "$HOME/.codex/packages")
+fi
+if [ -d "$HOME/.codex/plugins" ]; then
+  mkdir -p "$PROFILE_DIR/.codex/plugins"
+  CODEX_EXTRA_BINDS+=(--ro-bind "$HOME/.codex/plugins" "$HOME/.codex/plugins")
+fi
+
+CODEX_REAL=$(realpath "$CODEX_BIN" 2>/dev/null || true)
+if [[ -n "$CODEX_REAL" && "$CODEX_REAL" == "$HOME/.codex/"* ]]; then
+  REAL_DIR=$(dirname "$CODEX_REAL")
+  if [[ "$REAL_DIR" != "$HOME/.codex/packages"* && "$REAL_DIR" != "$HOME/.codex/plugins"* ]]; then
+    REL_PATH="${REAL_DIR#$HOME/.codex/}"
+    mkdir -p "$PROFILE_DIR/.codex/$REL_PATH"
+    CODEX_EXTRA_BINDS+=(--ro-bind "$REAL_DIR" "$REAL_DIR")
+  fi
+fi
+
 exec "$BWRAP_BIN" \
   --ro-bind / / \
   --dev /dev \
@@ -189,6 +209,7 @@ exec "$BWRAP_BIN" \
   --bind "$HOME" "$HOME" \
   "${RUNTIME_BIND[@]}" \
   --bind "$PROFILE_DIR/.codex" "$HOME/.codex" \
+  "${CODEX_EXTRA_BINDS[@]}" \
   --bind "$HOME/.local/state/openusage" "$HOME/.local/state/openusage" \
   --setenv HOME "$HOME" \
   --setenv CODEX_ACCOUNT "$ACCOUNT" \

@@ -50,7 +50,7 @@ var keychainProbes = []keychainProbe{
 		ProvenanceSource: "keychain:Claude Code-credentials",
 		DefaultConfigDir: ".claude",
 	},
-	// OpenAI Codex CLI when cli_auth_credentials_store=keyring (the default
+	// Codex CLI when cli_auth_credentials_store=keyring (the default
 	// on macOS when keychain is reachable). The stored value is an OpenAI
 	// OAuth access token; the codex provider reads its own auth.json and
 	// can refresh as needed. We annotate so users can see where the secret

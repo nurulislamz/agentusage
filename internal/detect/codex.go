@@ -45,6 +45,8 @@ func detectCodex(result *Result) {
 				hasBoxSessions := dirExists(boxSessionsDir)
 				hasBoxAuth := fileExists(boxAuthFile)
 
+
+
 				acct := core.AccountConfig{
 					ID:           fmt.Sprintf("codex-%s", boxName),
 					Provider:     "codex",
@@ -88,7 +90,7 @@ func detectCodex(result *Result) {
 
 	if bin != "" {
 		tool := DetectedTool{
-			Name:       "OpenAI Codex CLI",
+			Name:       "Codex",
 			BinaryPath: bin,
 			ConfigDir:  configDir,
 			Type:       "cli",

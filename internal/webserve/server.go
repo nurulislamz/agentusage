@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -100,7 +101,11 @@ func (s *Server) Handler() http.Handler {
 		}
 		fileServer.ServeHTTP(w, r)
 	})
-	return s.withBasePath(mux)
+	h := s.withBasePath(mux)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("webserve: %s %s from %s (Host: %q)", r.Method, r.URL.RequestURI(), r.RemoteAddr, r.Host)
+		h.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) withBasePath(h http.Handler) http.Handler {

@@ -111,3 +111,71 @@ func TestProvidersPanel_HideShowDelete(t *testing.T) {
 		t.Errorf("missing account_id status = %d, want 400", missing.Code)
 	}
 }
+
+func TestProvidersPanel_DragReorderAndMainBoardCleanliness(t *testing.T) {
+	srv := testServer(t, Options{Demo: true})
+
+	// 1. Main board views (matrix, bento, bars) must NOT have provider-drag-handle
+	for _, layout := range []string{"matrix", "bento", "bars", "dials", "strips"} {
+		w := getHTML(t, srv, "/partial/app?layout="+layout)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET /partial/app?layout=%s status = %d", layout, w.Code)
+		}
+		body := w.Body.String()
+		if strings.Contains(body, "provider-drag-handle") {
+			t.Errorf("layout %s should not contain provider-drag-handle on main board", layout)
+		}
+		if strings.Contains(body, `class="provider-group-header" draggable="true"`) {
+			t.Errorf("layout %s should not have draggable=true on provider-group-header", layout)
+		}
+	}
+
+	// 2. Providers submenu (/partial/providers) MUST have provider-drag-handle and data-provider
+	wProviders := getHTML(t, srv, "/partial/providers")
+	if wProviders.Code != http.StatusOK {
+		t.Fatalf("GET /partial/providers status = %d", wProviders.Code)
+	}
+	provBody := wProviders.Body.String()
+	if !strings.Contains(provBody, "provider-drag-handle") {
+		t.Error("providers panel should contain provider-drag-handle")
+	}
+	if !strings.Contains(provBody, `data-provider="`) {
+		t.Error("providers panel should contain data-provider attribute on groups")
+	}
+	if !strings.Contains(provBody, `class="providers-group-title" draggable="true"`) {
+		t.Error("providers panel group titles should be draggable")
+	}
+	if !strings.Contains(provBody, "provider-move-btn") {
+		t.Error("providers panel should contain provider-move-btn switch buttons")
+	}
+
+	// 3. Save a specific provider order and check that /partial/providers renders in that order
+	postResp := postForm(t, srv, "/actions/provider-order", "order=codex|cursor|antigravity&silent=1")
+	if postResp.Code != http.StatusOK {
+		t.Fatalf("provider-order status = %d", postResp.Code)
+	}
+
+	// Request /partial/providers with the cookie from the response
+	req := httptest.NewRequest(http.MethodGet, "/partial/providers", nil)
+	for _, c := range postResp.Result().Cookies() {
+		if c.Name == cookieProviderOrder {
+			req.AddCookie(c)
+		}
+	}
+	wOrdered := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(wOrdered, req)
+	if wOrdered.Code != http.StatusOK {
+		t.Fatalf("GET /partial/providers status = %d", wOrdered.Code)
+	}
+	orderedBody := wOrdered.Body.String()
+
+	idxCodex := strings.Index(orderedBody, `data-provider="codex"`)
+	idxCursor := strings.Index(orderedBody, `data-provider="cursor"`)
+	if idxCodex == -1 || idxCursor == -1 {
+		t.Fatalf("expected codex and cursor in provider panel, got body: %s", orderedBody)
+	}
+	if idxCodex > idxCursor {
+		t.Errorf("expected codex (%d) to appear before cursor (%d) after ordering", idxCodex, idxCursor)
+	}
+}
+

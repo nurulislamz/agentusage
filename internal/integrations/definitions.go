@@ -73,7 +73,7 @@ func codexDef() Definition {
 	return Definition{
 		ID:          CodexID,
 		Name:        "Codex Notify Hook",
-		Description: "Telemetry notify hook for OpenAI Codex CLI",
+		Description: "Telemetry notify hook for Codex",
 		Type:        TypeHookScript,
 		Template:    art.Template,
 

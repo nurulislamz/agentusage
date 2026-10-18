@@ -346,6 +346,9 @@ func (s *Server) resolveProviderOrder(r *http.Request) string {
 			return strings.Join(s.collector.opts.Config.Dashboard.ProviderOrder, "|")
 		}
 	}
+	if cfg, err := config.Load(); err == nil && len(cfg.Dashboard.ProviderOrder) > 0 {
+		return strings.Join(cfg.Dashboard.ProviderOrder, "|")
+	}
 	return ""
 }
 
@@ -455,7 +458,7 @@ func (s *Server) handleProvidersFragment(w http.ResponseWriter, r *http.Request)
 	env := s.envelopeOrError()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	data := providerPanelData{Groups: s.providerPanelGroups(env)}
+	data := providerPanelData{Groups: s.providerPanelGroups(env, s.resolveProviderOrder(r))}
 	if err := executeTemplate(w, "providers", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -519,7 +522,7 @@ func (s *Server) handleProviderAction(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	data := providerPanelData{Groups: s.providerPanelGroups(env)}
+	data := providerPanelData{Groups: s.providerPanelGroups(env, s.resolveProviderOrder(r))}
 	if err := executeTemplate(w, "providers-oob", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

@@ -594,7 +594,7 @@ func TestErrorSanitization_SuppressesCannotRenderError(t *testing.T) {
 			{
 				Key:          "err-acct",
 				ProviderID:   "codex",
-				ProviderName: "OpenAI Codex CLI",
+				ProviderName: "Codex",
 				AccountID:    "codex-cli",
 				Status:       "OK",
 				StatusBadge:  "ALL OK",

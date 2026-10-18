@@ -53,7 +53,7 @@ func New() *Provider {
 		Base: providerbase.New(core.ProviderSpec{
 			ID: "codex",
 			Info: core.ProviderInfo{
-				Name:         "OpenAI Codex CLI",
+				Name:         "Codex",
 				Capabilities: []string{"local_sessions", "live_usage_endpoint", "rate_limits", "token_usage", "credits", "burn_rate", "by_model", "by_client"},
 				DocURL:       "https://github.com/openai/codex",
 			},
@@ -372,7 +372,12 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 
 	hasData := hasLocalData || hasLiveData || hasCLIData
 	if !hasData {
-		if errors.Is(liveErr, errLiveUsageAuth) {
+		boxName := acct.Hint("box_name", "")
+		if boxName != "" {
+			snap.Status = core.StatusAuth
+			snap.Message = fmt.Sprintf("Codex auth required — run `codex-box %s` to sign in", boxName)
+			snap.SetDiagnostic("setup", fmt.Sprintf("Run `codex-box %s` to authenticate inside the box", boxName))
+		} else if errors.Is(liveErr, errLiveUsageAuth) {
 			snap.Status = core.StatusAuth
 			snap.Message = "Codex auth required — run `codex login`"
 		} else {

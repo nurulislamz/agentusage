@@ -24,8 +24,8 @@ func TestProviderID(t *testing.T) {
 func TestDescribe(t *testing.T) {
 	p := New()
 	info := p.Describe()
-	if info.Name != "OpenAI Codex CLI" {
-		t.Errorf("expected name 'OpenAI Codex CLI', got %q", info.Name)
+	if info.Name != "Codex" {
+		t.Errorf("expected name 'Codex', got %q", info.Name)
 	}
 	if len(info.Capabilities) == 0 {
 		t.Error("expected at least one capability")
