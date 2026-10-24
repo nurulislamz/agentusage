@@ -387,6 +387,27 @@ func TestRowsFromSectionLinesSkipsChartArt(t *testing.T) {
 	}
 }
 
+func TestRowsFromSectionLinesParsesProjectedGauges(t *testing.T) {
+	// buildDetailGaugeLines emits bar + reset caption as one multi-line entry.
+	rows := rowsFromSectionLines([]string{
+		"Usage 5h           ███████████████████████▌    96.00%\n                   resets in 1h 5m",
+		"Usage 7d           ████████████████████████ 100.00%\n                   resets in 4d 15h",
+	}, false)
+	if len(rows) != 2 {
+		t.Fatalf("rows = %+v, want 2 gauges", rows)
+	}
+	for i, want := range []struct {
+		label string
+		pct   float64
+		hint  string
+	}{{"Usage 5h", 96, "resets in 1h 5m"}, {"Usage 7d", 100, "resets in 4d 15h"}} {
+		r := rows[i]
+		if r.Kind != "gauge" || r.Label != want.label || r.Percent == nil || *r.Percent != want.pct || r.Hint != want.hint {
+			t.Fatalf("row %d = %+v, want gauge %q %.0f%% hint %q", i, r, want.label, want.pct, want.hint)
+		}
+	}
+}
+
 func TestThemeTokensForName(t *testing.T) {
 	tokens := ThemeTokensForName("Tokyo Night")
 	if tokens.Base == "" || tokens.Text == "" {

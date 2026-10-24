@@ -182,13 +182,23 @@ func rowsFromSectionLines(lines []string, isUsedMode bool) []WebDetailRow {
 		rows = append(rows, WebDetailRow{Kind: kind, Value: s})
 	}
 
+	// Gauges rendered with a reset projection carry their "resets in" caption
+	// on a second line inside the same entry; split so each parses on its own.
+	var split []string
 	for _, raw := range lines {
+		split = append(split, strings.Split(raw, "\n")...)
+	}
+
+	for _, raw := range split {
 		plain := strings.TrimSpace(StripANSI(raw))
 		plain = collapseSpaces(plain)
-		if plain == "" || isGaugeBarLine(plain) || isChartArtLine(plain) || (pendingLabel != "" && barePercentRe.MatchString(plain)) {
+		// A labelled bar ("5h ███ 96%") is mostly glyphs, so match it before
+		// the chart-art filter discards it.
+		gaugeLoc := singleLineGaugeRe.FindStringSubmatch(plain)
+		if plain == "" || isGaugeBarLine(plain) || (gaugeLoc == nil && isChartArtLine(plain)) || (pendingLabel != "" && barePercentRe.MatchString(plain)) {
 			continue
 		}
-		if loc := singleLineGaugeRe.FindStringSubmatch(plain); loc != nil {
+		if loc := gaugeLoc; loc != nil {
 			if pendingLabel != "" {
 				flushText(pendingLabel)
 				pendingLabel = ""
