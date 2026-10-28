@@ -229,6 +229,37 @@ assert_ok "codex-box launch devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" 
 assert_ok "codex-box invoked fake bwrap" test -s "$BOX_TEST_LOG"
 assert_ok "codex-box binds profile .codex" grep -q -- "$BOX_HOME/.codex-containers/devbox/.codex" "$BOX_TEST_LOG"
 
+# 8. empty / . / .. box names must not wipe the containers root
+assert_ok "codex-box add keep-me" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_CODEX_BOX" add keep-me
+assert_ok "agy-box add keep-me" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGY_BOX" add keep-agy
+assert_ok "agent-box add keep-me" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGENT_BOX" add keep-agent
+assert_fail "codex-box rm empty name" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_CODEX_BOX" rm ""
+assert_fail "codex-box rm dot" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_CODEX_BOX" rm .
+assert_fail "codex-box rm dotdot" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_CODEX_BOX" rm ..
+assert_fail "agy-box rm empty name" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_AGY_BOX" rm ""
+assert_fail "agent-box rm empty name" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" "$REAL_AGENT_BOX" rm ""
+assert_ok "codex keep-me survived empty rm" test -d "$BOX_HOME/.codex-containers/keep-me"
+assert_ok "agy keep-agy survived empty rm" test -d "$BOX_HOME/.agy-containers/keep-agy"
+assert_ok "agent keep-agent survived empty rm" test -d "$BOX_HOME/.agent-containers/keep-agent"
+
+# 9. codex binary under ~/.codex root must not remount host ~/.codex over the profile
+mkdir -p "$BOX_HOME/.codex"
+cp "$FAKE_BIN/codex" "$BOX_HOME/.codex/codex"
+chmod +x "$BOX_HOME/.codex/codex"
+: >"$BOX_TEST_LOG"
+assert_ok "codex-box launch with ~/.codex/codex binary" \
+  env HOME="$BOX_HOME" PATH="$BOX_HOME/.codex:$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" \
+  "$REAL_CODEX_BOX" keep-me
+assert_ok "codex-box still binds profile .codex" grep -q -- "$BOX_HOME/.codex-containers/keep-me/.codex" "$BOX_TEST_LOG"
+assert_ok "codex-box binds only the host binary file" grep -q -- "$BOX_HOME/.codex/codex" "$BOX_TEST_LOG"
+# Host ~/.codex directory must not be remounted over the profile bind.
+if grep -E -q -- "--ro-bind[[:space:]]+$BOX_HOME/\.codex[[:space:]]+$BOX_HOME/\.codex([[:space:]]|$)" "$BOX_TEST_LOG"; then
+  FAIL=$((FAIL + 1))
+  echo "FAIL: codex-box remounted host ~/.codex over the profile bind" >&2
+else
+  PASS=$((PASS + 1))
+fi
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

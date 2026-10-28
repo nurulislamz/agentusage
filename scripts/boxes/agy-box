@@ -86,7 +86,9 @@ fi
 
 # Handle Subcommands: rm / delete / remove
 if [ "${1:-}" = "rm" ] || [ "${1:-}" = "delete" ] || [ "${1:-}" = "remove" ]; then
-  if [ $# -lt 2 ]; then
+  # Require a non-empty name: `rm ""` would resolve to $CONTAINERS_DIR/ and
+  # `rm -rf` would delete every box profile under the containers root.
+  if [ $# -lt 2 ] || [ -z "${2:-}" ] || [ "$2" = "." ] || [ "$2" = ".." ]; then
     echo "Usage: $CMD rm <box-name>" >&2
     exit 1
   fi

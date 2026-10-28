@@ -227,23 +227,19 @@ func (r *ViewRuntime) readFrame(ctx context.Context, timeWindow core.TimeWindow,
 		r.lastGoodMu.RUnlock()
 		return frame
 	}
+	// Successful responses are authoritative. lastGood is only a fallback for
+	// transport/daemon failures — returning it on empty or unusable success
+	// kept deleted/disabled accounts visible forever after config cleared.
+	r.lastGoodMu.Lock()
 	if len(snaps) > 0 && SnapshotsHaveUsableData(snaps) {
-		r.lastGoodMu.Lock()
 		if r.lastGoodSnapshots == nil {
 			r.lastGoodSnapshots = make(map[core.TimeWindow]map[string]core.UsageSnapshot)
 		}
 		r.lastGoodSnapshots[frame.TimeWindow] = core.DeepCloneSnapshots(snaps)
-		r.lastGoodMu.Unlock()
-		frame.Snapshots = snaps
-		return frame
+	} else if len(snaps) == 0 && r.lastGoodSnapshots != nil {
+		delete(r.lastGoodSnapshots, frame.TimeWindow)
 	}
-	r.lastGoodMu.RLock()
-	if cached, ok := r.lastGoodSnapshots[frame.TimeWindow]; ok && len(cached) > 0 {
-		frame.Snapshots = core.DeepCloneSnapshots(cached)
-		r.lastGoodMu.RUnlock()
-		return frame
-	}
-	r.lastGoodMu.RUnlock()
+	r.lastGoodMu.Unlock()
 	frame.Snapshots = snaps
 	return frame
 }

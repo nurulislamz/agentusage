@@ -439,6 +439,62 @@ func TestViewRuntime_DisconnectReturnsLastGoodSnapshots(t *testing.T) {
 	}
 }
 
+func TestViewRuntime_EmptySuccessClearsLastGoodSnapshots(t *testing.T) {
+	origSpawn := spawnDaemonFunc
+	spawnDaemonFunc = func(socketPath string, verbose bool) error {
+		return fmt.Errorf("spawn disabled in test")
+	}
+	defer func() { spawnDaemonFunc = origSpawn }()
+
+	empty := false
+	mockClient := &Client{
+		SocketPath: "/tmp/mock.sock",
+		http: &http.Client{
+			Transport: mockDaemonRoundTripper(func(req *http.Request) (*http.Response, error) {
+				resp := ReadModelResponse{Snapshots: map[string]core.UsageSnapshot{}}
+				if !empty {
+					resp.Snapshots["acc1"] = core.UsageSnapshot{
+						ProviderID: "prov1",
+						AccountID:  "acc1",
+						Status:     core.StatusOK,
+						Metrics: map[string]core.Metric{
+							"requests": {Used: ptr(7.0)},
+						},
+					}
+				}
+				body, _ := json.Marshal(resp)
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+					Header:     make(http.Header),
+				}, nil
+			}),
+		},
+	}
+
+	rt := NewViewRuntime(nil, "/tmp/mock.sock", false)
+	rt.SetClient(mockClient)
+	ctx := context.Background()
+
+	frame := rt.ReadForWindow(ctx, core.TimeWindow30d)
+	if len(frame.Snapshots) != 1 {
+		t.Fatalf("seed read = %+v", frame)
+	}
+
+	empty = true
+	frameAfterClear := rt.ReadForWindow(ctx, core.TimeWindow30d)
+	if len(frameAfterClear.Snapshots) != 0 {
+		t.Fatalf("expected authoritative empty success to clear last-good, got: %+v", frameAfterClear.Snapshots)
+	}
+
+	// Disconnect should no longer resurrect the pre-clear snapshots.
+	rt.SetClient(nil)
+	frameOffline := rt.ReadForWindow(ctx, core.TimeWindow30d)
+	if len(frameOffline.Snapshots) != 0 {
+		t.Fatalf("expected no last-good after empty success, got: %+v", frameOffline.Snapshots)
+	}
+}
+
 func TestOverlappingClientRefreshes_DoNotMultiplyUpstreamFetches(t *testing.T) {
 	var upstreamFetches sync.WaitGroup
 	var fakeUpstreamFetchCount int
