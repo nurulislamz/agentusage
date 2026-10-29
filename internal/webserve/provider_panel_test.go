@@ -2,8 +2,10 @@ package webserve
 
 import (
 	"encoding/json"
+	"html"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -36,7 +38,7 @@ func TestProvidersPanel_HideShowDelete(t *testing.T) {
 		t.Fatalf("partial/providers status = %d", w.Code)
 	}
 	panel := w.Body.String()
-	for _, want := range []string{"cursor-ide", "codex-cli", `hx-post="actions/providers"`, `"op":"hide"`, `"op":"delete"`, "providers-group-title"} {
+	for _, want := range []string{"cursor-ide", "codex-cli", `hx-post="actions/providers"`, `&#34;op&#34;:&#34;hide&#34;`, `&#34;op&#34;:&#34;delete&#34;`, "providers-group-title"} {
 		if !strings.Contains(panel, want) {
 			t.Errorf("providers panel missing %q", want)
 		}
@@ -56,7 +58,7 @@ func TestProvidersPanel_HideShowDelete(t *testing.T) {
 	if !strings.Contains(body, `id="providers-content" hx-swap-oob="innerHTML"`) {
 		t.Error("hide response must refresh the dropdown out-of-band")
 	}
-	if !strings.Contains(body, `"op":"show"`) {
+	if !strings.Contains(body, `&#34;op&#34;:&#34;show&#34;`) {
 		t.Error("hidden account should offer a Show action")
 	}
 	if visible := panelViewIDs(t, srv); visible["cursor-ide"] {
@@ -68,7 +70,7 @@ func TestProvidersPanel_HideShowDelete(t *testing.T) {
 	if showResp.Code != http.StatusOK {
 		t.Fatalf("show status = %d", showResp.Code)
 	}
-	if !strings.Contains(showResp.Body.String(), `"op":"hide"`) {
+	if !strings.Contains(showResp.Body.String(), `&#34;op&#34;:&#34;hide&#34;`) {
 		t.Error("restored account should offer a Hide action")
 	}
 	if visible := panelViewIDs(t, srv); !visible["cursor-ide"] {
@@ -109,6 +111,76 @@ func TestProvidersPanel_HideShowDelete(t *testing.T) {
 	}
 	if missing := postForm(t, srv, "/actions/providers", "op=hide"); missing.Code != http.StatusBadRequest {
 		t.Errorf("missing account_id status = %d, want 400", missing.Code)
+	}
+}
+
+func TestProviderActionVals_JSONEscapesAccountID(t *testing.T) {
+	crafted := `evil","op":"delete","account_id":"openai`
+	raw := providerActionVals("hide", crafted)
+	var parsed map[string]string
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		t.Fatalf("providerActionVals JSON: %v (raw=%s)", err, raw)
+	}
+	if parsed["op"] != "hide" {
+		t.Fatalf("op = %q, want hide (injection must not flip op)", parsed["op"])
+	}
+	if parsed["account_id"] != crafted {
+		t.Fatalf("account_id = %q, want literal crafted id", parsed["account_id"])
+	}
+
+	// html/template puts the JSON into a double-quoted attribute; entity decode
+	// must still yield the same safe object (the old string-interpolation bug
+	// flipped op to delete and retargeted account_id after this round-trip).
+	attr := html.EscapeString(raw)
+	decoded := html.UnescapeString(attr)
+	var again map[string]string
+	if err := json.Unmarshal([]byte(decoded), &again); err != nil {
+		t.Fatalf("after HTML round-trip: %v (decoded=%s)", err, decoded)
+	}
+	if again["op"] != "hide" || again["account_id"] != crafted {
+		t.Fatalf("after HTML round-trip got %#v, want op=hide account_id=%q", again, crafted)
+	}
+}
+
+func TestProvidersPanel_CraftedAccountIDCannotFlipAction(t *testing.T) {
+	crafted := `evil","op":"delete","account_id":"openai`
+	var buf strings.Builder
+	if err := executeTemplate(&buf, "providers", providerPanelData{
+		Groups: []ProviderPanelGroup{{
+			ProviderID:   "openai",
+			ProviderName: "OpenAI",
+			Rows: []ProviderPanelRow{{
+				AccountID:  crafted,
+				ProviderID: "openai",
+				Enabled:    true,
+				Status:     "OK",
+			}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	body := buf.String()
+	re := regexp.MustCompile(`hx-vals="([^"]*)"`)
+	matches := re.FindAllStringSubmatch(body, -1)
+	if len(matches) < 2 {
+		t.Fatalf("expected hide+delete hx-vals, got %d matches in %s", len(matches), body)
+	}
+	wantOps := []string{"hide", "delete"}
+	for i, wantOp := range wantOps {
+		decoded := html.UnescapeString(matches[i][1])
+		var vals map[string]string
+		if err := json.Unmarshal([]byte(decoded), &vals); err != nil {
+			t.Fatalf("hx-vals[%d] JSON: %v (decoded=%s)", i, err, decoded)
+		}
+		if vals["op"] != wantOp {
+			t.Fatalf("hx-vals[%d] op = %q, want %q (crafted quotes must not flip action)", i, vals["op"], wantOp)
+		}
+		if vals["account_id"] != crafted {
+			t.Fatalf("hx-vals[%d] account_id = %q, want crafted literal", i, vals["account_id"])
+		}
+		if vals["account_id"] == "openai" {
+			t.Fatal("action retargeted account_id to openai via quote injection")
+		}
 	}
 }
 

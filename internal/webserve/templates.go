@@ -3,6 +3,7 @@ package webserve
 import (
 	"bytes"
 	"embed"
+	"encoding/json"
 	"html/template"
 	"io"
 	"strconv"
@@ -69,6 +70,22 @@ var templateFuncs = template.FuncMap{
 	"cleanHeroCycle":   cleanHeroCycle,
 	"cctx":             func(m renderModel, v renderView) cockpitCtx { return cockpitCtx{M: m, V: v} },
 	"cardctx":          func(m renderModel, c DetailCard) cardCtx { return cardCtx{M: m, Card: c} },
+	// providerActionVals JSON-encodes hide/show/delete payloads so account IDs
+	// with quotes or control characters cannot break out of hx-vals and flip op
+	// or retarget another account (HTML entity round-trip of raw interpolation).
+	"providerActionVals": providerActionVals,
+}
+
+// providerActionVals returns a safe hx-vals JSON object for provider panel actions.
+func providerActionVals(op, accountID string) string {
+	b, err := json.Marshal(map[string]string{
+		"op":         op,
+		"account_id": accountID,
+	})
+	if err != nil {
+		return `{"op":"","account_id":""}`
+	}
+	return string(b)
 }
 
 var pageTemplates = template.Must(template.New("agentusage").Funcs(templateFuncs).ParseFS(templateFS, "templates/*.tmpl"))

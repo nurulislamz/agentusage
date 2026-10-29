@@ -13,8 +13,8 @@
   <div class="providers-row{{if not .Enabled}} providers-row-hidden{{end}}">
     <span class="providers-name">{{.AccountID}}</span>
     {{if .Enabled}}<span class="pill {{pillClass .StatusBadge}}">{{if .StatusBadge}}{{.StatusBadge}}{{else}}{{.Status}}{{end}}</span>{{else}}<span class="pill dim">HIDDEN</span>{{end}}
-    <button type="button" class="providers-btn" hx-post="actions/providers" hx-vals='{"op":"{{if .Enabled}}hide{{else}}show{{end}}","account_id":"{{.AccountID}}"}' hx-target="#app" hx-swap="outerHTML" title="{{if .Enabled}}Hide from dashboard{{else}}Show on dashboard{{end}}" aria-label="{{if .Enabled}}Hide {{.AccountID}}{{else}}Show {{.AccountID}}{{end}}">{{if .Enabled}}Hide{{else}}Show{{end}}</button>
-    <button type="button" class="providers-btn danger" hx-post="actions/providers" hx-vals='{"op":"delete","account_id":"{{.AccountID}}"}' hx-target="#app" hx-swap="outerHTML" hx-confirm="Remove {{.AccountID}} from agentUsage?" title="Remove account and stored credentials" aria-label="Remove {{.AccountID}}">✕</button>
+    {{if .Enabled}}<button type="button" class="providers-btn" hx-post="actions/providers" hx-vals="{{providerActionVals "hide" .AccountID}}" hx-target="#app" hx-swap="outerHTML" title="Hide from dashboard" aria-label="Hide {{.AccountID}}">Hide</button>{{else}}<button type="button" class="providers-btn" hx-post="actions/providers" hx-vals="{{providerActionVals "show" .AccountID}}" hx-target="#app" hx-swap="outerHTML" title="Show on dashboard" aria-label="Show {{.AccountID}}">Show</button>{{end}}
+    <button type="button" class="providers-btn danger" hx-post="actions/providers" hx-vals="{{providerActionVals "delete" .AccountID}}" hx-target="#app" hx-swap="outerHTML" hx-confirm="Remove {{.AccountID}} from agentUsage?" title="Remove account and stored credentials" aria-label="Remove {{.AccountID}}">✕</button>
   </div>
   {{end}}
 </section>
