@@ -1248,6 +1248,63 @@ func TestApplyUsageViewToSnapshot_DoesNotRestoreRootModelBreakdownForEmptyWindow
 	}
 }
 
+// TestApplyUsageViewToSnapshot_PreservesProviderNativeSpendMetrics guards the
+// bug where isStaleActivityMetric's "today_" / "7d_" prefixes deleted
+// provider-native spend keys (today_cost, today_byok_cost, 7d_byok_cost) even
+// though isCurrentStateMetric listed today_cost as a quota root that must
+// survive. After hydrateRootsFromLimitSnapshots, applyCanonicalUsageView ran
+// this strip on every telemetry-active Cursor/Codex/Amp/OpenRouter account,
+// blanking dashboard/tmux today-spend and forcing window_credit_spend off the
+// provider's own 1d metric onto a partial balance-series delta.
+func TestApplyUsageViewToSnapshot_PreservesProviderNativeSpendMetrics(t *testing.T) {
+	today := 4.21
+	todayBYOK := 1.10
+	week := 18.5
+	weekBYOK := 3.25
+	month := 40.0
+	plan := 80.0
+	snap := core.UsageSnapshot{
+		ProviderID: "cursor",
+		AccountID:  "cursor",
+		Status:     core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"today_cost":      {Used: &today, Unit: "USD", Window: "today"},
+			"today_byok_cost": {Used: &todayBYOK, Unit: "USD", Window: "today"},
+			"7d_api_cost":     {Used: &week, Unit: "USD", Window: "7d"},
+			"7d_byok_cost":    {Used: &weekBYOK, Unit: "USD", Window: "7d"},
+			"30d_api_cost":    {Used: &month, Unit: "USD", Window: "30d"},
+			"plan_spend":      {Used: &plan, Unit: "USD", Window: "monthly"},
+			"today_api_cost":  {Used: float64Ptr(99), Unit: "USD", Window: "1d"},
+			"messages_today":  {Used: float64Ptr(12), Unit: "messages", Window: "1d"},
+		},
+	}
+
+	applyUsageViewToSnapshot(&snap, &telemetryUsageAgg{EventCount: 3}, core.TimeWindow30d)
+
+	for key, want := range map[string]float64{
+		"today_cost":      today,
+		"today_byok_cost": todayBYOK,
+		"7d_api_cost":     week,
+		"7d_byok_cost":    weekBYOK,
+		"30d_api_cost":    month,
+		"plan_spend":      plan,
+	} {
+		if got := metricUsed(snap.Metrics[key]); got != want {
+			t.Errorf("%s = %v, want provider-native %v (must not be stripped as stale activity)", key, got, want)
+		}
+	}
+	if _, ok := snap.Metrics["today_api_cost"]; ok {
+		t.Error("today_api_cost is telemetry-derived and should be stripped when the window agg has no TotalCostToday")
+	}
+	if _, ok := snap.Metrics["messages_today"]; ok {
+		t.Error("messages_today should still be stripped as a stale activity metric")
+	}
+
+	if val, _, ok := nativeWindowSpend(snap, core.TimeWindow1d); !ok || val != today {
+		t.Fatalf("nativeWindowSpend(1d) = (%v, ok=%v), want today_cost %v so window_credit_spend stays on the provider figure", val, ok, today)
+	}
+}
+
 // TestApplyUsageViewToSnapshot_TodayCostScopedToToday guards against the bug
 // where today_api_cost was set to the view-window total — so a 30-day view
 // reported the 30-day total as "today". today_api_cost must come from the
