@@ -42,6 +42,11 @@ func applyUsageViewToSnapshot(snap *core.UsageSnapshot, agg *telemetryUsageAgg, 
 	stripAllTime := timeWindow != "" && timeWindow != "all"
 	deletedCount := 0
 	for key, metric := range snap.Metrics {
+		// Provider-native quota/spend keys must survive even when they share a
+		// prefix with telemetry activity metrics (today_cost vs today_api_cost).
+		if isCurrentStateMetric(key) {
+			continue
+		}
 		if strings.HasPrefix(key, "source_") ||
 			strings.HasPrefix(key, "client_") ||
 			strings.HasPrefix(key, "tool_") ||
@@ -53,7 +58,7 @@ func applyUsageViewToSnapshot(snap *core.UsageSnapshot, agg *telemetryUsageAgg, 
 			isStaleActivityMetric(key) {
 			delete(snap.Metrics, key)
 			deletedCount++
-		} else if stripAllTime && metric.Window == "all-time" && !isCurrentStateMetric(key) {
+		} else if stripAllTime && metric.Window == "all-time" {
 			delete(snap.Metrics, key)
 			deletedCount++
 		}
@@ -340,6 +345,9 @@ func pointsFromDaily(in []telemetryDayPoint, pick func(telemetryDayPoint) float6
 }
 
 func isStaleActivityMetric(key string) bool {
+	if isCurrentStateMetric(key) {
+		return false
+	}
 	switch key {
 	case "messages_today", "sessions_today", "tool_calls_today",
 		"7d_tool_calls", "all_time_tool_calls", "tool_calls_total",
@@ -381,7 +389,11 @@ func isCurrentStateMetric(key string) bool {
 		return true
 	}
 	switch key {
-	case "today_cost", "7d_api_cost", "all_time_api_cost", "5h_block_cost", "usage_daily", "usage_weekly", "usage_five_hour":
+	case "today_cost", "today_byok_cost", "today_cost_usd",
+		"7d_api_cost", "7d_byok_cost",
+		"30d_api_cost", "30d_byok_cost",
+		"all_time_api_cost", "5h_block_cost",
+		"usage_daily", "usage_weekly", "usage_five_hour":
 		return true
 	}
 	return false
