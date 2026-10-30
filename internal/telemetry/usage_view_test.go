@@ -1270,6 +1270,7 @@ func TestApplyUsageViewToSnapshot_PreservesProviderNativeSpendMetrics(t *testing
 		Metrics: map[string]core.Metric{
 			"today_cost":      {Used: &today, Unit: "USD", Window: "today"},
 			"today_byok_cost": {Used: &todayBYOK, Unit: "USD", Window: "today"},
+			"today_cost_usd":  {Used: &today, Unit: "USD", Window: "today"},
 			"7d_api_cost":     {Used: &week, Unit: "USD", Window: "7d"},
 			"7d_byok_cost":    {Used: &weekBYOK, Unit: "USD", Window: "7d"},
 			"30d_api_cost":    {Used: &month, Unit: "USD", Window: "30d"},
@@ -1284,6 +1285,7 @@ func TestApplyUsageViewToSnapshot_PreservesProviderNativeSpendMetrics(t *testing
 	for key, want := range map[string]float64{
 		"today_cost":      today,
 		"today_byok_cost": todayBYOK,
+		"today_cost_usd":  today,
 		"7d_api_cost":     week,
 		"7d_byok_cost":    weekBYOK,
 		"30d_api_cost":    month,

@@ -389,7 +389,7 @@ func isCurrentStateMetric(key string) bool {
 		return true
 	}
 	switch key {
-	case "today_cost", "today_byok_cost",
+	case "today_cost", "today_byok_cost", "today_cost_usd",
 		"7d_api_cost", "7d_byok_cost",
 		"30d_api_cost", "30d_byok_cost",
 		"all_time_api_cost", "5h_block_cost",
