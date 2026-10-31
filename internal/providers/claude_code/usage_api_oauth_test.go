@@ -203,18 +203,19 @@ func TestOAuthAuthHeaders(t *testing.T) {
 }
 
 // TestUsageAuthSources_NamesAndOrder pins down the fixture list itself:
-// oauth is tried before cookie, matching the OAuth-first priority.
+// agentusage's own sign-in is tried first, then the Claude Code CLI's oauth
+// token, then cookie, matching the OAuth-first priority.
 func TestUsageAuthSources_NamesAndOrder(t *testing.T) {
 	p := &Provider{}
-	sources := p.usageAuthSources("org-uuid")
-	if len(sources) != 2 {
-		t.Fatalf("len(sources) = %d, want 2", len(sources))
+	sources := p.usageAuthSources(context.Background(), "org-uuid")
+	want := []string{"agent-oauth", "oauth", "cookie"}
+	if len(sources) != len(want) {
+		t.Fatalf("len(sources) = %d, want %d", len(sources), len(want))
 	}
-	if sources[0].name != "oauth" {
-		t.Errorf("sources[0].name = %q, want %q", sources[0].name, "oauth")
-	}
-	if sources[1].name != "cookie" {
-		t.Errorf("sources[1].name = %q, want %q", sources[1].name, "cookie")
+	for i, name := range want {
+		if sources[i].name != name {
+			t.Errorf("sources[%d].name = %q, want %q", i, sources[i].name, name)
+		}
 	}
 }
 
@@ -226,7 +227,7 @@ func TestUsageAuthSources_OAuthPrepare_UsesOAuthSchemeAndURL(t *testing.T) {
 	writeCredentials(t, `{"claudeAiOauth":{"accessToken":"tok-fixture","expiresAt":`+futureMs+`}}`)
 
 	p := &Provider{}
-	sources := p.usageAuthSources("org-uuid")
+	sources := p.usageAuthSources(context.Background(), "org-uuid")
 	src, ok := findUsageAuthSource(sources, "oauth")
 	if !ok {
 		t.Fatal(`findUsageAuthSource(sources, "oauth") = false`)
@@ -254,7 +255,7 @@ func TestUsageAuthSources_OAuthPrepare_UsesOAuthSchemeAndURL(t *testing.T) {
 // to resume the previously successful source.
 func TestFindUsageAuthSource(t *testing.T) {
 	p := &Provider{}
-	sources := p.usageAuthSources("org-uuid")
+	sources := p.usageAuthSources(context.Background(), "org-uuid")
 
 	if _, ok := findUsageAuthSource(sources, "oauth"); !ok {
 		t.Error(`findUsageAuthSource(sources, "oauth") = false, want true`)

@@ -99,6 +99,14 @@ func newRootCommand() *cobra.Command {
 	serveCmd.GroupID = "everyday"
 	root.AddCommand(serveCmd)
 
+	loginCmd := newLoginCommand()
+	loginCmd.GroupID = "everyday"
+	root.AddCommand(loginCmd)
+
+	logoutCmd := newLogoutCommand()
+	logoutCmd.GroupID = "everyday"
+	root.AddCommand(logoutCmd)
+
 	daemonCmd := newDaemonCommand()
 	daemonCmd.GroupID = "admin"
 	root.AddCommand(daemonCmd)

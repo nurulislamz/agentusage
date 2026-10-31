@@ -2,6 +2,7 @@ package claude_code
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -432,7 +433,18 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 	}
 
 	snap.Message = "Claude Code CLI · costs are API-equivalent estimates, not subscription charges"
+	if snap.Raw["usage_api_ok"] != "true" && needsAgentLogin(snap.Raw["usage_api_error"]+snap.Raw["usage_api_stale_reason"]) {
+		snap.Message = "Claude Code CLI · live 5h/7d quota unavailable — run `agentusage login claude`"
+	}
 	return snap, nil
+}
+
+// needsAgentLogin reports whether a usage-API failure is one that
+// `agentusage login claude` would fix: no stored sign-in, or a dead one.
+// Rate limits and outages don't qualify.
+func needsAgentLogin(reason string) bool {
+	return strings.Contains(reason, ErrAgentOAuthNotSignedIn.Error()) ||
+		strings.Contains(reason, ErrAgentOAuthSignInExpired.Error())
 }
 
 // usageAuthSource is one way of authenticating against the usage API.
@@ -443,12 +455,34 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 type usageAuthSource struct {
 	name    string
 	prepare func() (url string, setAuth func(*http.Request), err error)
+	// reauth, when set, renews the credential after the API refuses it (401)
+	// and returns fresh auth headers for a single retry.
+	reauth func() (setAuth func(*http.Request), err error)
 }
 
-// usageAuthSources lists the auth sources in priority order: OAuth token first,
-// then cookie/org as fallback when OAuth credentials are unavailable or rejected.
-func (p *Provider) usageAuthSources(orgUUID string) []usageAuthSource {
+// usageAuthSources lists the auth sources in priority order: agentusage's own
+// Claude sign-in first (it renews itself), then the Claude Code CLI's OAuth
+// token, then cookie/org as fallback when OAuth credentials are unavailable or
+// rejected.
+func (p *Provider) usageAuthSources(ctx context.Context, orgUUID string) []usageAuthSource {
 	return []usageAuthSource{
+		{
+			name: "agent-oauth",
+			prepare: func() (string, func(*http.Request), error) {
+				token, err := agentOAuthAccessToken(ctx, false)
+				if err != nil {
+					return "", nil, err
+				}
+				return oauthUsageURL, oauthAuthHeaders(token), nil
+			},
+			reauth: func() (func(*http.Request), error) {
+				token, err := agentOAuthAccessToken(ctx, true)
+				if err != nil {
+					return nil, err
+				}
+				return oauthAuthHeaders(token), nil
+			},
+		},
 		{
 			name: "oauth",
 			prepare: func() (string, func(*http.Request), error) {
@@ -521,20 +555,24 @@ func isFatalOAuthError(err error) bool {
 // pinned source stops working, the pin is cleared so the next call re-scans
 // all sources from scratch.
 func (p *Provider) readUsageAPI(ctx context.Context, orgUUID string, snap *core.UsageSnapshot) error {
-	sources := p.usageAuthSources(orgUUID)
+	sources := p.usageAuthSources(ctx, orgUUID)
 
 	if pinned := p.getLastUsageAuthSource(); pinned != "" {
+		reason := fmt.Sprintf("%s auth source (previously successful) failed", pinned)
 		src, ok := findUsageAuthSource(sources, pinned)
 		if ok {
-			if err := p.tryUsageAuthSource(ctx, src, snap); err == nil {
+			err := p.tryUsageAuthSource(ctx, src, snap)
+			if err == nil {
 				return nil
 			}
+			reason += ": " + err.Error()
 			p.setLastUsageAuthSource("")
 		}
 		if p.applyCachedUsage(snap) {
+			snap.Raw["usage_api_stale_reason"] = reason
 			return nil
 		}
-		return fmt.Errorf("%s auth source (previously successful) failed and no cached usage available", pinned)
+		return fmt.Errorf("%s and no cached usage available", reason)
 	}
 
 	var errs []string
@@ -545,15 +583,17 @@ func (p *Provider) readUsageAPI(ctx context.Context, orgUUID string, snap *core.
 		}
 		errs = append(errs, fmt.Sprintf("%s: %v", src.name, err))
 		// If OAuth fails with a rate limit (429) or network failure, do not fallback to cookies
-		if src.name == "oauth" && isFatalOAuthError(err) {
+		if (src.name == "oauth" || src.name == "agent-oauth") && isFatalOAuthError(err) {
 			break
 		}
 	}
 
+	reason := "all usage API sources failed: " + strings.Join(errs, "; ")
 	if p.applyCachedUsage(snap) {
+		snap.Raw["usage_api_stale_reason"] = reason
 		return nil
 	}
-	return fmt.Errorf("all usage API sources failed: %s", strings.Join(errs, "; "))
+	return errors.New(reason)
 }
 
 func findUsageAuthSource(sources []usageAuthSource, name string) (usageAuthSource, bool) {
@@ -573,6 +613,13 @@ func (p *Provider) tryUsageAuthSource(ctx context.Context, src usageAuthSource, 
 		return err
 	}
 	usage, err := fetchUsageAPIWithAuth(ctx, url, setAuth)
+	if err != nil && src.reauth != nil && strings.Contains(err.Error(), "API returned 401") {
+		setAuth, err = src.reauth()
+		if err != nil {
+			return err
+		}
+		usage, err = fetchUsageAPIWithAuth(ctx, url, setAuth)
+	}
 	if err != nil {
 		return err
 	}

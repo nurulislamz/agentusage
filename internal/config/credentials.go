@@ -12,6 +12,20 @@ import (
 type Credentials struct {
 	Keys     map[string]string         `json:"keys"`               // account ID → API key
 	Sessions map[string]BrowserSession `json:"sessions,omitempty"` // account ID → browser-session credential
+	OAuth    map[string]OAuthToken     `json:"oauth,omitempty"`    // account ID → agentusage's own OAuth sign-in
+}
+
+// OAuthToken stores an OAuth sign-in that agentusage obtained itself (e.g.
+// `agentusage login claude`), as opposed to a token borrowed from another
+// tool's credentials file. agentusage owns the refresh token, so it can renew
+// the access token without disturbing the other tool's session.
+type OAuthToken struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	// ExpiresAt is the access token's expiry as an RFC3339 string; empty when
+	// the provider didn't report one.
+	ExpiresAt string `json:"expires_at,omitempty"`
+	Scope     string `json:"scope,omitempty"`
 }
 
 // BrowserSession stores a single account's browser-session credential. Used
@@ -55,7 +69,7 @@ func LoadCredentials() (Credentials, error) {
 }
 
 func LoadCredentialsFrom(path string) (Credentials, error) {
-	creds := Credentials{Keys: make(map[string]string)}
+	creds := Credentials{Keys: make(map[string]string), OAuth: make(map[string]OAuthToken)}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -74,6 +88,9 @@ func LoadCredentialsFrom(path string) (Credentials, error) {
 	}
 	if creds.Sessions == nil {
 		creds.Sessions = make(map[string]BrowserSession)
+	}
+	if creds.OAuth == nil {
+		creds.OAuth = make(map[string]OAuthToken)
 	}
 	if len(creds.Keys) > 0 {
 		normalized := make(map[string]string, len(creds.Keys))
@@ -100,6 +117,19 @@ func LoadCredentialsFrom(path string) (Credentials, error) {
 			}
 		}
 		creds.Sessions = normalized
+	}
+	if len(creds.OAuth) > 0 {
+		normalized := make(map[string]OAuthToken, len(creds.OAuth))
+		for accountID, token := range creds.OAuth {
+			id := normalizeAccountID(accountID)
+			if id == "" {
+				continue
+			}
+			if _, exists := normalized[id]; !exists || accountID == id {
+				normalized[id] = token
+			}
+		}
+		creds.OAuth = normalized
 	}
 
 	return creds, nil
@@ -231,6 +261,75 @@ func LoadSessionFrom(path, accountID string) (BrowserSession, bool, error) {
 	}
 	s, ok := creds.Sessions[accountID]
 	return s, ok, nil
+}
+
+// SaveOAuthToken persists agentusage's own OAuth sign-in for an account.
+// Like API keys and browser sessions, it is protected only by the
+// credentials file's 0o600 permissions.
+func SaveOAuthToken(accountID string, token OAuthToken) error {
+	return SaveOAuthTokenTo(CredentialsPath(), accountID, token)
+}
+
+func SaveOAuthTokenTo(path, accountID string, token OAuthToken) error {
+	accountID = normalizeAccountID(accountID)
+	if accountID == "" {
+		return fmt.Errorf("account ID is empty")
+	}
+	if strings.TrimSpace(token.AccessToken) == "" {
+		return fmt.Errorf("access token is empty")
+	}
+
+	credMu.Lock()
+	defer credMu.Unlock()
+
+	creds, err := LoadCredentialsFrom(path)
+	if err != nil {
+		return err
+	}
+	creds.OAuth[accountID] = token
+	return writeCredentials(path, creds)
+}
+
+// DeleteOAuthToken removes an account's OAuth sign-in. Safe to call when no
+// entry exists.
+func DeleteOAuthToken(accountID string) error {
+	return DeleteOAuthTokenFrom(CredentialsPath(), accountID)
+}
+
+func DeleteOAuthTokenFrom(path, accountID string) error {
+	accountID = normalizeAccountID(accountID)
+	if accountID == "" {
+		return fmt.Errorf("account ID is empty")
+	}
+
+	credMu.Lock()
+	defer credMu.Unlock()
+
+	creds, err := LoadCredentialsFrom(path)
+	if err != nil {
+		return err
+	}
+	delete(creds.OAuth, accountID)
+	return writeCredentials(path, creds)
+}
+
+// LoadOAuthToken returns the stored OAuth sign-in for an account along with a
+// found flag.
+func LoadOAuthToken(accountID string) (OAuthToken, bool, error) {
+	return LoadOAuthTokenFrom(CredentialsPath(), accountID)
+}
+
+func LoadOAuthTokenFrom(path, accountID string) (OAuthToken, bool, error) {
+	accountID = normalizeAccountID(accountID)
+	if accountID == "" {
+		return OAuthToken{}, false, fmt.Errorf("account ID is empty")
+	}
+	creds, err := LoadCredentialsFrom(path)
+	if err != nil {
+		return OAuthToken{}, false, err
+	}
+	t, ok := creds.OAuth[accountID]
+	return t, ok, nil
 }
 
 func writeCredentials(path string, creds Credentials) error {

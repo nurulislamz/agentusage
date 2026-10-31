@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/nurulislamz/agentusage/internal/core"
@@ -17,7 +18,15 @@ func TestMain(m *testing.M) {
 	priceLookup = func(_ context.Context, _ string, _ int) (*pricing.Price, error) {
 		return nil, errors.New("pricing disabled in tests")
 	}
-	os.Exit(m.Run())
+	// Never read (or renew) the developer's real agentusage Claude sign-in.
+	credsDir, err := os.MkdirTemp("", "claude-code-agent-oauth-")
+	if err != nil {
+		panic(err)
+	}
+	agentOAuthCredsPath = func() string { return filepath.Join(credsDir, "credentials.json") }
+	code := m.Run()
+	_ = os.RemoveAll(credsDir)
+	os.Exit(code)
 }
 
 func testClaudeAccount(id, statsPath, accountPath string) core.AccountConfig {

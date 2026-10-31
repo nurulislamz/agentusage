@@ -51,9 +51,11 @@ func applyUsageResponse(usage *usageResponse, snap *core.UsageSnapshot, now time
 		limit := float64(100)
 		if t, ok := parseReset(bucket.ResetsAt); ok {
 			if !t.After(now) {
+				// The window already rolled over (typically a cached
+				// response that outlived its reset): report it as reset
+				// rather than surfacing a timer that reads "expired".
 				util = 0
-			}
-			if resetKey != "" {
+			} else if resetKey != "" {
 				snap.Resets[resetKey] = t
 			}
 		}

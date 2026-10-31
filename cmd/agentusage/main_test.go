@@ -33,6 +33,8 @@ var retainedCommands = []string{
 	"get",
 	"help",
 	"list",
+	"login",
+	"logout",
 	"serve",
 }
 
