@@ -165,11 +165,11 @@ func applyCanonicalUsageViewWithDB(
 	cache := make(map[string]*telemetryUsageAgg)
 
 	activeStart := time.Now()
-	telemetryActiveProviders, err := queryTelemetryActiveProviders(ctx, db)
+	telemetryActive, err := queryTelemetryActive(ctx, db)
 	if err != nil {
 		return snaps, err
 	}
-	core.Tracef("[usage_view_perf] queryTelemetryActiveProviders: %dms", time.Since(activeStart).Milliseconds())
+	core.Tracef("[usage_view_perf] queryTelemetryActive: %dms", time.Since(activeStart).Milliseconds())
 
 	// Accounts sharing the same source-provider set are ambiguous for the
 	// provider-scope fallback below: if account-scoped telemetry is empty
@@ -228,12 +228,24 @@ func applyCanonicalUsageViewWithDB(
 			agg = loaded
 		}
 		if agg == nil || agg.EventCount == 0 {
-			// Check if telemetry is active for this provider (has ANY events, just not in this window).
+			// Empty window strip must only run when THIS account (or the sole
+			// provider-scope fallback) actually has telemetry. Provider-wide
+			// activity can belong entirely to a sibling account; applying the
+			// empty view in that case deletes the sibling's live native meters.
 			hasTelemetry := false
-			for _, sp := range sourceProviders {
-				if telemetryActiveProviders[sp] {
-					hasTelemetry = true
-					break
+			if allowProviderFallback {
+				for _, sp := range sourceProviders {
+					if telemetryActive.providers[sp] {
+						hasTelemetry = true
+						break
+					}
+				}
+			} else if accountScope != "" {
+				for _, sp := range sourceProviders {
+					if telemetryActive.accounts[telemetryAccountActivityKey(sp, accountScope)] {
+						hasTelemetry = true
+						break
+					}
 				}
 			}
 			if hasTelemetry && agg != nil {
@@ -262,37 +274,54 @@ func applyCanonicalUsageViewWithDB(
 	return out, nil
 }
 
-// queryTelemetryActiveProviders returns the set of provider IDs that have at least
-// one telemetry event in the database, regardless of time window. This is used to
-// distinguish providers that have a telemetry adapter (but may have no events in the
-// current time window) from providers that have no telemetry at all.
-func queryTelemetryActiveProviders(ctx context.Context, db *sql.DB) (map[string]bool, error) {
-	out := make(map[string]bool)
-	// Use raw provider_id (no LOWER/TRIM in SQL) so SQLite can resolve
-	// the DISTINCT directly from idx_usage_events_type_provider index
-	// without scanning every matching row.
+// telemetryActiveIndex tracks which providers / provider+account pairs have at
+// least one message_usage/tool_usage event, regardless of time window.
+type telemetryActiveIndex struct {
+	providers map[string]bool
+	accounts  map[string]bool
+}
+
+func telemetryAccountActivityKey(providerID, accountID string) string {
+	return strings.ToLower(strings.TrimSpace(providerID)) + "\x00" + strings.TrimSpace(accountID)
+}
+
+// queryTelemetryActive returns provider- and account-scoped telemetry activity.
+// Account keys are required when multiple dashboard accounts share a provider:
+// provider-wide activity must not strip a sibling that never emitted events.
+func queryTelemetryActive(ctx context.Context, db *sql.DB) (telemetryActiveIndex, error) {
+	out := telemetryActiveIndex{
+		providers: make(map[string]bool),
+		accounts:  make(map[string]bool),
+	}
+	// Use raw provider_id/account_id (no LOWER/TRIM in SQL) so SQLite can
+	// resolve DISTINCT from the provider/account indexes without a full scan.
 	rows, err := db.QueryContext(ctx, `
-		SELECT DISTINCT provider_id
+		SELECT DISTINCT provider_id, account_id
 		FROM usage_events
 		WHERE event_type IN ('message_usage', 'tool_usage')
 		  AND provider_id IS NOT NULL AND provider_id != ''
 	`)
 	if err != nil {
-		return out, fmt.Errorf("query active telemetry providers: %w", err)
+		return out, fmt.Errorf("query active telemetry: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var pid string
-		if err := rows.Scan(&pid); err != nil {
-			return out, fmt.Errorf("scan active telemetry provider row: %w", err)
+		var pid, accountID string
+		if err := rows.Scan(&pid, &accountID); err != nil {
+			return out, fmt.Errorf("scan active telemetry row: %w", err)
 		}
 		pid = strings.ToLower(strings.TrimSpace(pid))
-		if pid != "" {
-			out[pid] = true
+		accountID = strings.TrimSpace(accountID)
+		if pid == "" {
+			continue
+		}
+		out.providers[pid] = true
+		if accountID != "" {
+			out.accounts[telemetryAccountActivityKey(pid, accountID)] = true
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return out, fmt.Errorf("iterate active telemetry provider rows: %w", err)
+		return out, fmt.Errorf("iterate active telemetry rows: %w", err)
 	}
 	return out, nil
 }

@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
 	"time"
@@ -482,6 +483,12 @@ func TestApplyCanonicalUsageView_DoesNotLeakProviderScopeAcrossSiblingAccounts(t
 	// sibling "opencode-personal" account has none. The provider-scope
 	// fallback must not leak the "opencode" account's usage into
 	// "opencode-personal" just because they share a provider.
+	//
+	// Equally important: provider-wide "telemetry active" must not apply an
+	// empty usage view to the sibling and strip its live native meters.
+	blockMsgs := 12.0
+	todayReqs := 4.0
+	burnRate := 1.5
 	snaps := map[string]core.UsageSnapshot{
 		"opencode": {
 			ProviderID: "opencode",
@@ -490,6 +497,12 @@ func TestApplyCanonicalUsageView_DoesNotLeakProviderScopeAcrossSiblingAccounts(t
 		"opencode-personal": {
 			ProviderID: "opencode",
 			AccountID:  "opencode-personal",
+			Metrics: map[string]core.Metric{
+				"5h_block_msgs":  {Used: &blockMsgs, Unit: "messages", Window: "5h"},
+				"today_requests": {Used: &todayReqs, Unit: "requests", Window: "1d"},
+				"burn_rate":      {Used: &burnRate, Unit: "msg/hr", Window: "5h"},
+				"credit_balance": {Used: float64Ptr(42), Unit: "USD", Window: "current"},
+			},
 		},
 	}
 
@@ -501,6 +514,97 @@ func TestApplyCanonicalUsageView_DoesNotLeakProviderScopeAcrossSiblingAccounts(t
 	personal := merged["opencode-personal"]
 	if _, ok := personal.Metrics["client_opencode_requests"]; ok {
 		t.Fatalf("opencode-personal picked up sibling account's usage metrics via provider-scope fallback: %+v", personal.Metrics)
+	}
+	for _, key := range []string{"5h_block_msgs", "today_requests", "burn_rate", "credit_balance"} {
+		if _, ok := personal.Metrics[key]; !ok {
+			t.Fatalf("opencode-personal lost native metric %q after sibling telemetry empty-view strip: %+v", key, personal.Metrics)
+		}
+	}
+	if got := personal.Attributes["telemetry_view"]; got == "canonical" {
+		t.Fatalf("opencode-personal telemetry_view=%q; empty canonical view must not apply without this account's events", got)
+	}
+}
+
+func TestApplyCanonicalUsageView_EmptyWindowStillStripsOwnAccountAmongSiblings(t *testing.T) {
+	dbPath, store := openUsageViewTestStore(t)
+
+	occurredAt := time.Date(2026, 2, 23, 7, 30, 0, 0, time.UTC)
+	if _, err := store.Ingest(context.Background(), IngestRequest{
+		SourceSystem:  SourceSystem("opencode"),
+		SourceChannel: SourceChannelHook,
+		OccurredAt:    occurredAt,
+		ProviderID:    "opencode",
+		AccountID:     "opencode-work",
+		AgentName:     "opencode",
+		EventType:     EventTypeMessageUsage,
+		SessionID:     "sess-work",
+		MessageID:     "msg-work",
+		ModelRaw:      "claude-4.6-opus-high-thinking",
+		TokenUsage: core.TokenUsage{
+			InputTokens: int64Ptr(10),
+			TotalTokens: int64Ptr(10),
+			Requests:    int64Ptr(1),
+		},
+	}); err != nil {
+		t.Fatalf("ingest work event: %v", err)
+	}
+	if _, err := store.Ingest(context.Background(), IngestRequest{
+		SourceSystem:  SourceSystem("opencode"),
+		SourceChannel: SourceChannelHook,
+		OccurredAt:    occurredAt,
+		ProviderID:    "opencode",
+		AccountID:     "opencode-personal",
+		AgentName:     "opencode",
+		EventType:     EventTypeMessageUsage,
+		SessionID:     "sess-personal",
+		MessageID:     "msg-personal",
+		ModelRaw:      "claude-4.6-opus-high-thinking",
+		TokenUsage: core.TokenUsage{
+			InputTokens: int64Ptr(11),
+			TotalTokens: int64Ptr(11),
+			Requests:    int64Ptr(1),
+		},
+	}); err != nil {
+		t.Fatalf("ingest personal event: %v", err)
+	}
+
+	burnRate := 9.0
+	snaps := map[string]core.UsageSnapshot{
+		"opencode-work": {
+			ProviderID: "opencode",
+			AccountID:  "opencode-work",
+			Metrics: map[string]core.Metric{
+				"burn_rate": {Used: &burnRate, Unit: "msg/hr", Window: "5h"},
+			},
+		},
+		"opencode-personal": {
+			ProviderID: "opencode",
+			AccountID:  "opencode-personal",
+		},
+	}
+
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	if err := configureSQLiteConnection(db); err != nil {
+		t.Fatalf("configure db: %v", err)
+	}
+
+	// Window starts after both events: each account has telemetry historically
+	// but nothing in-window, so the empty view should still strip own meters.
+	since := time.Date(2026, 2, 24, 0, 0, 0, 0, time.UTC)
+	merged, err := applyCanonicalUsageViewWithDB(context.Background(), db, usageViewCacheNamespace(dbPath), snaps, nil, since, since, core.TimeWindow("1d"))
+	if err != nil {
+		t.Fatalf("apply canonical usage view: %v", err)
+	}
+	work := merged["opencode-work"]
+	if _, ok := work.Metrics["burn_rate"]; ok {
+		t.Fatalf("opencode-work kept burn_rate after empty-window strip: %+v", work.Metrics)
+	}
+	if got := work.Attributes["telemetry_view"]; got != "canonical" {
+		t.Fatalf("opencode-work telemetry_view=%q, want canonical after own-account empty window", got)
 	}
 }
 
