@@ -79,6 +79,113 @@ func TestRollupDaily_TotalsAndIdempotency(t *testing.T) {
 	}
 }
 
+func TestPruneOldEvents_SkipsUnrolledMessageUsageAfterEmptyRollup(t *testing.T) {
+	_, store := openUsageViewTestStore(t)
+	ctx := context.Background()
+	now := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
+
+	// Fresh / poll-only DB: retention empty-pass advances the watermark.
+	if _, err := store.RollupDaily(ctx, now); err != nil {
+		t.Fatalf("empty rollup: %v", err)
+	}
+	wm, err := store.RollupWatermark(ctx)
+	if err != nil || wm == "" {
+		t.Fatalf("expected watermark after empty rollup, got %q err=%v", wm, err)
+	}
+
+	// Concurrent collector backfill lands after rollup but before prune.
+	old := now.AddDate(0, 0, -60)
+	mustIngestUsageEvent(t, store, IngestRequest{
+		SourceSystem:  "codex",
+		SourceChannel: SourceChannelHook,
+		OccurredAt:    old,
+		ProviderID:    "openai",
+		AccountID:     "acct",
+		SessionID:     "s1",
+		MessageID:     "race-1",
+		EventType:     EventTypeMessageUsage,
+		ModelRaw:      "gpt-5",
+		TokenUsage:    core.TokenUsage{InputTokens: i64(100), OutputTokens: i64(10), CostUSD: f64p(1.0)},
+	}, "race backfill")
+
+	deleted, _, err := store.PruneOldEvents(ctx, 30, wm)
+	if err != nil {
+		t.Fatalf("prune: %v", err)
+	}
+	if deleted != 0 {
+		t.Fatalf("prune deleted %d unrolled message_usage rows; want 0", deleted)
+	}
+	var left int64
+	if err := store.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM usage_events WHERE event_type = 'message_usage'`).Scan(&left); err != nil {
+		t.Fatalf("count events: %v", err)
+	}
+	if left != 1 {
+		t.Fatalf("message_usage rows left = %d, want 1 (must survive until rolled)", left)
+	}
+}
+
+func TestRollupDaily_ExpandsWindowForPreWatermarkBackfill(t *testing.T) {
+	_, store := openUsageViewTestStore(t)
+	ctx := context.Background()
+	now := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
+
+	// Establish a normal watermark from recent activity.
+	recent := now.AddDate(0, 0, -2)
+	mustIngestUsageEvent(t, store, IngestRequest{
+		SourceSystem:  "codex",
+		SourceChannel: SourceChannelHook,
+		OccurredAt:    recent,
+		ProviderID:    "openai",
+		AccountID:     "acct",
+		SessionID:     "s1",
+		MessageID:     "recent-1",
+		EventType:     EventTypeMessageUsage,
+		ModelRaw:      "gpt-5",
+		TokenUsage:    core.TokenUsage{InputTokens: i64(10), OutputTokens: i64(1), CostUSD: f64p(0.1)},
+	}, "recent")
+	if _, err := store.RollupDaily(ctx, now); err != nil {
+		t.Fatalf("initial rollup: %v", err)
+	}
+	wm, err := store.RollupWatermark(ctx)
+	if err != nil || wm == "" {
+		t.Fatalf("expected watermark after initial rollup, got %q err=%v", wm, err)
+	}
+
+	// Late-arriving collector history older than the watermark.
+	old := now.AddDate(0, 0, -45)
+	mustIngestUsageEvent(t, store, IngestRequest{
+		SourceSystem:  "claude_code",
+		SourceChannel: SourceChannelJSONL,
+		OccurredAt:    old,
+		ProviderID:    "anthropic",
+		AccountID:     "acct",
+		SessionID:     "s2",
+		MessageID:     "late-1",
+		EventType:     EventTypeMessageUsage,
+		ModelRaw:      "claude",
+		TokenUsage:    core.TokenUsage{InputTokens: i64(50), OutputTokens: i64(5), CostUSD: f64p(0.5)},
+	}, "late backfill")
+
+	rolled, err := store.RollupDaily(ctx, now)
+	if err != nil {
+		t.Fatalf("rollup after late backfill: %v", err)
+	}
+	if rolled < 1 {
+		t.Fatalf("rollup after late backfill rows = %d, want at least the pre-watermark day", rolled)
+	}
+	var evcount int64
+	row := store.db.QueryRowContext(ctx,
+		`SELECT event_count FROM usage_rollup_daily WHERE day = ? AND provider_id = 'anthropic'`,
+		old.Format("2006-01-02"))
+	if err := row.Scan(&evcount); err != nil {
+		t.Fatalf("pre-watermark day missing from rollup (incremental window skipped it): %v", err)
+	}
+	if evcount != 1 {
+		t.Fatalf("pre-watermark day event_count = %d, want 1", evcount)
+	}
+}
+
 func TestRollupDaily_DedupsAcrossChannels(t *testing.T) {
 	_, store := openUsageViewTestStore(t)
 	ctx := context.Background()

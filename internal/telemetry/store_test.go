@@ -459,6 +459,18 @@ func TestStorePruneOldEvents_DeletesExpiredEventsOnly(t *testing.T) {
 		}
 	}
 
+	// message_usage prune requires the day to exist in usage_rollup_daily.
+	oldDay := now.Add(-60 * 24 * time.Hour).Format("2006-01-02")
+	if _, err := db.Exec(
+		`INSERT INTO usage_rollup_daily (
+			day, provider_id, account_id, model_canonical, tool_name, project, status,
+			input_tokens, output_tokens, reasoning_tokens, cache_read_tokens, cache_write_tokens,
+			total_tokens, cost_usd, requests, event_count
+		) VALUES (?, '', '', '', '', '', '', 0, 0, 0, 0, 0, 0, 0, 0, 2)`, oldDay,
+	); err != nil {
+		t.Fatalf("seed rollup day: %v", err)
+	}
+
 	// Prune with 30-day retention: should delete the 2 old events.
 	deleted, complete, err := store.PruneOldEvents(context.Background(), 30, "9999-12-31")
 	if err != nil {
