@@ -98,8 +98,21 @@ func TestPruneOldEventsBatchedRemovesBacklog(t *testing.T) {
 			t.Fatalf("commit tx: %v", err)
 		}
 	}
-	insert(oldCount, time.Now().Add(-90*24*time.Hour))
+	oldAt := time.Now().Add(-90 * 24 * time.Hour)
+	insert(oldCount, oldAt)
 	insert(recentCount, time.Now().Add(-1*time.Hour))
+
+	// tool_usage prune requires the day to exist in usage_rollup_daily.
+	if _, err := db.Exec(
+		`INSERT INTO usage_rollup_daily (
+			day, provider_id, account_id, model_canonical, tool_name, project, status,
+			input_tokens, output_tokens, reasoning_tokens, cache_read_tokens, cache_write_tokens,
+			total_tokens, cost_usd, requests, event_count
+		) VALUES (?, 'p', 'a', '', '', '', '', 0, 0, 0, 0, 0, 0, 0, 0, ?)`,
+		oldAt.Format("2006-01-02"), oldCount,
+	); err != nil {
+		t.Fatalf("seed rollup day: %v", err)
+	}
 
 	deleted, complete, err := store.PruneOldEvents(context.Background(), 30, "9999-12-31")
 	if err != nil {

@@ -939,6 +939,9 @@ const pruneEventsBatch = 5000
 // usage_rollup_daily, so per-event detail is never discarded before its
 // aggregate exists. rolledThroughDay is the rollup watermark (YYYY-MM-DD); an
 // empty watermark means the rollup has not run, so nothing is pruned.
+// message_usage/tool_usage rows additionally require a usage_rollup_daily row
+// for their day, so a watermark advanced by an empty first pass cannot race a
+// concurrent backfill and delete un-aggregated history.
 //
 // Returns the number of rows deleted and whether the backlog was fully drained
 // (complete=false means it stopped early — context cancelled or a batch error
@@ -959,15 +962,25 @@ func (s *Store) PruneOldEvents(ctx context.Context, retentionDays int, rolledThr
 		}
 		// mattn/go-sqlite3 isn't built with the DELETE...LIMIT extension, so
 		// scope the delete via a subselect on the indexed occurred_at column.
-		// The date() guard is the safety gate: only delete days at or before the
-		// rollup watermark.
+		// The date() guard is the first safety gate: only delete days at or
+		// before the rollup watermark. message_usage/tool_usage also require a
+		// usage_rollup_daily row for that day so an empty first pass that
+		// advances the watermark cannot race a concurrent collector backfill
+		// and permanently drop history that was never aggregated.
 		result, execErr := s.db.ExecContext(ctx, `
 			DELETE FROM usage_events
 			WHERE event_id IN (
-				SELECT event_id FROM usage_events
-				WHERE occurred_at < datetime('now', ?)
-				  AND date(occurred_at) <= ?
-				ORDER BY occurred_at ASC
+				SELECT e.event_id FROM usage_events e
+				WHERE e.occurred_at < datetime('now', ?)
+				  AND date(e.occurred_at) <= ?
+				  AND (
+					e.event_type NOT IN ('message_usage', 'tool_usage')
+					OR EXISTS (
+						SELECT 1 FROM usage_rollup_daily r
+						WHERE r.day = date(e.occurred_at)
+					)
+				  )
+				ORDER BY e.occurred_at ASC
 				LIMIT ?
 			)
 		`, cutoff, rolledThroughDay, pruneEventsBatch)

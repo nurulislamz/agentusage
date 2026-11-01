@@ -54,7 +54,9 @@ func (s *Store) RollupWatermark(ctx context.Context) (string, error) {
 // current watermark through `now` (re-capturing late-arriving events for the
 // boundary day) by deleting those days' rollup rows and re-inserting them from
 // the deduped raw events, then sets the watermark to the last fully-settled day
-// (yesterday, UTC). On first run (no watermark) it backfills all history.
+// (yesterday, UTC). On first run (no watermark) it backfills all history. If
+// events later appear before the watermark (collector backfill after an empty
+// first pass), the dirty window expands to include them before prune runs.
 //
 // Recompute-and-replace per day is what makes it safe to re-run after a crash
 // or alongside re-ingested (deduped) events: the result for a day is a pure
@@ -70,7 +72,9 @@ func (s *Store) RollupDaily(ctx context.Context, now time.Time) (rolledDays int,
 	}
 
 	// Scope: recompute from the watermark day forward (inclusive), or everything
-	// on first run.
+	// on first run. If history older than the watermark arrived late (collector
+	// backfill after an empty/poll-only first pass), expand the dirty window so
+	// those days are aggregated before prune can treat them as rolled.
 	var sinceTS, deleteFrom string
 	if wm == "" {
 		sinceTS = "1970-01-01T00:00:00Z"
@@ -78,6 +82,18 @@ func (s *Store) RollupDaily(ctx context.Context, now time.Time) (rolledDays int,
 	} else {
 		sinceTS = wm + "T00:00:00Z"
 		deleteFrom = wm
+		var minDay sql.NullString
+		qerr := s.db.QueryRowContext(ctx, `
+			SELECT MIN(date(occurred_at)) FROM usage_events
+			WHERE event_type IN ('message_usage', 'tool_usage')
+			  AND occurred_at < ?`, wm+"T00:00:00Z").Scan(&minDay)
+		if qerr != nil {
+			return 0, fmt.Errorf("telemetry: rollup pre-watermark scan: %w", qerr)
+		}
+		if minDay.Valid && minDay.String != "" {
+			sinceTS = minDay.String + "T00:00:00Z"
+			deleteFrom = minDay.String
+		}
 	}
 
 	cte, args := dedupedUsageCTEWhere("e.occurred_at >= ?", []any{sinceTS})
