@@ -153,12 +153,32 @@ if [ ! -x "$AGENT_BIN" ]; then
   exit 1
 fi
 
+# HOME is bound RW for cwd/projects, but that also exposes every sibling and
+# cross-family box profile under ~/.*-containers. Mask those roots with tmpfs
+# and re-bind only this account's profile. Also hide host credentials.json.
+ISOLATION_BINDS=()
+for _box_root in \
+  "$HOME/.codex-containers" \
+  "$HOME/.agy-containers" \
+  "$HOME/.agent-containers" \
+  "$HOME/.opencode-containers"
+do
+  if [ -d "$_box_root" ]; then
+    ISOLATION_BINDS+=(--tmpfs "$_box_root")
+  fi
+done
+ISOLATION_BINDS+=(--dir "$CONTAINERS_DIR/$ACCOUNT" --bind "$PROFILE_DIR" "$CONTAINERS_DIR/$ACCOUNT")
+if [ -e "$HOME/.config/agentusage/credentials.json" ]; then
+  ISOLATION_BINDS+=(--ro-bind /dev/null "$HOME/.config/agentusage/credentials.json")
+fi
+
 exec "$BWRAP_BIN" \
   --ro-bind / / \
   --dev /dev \
   --proc /proc \
   --bind /tmp /tmp \
   --bind "$HOME" "$HOME" \
+  "${ISOLATION_BINDS[@]}" \
   --bind "$PROFILE_DIR/.cursor" "$HOME/.cursor" \
   --bind "$PROFILE_DIR/.config/cursor" "$HOME/.config/cursor" \
   --bind "$PROFILE_DIR/.config/Cursor" "$HOME/.config/Cursor" \

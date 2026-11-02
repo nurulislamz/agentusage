@@ -173,12 +173,32 @@ elif [ -d "/run/user/$(id -u)" ]; then
   RUNTIME_BIND=(--bind "/run/user/$(id -u)" "/run/user/$(id -u)")
 fi
 
+# HOME is bound RW for cwd/projects, but that also exposes every sibling and
+# cross-family box profile under ~/.*-containers. Mask those roots with tmpfs
+# and re-bind only this account's profile. Also hide host credentials.json.
+ISOLATION_BINDS=()
+for _box_root in \
+  "$HOME/.codex-containers" \
+  "$HOME/.agy-containers" \
+  "$HOME/.agent-containers" \
+  "$HOME/.opencode-containers"
+do
+  if [ -d "$_box_root" ]; then
+    ISOLATION_BINDS+=(--tmpfs "$_box_root")
+  fi
+done
+ISOLATION_BINDS+=(--dir "$CONTAINERS_DIR/$ACCOUNT" --bind "$PROFILE_DIR" "$CONTAINERS_DIR/$ACCOUNT")
+if [ -e "$HOME/.config/agentusage/credentials.json" ]; then
+  ISOLATION_BINDS+=(--ro-bind /dev/null "$HOME/.config/agentusage/credentials.json")
+fi
+
 exec "$BWRAP_BIN" \
   --ro-bind / / \
   --dev-bind /dev /dev \
   --proc /proc \
   --bind /tmp /tmp \
   --bind "$HOME" "$HOME" \
+  "${ISOLATION_BINDS[@]}" \
   "${RUNTIME_BIND[@]}" \
   --bind "$PROFILE_DIR/.gemini" "$HOME/.gemini" \
   --bind "$HOME/.local/state/openusage" "$HOME/.local/state/openusage" \

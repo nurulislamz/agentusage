@@ -168,11 +168,13 @@ export BOX_TEST_LOG="$WORKDIR/bwrap.log"
 REAL_AGY_BOX="$ROOT/scripts/boxes/agy-box"
 REAL_AGENT_BOX="$ROOT/scripts/boxes/agent-box"
 REAL_CODEX_BOX="$ROOT/scripts/boxes/codex-box"
+REAL_OPENCODE_BOX="$ROOT/scripts/boxes/opencode-box"
 
 # 1. Shell syntax check
 assert_ok "agy-box syntax" bash -n "$REAL_AGY_BOX"
 assert_ok "agent-box syntax" bash -n "$REAL_AGENT_BOX"
 assert_ok "codex-box syntax" bash -n "$REAL_CODEX_BOX"
+assert_ok "opencode-box syntax" bash -n "$REAL_OPENCODE_BOX"
 
 # 2. agy-box add does not inject statusline
 assert_ok "agy-box add devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGY_BOX" add devbox
@@ -228,6 +230,54 @@ assert_ok "codex-box creates .codex directory" test -d "$BOX_HOME/.codex-contain
 assert_ok "codex-box launch devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_CODEX_BOX" devbox
 assert_ok "codex-box invoked fake bwrap" test -s "$BOX_TEST_LOG"
 assert_ok "codex-box binds profile .codex" grep -q -- "$BOX_HOME/.codex-containers/devbox/.codex" "$BOX_TEST_LOG"
+
+# 8. Launch masks sibling/cross-family container roots and host credentials
+mkdir -p \
+  "$BOX_HOME/.codex-containers/alice/.codex" \
+  "$BOX_HOME/.codex-containers/bob/.codex" \
+  "$BOX_HOME/.agy-containers/other/.gemini" \
+  "$BOX_HOME/.agent-containers/other/.cursor" \
+  "$BOX_HOME/.opencode-containers/other/config" \
+  "$BOX_HOME/.config/agentusage"
+echo '{"api_keys":{"x":"secret"}}' >"$BOX_HOME/.config/agentusage/credentials.json"
+echo 'bob-token' >"$BOX_HOME/.codex-containers/bob/.codex/auth.json"
+
+: >"$BOX_TEST_LOG"
+assert_ok "codex-box launch alice with siblings" \
+  env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_CODEX_BOX" alice
+assert_ok "codex-box tmpfs own containers root" grep -q -- "--tmpfs $BOX_HOME/.codex-containers" "$BOX_TEST_LOG"
+assert_ok "codex-box tmpfs agy containers root" grep -q -- "--tmpfs $BOX_HOME/.agy-containers" "$BOX_TEST_LOG"
+assert_ok "codex-box tmpfs agent containers root" grep -q -- "--tmpfs $BOX_HOME/.agent-containers" "$BOX_TEST_LOG"
+assert_ok "codex-box tmpfs opencode containers root" grep -q -- "--tmpfs $BOX_HOME/.opencode-containers" "$BOX_TEST_LOG"
+assert_ok "codex-box rebinds own profile only" grep -q -- "--bind $BOX_HOME/.codex-containers/alice $BOX_HOME/.codex-containers/alice" "$BOX_TEST_LOG"
+assert_ok "codex-box hides credentials.json" grep -q -- "--ro-bind /dev/null $BOX_HOME/.config/agentusage/credentials.json" "$BOX_TEST_LOG"
+assert_fail "codex-box must not bind sibling bob profile" grep -q -- ".codex-containers/bob " "$BOX_TEST_LOG"
+
+: >"$BOX_TEST_LOG"
+assert_ok "agy-box launch other with siblings" \
+  env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGY_BOX" other
+assert_ok "agy-box tmpfs codex containers root" grep -q -- "--tmpfs $BOX_HOME/.codex-containers" "$BOX_TEST_LOG"
+assert_ok "agy-box rebinds own profile only" grep -q -- "--bind $BOX_HOME/.agy-containers/other $BOX_HOME/.agy-containers/other" "$BOX_TEST_LOG"
+assert_ok "agy-box hides credentials.json" grep -q -- "--ro-bind /dev/null $BOX_HOME/.config/agentusage/credentials.json" "$BOX_TEST_LOG"
+
+: >"$BOX_TEST_LOG"
+assert_ok "agent-box launch other with siblings" \
+  env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGENT_BOX" other
+assert_ok "agent-box tmpfs sibling roots" grep -q -- "--tmpfs $BOX_HOME/.codex-containers" "$BOX_TEST_LOG"
+assert_ok "agent-box rebinds own profile only" grep -q -- "--bind $BOX_HOME/.agent-containers/other $BOX_HOME/.agent-containers/other" "$BOX_TEST_LOG"
+assert_ok "agent-box hides credentials.json" grep -q -- "--ro-bind /dev/null $BOX_HOME/.config/agentusage/credentials.json" "$BOX_TEST_LOG"
+
+cat >"$FAKE_BIN/opencode" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$FAKE_BIN/opencode"
+: >"$BOX_TEST_LOG"
+assert_ok "opencode-box launch other with siblings" \
+  env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_OPENCODE_BOX" other
+assert_ok "opencode-box tmpfs sibling roots" grep -q -- "--tmpfs $BOX_HOME/.codex-containers" "$BOX_TEST_LOG"
+assert_ok "opencode-box rebinds own profile only" grep -q -- "--bind $BOX_HOME/.opencode-containers/other $BOX_HOME/.opencode-containers/other" "$BOX_TEST_LOG"
+assert_ok "opencode-box hides credentials.json" grep -q -- "--ro-bind /dev/null $BOX_HOME/.config/agentusage/credentials.json" "$BOX_TEST_LOG"
 
 echo
 echo "passed=$PASS failed=$FAIL"

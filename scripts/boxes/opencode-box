@@ -105,9 +105,12 @@ if [ ! -x "$OPENCODE_BIN" ]; then
     exit 1
 fi
 
-# Prefer distro bwrap: on Ubuntu 24.04+ Homebrew bwrap lacks the AppArmor
-# profile and fails with "setting up uid map: Permission denied".
-if [ -x /usr/bin/bwrap ]; then
+# Prefer an explicit BWRAP_BIN (tests), then distro bwrap: on Ubuntu 24.04+
+# Homebrew bwrap lacks the AppArmor profile and fails with
+# "setting up uid map: Permission denied".
+if [ -n "${BWRAP_BIN:-}" ] && [ -x "$BWRAP_BIN" ]; then
+  :
+elif [ -x /usr/bin/bwrap ]; then
   BWRAP_BIN=/usr/bin/bwrap
 elif BWRAP_BIN=$(command -v bwrap 2>/dev/null) && [ -n "$BWRAP_BIN" ]; then
   :
@@ -122,13 +125,34 @@ if [ ! -x "$BWRAP_BIN" ]; then
   exit 1
 fi
 
-# Execute opencode inside the bubblewrap namespace isolating only OpenCode's dirs
+# HOME is bound RW for cwd/projects, but that also exposes every sibling and
+# cross-family box profile under ~/.*-containers. Mask those roots with tmpfs
+# and re-bind only this account's profile. Also hide host credentials.json.
+ISOLATION_BINDS=()
+for _box_root in \
+  "$HOME/.codex-containers" \
+  "$HOME/.agy-containers" \
+  "$HOME/.agent-containers" \
+  "$HOME/.opencode-containers"
+do
+  if [ -d "$_box_root" ]; then
+    ISOLATION_BINDS+=(--tmpfs "$_box_root")
+  fi
+done
+ISOLATION_BINDS+=(--dir "$CONTAINERS_DIR/$PROFILE" --bind "$PROFILE_DIR" "$CONTAINERS_DIR/$PROFILE")
+if [ -e "$HOME/.config/agentusage/credentials.json" ]; then
+  ISOLATION_BINDS+=(--ro-bind /dev/null "$HOME/.config/agentusage/credentials.json")
+fi
+
+# Execute opencode inside the bubblewrap namespace isolating OpenCode's dirs
+# and sibling box profiles.
 exec "$BWRAP_BIN" \
     --ro-bind / / \
     --dev /dev \
     --proc /proc \
     --tmpfs /tmp \
     --bind "$HOME" "$HOME" \
+    "${ISOLATION_BINDS[@]}" \
     --bind "$PROFILE_DIR/config" "$HOME/.config/opencode" \
     --bind "$PROFILE_DIR/share" "$HOME/.local/share/opencode" \
     --bind "$PROFILE_DIR/state" "$HOME/.local/state/opencode" \
