@@ -202,48 +202,99 @@ func patchCodexConfig(configData []byte, targetFile string, install bool) ([]byt
 	notifyLine := codexNotifyTOML(targetFile)
 
 	if install {
-		out := notifyLine + "\n"
-		if len(configData) > 0 {
-			lines := strings.Split(string(configData), "\n")
-			replaced := false
-			for i, line := range lines {
-				if strings.HasPrefix(strings.TrimSpace(line), "notify") && strings.Contains(line, "=") {
-					lines[i] = notifyLine
-					replaced = true
-					break
-				}
+		if len(configData) == 0 {
+			return []byte(notifyLine + "\n"), nil
+		}
+		lines := strings.Split(string(configData), "\n")
+		start, end, found := findNotifyAssignmentSpan(lines)
+		if found {
+			replaced := make([]string, 0, len(lines)-(end-start)+1)
+			replaced = append(replaced, lines[:start]...)
+			replaced = append(replaced, notifyLine)
+			replaced = append(replaced, lines[end+1:]...)
+			lines = replaced
+		} else {
+			if len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) != "" {
+				lines = append(lines, "")
 			}
-			if !replaced {
-				if len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) != "" {
-					lines = append(lines, "")
-				}
-				lines = append(lines, notifyLine)
-			}
-			out = strings.Join(lines, "\n")
-			if !strings.HasSuffix(out, "\n") {
-				out += "\n"
-			}
+			lines = append(lines, notifyLine)
+		}
+		out := strings.Join(lines, "\n")
+		if !strings.HasSuffix(out, "\n") {
+			out += "\n"
 		}
 		return []byte(out), nil
 	}
 
-	// Uninstall: remove the notify line.
+	// Uninstall: remove the full notify assignment (including multi-line arrays).
 	if len(configData) == 0 {
 		return configData, nil
 	}
 	lines := strings.Split(string(configData), "\n")
-	var filtered []string
-	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "notify") && strings.Contains(line, "=") {
-			continue
-		}
-		filtered = append(filtered, line)
+	start, end, found := findNotifyAssignmentSpan(lines)
+	if found {
+		filtered := make([]string, 0, len(lines)-(end-start+1))
+		filtered = append(filtered, lines[:start]...)
+		filtered = append(filtered, lines[end+1:]...)
+		lines = filtered
 	}
-	out := strings.Join(filtered, "\n")
+	out := strings.Join(lines, "\n")
 	if !strings.HasSuffix(out, "\n") {
 		out += "\n"
 	}
 	return []byte(out), nil
+}
+
+// findNotifyAssignmentSpan returns the inclusive line range of a top-level
+// `notify = ...` assignment. Multi-line TOML arrays are included through the
+// matching closing bracket so install/uninstall do not leave orphan lines.
+func findNotifyAssignmentSpan(lines []string) (start, end int, found bool) {
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "notify") {
+			continue
+		}
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "notify"))
+		if !strings.HasPrefix(rest, "=") {
+			continue
+		}
+
+		start = i
+		end = i
+		eqIdx := strings.Index(line, "=")
+		valuePart := ""
+		if eqIdx >= 0 {
+			valuePart = line[eqIdx+1:]
+		}
+		depth := 0
+		for _, r := range valuePart {
+			switch r {
+			case '[':
+				depth++
+			case ']':
+				depth--
+			}
+		}
+		if depth == 0 {
+			return start, end, true
+		}
+		for j := i + 1; j < len(lines); j++ {
+			for _, r := range lines[j] {
+				switch r {
+				case '[':
+					depth++
+				case ']':
+					depth--
+				}
+			}
+			end = j
+			if depth <= 0 {
+				return start, end, true
+			}
+		}
+		return start, len(lines) - 1, true
+	}
+	return 0, 0, false
 }
 
 func patchOpenCodeConfig(configData []byte, targetFile string, install bool) ([]byte, error) {
