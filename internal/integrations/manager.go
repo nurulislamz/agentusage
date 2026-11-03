@@ -165,6 +165,13 @@ func backupIfExists(path string) error {
 		return fmt.Errorf("read backup source %s: %w", path, err)
 	}
 	backupPath := path + ".bak"
+	// Preserve the first pre-install copy. Re-install/upgrade must not
+	// overwrite it with a later (possibly already-broken) config.
+	if _, statErr := os.Stat(backupPath); statErr == nil {
+		return nil
+	} else if !os.IsNotExist(statErr) {
+		return fmt.Errorf("stat backup %s: %w", backupPath, statErr)
+	}
 	if err := os.WriteFile(backupPath, data, 0o600); err != nil {
 		return fmt.Errorf("write backup %s: %w", backupPath, err)
 	}
