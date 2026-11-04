@@ -132,16 +132,19 @@ fi
 mkdir -p "$PROFILE_DIR/.gemini/antigravity-cli" "$HOME/.local/state/openusage"
 
 
-# Re-sync global skills, workflows, agents, and rules into the box on every launch
+# Re-sync global skills, workflows, agents, and rules into the box on every launch.
+# --remove-destination replaces dest symlinks instead of writing through them,
+# so a box cannot plant an absolute symlink that next launch overwrites host
+# ~/.gemini oauth/credential files (masked by the profile bind inside bwrap).
 for src in workflows global_workflows skills agents rules; do
   if [ -d "$HOME/.gemini/config/$src" ]; then
     mkdir -p "$PROFILE_DIR/.gemini/config/$src"
-    cp -ru "$HOME/.gemini/config/$src"/. "$PROFILE_DIR/.gemini/config/$src/" 2>/dev/null || true
+    cp -ru --remove-destination "$HOME/.gemini/config/$src"/. "$PROFILE_DIR/.gemini/config/$src/" 2>/dev/null || true
   fi
 done
 if [ -d "$HOME/.gemini/antigravity-cli/builtin" ]; then
   mkdir -p "$PROFILE_DIR/.gemini/antigravity-cli/builtin"
-  cp -ru "$HOME/.gemini/antigravity-cli/builtin"/. "$PROFILE_DIR/.gemini/antigravity-cli/builtin/" 2>/dev/null || true
+  cp -ru --remove-destination "$HOME/.gemini/antigravity-cli/builtin"/. "$PROFILE_DIR/.gemini/antigravity-cli/builtin/" 2>/dev/null || true
 fi
 
 # Prefer an explicit BWRAP_BIN (tests), then distro bwrap: on Ubuntu 24.04+

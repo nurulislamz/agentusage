@@ -229,6 +229,46 @@ assert_ok "codex-box launch devbox" env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" 
 assert_ok "codex-box invoked fake bwrap" test -s "$BOX_TEST_LOG"
 assert_ok "codex-box binds profile .codex" grep -q -- "$BOX_HOME/.codex-containers/devbox/.codex" "$BOX_TEST_LOG"
 
+# 8. codex-box launch sync must not write through planted dest symlinks into host auth
+mkdir -p "$BOX_HOME/.codex/skills/shared" \
+  "$BOX_HOME/.codex-containers/evil/.codex/skills/shared"
+printf 'HOST_AUTH_TOKEN\n' >"$BOX_HOME/.codex/auth.json"
+printf 'skill-v1\n' >"$BOX_HOME/.codex/skills/shared/tool.md"
+ln -sfn "$BOX_HOME/.codex/auth.json" \
+  "$BOX_HOME/.codex-containers/evil/.codex/skills/shared/tool.md"
+sleep 0.05
+printf 'skill-v2\n' >"$BOX_HOME/.codex/skills/shared/tool.md"
+: >"$BOX_TEST_LOG"
+assert_ok "codex-box launch evil (symlink sync)" \
+  env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_CODEX_BOX" evil
+assert_eq "$(cat "$BOX_HOME/.codex/auth.json")" "HOST_AUTH_TOKEN" \
+  "codex-box launch sync must not overwrite host auth via dest symlink"
+assert_ok "codex-box replaced planted skills symlink with real file" \
+  test -f "$BOX_HOME/.codex-containers/evil/.codex/skills/shared/tool.md" \
+  -a ! -L "$BOX_HOME/.codex-containers/evil/.codex/skills/shared/tool.md"
+
+# 9. agy-box launch sync must not write through planted dest symlinks into host oauth token
+mkdir -p "$BOX_HOME/.gemini/config/skills" \
+  "$BOX_HOME/.agy-containers/evil/.gemini/config/skills" \
+  "$BOX_HOME/.gemini/antigravity-cli"
+printf '{"token":{"access_token":"SECRET"}}\n' \
+  >"$BOX_HOME/.gemini/antigravity-cli/antigravity-oauth-token"
+printf 'agy-skill-v1\n' >"$BOX_HOME/.gemini/config/skills/note.md"
+ln -sfn "$BOX_HOME/.gemini/antigravity-cli/antigravity-oauth-token" \
+  "$BOX_HOME/.agy-containers/evil/.gemini/config/skills/note.md"
+sleep 0.05
+printf 'agy-skill-v2\n' >"$BOX_HOME/.gemini/config/skills/note.md"
+: >"$BOX_TEST_LOG"
+# Profile dir already planted above (with dest symlink); launch re-syncs skills.
+assert_ok "agy-box launch evil (symlink sync)" \
+  env HOME="$BOX_HOME" PATH="$FAKE_BIN:$PATH" BWRAP_BIN="$FAKE_BIN/bwrap" "$REAL_AGY_BOX" evil
+assert_eq "$(cat "$BOX_HOME/.gemini/antigravity-cli/antigravity-oauth-token")" \
+  '{"token":{"access_token":"SECRET"}}' \
+  "agy-box launch sync must not overwrite host oauth token via dest symlink"
+assert_ok "agy-box replaced planted skills symlink with real file" \
+  test -f "$BOX_HOME/.agy-containers/evil/.gemini/config/skills/note.md" \
+  -a ! -L "$BOX_HOME/.agy-containers/evil/.gemini/config/skills/note.md"
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
