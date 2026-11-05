@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -239,8 +240,9 @@ func TestProcessHookSpool_And_Cleanup(t *testing.T) {
 	// 2. Write a corrupt/invalid hook file
 	_ = os.WriteFile(filepath.Join(hookDir, "corrupt.json"), []byte("invalid json!"), 0644)
 
-	// 3. Write a .tmp file
-	_ = os.WriteFile(filepath.Join(hookDir, "test.json.tmp"), []byte("tmp"), 0644)
+	// 3. Write a fresh .tmp file (must survive cleanup — OpenCode atomic rename)
+	freshTmp := filepath.Join(hookDir, "fresh.json.tmp")
+	_ = os.WriteFile(freshTmp, []byte("tmp"), 0644)
 
 	// Run processHookSpool
 	svc.processHookSpool(context.Background(), hookDir)
@@ -250,19 +252,58 @@ func TestProcessHookSpool_And_Cleanup(t *testing.T) {
 		t.Error("expected hook1.json to be processed and removed")
 	}
 
-	// 4. Create an old json file (> 24h old)
+	// 4. Create an old json file (> 24h old) and a stale tmp
 	oldPath := filepath.Join(hookDir, "old.json")
 	_ = os.WriteFile(oldPath, []byte("{}"), 0644)
 	oldTime := time.Now().Add(-48 * time.Hour)
 	_ = os.Chtimes(oldPath, oldTime, oldTime)
+
+	staleTmp := filepath.Join(hookDir, "stale.json.tmp")
+	_ = os.WriteFile(staleTmp, []byte("tmp"), 0644)
+	_ = os.Chtimes(staleTmp, oldTime, oldTime)
 
 	// Run cleanupHookSpool
 	svc.cleanupHookSpool(hookDir)
 	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
 		t.Error("expected old.json to be pruned by cleanupHookSpool")
 	}
-	if _, err := os.Stat(filepath.Join(hookDir, "test.json.tmp")); !os.IsNotExist(err) {
-		t.Error("expected test.json.tmp to be cleaned up")
+	if _, err := os.Stat(staleTmp); !os.IsNotExist(err) {
+		t.Error("expected stale.json.tmp to be cleaned up")
+	}
+	if _, err := os.Stat(freshTmp); err != nil {
+		t.Error("expected fresh.json.tmp to survive cleanup (atomic rename in flight)")
+	}
+}
+
+func TestCleanupHookSpool_PreservesUnprocessedBacklog(t *testing.T) {
+	// Startup used to process one 200-file batch then count-cap remaining
+	// files at 500 in Glob order, permanently dropping unprocessed Claude/Codex
+	// hook payloads when the daemon was down long enough for a large backlog.
+	svc := &Service{
+		logThrottle: core.NewLogThrottle(5, time.Minute),
+	}
+	hookDir := filepath.Join(t.TempDir(), "hooks")
+	if err := os.MkdirAll(hookDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	const backlog = 700
+	for i := 0; i < backlog; i++ {
+		name := filepath.Join(hookDir, fmt.Sprintf("pending_%04d.json", i))
+		if err := os.WriteFile(name, []byte(`{"source":"claude_code","account_id":"a","payload":{}}`), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// cleanup alone must not trim a fresh >500 backlog (age gate only).
+	svc.cleanupHookSpool(hookDir)
+
+	remaining, err := filepath.Glob(filepath.Join(hookDir, "*.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(remaining); got != backlog {
+		t.Fatalf("cleanup deleted unprocessed hook files: got %d remaining, want %d", got, backlog)
 	}
 }
 

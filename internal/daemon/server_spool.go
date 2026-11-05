@@ -196,49 +196,57 @@ func (s *Service) processHookSpool(ctx context.Context, dir string) {
 	}
 }
 
-func (s *Service) cleanupHookSpool(dir string) {
-	files, err := filepath.Glob(filepath.Join(dir, "*.json"))
-	if err != nil || len(files) == 0 {
-		tmps, _ := filepath.Glob(filepath.Join(dir, "*.json.tmp"))
-		for _, tmp := range tmps {
-			_ = os.Remove(tmp)
-		}
-		return
-	}
+// hookSpoolMaxAge is how long an unprocessed hook file may sit before cleanup
+// drops it. Count-based caps are intentionally not used: Claude/Codex hooks
+// write uncapped $$$RANDOM.json files, processHookSpool drains only
+// hookSpoolBatchLimit per tick, and runHookSpoolLoop calls cleanup immediately
+// after a single batch on start — a hard remaining-file cap would delete
+// unprocessed events that are still the only copy of usage/cost data.
+const hookSpoolMaxAge = 24 * time.Hour
 
+// hookSpoolTmpMaxAge is how long an OpenCode atomic-write *.json.tmp may sit
+// before cleanup treats it as abandoned. Fresh temps must not be deleted or
+// cleanup races the rename and drops in-flight events.
+const hookSpoolTmpMaxAge = time.Hour
+
+func (s *Service) cleanupHookSpool(dir string) {
 	now := time.Now()
 	removed := 0
-	remaining := make([]string, 0, len(files))
-	for _, path := range files {
-		info, statErr := os.Stat(path)
-		if statErr != nil {
-			_ = os.Remove(path)
-			removed++
-			continue
-		}
-		if now.Sub(info.ModTime()) > 24*time.Hour {
-			_ = os.Remove(path)
-			removed++
-			continue
-		}
-		remaining = append(remaining, path)
-	}
+	remaining := 0
 
-	if len(remaining) > 500 {
-		for _, path := range remaining[:len(remaining)-500] {
-			_ = os.Remove(path)
-			removed++
+	files, err := filepath.Glob(filepath.Join(dir, "*.json"))
+	if err == nil {
+		for _, path := range files {
+			info, statErr := os.Stat(path)
+			if statErr != nil {
+				_ = os.Remove(path)
+				removed++
+				continue
+			}
+			if now.Sub(info.ModTime()) > hookSpoolMaxAge {
+				_ = os.Remove(path)
+				removed++
+				continue
+			}
+			remaining++
 		}
-		remaining = remaining[len(remaining)-500:]
 	}
 
 	tmps, _ := filepath.Glob(filepath.Join(dir, "*.json.tmp"))
 	for _, tmp := range tmps {
-		_ = os.Remove(tmp)
-		removed++
+		info, statErr := os.Stat(tmp)
+		if statErr != nil {
+			_ = os.Remove(tmp)
+			removed++
+			continue
+		}
+		if now.Sub(info.ModTime()) > hookSpoolTmpMaxAge {
+			_ = os.Remove(tmp)
+			removed++
+		}
 	}
 
 	if removed > 0 {
-		s.infof("hook_spool_cleanup", "removed=%d remaining=%d", removed, len(remaining))
+		s.infof("hook_spool_cleanup", "removed=%d remaining=%d", removed, remaining)
 	}
 }
