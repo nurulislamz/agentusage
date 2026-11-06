@@ -147,6 +147,21 @@ type rawHookFile struct {
 
 const hookSpoolBatchLimit = 200
 
+// hookSpoolWriteGrace is how long a *.json file may look empty or malformed
+// before processHookSpool treats it as garbage. Installed Claude/Codex hooks
+// historically wrote with `printf > $$$RANDOM.json` (create+truncate, then
+// write), so a concurrent Glob can observe a zero-length or partial file.
+// Deleting that dropped the only copy of the usage event.
+const hookSpoolWriteGrace = 15 * time.Second
+
+func hookSpoolFileStillWriting(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return time.Since(info.ModTime()) < hookSpoolWriteGrace
+}
+
 func (s *Service) processHookSpool(ctx context.Context, dir string) {
 	files, err := filepath.Glob(filepath.Join(dir, "*.json"))
 	if err != nil || len(files) == 0 {
@@ -161,6 +176,9 @@ func (s *Service) processHookSpool(ctx context.Context, dir string) {
 
 		data, readErr := os.ReadFile(path)
 		if readErr != nil {
+			if hookSpoolFileStillWriting(path) {
+				continue
+			}
 			_ = os.Remove(path)
 			processed++
 			continue
@@ -168,6 +186,9 @@ func (s *Service) processHookSpool(ctx context.Context, dir string) {
 
 		var raw rawHookFile
 		if json.Unmarshal(data, &raw) != nil || len(raw.Payload) == 0 {
+			if hookSpoolFileStillWriting(path) {
+				continue
+			}
 			_ = os.Remove(path)
 			processed++
 			continue
@@ -175,6 +196,9 @@ func (s *Service) processHookSpool(ctx context.Context, dir string) {
 
 		parsed, parseErr := ParseHookRequests(raw.Source, strings.TrimSpace(raw.AccountID), raw.Payload)
 		if parseErr != nil || len(parsed.Requests) == 0 {
+			if hookSpoolFileStillWriting(path) {
+				continue
+			}
 			_ = os.Remove(path)
 			processed++
 			continue

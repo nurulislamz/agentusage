@@ -19,5 +19,8 @@ dir="${AGENTUSAGE_HOOK_SPOOL:-${XDG_STATE_HOME:-$HOME/.local/state}/agentusage/h
 [[ -d "$dir" ]] || mkdir -p "$dir" 2>/dev/null || exit 0
 
 acct="${AGENTUSAGE_TELEMETRY_ACCOUNT_ID:-}"
+id="$$$RANDOM"
+tmp="$dir/$id.json.tmp"
+dst="$dir/$id.json"
 printf '{"source":"codex","account_id":"%s","payload":%s}\n' "$acct" "$payload" \
-  > "$dir/$$$RANDOM.json" 2>/dev/null
+  > "$tmp" 2>/dev/null && mv -f "$tmp" "$dst" 2>/dev/null

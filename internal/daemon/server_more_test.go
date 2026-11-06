@@ -266,6 +266,53 @@ func TestProcessHookSpool_And_Cleanup(t *testing.T) {
 	}
 }
 
+func TestProcessHookSpool_PreservesFreshIncompleteFile(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "telemetry.db")
+	store, err := telemetry.OpenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	svc := &Service{
+		store:       store,
+		logThrottle: core.NewLogThrottle(5, time.Minute),
+	}
+
+	hookDir := filepath.Join(tempDir, "hooks")
+	if err := os.MkdirAll(hookDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	freshPath := filepath.Join(hookDir, "in-flight.json")
+	if err := os.WriteFile(freshPath, []byte(`{"source":"claude_code","account_id":""`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	svc.processHookSpool(context.Background(), hookDir)
+	if _, err := os.Stat(freshPath); err != nil {
+		t.Fatalf("fresh incomplete hook file was deleted: %v", err)
+	}
+
+	stalePath := filepath.Join(hookDir, "stale-partial.json")
+	if err := os.WriteFile(stalePath, []byte("{"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	staleTime := time.Now().Add(-hookSpoolWriteGrace - time.Second)
+	if err := os.Chtimes(stalePath, staleTime, staleTime); err != nil {
+		t.Fatal(err)
+	}
+
+	svc.processHookSpool(context.Background(), hookDir)
+	if _, err := os.Stat(stalePath); !os.IsNotExist(err) {
+		t.Fatal("expected stale malformed hook file to be deleted")
+	}
+	if _, err := os.Stat(freshPath); err != nil {
+		t.Fatalf("fresh incomplete hook file should still exist after stale cleanup: %v", err)
+	}
+}
+
 func TestPushToExporter(t *testing.T) {
 	// 1. Nil exporter is safe no-op
 	svc := &Service{}
