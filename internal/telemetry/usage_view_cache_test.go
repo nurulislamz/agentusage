@@ -34,7 +34,7 @@ func TestLoadUsageViewCached_ColdStart(t *testing.T) {
 	}, "ingest cold event")
 
 	filter := usageFilter{ProviderIDs: []string{"openrouter"}}
-	agg, maxRowID, count, hit, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
+	agg, fp, hit, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
 	if err != nil {
 		t.Fatalf("cache lookup: %v", err)
 	}
@@ -44,8 +44,8 @@ func TestLoadUsageViewCached_ColdStart(t *testing.T) {
 	if agg != nil {
 		t.Fatal("expected nil agg on miss")
 	}
-	if count == 0 || maxRowID == 0 {
-		t.Fatalf("expected non-zero fingerprint on cold start, got maxRowID=%d count=%d", maxRowID, count)
+	if fp.empty() {
+		t.Fatalf("expected non-zero fingerprint on cold start, got %+v", fp)
 	}
 }
 
@@ -74,14 +74,14 @@ func TestLoadUsageViewCached_HitWhenFingerprintMatches(t *testing.T) {
 	}, "ingest hit event")
 
 	filter := usageFilter{ProviderIDs: []string{"openrouter"}}
-	_, maxRowID, count, _, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
+	_, fp, _, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
 	if err != nil {
 		t.Fatalf("cache lookup (probe): %v", err)
 	}
 	expectedAgg := &telemetryUsageAgg{EventCount: 1, LastOccurred: "2026-05-17T12:00:00Z"}
-	storeUsageViewCache("test-ns", filter, expectedAgg, maxRowID, count)
+	storeUsageViewCache("test-ns", filter, expectedAgg, fp)
 
-	agg, _, _, hit, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
+	agg, _, hit, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
 	if err != nil {
 		t.Fatalf("cache lookup (hit): %v", err)
 	}
@@ -117,11 +117,11 @@ func TestLoadUsageViewCached_InvalidatedOnNewEvent(t *testing.T) {
 	}, "ingest first event")
 
 	filter := usageFilter{ProviderIDs: []string{"openrouter"}}
-	_, maxRowID, count, _, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
+	_, fp, _, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
 	if err != nil {
 		t.Fatalf("cache lookup (probe): %v", err)
 	}
-	storeUsageViewCache("test-ns", filter, &telemetryUsageAgg{EventCount: 1}, maxRowID, count)
+	storeUsageViewCache("test-ns", filter, &telemetryUsageAgg{EventCount: 1}, fp)
 
 	// Ingest a second event — fingerprint changes.
 	mustIngestUsageEvent(t, store, IngestRequest{
@@ -142,7 +142,7 @@ func TestLoadUsageViewCached_InvalidatedOnNewEvent(t *testing.T) {
 		},
 	}, "ingest second event")
 
-	_, _, _, hit, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
+	_, _, hit, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
 	if err != nil {
 		t.Fatalf("cache lookup after ingest: %v", err)
 	}
@@ -175,18 +175,18 @@ func TestLoadUsageViewCached_InvalidatedOnPrune(t *testing.T) {
 	}, "ingest prune event")
 
 	filter := usageFilter{ProviderIDs: []string{"openrouter"}}
-	_, maxRowID, count, _, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
+	_, fp, _, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
 	if err != nil {
 		t.Fatalf("cache lookup (probe): %v", err)
 	}
-	storeUsageViewCache("test-ns", filter, &telemetryUsageAgg{EventCount: 1}, maxRowID, count)
+	storeUsageViewCache("test-ns", filter, &telemetryUsageAgg{EventCount: 1}, fp)
 
 	// Simulate prune: delete the row.
 	if _, err := db.Exec("DELETE FROM usage_events WHERE provider_id = 'openrouter'"); err != nil {
 		t.Fatalf("prune events: %v", err)
 	}
 
-	_, _, _, hit, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
+	_, _, hit, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
 	if err != nil {
 		t.Fatalf("cache lookup after prune: %v", err)
 	}
@@ -219,8 +219,8 @@ func TestLoadUsageViewCached_EmptyNamespaceDisablesCache(t *testing.T) {
 	}, "ingest bypass event")
 
 	filter := usageFilter{ProviderIDs: []string{"openrouter"}}
-	storeUsageViewCache("", filter, &telemetryUsageAgg{EventCount: 999}, 1, 1)
-	agg, _, _, hit, err := loadUsageViewCached(context.Background(), db, "", filter)
+	storeUsageViewCache("", filter, &telemetryUsageAgg{EventCount: 999}, usageViewFingerprint{maxRowID: 1, count: 1})
+	agg, _, hit, err := loadUsageViewCached(context.Background(), db, "", filter)
 	if err != nil {
 		t.Fatalf("cache lookup with empty namespace: %v", err)
 	}
@@ -229,5 +229,152 @@ func TestLoadUsageViewCached_EmptyNamespaceDisablesCache(t *testing.T) {
 	}
 	if agg != nil {
 		t.Fatalf("empty namespace should return nil agg, got %+v", agg)
+	}
+}
+
+// TestLoadUsageViewCached_InvalidatedOnDedupEnrich verifies that an in-place
+// UPDATE from enrichEventByDedupKey (same rowid, same COUNT(*)) still misses
+// the cache because token/cost sums changed.
+func TestLoadUsageViewCached_InvalidatedOnDedupEnrich(t *testing.T) {
+	globalUsageViewCache.reset()
+	_, db, store := openUsageViewRawTestStore(t)
+	jsonl := IngestRequest{
+		SourceSystem:  SourceSystem("claude_code"),
+		SourceChannel: SourceChannelJSONL,
+		OccurredAt:    time.Date(2026, 5, 17, 12, 0, 0, 0, time.UTC),
+		ProviderID:    "claude_code",
+		AccountID:     "claude_code",
+		AgentName:     "claude",
+		EventType:     EventTypeMessageUsage,
+		SessionID:     "sess-enrich",
+		MessageID:     "msg-enrich",
+		ModelRaw:      "claude-sonnet",
+		TokenUsage: core.TokenUsage{
+			InputTokens:  int64Ptr(10),
+			OutputTokens: int64Ptr(0),
+			TotalTokens:  int64Ptr(10),
+			CostUSD:      float64Ptr(0.01),
+			Requests:     int64Ptr(1),
+		},
+	}
+	mustIngestUsageEvent(t, store, jsonl, "ingest jsonl event")
+
+	filter := usageFilter{ProviderIDs: []string{"claude_code"}, AccountID: "claude_code"}
+	_, fp, _, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
+	if err != nil {
+		t.Fatalf("cache lookup (probe): %v", err)
+	}
+	storeUsageViewCache("test-ns", filter, &telemetryUsageAgg{EventCount: 1, Activity: telemetryActivityAgg{TotalTokens: 10, TotalCost: 0.01}}, fp)
+
+	hook := jsonl
+	hook.SourceChannel = SourceChannelHook
+	hook.TokenUsage = core.TokenUsage{
+		InputTokens:  int64Ptr(80),
+		OutputTokens: int64Ptr(20),
+		TotalTokens:  int64Ptr(100),
+		CostUSD:      float64Ptr(0.50),
+		Requests:     int64Ptr(1),
+	}
+	result, err := store.Ingest(context.Background(), hook)
+	if err != nil {
+		t.Fatalf("hook enrich: %v", err)
+	}
+	if !result.Deduped {
+		t.Fatal("expected hook ingest to be deduped")
+	}
+
+	var rowCount, totalTokens int64
+	if err := db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(total_tokens), 0) FROM usage_events`).Scan(&rowCount, &totalTokens); err != nil {
+		t.Fatalf("query after enrich: %v", err)
+	}
+	if rowCount != 1 {
+		t.Fatalf("canonical row count = %d, want 1 (in-place update)", rowCount)
+	}
+	if totalTokens != 100 {
+		t.Fatalf("canonical total_tokens = %d, want 100", totalTokens)
+	}
+
+	_, _, hit, err := loadUsageViewCached(context.Background(), db, "test-ns", filter)
+	if err != nil {
+		t.Fatalf("cache lookup after enrich: %v", err)
+	}
+	if hit {
+		t.Fatal("expected cache miss after in-place dedup enrich (fingerprint must include token/cost sums)")
+	}
+}
+
+// TestApplyCanonicalUsageView_RefreshesAfterDedupEnrich is the user-facing
+// path: collector JSONL warms the view cache, then a hook for the same
+// message_id overlays higher tokens/cost. The next apply must not keep the
+// pre-enrich window_tokens / window_cost.
+func TestApplyCanonicalUsageView_RefreshesAfterDedupEnrich(t *testing.T) {
+	globalUsageViewCache.reset()
+	dbPath, store := openUsageViewTestStore(t)
+
+	jsonl := IngestRequest{
+		SourceSystem:  SourceSystem("claude_code"),
+		SourceChannel: SourceChannelJSONL,
+		OccurredAt:    time.Date(2026, 5, 17, 12, 0, 0, 0, time.UTC),
+		ProviderID:    "claude_code",
+		AccountID:     "claude_code",
+		AgentName:     "claude",
+		EventType:     EventTypeMessageUsage,
+		SessionID:     "sess-enrich-view",
+		MessageID:     "msg-enrich-view",
+		ModelRaw:      "claude-sonnet",
+		TokenUsage: core.TokenUsage{
+			InputTokens:  int64Ptr(10),
+			OutputTokens: int64Ptr(0),
+			TotalTokens:  int64Ptr(10),
+			CostUSD:      float64Ptr(0.01),
+			Requests:     int64Ptr(1),
+		},
+	}
+	mustIngestUsageEvent(t, store, jsonl, "ingest jsonl event")
+
+	snaps := map[string]core.UsageSnapshot{
+		"claude_code": {
+			ProviderID: "claude_code",
+			AccountID:  "claude_code",
+			Metrics:    map[string]core.Metric{},
+		},
+	}
+	first, err := applyCanonicalUsageViewForTest(context.Background(), dbPath, snaps)
+	if err != nil {
+		t.Fatalf("first view: %v", err)
+	}
+	if got := metricUsed(first["claude_code"].Metrics["window_tokens"]); got != 10 {
+		t.Fatalf("after jsonl window_tokens = %v, want 10", got)
+	}
+	if got := metricUsed(first["claude_code"].Metrics["window_cost"]); got != 0.01 {
+		t.Fatalf("after jsonl window_cost = %v, want 0.01", got)
+	}
+
+	hook := jsonl
+	hook.SourceChannel = SourceChannelHook
+	hook.TokenUsage = core.TokenUsage{
+		InputTokens:  int64Ptr(80),
+		OutputTokens: int64Ptr(20),
+		TotalTokens:  int64Ptr(100),
+		CostUSD:      float64Ptr(0.50),
+		Requests:     int64Ptr(1),
+	}
+	result, err := store.Ingest(context.Background(), hook)
+	if err != nil {
+		t.Fatalf("hook enrich: %v", err)
+	}
+	if !result.Deduped {
+		t.Fatal("expected hook ingest to be deduped")
+	}
+
+	second, err := applyCanonicalUsageViewForTest(context.Background(), dbPath, snaps)
+	if err != nil {
+		t.Fatalf("second view: %v", err)
+	}
+	if got := metricUsed(second["claude_code"].Metrics["window_tokens"]); got != 100 {
+		t.Fatalf("after hook enrich window_tokens = %v, want 100 (stale cache would keep 10)", got)
+	}
+	if got := metricUsed(second["claude_code"].Metrics["window_cost"]); got != 0.50 {
+		t.Fatalf("after hook enrich window_cost = %v, want 0.50 (stale cache would keep 0.01)", got)
 	}
 }

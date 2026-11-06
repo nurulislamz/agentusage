@@ -352,7 +352,7 @@ func loadUsageViewForProviderWithSources(ctx context.Context, db *sql.DB, cacheN
 func loadUsageViewForFilter(ctx context.Context, db *sql.DB, cacheNamespace usageViewCacheNamespace, filter usageFilter) (*telemetryUsageAgg, error) {
 	filterStart := time.Now()
 
-	cached, maxRowID, count, hit, cacheErr := loadUsageViewCached(ctx, db, cacheNamespace, filter)
+	cached, fp, hit, cacheErr := loadUsageViewCached(ctx, db, cacheNamespace, filter)
 	if cacheErr != nil {
 		return nil, cacheErr
 	}
@@ -385,13 +385,13 @@ func loadUsageViewForFilter(ctx context.Context, db *sql.DB, cacheNamespace usag
 	core.Tracef("[usage_view_perf] countQuery: %dms (events=%d, providers=%v, since=%s)",
 		time.Since(countStart).Milliseconds(), agg.EventCount, filter.ProviderIDs, filter.Since.Format(time.RFC3339))
 	if agg.EventCount == 0 {
-		storeUsageViewCache(cacheNamespace, filter, agg, maxRowID, count)
+		storeUsageViewCache(cacheNamespace, filter, agg, fp)
 		return agg, nil
 	}
 	if err := loadMaterializedUsageAgg(ctx, db, matFilter, agg); err != nil {
 		return nil, err
 	}
-	storeUsageViewCache(cacheNamespace, filter, agg, maxRowID, count)
+	storeUsageViewCache(cacheNamespace, filter, agg, fp)
 	core.Tracef("[usage_view_perf] loadUsageViewForFilter TOTAL: %dms (providers=%v)", time.Since(filterStart).Milliseconds(), filter.ProviderIDs)
 	return agg, nil
 }
