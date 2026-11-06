@@ -228,9 +228,12 @@ func TestHasChanged(t *testing.T) {
 	}
 	p := New()
 	acct := core.AccountConfig{
-		ID:            "cursor",
-		Provider:      "cursor",
-		ProviderPaths: map[string]string{"status_file": path},
+		ID:       "cursor",
+		Provider: "cursor",
+		ProviderPaths: map[string]string{
+			"status_file": path,
+			"state_db":    filepath.Join(dir, "missing.vscdb"),
+		},
 	}
 	changed, err := p.HasChanged(acct, time.Now().Add(-1*time.Minute))
 	if err != nil {
@@ -246,6 +249,50 @@ func TestHasChanged(t *testing.T) {
 	}
 	if changed {
 		t.Fatal("HasChanged() = true, want false for future timestamp")
+	}
+}
+
+func TestHasChangedPollsAuthenticatedPlanAPI(t *testing.T) {
+	dir := t.TempDir()
+	authFile := filepath.Join(dir, "auth.json")
+	if err := os.WriteFile(authFile, []byte(`{"accessToken":"cursor-jwt"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := New()
+	changed, err := p.HasChanged(core.AccountConfig{
+		ID:       "cursor-box",
+		Provider: "cursor",
+		ProviderPaths: map[string]string{
+			"auth_file":   authFile,
+			"status_file": filepath.Join(dir, "missing-status.json"),
+			"state_db":    filepath.Join(dir, "missing.vscdb"),
+		},
+	}, time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatalf("HasChanged() error = %v", err)
+	}
+	if !changed {
+		t.Fatal("expected authenticated Cursor account to poll live plan API")
+	}
+}
+
+func TestHasChanged_MissingStatusWithoutAuth(t *testing.T) {
+	dir := t.TempDir()
+	p := New()
+	changed, err := p.HasChanged(core.AccountConfig{
+		ID:       "cursor-box",
+		Provider: "cursor",
+		ProviderPaths: map[string]string{
+			"status_file": filepath.Join(dir, "missing-status.json"),
+			"state_db":    filepath.Join(dir, "missing.vscdb"),
+			"auth_file":   filepath.Join(dir, "missing-auth.json"),
+		},
+	}, time.Now().Add(-time.Hour))
+	if err != nil {
+		t.Fatalf("HasChanged() error = %v", err)
+	}
+	if changed {
+		t.Fatal("HasChanged() = true, want false when status file and auth are missing")
 	}
 }
 
