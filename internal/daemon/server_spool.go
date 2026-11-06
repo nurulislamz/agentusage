@@ -221,16 +221,15 @@ func (s *Service) processHookSpool(ctx context.Context, dir string) {
 }
 
 func (s *Service) cleanupHookSpool(dir string) {
+	now := time.Now()
 	files, err := filepath.Glob(filepath.Join(dir, "*.json"))
 	if err != nil || len(files) == 0 {
-		tmps, _ := filepath.Glob(filepath.Join(dir, "*.json.tmp"))
-		for _, tmp := range tmps {
-			_ = os.Remove(tmp)
+		if n := cleanupHookSpoolTemps(dir, now); s != nil && n > 0 {
+			s.infof("hook_spool_cleanup", "removed=%d remaining=%d", n, 0)
 		}
 		return
 	}
 
-	now := time.Now()
 	removed := 0
 	remaining := make([]string, 0, len(files))
 	for _, path := range files {
@@ -256,13 +255,34 @@ func (s *Service) cleanupHookSpool(dir string) {
 		remaining = remaining[len(remaining)-500:]
 	}
 
-	tmps, _ := filepath.Glob(filepath.Join(dir, "*.json.tmp"))
-	for _, tmp := range tmps {
-		_ = os.Remove(tmp)
-		removed++
-	}
+	removed += cleanupHookSpoolTemps(dir, now)
 
 	if removed > 0 {
 		s.infof("hook_spool_cleanup", "removed=%d remaining=%d", removed, len(remaining))
 	}
+}
+
+// cleanupHookSpoolTemps removes abandoned *.json.tmp files. Fresh temps are
+// left alone so cleanup cannot race installed Claude/Codex hooks that write
+// via tmp+rename.
+func cleanupHookSpoolTemps(dir string, now time.Time) int {
+	tmps, err := filepath.Glob(filepath.Join(dir, "*.json.tmp"))
+	if err != nil || len(tmps) == 0 {
+		return 0
+	}
+	removed := 0
+	for _, tmp := range tmps {
+		info, statErr := os.Stat(tmp)
+		if statErr != nil {
+			_ = os.Remove(tmp)
+			removed++
+			continue
+		}
+		if now.Sub(info.ModTime()) < hookSpoolWriteGrace {
+			continue
+		}
+		_ = os.Remove(tmp)
+		removed++
+	}
+	return removed
 }
