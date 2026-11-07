@@ -438,6 +438,8 @@ type envKeyMappingEntry struct {
 }
 
 var envKeyMapping = []envKeyMappingEntry{
+	{EnvVar: "OPENROUTER_API_KEY", Provider: "openrouter", AccountID: "openrouter"},
+	{EnvVar: "DEEPSEEK_API_KEY", Provider: "deepseek", AccountID: "deepseek"},
 	{EnvVar: "ZEN_API_KEY", Provider: "opencode", AccountID: "opencode"},
 	{EnvVar: "OPENCODE_API_KEY", Provider: "opencode", AccountID: "opencode"},
 }
