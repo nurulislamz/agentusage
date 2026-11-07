@@ -84,7 +84,7 @@ func TestPrintDetectReport_EmptyResult(t *testing.T) {
 	if !strings.Contains(out, "No credentials found for:") {
 		t.Errorf("expected missing-providers section, got:\n%s", out)
 	}
-	if !strings.Contains(out, "openai") || !strings.Contains(out, "anthropic") {
+	if !strings.Contains(out, "claude_code") || !strings.Contains(out, "codex") {
 		t.Errorf("expected missing list to include known providers, got:\n%s", out)
 	}
 }

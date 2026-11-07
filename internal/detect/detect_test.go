@@ -33,12 +33,12 @@ func TestAutoDetect_Runs(t *testing.T) {
 
 // TestAutoDetect_PrecedenceShellRCWinsWhenEnvUnset verifies the boot scenario
 // the user cares about: a key exported only in ~/.zshrc still surfaces when
-// the running process didn't inherit a set OPENAI_API_KEY (e.g. agentusage
+// the running process didn't inherit a set OPENCODE_API_KEY (e.g. agentusage
 // launched from Spotlight/Dock).
 func TestAutoDetect_PrecedenceShellRCWinsWhenEnvUnset(t *testing.T) {
 	home := t.TempDir()
 	if err := os.WriteFile(filepath.Join(home, ".zshrc"),
-		[]byte("export OPENAI_API_KEY=sk-from-zshrc-precedence-12345\n"), 0o600); err != nil {
+		[]byte("export OPENCODE_API_KEY=sk-from-zshrc-precedence-12345\n"), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	setHome(t, home)
@@ -52,12 +52,12 @@ func TestAutoDetect_PrecedenceShellRCWinsWhenEnvUnset(t *testing.T) {
 
 	var found bool
 	for _, a := range result.Accounts {
-		if a.Provider == "openai" && a.Token == "sk-from-zshrc-precedence-12345" {
+		if a.Provider == "opencode" && a.Token == "sk-from-zshrc-precedence-12345" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("expected openai account from ~/.zshrc to surface via AutoDetect, got %+v", result.Accounts)
+		t.Errorf("expected opencode account from ~/.zshrc to surface via AutoDetect, got %+v", result.Accounts)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestAutoDetect_PrecedenceShellRCWinsWhenEnvUnset(t *testing.T) {
 func TestAutoDetect_PrecedenceEnvVarBeatsAllFiles(t *testing.T) {
 	home := t.TempDir()
 	if err := os.WriteFile(filepath.Join(home, ".zshrc"),
-		[]byte("export OPENAI_API_KEY=sk-from-zshrc\n"), 0o600); err != nil {
+		[]byte("export OPENCODE_API_KEY=sk-from-zshrc\n"), 0o600); err != nil {
 		t.Fatalf("write zshrc: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(home, ".aider.conf.yml"),
@@ -76,12 +76,12 @@ func TestAutoDetect_PrecedenceEnvVarBeatsAllFiles(t *testing.T) {
 	setHome(t, home)
 	t.Setenv("PATH", "")
 	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
-	t.Setenv("OPENAI_API_KEY", "sk-from-process-env-12345")
+	t.Setenv("OPENCODE_API_KEY", "sk-from-process-env-12345")
 
 	result := AutoDetect()
 
 	for _, a := range result.Accounts {
-		if a.Provider != "openai" {
+		if a.Provider != "opencode" {
 			continue
 		}
 		// detectEnvKeys registers the account with no Token (env var resolved
@@ -94,38 +94,20 @@ func TestAutoDetect_PrecedenceEnvVarBeatsAllFiles(t *testing.T) {
 }
 
 func TestDetectEnvKeys_FindsSetKey(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "sk-test1234567890abcdef")
+	t.Setenv("OPENCODE_API_KEY", "sk-test1234567890abcdef")
 
 	var result Result
 	detectEnvKeys(&result)
 
 	found := false
 	for _, acct := range result.Accounts {
-		if acct.Provider == "openai" && acct.APIKeyEnv == "OPENAI_API_KEY" && acct.ID == "openai" {
+		if acct.Provider == "opencode" && acct.APIKeyEnv == "OPENCODE_API_KEY" && acct.ID == "opencode" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("Expected OPENAI_API_KEY to be detected")
-	}
-}
-
-func TestDetectEnvKeys_FindsMoonshotKey(t *testing.T) {
-	t.Setenv("MOONSHOT_API_KEY", "sk-moonshot-1234567890abcdef")
-
-	var result Result
-	detectEnvKeys(&result)
-
-	found := false
-	for _, acct := range result.Accounts {
-		if acct.Provider == "moonshot" && acct.APIKeyEnv == "MOONSHOT_API_KEY" && acct.ID == "moonshot-ai" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("Expected MOONSHOT_API_KEY to be detected as moonshot-ai")
+		t.Error("Expected OPENCODE_API_KEY to be detected")
 	}
 }
 
@@ -165,143 +147,24 @@ func TestDetectEnvKeys_FindsOpenCodeKey(t *testing.T) {
 	}
 }
 
-func TestDetectEnvKeys_FindsAzureKey(t *testing.T) {
-	t.Setenv("AZURE_API_KEY", "azure-test-key-123456")
-
-	var result Result
-	detectEnvKeys(&result)
-
-	found := false
-	for _, acct := range result.Accounts {
-		if acct.Provider == "azure_openai" && acct.APIKeyEnv == "AZURE_API_KEY" && acct.ID == "azure_openai" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("Expected AZURE_API_KEY to be detected as azure_openai")
-	}
-}
-
-func TestDetectEnvKeys_AzureOpenAIKeyWinsOverAzureKey(t *testing.T) {
-	t.Setenv("AZURE_OPENAI_API_KEY", "azure-openai-test-key")
-	t.Setenv("AZURE_API_KEY", "azure-test-key")
-
-	var result Result
-	detectEnvKeys(&result)
-
-	count := 0
-	var apiKeyEnv string
-	for _, acct := range result.Accounts {
-		if acct.ID == "azure_openai" {
-			count++
-			apiKeyEnv = acct.APIKeyEnv
-		}
-	}
-	if count != 1 {
-		t.Fatalf("azure_openai account count = %d, want 1 (deduped by ID)", count)
-	}
-	if apiKeyEnv != "AZURE_OPENAI_API_KEY" {
-		t.Errorf("APIKeyEnv = %q, want AZURE_OPENAI_API_KEY to win (listed first)", apiKeyEnv)
-	}
-}
-
-func TestDetectEnvKeys_FindsZAIKeys(t *testing.T) {
-	t.Setenv("ZAI_API_KEY", "zai-test-key-123456")
-	t.Setenv("ZHIPUAI_API_KEY", "zhipuai-test-key-123456")
-
-	var result Result
-	detectEnvKeys(&result)
-
-	foundZAI := false
-	foundZhipu := false
-	for _, acct := range result.Accounts {
-		if acct.Provider != "zai" {
-			continue
-		}
-		if acct.ID == "zai" && acct.APIKeyEnv == "ZAI_API_KEY" {
-			foundZAI = true
-		}
-		if acct.ID == "zhipuai-auto" && acct.APIKeyEnv == "ZHIPUAI_API_KEY" {
-			foundZhipu = true
-		}
-	}
-	if !foundZAI {
-		t.Fatal("expected ZAI_API_KEY mapping to zai")
-	}
-	if !foundZhipu {
-		t.Fatal("expected ZHIPUAI_API_KEY mapping to zhipuai-auto")
-	}
-}
-
-func TestProviderForStoredCredential_ZAI(t *testing.T) {
-	if got := providerForStoredCredential("zai"); got != "zai" {
-		t.Fatalf("providerForStoredCredential(zai) = %q, want zai", got)
-	}
-}
-
-func TestDetectZAICodingHelper_Config(t *testing.T) {
-	home := t.TempDir()
-	configDir := filepath.Join(home, ".chelper")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatalf("mkdir %s: %v", configDir, err)
-	}
-	configFile := filepath.Join(configDir, "config.yaml")
-	content := `lang: en_US
-plan: glm_coding_plan_china
-api_key: test-zai-token
-`
-	if err := os.WriteFile(configFile, []byte(content), 0o600); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	setHome(t, home)
-	t.Setenv("PATH", "")
-	t.Setenv("AGENTUSAGE_DETECT_BIN_DIRS", "")
-
-	var result Result
-	detectZAICodingHelper(&result)
-
-	if len(result.Accounts) != 1 {
-		t.Fatalf("expected 1 account, got %d", len(result.Accounts))
-	}
-
-	acct := result.Accounts[0]
-	if acct.ID != "zai-coding-plan-auto" {
-		t.Fatalf("account ID = %q, want zai-coding-plan-auto", acct.ID)
-	}
-	if acct.Provider != "zai" {
-		t.Fatalf("provider = %q, want zai", acct.Provider)
-	}
-	if acct.Token != "test-zai-token" {
-		t.Fatalf("token = %q, want test-zai-token", acct.Token)
-	}
-	if acct.RuntimeHints == nil || acct.RuntimeHints["plan_type"] != "glm_coding_plan_china" {
-		t.Fatalf("plan_type = %q, want glm_coding_plan_china", acct.RuntimeHints["plan_type"])
-	}
-	if acct.RuntimeHints["source"] != "chelper" {
-		t.Fatalf("source = %q, want chelper", acct.RuntimeHints["source"])
-	}
-}
-
 func TestDetectEnvKeys_SkipsEmpty(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("OPENCODE_API_KEY", "")
 
 	var result Result
 	detectEnvKeys(&result)
 
 	for _, acct := range result.Accounts {
-		if acct.Provider == "openai" {
-			t.Error("Should not detect openai when OPENAI_API_KEY is not set")
+		if acct.Provider == "opencode" {
+			t.Error("Should not detect opencode when OPENCODE_API_KEY is not set")
 		}
 	}
 }
 
 func TestAddAccount_NoDuplicates(t *testing.T) {
 	var result Result
-	addAccount(&result, core.AccountConfig{ID: "test-1", Provider: "openai"})
-	addAccount(&result, core.AccountConfig{ID: "test-1", Provider: "openai"})
-	addAccount(&result, core.AccountConfig{ID: "test-2", Provider: "anthropic"})
+	addAccount(&result, core.AccountConfig{ID: "test-1", Provider: "opencode"})
+	addAccount(&result, core.AccountConfig{ID: "test-1", Provider: "opencode"})
+	addAccount(&result, core.AccountConfig{ID: "test-2", Provider: "opencode"})
 
 	if len(result.Accounts) != 2 {
 		t.Errorf("Expected 2 accounts, got %d", len(result.Accounts))

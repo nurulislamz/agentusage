@@ -15,13 +15,9 @@ import (
 func TestItemizedCoverage(t *testing.T) {
 	wantTelemetry := map[string]bool{
 		"claude_code": true, "codex": true, "gemini_cli": true, "antigravity": true,
-		"copilot": true, "cursor": true, "ollama": true, "opencode": true,
+		"copilot": true, "cursor": true, "opencode": true,
 	}
-	wantItemized := map[string]bool{
-		"amp": true, "codebuff": true, "openclaw": true, "roocode": true,
-		"kilo_code": true, "crush": true, "goose": true, "hermes": true,
-		"zed": true, "droid": true, "kiro_cli": true,
-	}
+	wantItemized := map[string]bool{}
 
 	gotTelemetry := map[string]bool{}
 	gotItemized := map[string]bool{}

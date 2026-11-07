@@ -189,12 +189,12 @@ func TestAddAccount_DirectAPIKeyValidationAndSave(t *testing.T) {
 	m.openAddAccountModal()
 	// Set specific provider
 	for i, p := range m.settings.addAccount.providerList {
-		if p.ID == "openai" {
+		if p.ID == "opencode" {
 			m.settings.addAccount.providerCursor = i
-			m.settings.addAccount.accountID = "openai-work"
+			m.settings.addAccount.accountID = "opencode-work"
 			m.settings.addAccount.accountIDEdited = true
 			m.syncAddAccountProviderState()
-			m.settings.addAccount.accountID = "openai-work"
+			m.settings.addAccount.accountID = "opencode-work"
 			break
 		}
 	}
@@ -243,10 +243,10 @@ func TestAddAccount_DirectAPIKeyValidationAndSave(t *testing.T) {
 	if !addedCallback {
 		t.Fatalf("expected onAddAccount callback to have been called")
 	}
-	if m.accountProviders["openai-work"] != "openai" {
+	if m.accountProviders["opencode-work"] != "opencode" {
 		t.Fatalf("expected accountProviders['openai-work'] == 'openai'")
 	}
-	if !m.providerEnabled["openai-work"] {
+	if !m.providerEnabled["opencode-work"] {
 		t.Fatalf("expected providerEnabled['openai-work'] == true")
 	}
 
@@ -254,7 +254,7 @@ func TestAddAccount_DirectAPIKeyValidationAndSave(t *testing.T) {
 	if nextCmd != nil {
 		_ = unwrapCmd(nextCmd)
 	}
-	if svc.savedCredAcct != "openai-work" || svc.savedCredKey != "sk-test-12345" {
+	if svc.savedCredAcct != "opencode-work" || svc.savedCredKey != "sk-test-12345" {
 		t.Fatalf("expected credential saved for openai-work")
 	}
 }
@@ -307,10 +307,16 @@ func TestAddAccount_EnvVarSave(t *testing.T) {
 	m.SetServices(svc)
 
 	m.openAddAccountModal()
-	m.settings.addAccount.accountID = "anthropic-env"
+	for i, p := range m.settings.addAccount.providerList {
+		if p.ID == "opencode" {
+			m.settings.addAccount.providerCursor = i
+			m.syncAddAccountProviderState()
+		}
+	}
+	m.settings.addAccount.accountID = "opencode-env"
 	m.settings.addAccount.field = addAccountFieldCredential
 	m.settings.addAccount.authMode = addAccountAuthEnvVar
-	m.settings.addAccount.apiKeyEnv = "ANTHROPIC_API_KEY"
+	m.settings.addAccount.apiKeyEnv = "OPENCODE_API_KEY"
 
 	// Submit form
 	res, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -340,11 +346,11 @@ func TestAddAccount_EnvVarSave(t *testing.T) {
 	if m.settings.addAccount.active {
 		t.Fatalf("expected modal to close on success")
 	}
-	if svc.savedAccount.ID != "anthropic-env" {
-		t.Fatalf("expected savedAccount.ID == 'anthropic-env', got '%s'", svc.savedAccount.ID)
+	if svc.savedAccount.ID != "opencode-env" {
+		t.Fatalf("expected savedAccount.ID == 'opencode-env', got '%s'", svc.savedAccount.ID)
 	}
-	if svc.savedAccount.APIKeyEnv != "ANTHROPIC_API_KEY" {
-		t.Fatalf("expected APIKeyEnv == 'ANTHROPIC_API_KEY', got '%s'", svc.savedAccount.APIKeyEnv)
+	if svc.savedAccount.APIKeyEnv != "OPENCODE_API_KEY" {
+		t.Fatalf("expected APIKeyEnv == 'OPENCODE_API_KEY', got '%s'", svc.savedAccount.APIKeyEnv)
 	}
 }
 

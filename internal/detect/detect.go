@@ -44,27 +44,9 @@ func AutoDetect() Result {
 	detectCursor(&result)
 	detectClaudeCode(&result)
 	detectCodex(&result)
-	detectZAICodingHelper(&result)
-	detectOllama(&result)
-	detectAider(&result)
 	detectGHCopilot(&result)
 	detectGeminiCLI(&result)
 	detectAntigravity(&result)
-	detectAmp(&result)
-	detectGoose(&result)
-	detectHermes(&result)
-	detectMux(&result)
-	detectDroid(&result)
-	detectCrush(&result)
-	detectRooCode(&result)
-	detectKiloCode(&result)
-	detectKiro(&result)
-	detectZed(&result)
-	detectCodebuff(&result)
-	detectKimiCLI(&result)
-	detectOpenClaw(&result)
-	detectPi(&result)
-	detectQwenCLI(&result)
 	detectCommandCode(&result)
 
 	// Phase 2: process env vars. Most authoritative; runs before any
@@ -77,7 +59,6 @@ func AutoDetect() Result {
 	// adopted, and addAccount is idempotent on account ID.
 	detectShellRC(&result)
 	detectOpenCodeAuth(&result)
-	detectAiderConfig(&result)
 
 	// Phase 4: credential-store probes. We only annotate accounts (or
 	// create minimal placeholders) — the providers themselves still read
@@ -215,26 +196,6 @@ func addAccount(result *Result, acct core.AccountConfig) {
 	}
 	result.accountIDs[acct.ID] = struct{}{}
 	result.Accounts = append(result.Accounts, acct)
-}
-
-func detectAider(result *Result) {
-	bin := findBinary("aider")
-	if bin == "" {
-		return
-	}
-
-	home := homeDir()
-	configDir := filepath.Join(home, ".aider")
-
-	tool := DetectedTool{
-		Name:       "Aider",
-		BinaryPath: bin,
-		ConfigDir:  configDir,
-		Type:       "cli",
-	}
-	result.Tools = append(result.Tools, tool)
-
-	log.Printf("[detect] Found Aider at %s", bin)
 }
 
 func detectGHCopilot(result *Result) {
@@ -471,31 +432,14 @@ func detectAntigravity(result *Result) {
 // names alongside the env-var entry; aider.go looks them up via
 // envKeyByAiderShortName().
 type envKeyMappingEntry struct {
-	EnvVar          string
-	Provider        string
-	AccountID       string
-	AiderShortNames []string
+	EnvVar    string
+	Provider  string
+	AccountID string
 }
 
 var envKeyMapping = []envKeyMappingEntry{
-	{EnvVar: "OPENAI_API_KEY", Provider: "openai", AccountID: "openai", AiderShortNames: []string{"openai"}},
-	{EnvVar: "ANTHROPIC_API_KEY", Provider: "anthropic", AccountID: "anthropic", AiderShortNames: []string{"anthropic"}},
-	{EnvVar: "AZURE_OPENAI_API_KEY", Provider: "azure_openai", AccountID: "azure_openai"},
-	{EnvVar: "AZURE_API_KEY", Provider: "azure_openai", AccountID: "azure_openai"},
-	{EnvVar: "OPENROUTER_API_KEY", Provider: "openrouter", AccountID: "openrouter", AiderShortNames: []string{"openrouter"}},
-	{EnvVar: "GROQ_API_KEY", Provider: "groq", AccountID: "groq", AiderShortNames: []string{"groq"}},
-	{EnvVar: "MISTRAL_API_KEY", Provider: "mistral", AccountID: "mistral", AiderShortNames: []string{"mistral"}},
-	{EnvVar: "DEEPSEEK_API_KEY", Provider: "deepseek", AccountID: "deepseek", AiderShortNames: []string{"deepseek"}},
-	{EnvVar: "MOONSHOT_API_KEY", Provider: "moonshot", AccountID: "moonshot-ai", AiderShortNames: []string{"moonshot", "moonshotai"}},
-	{EnvVar: "XAI_API_KEY", Provider: "xai", AccountID: "xai", AiderShortNames: []string{"xai", "grok"}},
-	{EnvVar: "ZAI_API_KEY", Provider: "zai", AccountID: "zai", AiderShortNames: []string{"zai", "zhipuai"}},
-	{EnvVar: "ZHIPUAI_API_KEY", Provider: "zai", AccountID: "zhipuai-auto"},
 	{EnvVar: "ZEN_API_KEY", Provider: "opencode", AccountID: "opencode"},
 	{EnvVar: "OPENCODE_API_KEY", Provider: "opencode", AccountID: "opencode"},
-	{EnvVar: "GEMINI_API_KEY", Provider: "gemini_api", AccountID: "gemini-api", AiderShortNames: []string{"gemini", "google"}},
-	{EnvVar: "GOOGLE_API_KEY", Provider: "gemini_api", AccountID: "gemini-google"},
-	{EnvVar: "OLLAMA_API_KEY", Provider: "ollama", AccountID: "ollama-cloud"},
-	{EnvVar: "ALIBABA_CLOUD_API_KEY", Provider: "alibaba_cloud", AccountID: "alibaba_cloud", AiderShortNames: []string{"alibaba", "qwen"}},
 }
 
 // envKeyByVar indexes envKeyMapping by env-var name for O(1) lookup. Built
@@ -504,19 +448,6 @@ var envKeyByVar = func() map[string]envKeyMappingEntry {
 	out := make(map[string]envKeyMappingEntry, len(envKeyMapping))
 	for _, m := range envKeyMapping {
 		out[m.EnvVar] = m
-	}
-	return out
-}()
-
-// envKeyByAiderShortName indexes envKeyMapping by Aider's per-provider short
-// name (the left side of `<provider>=<key>` entries in `.aider.conf.yml`'s
-// `api-key:` list). Multiple short names can map to the same entry.
-var envKeyByAiderShortName = func() map[string]envKeyMappingEntry {
-	out := make(map[string]envKeyMappingEntry)
-	for _, m := range envKeyMapping {
-		for _, name := range m.AiderShortNames {
-			out[strings.ToLower(name)] = m
-		}
 	}
 	return out
 }()

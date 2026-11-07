@@ -141,7 +141,7 @@ func TestProviderCatalogIncludesKnownIDs(t *testing.T) {
 		}
 		seen[entry.ID] = true
 	}
-	for _, id := range []string{"openai", "claude_code", "cursor"} {
+	for _, id := range []string{"codex", "claude_code", "cursor"} {
 		if !seen[id] {
 			t.Errorf("catalog missing %s", id)
 		}

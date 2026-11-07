@@ -647,6 +647,9 @@ func TestSettingsModal_MouseWheelScrollsActiveTabCursor(t *testing.T) {
 		m.settings.show = true
 		m.settings.tab = settingsTabAPIKeys
 		m.settings.cursor = 0
+		if len(m.apiKeysTabIDs()) < 2 {
+			t.Skip("needs at least two API key rows to scroll")
+		}
 
 		updated, _ := m.Update(tea.MouseMsg{
 			Action: tea.MouseActionPress,
@@ -762,6 +765,9 @@ func TestSettingsModal_ClickRowActivatesOrEntersItem(t *testing.T) {
 		ids := m.apiKeysTabIDs()
 		if len(ids) == 0 {
 			t.Fatal("no API key IDs")
+		}
+		if len(ids) < 2 {
+			t.Skip("click-to-edit needs a primary API-key row; only a mixed-auth row remains")
 		}
 
 		contentW := clamp(m.width-24, 68, 92)

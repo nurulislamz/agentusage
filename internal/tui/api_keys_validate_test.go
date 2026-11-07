@@ -15,9 +15,7 @@ func TestProviderForAccountID_FallsBackToSpecsForUnconfiguredAccount(t *testing.
 	empty := map[string]string{}
 
 	cases := map[string]string{
-		"moonshot-ai": "moonshot",
-		"openai":      "openai",
-		"deepseek":    "deepseek",
+		"opencode": "opencode",
 	}
 	for accountID, wantProviderID := range cases {
 		got := providerForAccountID(accountID, empty)
@@ -31,9 +29,9 @@ func TestProviderForAccountID_FallsBackToSpecsForUnconfiguredAccount(t *testing.
 // entry should win over the static spec lookup.
 func TestProviderForAccountID_PrefersAccountProvidersMap(t *testing.T) {
 	configured := map[string]string{
-		"moonshot-ai": "moonshot-custom-override",
+		"opencode": "opencode-custom-override",
 	}
-	if got := providerForAccountID("moonshot-ai", configured); got != "moonshot-custom-override" {
-		t.Errorf("providerForAccountID with override = %q, want moonshot-custom-override", got)
+	if got := providerForAccountID("opencode", configured); got != "opencode-custom-override" {
+		t.Errorf("providerForAccountID with override = %q, want opencode-custom-override", got)
 	}
 }

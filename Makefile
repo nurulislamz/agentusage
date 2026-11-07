@@ -132,11 +132,6 @@ uninstall: ## Uninstall binary from ~/.local/bin and remove daemon service
 
 
 
-.PHONY: demo
-demo: deps ## Build and run the demo with dummy data (for screenshots)
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/$(APP_NAME)-demo$(EXE) ./cmd/demo
-	$(BIN_DIR)/$(APP_NAME)-demo$(EXE)
-
 .PHONY: sync-tools
 sync-tools: ## Regenerate all AI tool config files from canonical template
 	@./scripts/sync-tool-configs.sh
