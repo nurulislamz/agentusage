@@ -32,7 +32,7 @@ Backlog for upcoming infrastructure and UX work.
 
 **Current state:**
 - `Dockerfile.hub` exists for the hub/headless aggregation server only.
-- `.github/workflows/ci.yaml` runs lint, vet, test, and native binary builds — no Docker jobs.
+- No CI workflows; lint, vet, test, and builds run locally via the Makefile.
 - CGO + `mattn/go-sqlite3` requires gcc/musl in the builder stage.
 
 ### Tasks
