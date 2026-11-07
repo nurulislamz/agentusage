@@ -102,6 +102,40 @@ func TestReadClaudeCodeOAuthToken_MissingFile(t *testing.T) {
 	}
 }
 
+func TestReadClaudeCodeOAuthToken_RefreshesExpiredToken(t *testing.T) {
+	home := setTempHome(t)
+	dir := filepath.Join(home, ".claude")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	past := strconv.FormatInt(time.Now().Add(-time.Hour).UnixMilli(), 10)
+	future := strconv.FormatInt(time.Now().Add(time.Hour).UnixMilli(), 10)
+
+	if err := os.WriteFile(filepath.Join(dir, ".credentials.json"), []byte(`{"claudeAiOauth":{"accessToken":"tok-expired","expiresAt":`+past+`}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	refreshCalled := false
+	orig := refreshClaudeCLIFunc
+	t.Cleanup(func() { refreshClaudeCLIFunc = orig })
+	refreshClaudeCLIFunc = func(_ context.Context) error {
+		refreshCalled = true
+		return os.WriteFile(filepath.Join(dir, ".credentials.json"), []byte(`{"claudeAiOauth":{"accessToken":"tok-refreshed","expiresAt":`+future+`}}`), 0o600)
+	}
+
+	tok, err := readClaudeCodeOAuthToken()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !refreshCalled {
+		t.Fatal("expected refreshClaudeCLIFunc to be called")
+	}
+	if tok != "tok-refreshed" {
+		t.Fatalf("token = %q, want tok-refreshed", tok)
+	}
+}
+
 func TestFetchUsageAPIWithAuth_OAuth(t *testing.T) {
 	var gotAuth, gotBeta string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

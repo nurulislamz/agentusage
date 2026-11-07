@@ -140,6 +140,38 @@ func TestBuildGetResponse_FiveHourDefault(t *testing.T) {
 	}
 }
 
+func TestBuildGetResponse_FiveHourDerivesRemainingFromLimit(t *testing.T) {
+	limit, used, blockCost := 100.0, 65.0, 0.16
+	resetAt := time.Now().Add(2*time.Hour + 30*time.Minute)
+
+	snap := core.UsageSnapshot{
+		Status: core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"usage_five_hour": {Limit: &limit, Used: &used, Unit: "%", Window: "5h"},
+			"5h_block_cost":   {Used: &blockCost, Unit: "USD", Window: "22:00 – 03:00"},
+		},
+		Resets: map[string]time.Time{"usage_five_hour": resetAt},
+	}
+
+	resp := buildGetResponse(core.AccountConfig{ID: "claude-code", Provider: "claude_code"}, snap, "5h")
+
+	if resp.Remaining == nil || *resp.Remaining != 35.0 {
+		t.Fatalf("remaining = %v, want 35", resp.Remaining)
+	}
+	if resp.Unit != "%" {
+		t.Errorf("unit = %q, want %%", resp.Unit)
+	}
+	if !strings.HasPrefix(resp.ResetsIn, "2h") {
+		t.Errorf("resets_in = %q, want about 2h 30m", resp.ResetsIn)
+	}
+	if p := resp.Pools["usage_five_hour"]; p.Remaining == nil || *p.Remaining != 35.0 {
+		t.Errorf("usage_five_hour pool remaining = %v, want 35", p.Remaining)
+	}
+	if p := resp.Pools["5h_block_cost"]; p.Remaining != nil {
+		t.Errorf("5h_block_cost pool remaining = %v, want nil", *p.Remaining)
+	}
+}
+
 func TestBuildGetResponse_WeeklyWindow(t *testing.T) {
 	acct := core.AccountConfig{
 		ID:       "antigravity-nurulz",

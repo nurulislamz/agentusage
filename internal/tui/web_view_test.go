@@ -389,22 +389,73 @@ func TestRowsFromSectionLinesSkipsChartArt(t *testing.T) {
 
 func TestRowsFromSectionLinesParsesProjectedGauges(t *testing.T) {
 	// buildDetailGaugeLines emits bar + reset caption as one multi-line entry.
+	// When remaining capacity is 0%, the gauge bar has no glyphs (all spaces);
+	// it must still be parsed as a gauge rather than dropped or converted to text.
 	rows := rowsFromSectionLines([]string{
 		"Usage 5h           ███████████████████████▌    96.00%\n                   resets in 1h 5m",
 		"Usage 7d           ████████████████████████ 100.00%\n                   resets in 4d 15h",
+		"5-Hour Usage                                    0.00%\n                   resets in 1h 22m",
 	}, false)
-	if len(rows) != 2 {
-		t.Fatalf("rows = %+v, want 2 gauges", rows)
+	if len(rows) != 3 {
+		t.Fatalf("rows = %+v, want 3 gauges", rows)
 	}
 	for i, want := range []struct {
 		label string
 		pct   float64
 		hint  string
-	}{{"Usage 5h", 96, "resets in 1h 5m"}, {"Usage 7d", 100, "resets in 4d 15h"}} {
+	}{
+		{"Usage 5h", 96, "resets in 1h 5m"},
+		{"Usage 7d", 100, "resets in 4d 15h"},
+		{"5-Hour Usage", 0, "resets in 1h 22m"},
+	} {
 		r := rows[i]
 		if r.Kind != "gauge" || r.Label != want.label || r.Percent == nil || *r.Percent != want.pct || r.Hint != want.hint {
 			t.Fatalf("row %d = %+v, want gauge %q %.0f%% hint %q", i, r, want.label, want.pct, want.hint)
 		}
+	}
+}
+
+func TestClaudeCode_ExhaustedFiveHourIncludedInUsageLines(t *testing.T) {
+	now := time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)
+	limit := 100.0
+	used5h := 100.0
+	used7d := 89.0
+	snap := core.UsageSnapshot{
+		ProviderID: "claude_code",
+		AccountID:  "claude-code",
+		Timestamp:  now,
+		Status:     core.StatusOK,
+		Metrics: map[string]core.Metric{
+			"usage_five_hour": {Limit: &limit, Used: &used5h, Unit: "%", Window: "5h"},
+			"usage_seven_day": {Limit: &limit, Used: &used7d, Unit: "%", Window: "7d"},
+		},
+		Resets: map[string]time.Time{
+			"usage_five_hour": now.Add(1*time.Hour + 22*time.Minute),
+			"usage_seven_day": now.Add(12 * time.Minute),
+		},
+	}
+
+	p := WebProjector{
+		Now:         now,
+		UsageMode:   config.UsageModeRemaining,
+		TileWidth:   72,
+		DetailWidth: 80,
+	}
+	view := p.ProjectSnapshot(snap, "Claude Code")
+	if len(view.UsageLines) < 2 {
+		t.Fatalf("expected at least 2 usage lines, got %d: %#v", len(view.UsageLines), view.UsageLines)
+	}
+	if view.UsageLines[0].Short != "5h" {
+		t.Errorf("line 0 short = %q, want 5h", view.UsageLines[0].Short)
+	}
+	if view.UsageLines[0].Percent == nil || *view.UsageLines[0].Percent != 0.0 {
+		t.Errorf("line 0 percent = %v, want 0.0", view.UsageLines[0].Percent)
+	}
+	if view.UsageLines[1].Short != "Week" {
+		t.Errorf("line 1 short = %q, want Week", view.UsageLines[1].Short)
+	}
+	if view.UsageLines[1].Percent == nil || *view.UsageLines[1].Percent != 11.0 {
+		t.Errorf("line 1 percent = %v, want 11.0", view.UsageLines[1].Percent)
 	}
 }
 

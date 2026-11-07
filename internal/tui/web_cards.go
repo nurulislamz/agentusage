@@ -36,7 +36,7 @@ var (
 	trailingPctRe     = regexp.MustCompile(`[\d.]+\s*%\s*$`)
 	barePercentRe     = regexp.MustCompile(`^[\d.]+%$`)
 	barGlyphsRe       = regexp.MustCompile(`^[█░▒▓▀▄▌▐▏▎▍▋▊▉─━│┃┌┐└┘╭╮╰╯├┤┬┴┼\s]+$`)
-	singleLineGaugeRe = regexp.MustCompile(`^(.+?)\s+([█░▒▓▀▄▌▐▏▎▍▋▊▉─━│┃┌┐└┘╭╮╰╯├┤┬┴┼]+)\s+([\d.]+)%\s*$`)
+	singleLineGaugeRe = regexp.MustCompile(`^(.+?)\s+([█░▒▓▀▄▌▐▏▎▍▋▊▉─━│┃┌┐└┘╭╮╰╯├┤┬┴┼]*)\s*([\d.]+)%\s*$`)
 	dotLeaderRe       = regexp.MustCompile(`^(.+?)\s+[·•]{2,}\s+(.+)$`)
 	colonKvRe         = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9 _\-\/]{1,30}):\s+(.+)$`)
 )
@@ -199,21 +199,24 @@ func rowsFromSectionLines(lines []string, isUsedMode bool) []WebDetailRow {
 			continue
 		}
 		if loc := gaugeLoc; loc != nil {
-			if pendingLabel != "" {
-				flushText(pendingLabel)
-				pendingLabel = ""
-			}
-			pct, err := strconv.ParseFloat(loc[3], 64)
-			if err == nil {
-				label := strings.TrimSpace(loc[1])
-				p := pct
-				rows = append(rows, WebDetailRow{
-					Kind:    "gauge",
-					Label:   label,
-					Percent: &p,
-					Tone:    quotaTone(pct, isUsedMode),
-				})
-				continue
+			barGlyphs := strings.TrimSpace(loc[2])
+			label := strings.TrimSpace(loc[1])
+			if barGlyphs != "" || (!strings.HasSuffix(label, ":") && (looksLikeGaugeLabel(label) || strings.Contains(strings.ToLower(label), "usage"))) {
+				if pendingLabel != "" {
+					flushText(pendingLabel)
+					pendingLabel = ""
+				}
+				pct, err := strconv.ParseFloat(loc[3], 64)
+				if err == nil {
+					p := pct
+					rows = append(rows, WebDetailRow{
+						Kind:    "gauge",
+						Label:   label,
+						Percent: &p,
+						Tone:    quotaTone(pct, isUsedMode),
+					})
+					continue
+				}
 			}
 		}
 		if loc := quotaLineRe.FindStringSubmatch(plain); loc != nil {
@@ -343,6 +346,7 @@ func looksLikeGaugeLabel(s string) bool {
 	lower := strings.ToLower(s)
 	return strings.Contains(lower, "remaining") ||
 		strings.Contains(lower, "used") ||
+		strings.Contains(lower, "usage") ||
 		strings.Contains(lower, "limit") ||
 		strings.Contains(lower, "quota") ||
 		strings.Contains(lower, "cap") ||

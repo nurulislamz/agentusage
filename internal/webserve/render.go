@@ -699,6 +699,11 @@ func buildUsageLines(v AccountView, used bool) []usageLine {
 	if isCannotRenderError(v.Summary) {
 		v.Summary = ""
 	}
+	// An expired Cursor session has no plan data; don't let stale context-window
+	// or empty fallback gauges read as healthy usage.
+	if v.ProviderID == "cursor" && strings.EqualFold(v.Status, string(core.StatusAuth)) {
+		return []usageLine{{Label: "Auth", Short: "Auth", Value: firstNonEmpty(v.Message, "Sign in required"), Tone: "dim"}}
+	}
 	if len(v.UsageLines) > 0 {
 		lines := make([]usageLine, 0, len(v.UsageLines))
 		for _, l := range v.UsageLines {

@@ -302,7 +302,4 @@ func TestInstallService_And_RunCommand(t *testing.T) {
 	if err == nil {
 		t.Error("expected error installing service from transient test binary")
 	}
-
-	// 4. UninstallService
-	_ = UninstallService("/tmp/test.sock")
 }

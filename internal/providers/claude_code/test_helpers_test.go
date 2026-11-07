@@ -18,6 +18,9 @@ func TestMain(m *testing.M) {
 	priceLookup = func(_ context.Context, _ string, _ int) (*pricing.Price, error) {
 		return nil, errors.New("pricing disabled in tests")
 	}
+	refreshClaudeCLIFunc = func(_ context.Context) error {
+		return errors.New("cli refresh disabled in tests")
+	}
 	// Never read (or renew) the developer's real agentusage Claude sign-in.
 	credsDir, err := os.MkdirTemp("", "claude-code-agent-oauth-")
 	if err != nil {

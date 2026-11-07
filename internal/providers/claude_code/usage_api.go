@@ -233,10 +233,44 @@ func fetchUsageAPIWithAuth(ctx context.Context, url string, setAuth func(*http.R
 // variable rather than a constant so tests can point it at an httptest server.
 var oauthUsageURL = "https://api.anthropic.com/api/oauth/usage"
 
+var refreshClaudeCLIFunc = refreshClaudeCodeCLI
+
+// refreshClaudeCodeCLI executes `claude auth status` via the Claude Code CLI.
+// When Claude Code checks auth status, it automatically refreshes expired access
+// tokens using its refresh token and updates ~/.claude/.credentials.json.
+func refreshClaudeCodeCLI(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctxTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	claudePath, err := exec.LookPath("claude")
+	if err != nil {
+		home, _ := os.UserHomeDir()
+		if home != "" {
+			fallback := filepath.Join(home, ".local", "bin", "claude")
+			if _, statErr := os.Stat(fallback); statErr == nil {
+				claudePath = fallback
+				err = nil
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("claude binary not found: %w", err)
+		}
+	}
+
+	cmd := exec.CommandContext(ctxTimeout, claudePath, "auth", "status")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("running claude auth status: %w", err)
+	}
+	return nil
+}
+
 // readClaudeCodeOAuthToken loads the Claude Code CLI's OAuth access token from
 // ~/.claude/.credentials.json. It errors if the file is missing, the token is
-// absent, or the token has already expired (Claude Code refreshes it on next
-// use, so a stale value would only produce 401s).
+// absent, or the token has already expired (attempting a refresh via Claude Code
+// CLI before giving up).
 func readClaudeCodeOAuthToken() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -263,6 +297,23 @@ func readClaudeCodeOAuthToken() (string, error) {
 		return "", fmt.Errorf("no OAuth access token in %s", credsPath)
 	}
 	if exp := creds.ClaudeAiOauth.ExpiresAt; exp > 0 && time.Now().UnixMilli() >= exp {
+		if refreshClaudeCLIFunc != nil {
+			if rErr := refreshClaudeCLIFunc(context.Background()); rErr == nil {
+				if refreshedData, readErr := os.ReadFile(credsPath); readErr == nil {
+					var refreshedCreds struct {
+						ClaudeAiOauth struct {
+							AccessToken string `json:"accessToken"`
+							ExpiresAt   int64  `json:"expiresAt"`
+						} `json:"claudeAiOauth"`
+					}
+					if json.Unmarshal(refreshedData, &refreshedCreds) == nil && refreshedCreds.ClaudeAiOauth.AccessToken != "" {
+						if rExp := refreshedCreds.ClaudeAiOauth.ExpiresAt; rExp <= 0 || time.Now().UnixMilli() < rExp {
+							return refreshedCreds.ClaudeAiOauth.AccessToken, nil
+						}
+					}
+				}
+			}
+		}
 		return "", fmt.Errorf("Claude Code OAuth token expired (refreshed on next Claude Code use)")
 	}
 	return token, nil

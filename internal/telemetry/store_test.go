@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"database/sql"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -588,5 +589,35 @@ func TestStorePruneOrphanRawEvents_RemovesOnlyUnreferencedRows(t *testing.T) {
 	}
 	if rawCount != 1 {
 		t.Fatalf("raw rows after second prune = %d, want 1", rawCount)
+	}
+}
+
+func TestOpenStore_KeepsSharedMemoryOfLiveStore(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "telemetry.db")
+	first, err := OpenStore(path)
+	if err != nil {
+		t.Fatalf("OpenStore() error = %v", err)
+	}
+	defer first.db.Close()
+	if err := first.db.Ping(); err != nil {
+		t.Fatalf("Ping() error = %v", err)
+	}
+	before, err := os.Stat(path + "-shm")
+	if err != nil {
+		t.Fatalf("stat -shm: %v", err)
+	}
+
+	second, err := OpenStore(path)
+	if err != nil {
+		t.Fatalf("second OpenStore() error = %v", err)
+	}
+	defer second.db.Close()
+
+	after, err := os.Stat(path + "-shm")
+	if err != nil {
+		t.Fatalf("stat -shm after second open: %v", err)
+	}
+	if !os.SameFile(before, after) {
+		t.Fatal("second OpenStore replaced -shm while the first store was live")
 	}
 }

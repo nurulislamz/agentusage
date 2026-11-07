@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/nurulislamz/agentusage/internal/core"
 )
 
 func getHTML(t *testing.T, srv *Server, path string) *httptest.ResponseRecorder {
@@ -1666,3 +1668,18 @@ func TestAntigravity_ExhaustedClaudeDoesNotDepleteGeminiAccount(t *testing.T) {
 	}
 }
 
+func TestBuildUsageLines_CursorAuthHidesStaleUsage(t *testing.T) {
+	pct := 62.3
+	lines := buildUsageLines(AccountView{
+		ProviderID: "cursor",
+		Status:     string(core.StatusAuth),
+		Message:    "Cursor session expired: run `agent-box nurulz login`",
+		UsageLines: []UsageLine{{Label: "Context Window", Short: "Context Window", Percent: &pct}},
+	}, false)
+	if len(lines) != 1 || lines[0].Pct != nil {
+		t.Fatalf("lines = %+v, want one auth line without a percentage", lines)
+	}
+	if !strings.Contains(lines[0].Value, "agent-box nurulz login") {
+		t.Fatalf("value = %q, want the login command", lines[0].Value)
+	}
+}

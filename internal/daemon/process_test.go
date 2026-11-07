@@ -3,10 +3,12 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -271,23 +273,35 @@ func TestWaitForHealth_NilAndTimeout(t *testing.T) {
 }
 
 func TestSpawnDaemonProcess(t *testing.T) {
-	err := spawnDaemonProcess("/tmp/test.sock", true)
-	if err != nil && strings.Contains(err.Error(), "unsupported") {
-		t.Errorf("spawnDaemonProcess err = %v, want helper spawn supported", err)
+	origExec := daemonExecCommand
+	t.Cleanup(func() { daemonExecCommand = origExec })
+	var gotArgs []string
+	daemonExecCommand = func(_ string, args ...string) *exec.Cmd {
+		gotArgs = args
+		return exec.Command("true")
+	}
+
+	if err := spawnDaemonProcess("/tmp/test.sock", true); err != nil {
+		t.Fatalf("spawnDaemonProcess err = %v, want helper spawn supported", err)
+	}
+	want := "daemon run --socket-path /tmp/test.sock --verbose"
+	if got := strings.Join(gotArgs, " "); got != want {
+		t.Errorf("spawn args = %q, want %q", got, want)
 	}
 }
 
 func TestStartViaManagedService_And_EnsureViaServiceManager(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
-	client := NewClient("/tmp/test.sock")
+	socketPath := filepath.Join(t.TempDir(), "test.sock")
+	client := NewClient(socketPath)
 
 	// 1. startViaManagedService needsUpgrade with transient exe
 	mgrTransient := ServiceManager{
 		Kind:    "linux",
 		exePath: "/tmp/go-build123/exe/main",
 	}
-	_, err := startViaManagedService(ctx, client, mgrTransient, true, "/tmp/test.sock")
+	_, err := startViaManagedService(ctx, client, mgrTransient, true, socketPath)
 	if err == nil || !strings.Contains(err.Error(), "to upgrade") {
 		t.Errorf("expected upgrade error, got: %v", err)
 	}
@@ -297,25 +311,24 @@ func TestStartViaManagedService_And_EnsureViaServiceManager(t *testing.T) {
 		Kind:     "linux",
 		unitPath: "/tmp/nonexistent.service",
 	}
-	_, err = startViaManagedService(ctx, client, mgrNotInstalled, false, "/tmp/test.sock")
+	_, err = startViaManagedService(ctx, client, mgrNotInstalled, false, socketPath)
 	if err == nil || !strings.Contains(err.Error(), "telemetry daemon service is not installed") {
 		t.Errorf("expected not installed error, got: %v", err)
 	}
 
 	// 2b. startViaManagedService installed but fails to start
-	tmpUnit := filepath.Join(t.TempDir(), "agentusage.service")
-	_ = os.WriteFile(tmpUnit, []byte(""), 0644)
-	mgrInstalled := ServiceManager{
-		Kind:     "linux",
-		unitPath: tmpUnit,
+	mgrInstalled := &fakeServiceManager{
+		supported: true,
+		installed: true,
+		startFn:   func() error { return errors.New("start failed") },
 	}
-	_, err = startViaManagedService(ctx, client, mgrInstalled, false, "/tmp/test.sock")
+	_, err = startViaManagedService(ctx, client, mgrInstalled, false, socketPath)
 	if err == nil {
 		t.Error("expected error when service fails to start")
 	}
 
 	// 3. ensureViaServiceManager with needsUpgrade and transient exe
-	_, err = ensureViaServiceManager(ctx, client, "/tmp/test.sock", false, true, HealthResponse{
+	_, err = ensureViaServiceManager(ctx, client, socketPath, false, true, HealthResponse{
 		DaemonVersion: "v0.0.1",
 	})
 	if err == nil {
@@ -341,7 +354,13 @@ func TestEnsureRunning_OfflineSocket(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 
-	_, err := EnsureRunning(ctx, "/tmp/nonexistent_socket_test.sock", false)
+	origFactory := serviceManagerFactory
+	t.Cleanup(func() { serviceManagerFactory = origFactory })
+	serviceManagerFactory = func(string) (serviceLifecycleManager, error) {
+		return nil, errors.New("service manager unavailable in test")
+	}
+
+	_, err := EnsureRunning(ctx, filepath.Join(t.TempDir(), "offline.sock"), false)
 	if err == nil {
 		t.Error("expected error ensuring running on nonexistent socket")
 	}

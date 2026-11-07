@@ -492,6 +492,19 @@ func (p *Provider) usageAuthSources(ctx context.Context, orgUUID string) []usage
 				}
 				return oauthUsageURL, oauthAuthHeaders(token), nil
 			},
+			reauth: func() (func(*http.Request), error) {
+				if refreshClaudeCLIFunc != nil {
+					if err := refreshClaudeCLIFunc(ctx); err != nil {
+						return nil, err
+					}
+					token, err := readClaudeCodeOAuthToken()
+					if err != nil {
+						return nil, err
+					}
+					return oauthAuthHeaders(token), nil
+				}
+				return nil, errors.New("no claude CLI refresh helper")
+			},
 		},
 		{
 			name: "cookie",

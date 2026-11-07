@@ -51,24 +51,15 @@ func OpenStore(path string) (*Store, error) {
 		return nil, fmt.Errorf("telemetry: creating DB dir: %w", err)
 	}
 
-	// Remove the shared-memory file before opening the database.
-	// After an unclean shutdown (SIGKILL, OOM, crash), the -shm file
-	// retains stale WAL frame indexes and lock counters from the dead
-	// process. If a new process opens the DB and trusts the stale -shm,
-	// it can misread WAL frames, causing duplicate page references and
-	// B-tree corruption. Removing the -shm forces SQLite to rebuild the
-	// WAL index from the checksummed WAL file, which is crash-safe.
-	// If another process holds the DB open, the file is still
-	// referenced via its inode and that process is unaffected.
-	_ = os.Remove(path + "-shm")
-
 	recoverCorrupt := func(detail string) (*sql.DB, error) {
 		backupPath := path + ".corrupt." + time.Now().Format("20060102T150405")
 		log.Printf("telemetry: database corrupt (%s), backing up to %s and starting fresh", detail, backupPath)
 		if err := os.Rename(path, backupPath); err != nil {
 			return nil, fmt.Errorf("telemetry: backup corrupt DB: %w", err)
 		}
-		_ = os.Remove(path + "-wal")
+		// Keep the WAL with its snapshot: it may hold the only copy of recent
+		// commits. -shm is rebuilt from the WAL, so it needs no backup.
+		_ = os.Rename(path+"-wal", backupPath+"-wal")
 		_ = os.Remove(path + "-shm")
 		freshDB, err := openAndConfigureDB(path)
 		if err != nil {

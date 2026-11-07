@@ -3,6 +3,7 @@ package cursor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -227,9 +228,21 @@ func (p *Provider) applyLivePlanUsage(ctx context.Context, acct core.AccountConf
 	live, err := client.fetchLivePlanUsage(ctx, token)
 	if err != nil {
 		snap.SetDiagnostic("plan_api_error", err.Error())
+		if errors.Is(err, errSessionExpired) && snap.Status != core.StatusError {
+			snap.Status = core.StatusAuth
+			snap.Message = "Cursor session expired: run `" + loginCommand(acct) + "`"
+		}
 		return
 	}
 	applyLivePlanToSnapshot(snap, live, auth)
+}
+
+func loginCommand(acct core.AccountConfig) string {
+	box := strings.TrimPrefix(acct.ID, "cursor-")
+	if box == acct.ID || box == "" {
+		return "agent login"
+	}
+	return "agent-box " + box + " login"
 }
 
 func applyLivePlanToSnapshot(snap *core.UsageSnapshot, live livePlanUsage, auth LocalAuthInfo) {

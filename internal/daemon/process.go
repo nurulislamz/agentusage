@@ -56,7 +56,8 @@ var (
 	serviceManagerFactory = func(socketPath string) (serviceLifecycleManager, error) {
 		return NewServiceManager(socketPath)
 	}
-	spawnDaemonFunc = spawnDaemonProcess
+	spawnDaemonFunc   = spawnDaemonProcess
+	daemonExecCommand = exec.Command
 )
 
 func EnsureRunning(ctx context.Context, socketPath string, verbose bool) (*Client, error) {
@@ -391,7 +392,7 @@ func spawnDaemonProcess(socketPath string, verbose bool) error {
 		args = append(args, "--verbose")
 	}
 
-	cmd := exec.Command(exe, args...)
+	cmd := daemonExecCommand(exe, args...)
 	if stateDir != "" {
 		stdoutLog, err := os.OpenFile(filepath.Join(stateDir, "daemon.stdout.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err == nil {

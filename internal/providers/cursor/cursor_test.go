@@ -543,6 +543,41 @@ func TestFetchLivePlan_MonthlyHitWhenAutoOrAPIIs100(t *testing.T) {
 	}
 }
 
+func TestFetch_ExpiredSessionReportsAuth(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	dir := t.TempDir()
+	authFile := filepath.Join(dir, "auth.json")
+	if err := os.WriteFile(authFile, []byte(`{"accessToken":"expired-jwt"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	statusFile := filepath.Join(dir, "cursor-nurulz-status.json")
+	if err := os.WriteFile(statusFile, []byte(`{"model":{"id":"composer-2.5","display_name":"Composer 2.5"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	snap, err := New().WithClient(NewClient(ts.URL, ts.Client())).Fetch(context.Background(), core.AccountConfig{
+		ID:       "cursor-nurulz",
+		Provider: "cursor",
+		ProviderPaths: map[string]string{
+			"auth_file":   authFile,
+			"status_file": statusFile,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch() error = %v", err)
+	}
+	if snap.Status != core.StatusAuth {
+		t.Fatalf("status = %q, want AUTH for a rejected session", snap.Status)
+	}
+	if !strings.Contains(snap.Message, "agent-box nurulz login") {
+		t.Fatalf("message = %q, want the box login command", snap.Message)
+	}
+}
+
 func TestEnrichSnapshots_UsesAuthFileHint(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer hinted-jwt" {

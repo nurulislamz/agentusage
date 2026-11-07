@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,9 @@ const (
 	defaultCursorAPIBase = "https://api2.cursor.sh"
 	livePlanCacheTTL     = 45 * time.Second
 )
+
+// errSessionExpired reports that Cursor rejected the stored session token.
+var errSessionExpired = errors.New("cursor: session token rejected")
 
 // Client talks to Cursor DashboardService over Connect JSON.
 type Client struct {
@@ -98,6 +102,9 @@ func (c *Client) dashboardPOST(ctx context.Context, token, method string, dest a
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("cursor: read %s body: %w", method, err)
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("%w: %s status %d", errSessionExpired, method, resp.StatusCode)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("cursor: %s status %d", method, resp.StatusCode)

@@ -73,8 +73,11 @@ run: ## Run the application locally
 	$(GO) run $(CMD_DIR)
 
 .PHONY: serve
-serve: ## Run the local web dashboard (agentusage serve)
-	$(GO) run $(CMD_DIR) serve $(ARGS)
+serve: build ## Rebuild, install, and restart the detached web dashboard (agentusage serve --detach)
+	install -d $(HOME)/.local/bin
+	install -m 755 $(BIN_DIR)/$(APP_NAME)$(EXE) $(HOME)/.local/bin/$(APP_NAME)$(EXE)
+	-@$(HOME)/.local/bin/$(APP_NAME)$(EXE) serve --stop
+	@$(HOME)/.local/bin/$(APP_NAME)$(EXE) serve --detach $(ARGS)
 
 .PHONY: daemon
 daemon: ## Run the background telemetry daemon in foreground (agentusage daemon run)

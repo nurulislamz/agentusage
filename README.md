@@ -1233,7 +1233,7 @@ make fmt            # Format Go source code
 make deps           # Download and verify Go dependencies
 make tidy           # Tidy Go module dependencies
 make demo           # Build and run demo dashboard with simulated data
-make serve          # Run local web dashboard
+make serve          # Rebuild, install, and restart the detached web dashboard
 make docker-build   # Build Docker image for agentusage
 make docker-run-hub # Run headless hub container
 make install        # Install binary to ~/.local/bin and configure daemon service

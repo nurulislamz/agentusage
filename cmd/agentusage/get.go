@@ -335,7 +335,7 @@ func buildGetResponse(acct core.AccountConfig, snap core.UsageSnapshot, requeste
 		pm := PoolMetric{
 			Limit:     m.Limit,
 			Used:      m.Used,
-			Remaining: m.Remaining,
+			Remaining: metricRemaining(m),
 			Unit:      m.Unit,
 			Window:    m.Window,
 		}
@@ -385,11 +385,12 @@ func selectFiveHourMetric(resp *GetResponse, snap core.UsageSnapshot, now time.T
 		if m.Window != "5h" && !strings.Contains(kLower, "5h") {
 			continue
 		}
-		if m.Remaining == nil {
+		remaining := metricRemaining(m)
+		if remaining == nil {
 			continue
 		}
 
-		rem := *m.Remaining
+		rem := *remaining
 		isModelMatch := activeModel != "" && (strings.Contains(activeModel, "gemini") && strings.Contains(kLower, "gemini") ||
 			(strings.Contains(activeModel, "claude") || strings.Contains(activeModel, "sonnet")) && (strings.Contains(kLower, "claude") || strings.Contains(kLower, "3p")))
 
@@ -409,7 +410,7 @@ func selectFiveHourMetric(resp *GetResponse, snap core.UsageSnapshot, now time.T
 	if chosenMetric != nil {
 		resp.Limit = chosenMetric.Limit
 		resp.Used = chosenMetric.Used
-		resp.Remaining = chosenMetric.Remaining
+		resp.Remaining = metricRemaining(*chosenMetric)
 		resp.Unit = chosenMetric.Unit
 		resp.Window = "5h"
 		if !chosenReset.IsZero() {
@@ -427,6 +428,21 @@ func selectFiveHourMetric(resp *GetResponse, snap core.UsageSnapshot, now time.T
 			resp.ResetsIn = formatDuration(resetTime.Sub(now))
 		}
 	}
+}
+
+// metricRemaining returns the metric's remaining amount, deriving it from
+// Limit and Used for providers that only report those (claude_code's
+// usage_five_hour). Metrics without a limit, like USD cost counters, have no
+// remaining amount and return nil.
+func metricRemaining(m core.Metric) *float64 {
+	if m.Remaining != nil {
+		return m.Remaining
+	}
+	if m.Limit == nil || m.Used == nil {
+		return nil
+	}
+	remaining := math.Max(*m.Limit-*m.Used, 0)
+	return &remaining
 }
 
 func selectFirstPoolMetric(resp *GetResponse, now time.Time) {
