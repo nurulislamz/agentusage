@@ -148,7 +148,7 @@ func (c AccountConfig) ResolveAPIKey() string {
 		}
 	}
 	if c.Provider == "opencode" || strings.HasPrefix(c.ID, "opencode-") {
-		if k := resolveOpenCodeAuthKey(c.ID); k != "" {
+		if k := resolveOpenCodeAuthKey(c); k != "" {
 			return k
 		}
 	}
@@ -160,37 +160,75 @@ func (c AccountConfig) ResolveAPIKey() string {
 	return ""
 }
 
-func resolveOpenCodeAuthKey(accountID string) string {
+// resolveOpenCodeAuthKey reads Zen API keys only from paths that belong to
+// this account. Box accounts (opencode-<name>) never fall through to the host
+// auth.json or sibling box profiles — that previously leaked other accounts'
+// keys into Fetch for empty/unsigned boxes (hardcoded mohammed/nurulz paths).
+func resolveOpenCodeAuthKey(acct AccountConfig) string {
+	for _, p := range openCodeAuthCandidatePaths(acct) {
+		if k := readOpenCodeAuthKeyFile(p); k != "" {
+			return k
+		}
+	}
+	return ""
+}
+
+func openCodeAuthCandidatePaths(acct AccountConfig) []string {
+	if authPath := strings.TrimSpace(acct.Path("auth_path", "")); authPath != "" {
+		return []string{authPath}
+	}
+	if authPath := strings.TrimSpace(acct.Hint("auth_path", "")); authPath != "" {
+		return []string{authPath}
+	}
+
 	home, _ := os.UserHomeDir()
 	if home == "" {
+		return nil
+	}
+
+	if strings.HasPrefix(acct.ID, "opencode-") {
+		box := strings.TrimPrefix(acct.ID, "opencode-")
+		if !validOpenCodeBoxName(box) {
+			return nil
+		}
+		return []string{filepath.Join(home, ".opencode-containers", box, "share", "auth.json")}
+	}
+
+	// Default/host OpenCode account: host data dirs only (never sibling boxes).
+	var paths []string
+	if xdg := strings.TrimSpace(os.Getenv("XDG_DATA_HOME")); xdg != "" {
+		paths = append(paths, filepath.Join(xdg, "opencode", "auth.json"))
+	}
+	paths = append(paths, filepath.Join(home, ".local", "share", "opencode", "auth.json"))
+	return paths
+}
+
+func validOpenCodeBoxName(box string) bool {
+	box = strings.TrimSpace(box)
+	if box == "" || box == "." || box == ".." {
+		return false
+	}
+	if strings.ContainsAny(box, `/\`) {
+		return false
+	}
+	return true
+}
+
+func readOpenCodeAuthKeyFile(path string) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
 		return ""
 	}
-	var candidatePaths []string
-	if strings.HasPrefix(accountID, "opencode-") {
-		box := strings.TrimPrefix(accountID, "opencode-")
-		candidatePaths = append(candidatePaths, filepath.Join(home, ".opencode-containers", box, "share", "auth.json"))
+	var payload map[string]struct {
+		Type string `json:"type"`
+		Key  string `json:"key"`
 	}
-	candidatePaths = append(candidatePaths,
-		filepath.Join(home, ".local", "share", "opencode", "auth.json"),
-		filepath.Join(home, ".opencode-containers", "mohammed", "share", "auth.json"),
-		filepath.Join(home, ".opencode-containers", "nurulz", "share", "auth.json"),
-	)
-	for _, p := range candidatePaths {
-		raw, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		var payload map[string]struct {
-			Type string `json:"type"`
-			Key  string `json:"key"`
-		}
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			continue
-		}
-		for _, k := range []string{"opencode-go", "opencode"} {
-			if entry, ok := payload[k]; ok && strings.TrimSpace(entry.Key) != "" {
-				return strings.TrimSpace(entry.Key)
-			}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return ""
+	}
+	for _, k := range []string{"opencode-go", "opencode"} {
+		if entry, ok := payload[k]; ok && strings.TrimSpace(entry.Key) != "" {
+			return strings.TrimSpace(entry.Key)
 		}
 	}
 	return ""

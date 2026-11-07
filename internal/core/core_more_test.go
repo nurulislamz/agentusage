@@ -2,6 +2,8 @@ package core
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/nurulislamz/agentusage/internal/observability"
@@ -237,6 +239,79 @@ func TestAccountConfig_ResolveAPIKey(t *testing.T) {
 	// 4. Fallback when env not set
 	acct4 := AccountConfig{APIKeyEnv: "NONEXISTENT_CORE_ENV_VAR"}
 	_ = acct4.ResolveAPIKey()
+}
+
+func TestAccountConfig_ResolveAPIKey_OpenCodeBoxDoesNotUseSiblingKeys(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(home, "xdg-empty"))
+
+	workAuth := filepath.Join(home, ".opencode-containers", "work", "share", "auth.json")
+	sibAuth := filepath.Join(home, ".opencode-containers", "nurulz", "share", "auth.json")
+	hostAuth := filepath.Join(home, ".local", "share", "opencode", "auth.json")
+	for _, dir := range []string{filepath.Dir(workAuth), filepath.Dir(sibAuth), filepath.Dir(hostAuth)} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+	if err := os.WriteFile(workAuth, []byte(`{}`), 0o600); err != nil {
+		t.Fatalf("write empty work auth: %v", err)
+	}
+	if err := os.WriteFile(sibAuth, []byte(`{"opencode":{"type":"api","key":"sk-nurulz-secret"}}`), 0o600); err != nil {
+		t.Fatalf("write sibling auth: %v", err)
+	}
+	if err := os.WriteFile(hostAuth, []byte(`{"opencode":{"type":"api","key":"sk-host-secret"}}`), 0o600); err != nil {
+		t.Fatalf("write host auth: %v", err)
+	}
+
+	work := AccountConfig{ID: "opencode-work", Provider: "opencode"}
+	if got := work.ResolveAPIKey(); got != "" {
+		t.Fatalf("empty box auth fell through to foreign key %q", got)
+	}
+
+	work.SetHint("auth_path", workAuth)
+	if got := work.ResolveAPIKey(); got != "" {
+		t.Fatalf("auth_path empty file fell through to foreign key %q", got)
+	}
+
+	if err := os.WriteFile(workAuth, []byte(`{"opencode-go":{"type":"api","key":"sk-work-secret"}}`), 0o600); err != nil {
+		t.Fatalf("write work auth: %v", err)
+	}
+	if got := work.ResolveAPIKey(); got != "sk-work-secret" {
+		t.Fatalf("ResolveAPIKey = %q, want sk-work-secret", got)
+	}
+}
+
+func TestAccountConfig_ResolveAPIKey_OpenCodeHostIgnoresSiblingBoxes(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(home, "xdg-empty"))
+
+	sibAuth := filepath.Join(home, ".opencode-containers", "mohammed", "share", "auth.json")
+	if err := os.MkdirAll(filepath.Dir(sibAuth), 0o755); err != nil {
+		t.Fatalf("mkdir sibling: %v", err)
+	}
+	if err := os.WriteFile(sibAuth, []byte(`{"opencode":{"type":"api","key":"sk-mohammed-secret"}}`), 0o600); err != nil {
+		t.Fatalf("write sibling auth: %v", err)
+	}
+
+	host := AccountConfig{ID: "opencode", Provider: "opencode"}
+	if got := host.ResolveAPIKey(); got != "" {
+		t.Fatalf("host account used sibling box key %q", got)
+	}
+
+	hostAuth := filepath.Join(home, ".local", "share", "opencode", "auth.json")
+	if err := os.MkdirAll(filepath.Dir(hostAuth), 0o755); err != nil {
+		t.Fatalf("mkdir host auth: %v", err)
+	}
+	if err := os.WriteFile(hostAuth, []byte(`{"opencode":{"type":"api","key":"sk-host-only"}}`), 0o600); err != nil {
+		t.Fatalf("write host auth: %v", err)
+	}
+	if got := host.ResolveAPIKey(); got != "sk-host-only" {
+		t.Fatalf("ResolveAPIKey = %q, want sk-host-only", got)
+	}
 }
 
 func TestUsageSnapshot_NewAuthSnapshot_And_MergeAccounts(t *testing.T) {

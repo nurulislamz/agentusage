@@ -344,11 +344,12 @@ func (p *Provider) enrichFromConsole(ctx context.Context, acct core.AccountConfi
 		ok = true
 	}
 	if err != nil || !ok || session.Value == "" {
+		// Only read the host browser when this account explicitly opted in
+		// via BrowserCookie. Synthesizing a ref here used to import the host
+		// opencode.ai cookie into every empty box account and overlay the
+		// host console billing onto the wrong tile.
 		if acct.BrowserCookie == nil {
-			acct.BrowserCookie = &core.BrowserCookieRef{
-				Domain:     "opencode.ai",
-				CookieName: "auth",
-			}
+			return errNoCookieConfigured
 		}
 		var autoErr error
 		session, ok, autoErr = loadBrowserSession(ctx, acct, nil)
