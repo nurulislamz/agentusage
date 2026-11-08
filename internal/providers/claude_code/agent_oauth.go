@@ -38,7 +38,17 @@ const (
 	// agentOAuthRefreshMargin renews the access token this long before it
 	// expires, so a poll never sends a token that dies mid-request.
 	agentOAuthRefreshMargin = 5 * time.Minute
+	tokenExchangeTimeout    = 15 * time.Second
 )
+
+// tokenExchangeContext is independent of the caller's deadline. A cancelled
+// Fetch must not abort a refresh whose POST may already have been applied.
+func tokenExchangeContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithTimeout(context.WithoutCancel(ctx), tokenExchangeTimeout)
+}
 
 // Package variables rather than constants so tests can point them at an
 // httptest server and a temp credentials file.
@@ -102,7 +112,14 @@ func (l *ClaudeLogin) Complete(ctx context.Context, pasted string) (config.OAuth
 	if state != "" && state != l.state {
 		return config.OAuthToken{}, fmt.Errorf("claude_code: state mismatch; start the sign-in again")
 	}
-	token, err := postClaudeToken(ctx, map[string]string{
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// Auth codes are single-use; finish the exchange even if the CLI's
+	// 30s timeout is already firing.
+	exchangeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	token, err := postClaudeToken(exchangeCtx, map[string]string{
 		"grant_type":    "authorization_code",
 		"client_id":     claudeOAuthClientID,
 		"code":          code,
@@ -113,7 +130,15 @@ func (l *ClaudeLogin) Complete(ctx context.Context, pasted string) (config.OAuth
 	if err != nil {
 		return config.OAuthToken{}, err
 	}
-	if err := config.SaveOAuthTokenTo(agentOAuthCredsPath(), AgentOAuthAccountID, token); err != nil {
+	path := agentOAuthCredsPath()
+	agentOAuthMu.Lock()
+	defer agentOAuthMu.Unlock()
+	unlock, err := lockAgentOAuthFile(path)
+	if err != nil {
+		return config.OAuthToken{}, fmt.Errorf("claude_code: locking sign-in: %w", err)
+	}
+	defer unlock()
+	if err := config.SaveOAuthTokenTo(path, AgentOAuthAccountID, token); err != nil {
 		return config.OAuthToken{}, fmt.Errorf("claude_code: saving sign-in: %w", err)
 	}
 	return token, nil
@@ -170,7 +195,7 @@ func postClaudeToken(ctx context.Context, fields map[string]string) (config.OAut
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: tokenExchangeTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return config.OAuthToken{}, fmt.Errorf("claude_code: token request failed: %w", err)
@@ -221,6 +246,11 @@ func truncateBody(b []byte, n int) string {
 
 // agentOAuthNeedsRefresh reports whether the token is expired or about to be.
 // A token with no recorded expiry is used until the API refuses it.
+func agentOAuthConfigured() bool {
+	tok, ok, err := config.LoadOAuthTokenFrom(agentOAuthCredsPath(), AgentOAuthAccountID)
+	return err == nil && ok && tok.AccessToken != ""
+}
+
 func agentOAuthNeedsRefresh(t config.OAuthToken, now time.Time) bool {
 	if t.ExpiresAt == "" {
 		return false
@@ -255,7 +285,10 @@ func agentOAuthAccessToken(ctx context.Context, force bool) (string, error) {
 
 	agentOAuthMu.Lock()
 	defer agentOAuthMu.Unlock()
-	unlock := lockAgentOAuthFile(path)
+	unlock, err := lockAgentOAuthFile(path)
+	if err != nil {
+		return "", fmt.Errorf("claude_code: locking sign-in: %w", err)
+	}
 	defer unlock()
 
 	// Re-read under the lock: another process may have renewed it already.
@@ -276,7 +309,13 @@ func agentOAuthAccessToken(ctx context.Context, force bool) (string, error) {
 		return "", ErrAgentOAuthSignInExpired
 	}
 
-	renewed, err := postClaudeToken(ctx, map[string]string{
+	// Detach from the caller (daemon Fetch is 8s, hydrate is 3s, and JSONL
+	// parsing often spends most of that). The refresh token is single-use:
+	// if Anthropic rotates it and the parent ctx then cancels, we must still
+	// read the body and persist or the sign-in is permanently dead.
+	exchangeCtx, cancel := tokenExchangeContext(ctx)
+	defer cancel()
+	renewed, err := postClaudeToken(exchangeCtx, map[string]string{
 		"grant_type":    "refresh_token",
 		"refresh_token": current.RefreshToken,
 		"client_id":     claudeOAuthClientID,

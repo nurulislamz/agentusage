@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -228,6 +230,109 @@ func TestReadUsageAPI_AgentOAuthRenewsOn401(t *testing.T) {
 		t.Errorf("usage_api_source = %q, want agent-oauth", snap.Raw["usage_api_source"])
 	}
 	if m := snap.Metrics["usage_five_hour"]; m.Used == nil || *m.Used != 42 {
+		t.Errorf("usage_five_hour = %+v", m)
+	}
+}
+
+func TestAgentOAuthAccessToken_CancelledContextStillSaves(t *testing.T) {
+	path := useAgentOAuthFixture(t, func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(30 * time.Millisecond)
+		_, _ = w.Write([]byte(`{"access_token":"acc-2","refresh_token":"ref-2","expires_in":28800}`))
+	})
+	saveAgentToken(t, path, config.OAuthToken{
+		AccessToken: "acc-1", RefreshToken: "ref-1",
+		ExpiresAt: time.Now().Add(-time.Minute).UTC().Format(time.RFC3339),
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	tok, err := agentOAuthAccessToken(ctx, false)
+	if err != nil || tok != "acc-2" {
+		t.Fatalf("token = %q, err = %v (cancelled Fetch must not abort persist)", tok, err)
+	}
+	stored, _, _ := config.LoadOAuthTokenFrom(path, AgentOAuthAccountID)
+	if stored.RefreshToken != "ref-2" {
+		t.Errorf("stored refresh = %q, want ref-2", stored.RefreshToken)
+	}
+}
+
+func TestAgentOAuthAccessToken_ConcurrentRefreshOnce(t *testing.T) {
+	var calls int32
+	path := useAgentOAuthFixture(t, func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		time.Sleep(40 * time.Millisecond)
+		_, _ = w.Write([]byte(`{"access_token":"acc-2","refresh_token":"ref-2","expires_in":28800}`))
+	})
+	saveAgentToken(t, path, config.OAuthToken{
+		AccessToken: "acc-1", RefreshToken: "ref-1",
+		ExpiresAt: time.Now().Add(-time.Minute).UTC().Format(time.RFC3339),
+	})
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 8)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			tok, err := agentOAuthAccessToken(context.Background(), false)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if tok != "acc-2" {
+				errCh <- fmtError("token", tok)
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Error(err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Errorf("token endpoint called %d times, want 1", got)
+	}
+}
+
+func fmtError(label, got string) error {
+	return errors.New(label + " = " + got)
+}
+
+func TestProvider_Fetch_AgentOAuthWithoutOrgUUID(t *testing.T) {
+	path := useAgentOAuthFixture(t, nil)
+	saveAgentToken(t, path, config.OAuthToken{
+		AccessToken: "acc", RefreshToken: "ref",
+		ExpiresAt: time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+	})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer acc" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{"five_hour":{"utilization":7,"resets_at":"2999-01-01T00:00:00Z"}}`))
+	}))
+	defer srv.Close()
+	old := oauthUsageURL
+	oauthUsageURL = srv.URL
+	defer func() { oauthUsageURL = old }()
+	setTempHome(t)
+
+	tmpDir := t.TempDir()
+	accountPath := filepath.Join(tmpDir, ".claude.json")
+	if err := os.WriteFile(accountPath, []byte(`{"hasAvailableSubscription":true,"oauthAccount":{"emailAddress":"a@b.c"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	p := New()
+	snap, err := p.Fetch(context.Background(), testClaudeAccount("test-claude", filepath.Join(tmpDir, "no-stats"), accountPath))
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if snap.Raw["usage_api_source"] != "agent-oauth" {
+		t.Errorf("usage_api_source = %q, want agent-oauth (no org UUID); raw=%v", snap.Raw["usage_api_source"], snap.Raw)
+	}
+	if m := snap.Metrics["usage_five_hour"]; m.Used == nil || *m.Used != 7 {
 		t.Errorf("usage_five_hour = %+v", m)
 	}
 }

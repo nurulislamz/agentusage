@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3" // already in go.mod for cursor provider
@@ -235,14 +236,29 @@ var oauthUsageURL = "https://api.anthropic.com/api/oauth/usage"
 
 var refreshClaudeCLIFunc = refreshClaudeCodeCLI
 
+var claudeCLIRefreshMu sync.Mutex
+
 // refreshClaudeCodeCLI executes `claude auth status` via the Claude Code CLI.
 // When Claude Code checks auth status, it automatically refreshes expired access
 // tokens using its refresh token and updates ~/.claude/.credentials.json.
-func refreshClaudeCodeCLI(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
+func refreshClaudeCodeCLI(_ context.Context) error {
+	claudeCLIRefreshMu.Lock()
+	defer claudeCLIRefreshMu.Unlock()
+
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		claudeDir := filepath.Join(home, ".claude")
+		_ = os.MkdirAll(claudeDir, 0o755)
+		unlock, err := lockAgentOAuthFile(filepath.Join(claudeDir, ".credentials.json"))
+		if err != nil {
+			return fmt.Errorf("locking Claude Code credentials: %w", err)
+		}
+		defer unlock()
 	}
-	ctxTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+
+	// Do not inherit the provider Fetch deadline: killing `claude auth status`
+	// mid-refresh spends Claude Code's single-use refresh token.
+	ctxTimeout, cancel := context.WithTimeout(context.WithoutCancel(context.Background()), 10*time.Second)
 	defer cancel()
 
 	claudePath, err := exec.LookPath("claude")
