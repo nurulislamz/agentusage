@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestSaveAndLoadCredentials(t *testing.T) {
@@ -235,7 +236,66 @@ func TestSaveSession_PermissionsAndAtomic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadDir: %v", err)
 	}
-	if len(entries) != 1 || entries[0].Name() != "credentials.json" {
-		t.Errorf("expected only credentials.json in directory, found: %v", entries)
+	names := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		names[e.Name()] = true
+	}
+	if !names["credentials.json"] {
+		t.Errorf("expected credentials.json in directory, found: %v", entries)
+	}
+	for name := range names {
+		if name != "credentials.json" && name != "credentials.json.lock" {
+			t.Errorf("unexpected file %q in credentials dir", name)
+		}
+	}
+}
+
+func TestLockCredentials_SerializesKeySaveWithOAuthWrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "credentials.json")
+	if err := SaveOAuthTokenTo(path, "claude-code", OAuthToken{
+		AccessToken: "acc-old", RefreshToken: "ref-old",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	unlock, err := LockCredentials(path)
+	if err != nil {
+		t.Fatalf("LockCredentials: %v", err)
+	}
+
+	started := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		close(started)
+		done <- SaveCredentialTo(path, "openai", "sk-new")
+	}()
+	<-started
+	select {
+	case err := <-done:
+		unlock()
+		t.Fatalf("key save completed while oauth lock held: %v", err)
+	case <-time.After(80 * time.Millisecond):
+	}
+
+	if err := SaveOAuthTokenTo(path, "claude-code", OAuthToken{
+		AccessToken: "acc-new", RefreshToken: "ref-new",
+	}); err != nil {
+		unlock()
+		t.Fatal(err)
+	}
+	unlock()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+
+	creds, err := LoadCredentialsFrom(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if creds.OAuth["claude-code"].RefreshToken != "ref-new" {
+		t.Errorf("oauth clobbered: %+v", creds.OAuth["claude-code"])
+	}
+	if creds.Keys["openai"] != "sk-new" {
+		t.Errorf("key = %q, want sk-new", creds.Keys["openai"])
 	}
 }

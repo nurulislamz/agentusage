@@ -416,7 +416,11 @@ func (p *Provider) Fetch(ctx context.Context, acct core.AccountConfig) (core.Usa
 		hasData = true
 	}
 
-	if orgUUID, ok := snap.Raw["organization_uuid"]; ok && orgUUID != "" {
+	orgUUID := snap.Raw["organization_uuid"]
+	// Agent OAuth usage does not need an org UUID (the cookie source does).
+	// `agentusage login claude` on a machine without ~/.claude.json must
+	// still hit the usage API.
+	if orgUUID != "" || agentOAuthConfigured() {
 		if err := p.readUsageAPI(ctx, orgUUID, &snap); err != nil {
 			snap.Raw["usage_api_error"] = err.Error()
 		} else {
@@ -494,7 +498,7 @@ func (p *Provider) usageAuthSources(ctx context.Context, orgUUID string) []usage
 			},
 			reauth: func() (func(*http.Request), error) {
 				if refreshClaudeCLIFunc != nil {
-					if err := refreshClaudeCLIFunc(ctx); err != nil {
+					if err := refreshClaudeCLIFunc(context.Background()); err != nil {
 						return nil, err
 					}
 					token, err := readClaudeCodeOAuthToken()

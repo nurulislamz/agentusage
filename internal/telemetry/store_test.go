@@ -119,6 +119,95 @@ func TestStoreIngest_IdempotentByDedupKey(t *testing.T) {
 	}
 }
 
+func TestStoreIngest_CodexJSONLSharedMessageIDKeepsFirstDelta(t *testing.T) {
+	_, store := openUsageViewTestStore(t)
+	now := time.Date(2026, 3, 5, 10, 0, 2, 0, time.UTC)
+
+	first, err := store.Ingest(context.Background(), IngestRequest{
+		SourceSystem:  SourceSystem("codex"),
+		SourceChannel: SourceChannelJSONL,
+		OccurredAt:    now,
+		ProviderID:    "codex",
+		AccountID:     "codex-cli",
+		SessionID:     "sess-msgid",
+		TurnID:        "req-1",
+		MessageID:     "req-1",
+		EventType:     EventTypeMessageUsage,
+		TokenUsage:    core.TokenUsage{InputTokens: int64Ptr(10), OutputTokens: int64Ptr(5), TotalTokens: int64Ptr(15)},
+	})
+	if err != nil {
+		t.Fatalf("ingest first delta: %v", err)
+	}
+	if first.Deduped {
+		t.Fatalf("first delta unexpectedly deduped")
+	}
+
+	second, err := store.Ingest(context.Background(), IngestRequest{
+		SourceSystem:  SourceSystem("codex"),
+		SourceChannel: SourceChannelJSONL,
+		OccurredAt:    now.Add(time.Second),
+		ProviderID:    "codex",
+		AccountID:     "codex-cli",
+		SessionID:     "sess-msgid",
+		TurnID:        "req-1",
+		MessageID:     "req-1",
+		EventType:     EventTypeMessageUsage,
+		TokenUsage:    core.TokenUsage{InputTokens: int64Ptr(2), OutputTokens: int64Ptr(2), TotalTokens: int64Ptr(4)},
+	})
+	if err != nil {
+		t.Fatalf("ingest second delta: %v", err)
+	}
+	if !second.Deduped {
+		t.Fatalf("shared message_id should collapse at ingest")
+	}
+
+	var total int64
+	if err := store.db.QueryRow(`SELECT total_tokens FROM usage_events`).Scan(&total); err != nil {
+		t.Fatalf("scan total_tokens: %v", err)
+	}
+	if total != 15 {
+		t.Fatalf("stored total_tokens = %d, want 15 (chooseInt64 first-wins dropped +4)", total)
+	}
+
+	uniqueFirst, err := store.Ingest(context.Background(), IngestRequest{
+		SourceSystem:  SourceSystem("codex"),
+		SourceChannel: SourceChannelJSONL,
+		OccurredAt:    now,
+		ProviderID:    "codex",
+		AccountID:     "codex-cli",
+		SessionID:     "sess-unique",
+		TurnID:        "req-2",
+		MessageID:     "req-2:3",
+		EventType:     EventTypeMessageUsage,
+		TokenUsage:    core.TokenUsage{InputTokens: int64Ptr(10), OutputTokens: int64Ptr(5), TotalTokens: int64Ptr(15)},
+	})
+	if err != nil || uniqueFirst.Deduped {
+		t.Fatalf("unique first: deduped=%v err=%v", uniqueFirst.Deduped, err)
+	}
+	uniqueSecond, err := store.Ingest(context.Background(), IngestRequest{
+		SourceSystem:  SourceSystem("codex"),
+		SourceChannel: SourceChannelJSONL,
+		OccurredAt:    now.Add(time.Second),
+		ProviderID:    "codex",
+		AccountID:     "codex-cli",
+		SessionID:     "sess-unique",
+		TurnID:        "req-2",
+		MessageID:     "req-2:4",
+		EventType:     EventTypeMessageUsage,
+		TokenUsage:    core.TokenUsage{InputTokens: int64Ptr(2), OutputTokens: int64Ptr(2), TotalTokens: int64Ptr(4)},
+	})
+	if err != nil || uniqueSecond.Deduped {
+		t.Fatalf("unique second: deduped=%v err=%v", uniqueSecond.Deduped, err)
+	}
+	var sum int64
+	if err := store.db.QueryRow(`SELECT SUM(total_tokens) FROM usage_events WHERE session_id = 'sess-unique'`).Scan(&sum); err != nil {
+		t.Fatalf("scan unique sum: %v", err)
+	}
+	if sum != 19 {
+		t.Fatalf("unique message_ids sum = %d, want 19", sum)
+	}
+}
+
 func TestStoreIngest_DedupEnrichesMissingFields(t *testing.T) {
 	db, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), "telemetry.db"))
 	if err != nil {

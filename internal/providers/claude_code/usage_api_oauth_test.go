@@ -402,9 +402,10 @@ func TestReadUsageAPI_FallbackOnRejectedOAuth(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when rejected OAuth and failed cookie")
 	}
-	// 401 rejected OAuth should allow probing cookie source
-	if !strings.Contains(err.Error(), "oauth: API returned 401") || !strings.Contains(err.Error(), "cookie:") {
-		t.Fatalf("expected both 401 oauth and cookie attempt in error, got %v", err)
+	// 401 triggers a CLI reauth attempt; tests stub that helper to fail, then
+	// cookie auth is still probed.
+	if !strings.Contains(err.Error(), "oauth:") || !strings.Contains(err.Error(), "cookie:") {
+		t.Fatalf("expected both oauth and cookie attempt in error, got %v", err)
 	}
 }
 

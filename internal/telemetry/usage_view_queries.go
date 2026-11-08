@@ -62,15 +62,36 @@ func dedupedUsageCTEWhere(where string, args []any) (string, []any) {
 			WHERE %s
 			  AND e.event_type IN ('message_usage', 'tool_usage')
 		),
+		codex_hook_turns AS (
+			SELECT DISTINCT
+				LOWER(TRIM(COALESCE(session_id, ''))) AS session_key,
+				LOWER(TRIM(turn_id)) AS turn_key
+			FROM scoped_usage
+			WHERE LOWER(TRIM(event_type)) = 'message_usage'
+			  AND LOWER(TRIM(source_system)) = 'codex'
+			  AND LOWER(TRIM(source_channel)) = 'hook'
+			  AND COALESCE(NULLIF(TRIM(turn_id), ''), '') != ''
+		),
+		filtered_usage AS (
+			SELECT s.*
+			FROM scoped_usage s
+			WHERE NOT (
+				LOWER(TRIM(s.event_type)) = 'message_usage'
+				AND LOWER(TRIM(s.source_system)) = 'codex'
+				AND LOWER(TRIM(COALESCE(s.source_channel, ''))) != 'hook'
+				AND COALESCE(NULLIF(TRIM(s.turn_id), ''), '') != ''
+				AND EXISTS (
+					SELECT 1 FROM codex_hook_turns h
+					WHERE h.session_key = LOWER(TRIM(COALESCE(s.session_id, '')))
+					  AND h.turn_key = LOWER(TRIM(s.turn_id))
+				)
+			)
+		),
 		ranked_usage AS (
 			SELECT
-				scoped_usage.*,
+				filtered_usage.*,
 					CASE
 						WHEN COALESCE(NULLIF(TRIM(tool_call_id), ''), '') != '' THEN 'tool:' || LOWER(TRIM(tool_call_id))
-						WHEN LOWER(TRIM(event_type)) = 'message_usage'
-							AND LOWER(TRIM(source_system)) = 'codex'
-							AND COALESCE(NULLIF(TRIM(turn_id), ''), '') != ''
-						THEN 'message_turn:' || LOWER(TRIM(turn_id))
 						WHEN COALESCE(NULLIF(TRIM(message_id), ''), '') != '' THEN 'message:' || LOWER(TRIM(message_id))
 						WHEN COALESCE(NULLIF(TRIM(turn_id), ''), '') != '' THEN 'turn:' || LOWER(TRIM(turn_id))
 						ELSE 'fallback:' || dedup_key
@@ -94,7 +115,7 @@ func dedupedUsageCTEWhere(where string, args []any) (string, []any) {
 						ELSE 0
 					END
 				) AS quality_score
-			FROM scoped_usage
+			FROM filtered_usage
 		),
 		deduped_usage AS (
 			SELECT

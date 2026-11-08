@@ -578,6 +578,44 @@ func TestFetch_ExpiredSessionReportsAuth(t *testing.T) {
 	}
 }
 
+func TestFetch_ExpiredSessionKeepsStatusLineQuota(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	dir := t.TempDir()
+	authFile := filepath.Join(dir, "auth.json")
+	if err := os.WriteFile(authFile, []byte(`{"accessToken":"expired-jwt"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	statusFile := filepath.Join(dir, "cursor-status.json")
+	if err := os.WriteFile(statusFile, []byte(sampleCursorStatusLineJSON), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	snap, err := New().WithClient(NewClient(ts.URL, ts.Client())).Fetch(context.Background(), core.AccountConfig{
+		ID:       "cursor-nurulz",
+		Provider: "cursor",
+		ProviderPaths: map[string]string{
+			"auth_file":   authFile,
+			"status_file": statusFile,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch() error = %v", err)
+	}
+	if snap.Status != core.StatusNearLimit {
+		t.Fatalf("status = %q, want NEAR_LIMIT from status-line quota (not AUTH from a rejected dashboard JWT)", snap.Status)
+	}
+	if got := metricUsed(t, snap, "quota"); got != 88 {
+		t.Fatalf("quota used = %v, want 88 from the status-line payload", got)
+	}
+	if snap.Diagnostics["plan_api_error"] == "" {
+		t.Fatal("expected plan_api_error diagnostic for the rejected session")
+	}
+}
+
 func TestEnrichSnapshots_UsesAuthFileHint(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer hinted-jwt" {

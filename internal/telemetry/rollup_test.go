@@ -113,3 +113,63 @@ func TestRollupDaily_DedupsAcrossChannels(t *testing.T) {
 		t.Errorf("deduped rollup = in:%d n:%d, want 100/1 (counted once across channels)", in, evcount)
 	}
 }
+
+func TestRollupDaily_SumsCodexJSONLDeltasInSameTurn(t *testing.T) {
+	_, store := openUsageViewTestStore(t)
+	ctx := context.Background()
+	now := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
+	day := now.AddDate(0, 0, -2)
+
+	mk := func(messageID string, tokens int64) IngestRequest {
+		return IngestRequest{
+			SourceSystem:  "codex",
+			SourceChannel: SourceChannelJSONL,
+			OccurredAt:    day,
+			ProviderID:    "codex",
+			AccountID:     "codex-cli",
+			SessionID:     "sess-1",
+			TurnID:        "req-1",
+			MessageID:     messageID,
+			EventType:     EventTypeMessageUsage,
+			ModelRaw:      "gpt-5-codex",
+			TokenUsage:    core.TokenUsage{InputTokens: i64(tokens), TotalTokens: i64(tokens)},
+		}
+	}
+	mustIngestUsageEvent(t, store, mk("req-1:3", 15), "delta 15")
+	mustIngestUsageEvent(t, store, mk("req-1:4", 4), "delta 4")
+
+	if _, err := store.RollupDaily(ctx, now); err != nil {
+		t.Fatalf("rollup: %v", err)
+	}
+	var in, evcount int64
+	row := store.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(input_tokens),0), COALESCE(SUM(event_count),0) FROM usage_rollup_daily WHERE day = ?`,
+		day.Format("2006-01-02"))
+	if err := row.Scan(&in, &evcount); err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if in != 19 || evcount != 2 {
+		t.Errorf("codex jsonl rollup = in:%d n:%d, want 19/2 (sum deltas; not keep-latest 4)", in, evcount)
+	}
+
+	wm, err := store.RollupWatermark(ctx)
+	if err != nil {
+		t.Fatalf("watermark: %v", err)
+	}
+	deleted, _, err := store.PruneOldEvents(ctx, 1, wm)
+	if err != nil {
+		t.Fatalf("prune: %v", err)
+	}
+	if deleted == 0 {
+		t.Fatalf("expected prune to delete rolled JSONL events")
+	}
+	row = store.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(input_tokens),0), COALESCE(SUM(event_count),0) FROM usage_rollup_daily WHERE day = ?`,
+		day.Format("2006-01-02"))
+	if err := row.Scan(&in, &evcount); err != nil {
+		t.Fatalf("scan after prune: %v", err)
+	}
+	if in != 19 || evcount != 2 {
+		t.Errorf("after prune rollup = in:%d n:%d, want 19/2 persisted", in, evcount)
+	}
+}

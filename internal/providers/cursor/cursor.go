@@ -228,13 +228,31 @@ func (p *Provider) applyLivePlanUsage(ctx context.Context, acct core.AccountConf
 	live, err := client.fetchLivePlanUsage(ctx, token)
 	if err != nil {
 		snap.SetDiagnostic("plan_api_error", err.Error())
-		if errors.Is(err, errSessionExpired) && snap.Status != core.StatusError {
+		// A rejected dashboard JWT must not hide live status-line quota
+		// gauges. The CLI quota payload is independent of DashboardService
+		// auth; only promote AUTH when this fetch has no local quota to show.
+		if errors.Is(err, errSessionExpired) && snap.Status != core.StatusError && !hasLocalCursorQuota(snap) {
 			snap.Status = core.StatusAuth
 			snap.Message = "Cursor session expired: run `" + loginCommand(acct) + "`"
 		}
 		return
 	}
 	applyLivePlanToSnapshot(snap, live, auth)
+}
+
+func hasLocalCursorQuota(snap *core.UsageSnapshot) bool {
+	if snap == nil {
+		return false
+	}
+	for key, m := range snap.Metrics {
+		if m.Remaining == nil && m.Used == nil && m.Limit == nil {
+			continue
+		}
+		if key == "quota" || key == "cursor_plan_usage" || strings.HasPrefix(key, "quota_") {
+			return true
+		}
+	}
+	return false
 }
 
 func loginCommand(acct core.AccountConfig) string {

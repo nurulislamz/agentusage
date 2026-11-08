@@ -150,6 +150,12 @@ func SaveCredentialTo(path, accountID, apiKey string) error {
 		return fmt.Errorf("api key is empty")
 	}
 
+	unlock, err := LockCredentials(path)
+	if err != nil {
+		return fmt.Errorf("locking credentials: %w", err)
+	}
+	defer unlock()
+
 	credMu.Lock()
 	defer credMu.Unlock()
 
@@ -172,6 +178,12 @@ func DeleteCredentialFrom(path, accountID string) error {
 	if accountID == "" {
 		return fmt.Errorf("account ID is empty")
 	}
+
+	unlock, err := LockCredentials(path)
+	if err != nil {
+		return fmt.Errorf("locking credentials: %w", err)
+	}
+	defer unlock()
 
 	credMu.Lock()
 	defer credMu.Unlock()
@@ -206,6 +218,12 @@ func SaveSessionTo(path, accountID string, session BrowserSession) error {
 		return fmt.Errorf("session domain and cookie_name are required")
 	}
 
+	unlock, err := LockCredentials(path)
+	if err != nil {
+		return fmt.Errorf("locking credentials: %w", err)
+	}
+	defer unlock()
+
 	credMu.Lock()
 	defer credMu.Unlock()
 
@@ -231,6 +249,12 @@ func DeleteSessionFrom(path, accountID string) error {
 	if accountID == "" {
 		return fmt.Errorf("account ID is empty")
 	}
+
+	unlock, err := LockCredentials(path)
+	if err != nil {
+		return fmt.Errorf("locking credentials: %w", err)
+	}
+	defer unlock()
 
 	credMu.Lock()
 	defer credMu.Unlock()
@@ -279,6 +303,13 @@ func SaveOAuthTokenTo(path, accountID string, token OAuthToken) error {
 		return fmt.Errorf("access token is empty")
 	}
 
+	// Inter-process lock is the caller's job when this is nested inside an
+	// OAuth refresh (which must hold the lock across the token HTTP call).
+	// Standalone callers (login Complete) take LockCredentials first.
+	return saveOAuthToken(path, accountID, token)
+}
+
+func saveOAuthToken(path, accountID string, token OAuthToken) error {
 	credMu.Lock()
 	defer credMu.Unlock()
 
@@ -301,6 +332,12 @@ func DeleteOAuthTokenFrom(path, accountID string) error {
 	if accountID == "" {
 		return fmt.Errorf("account ID is empty")
 	}
+
+	unlock, err := LockCredentials(path)
+	if err != nil {
+		return fmt.Errorf("locking credentials: %w", err)
+	}
+	defer unlock()
 
 	credMu.Lock()
 	defer credMu.Unlock()

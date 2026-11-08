@@ -2,6 +2,8 @@
 
 package claude_code
 
-func lockAgentOAuthFile(path string) func() {
-	return func() {}
+import "github.com/nurulislamz/agentusage/internal/config"
+
+func lockAgentOAuthFile(path string) (func(), error) {
+	return config.LockCredentials(path)
 }
