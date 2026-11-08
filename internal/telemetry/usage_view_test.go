@@ -863,7 +863,7 @@ func TestApplyCanonicalUsageView_SkipsProviderBurnMetricsForCodex(t *testing.T) 
 	}
 }
 
-func TestApplyCanonicalUsageView_DedupsCodexMessageUsageByTurnID(t *testing.T) {
+func TestApplyCanonicalUsageView_SumsCodexJSONLDeltasInSameTurn(t *testing.T) {
 	dbPath, store := openUsageViewTestStore(t)
 
 	now := time.Now().UTC()
@@ -878,7 +878,7 @@ func TestApplyCanonicalUsageView_DedupsCodexMessageUsageByTurnID(t *testing.T) {
 		EventType:     EventTypeMessageUsage,
 		SessionID:     "sess-dedup-1",
 		TurnID:        "turn-dedup-1",
-		MessageID:     "sess-dedup-1:101",
+		MessageID:     "req-1:3",
 		ModelRaw:      "gpt-5-codex",
 		TokenUsage: core.TokenUsage{
 			InputTokens:  int64Ptr(10),
@@ -888,7 +888,7 @@ func TestApplyCanonicalUsageView_DedupsCodexMessageUsageByTurnID(t *testing.T) {
 		},
 		Status: EventStatusOK,
 	}); err != nil {
-		t.Fatalf("ingest first codex message event: %v", err)
+		t.Fatalf("ingest first codex delta: %v", err)
 	}
 	if _, err := store.Ingest(context.Background(), IngestRequest{
 		SourceSystem:  SourceSystem("codex"),
@@ -901,17 +901,17 @@ func TestApplyCanonicalUsageView_DedupsCodexMessageUsageByTurnID(t *testing.T) {
 		EventType:     EventTypeMessageUsage,
 		SessionID:     "sess-dedup-1",
 		TurnID:        "turn-dedup-1",
-		MessageID:     "sess-dedup-1:102",
+		MessageID:     "req-1:4",
 		ModelRaw:      "gpt-5-codex",
 		TokenUsage: core.TokenUsage{
-			InputTokens:  int64Ptr(15),
-			OutputTokens: int64Ptr(9),
-			TotalTokens:  int64Ptr(24),
+			InputTokens:  int64Ptr(2),
+			OutputTokens: int64Ptr(2),
+			TotalTokens:  int64Ptr(4),
 			Requests:     int64Ptr(1),
 		},
 		Status: EventStatusOK,
 	}); err != nil {
-		t.Fatalf("ingest second codex message event: %v", err)
+		t.Fatalf("ingest second codex delta: %v", err)
 	}
 
 	snaps := map[string]core.UsageSnapshot{
@@ -927,14 +927,81 @@ func TestApplyCanonicalUsageView_DedupsCodexMessageUsageByTurnID(t *testing.T) {
 	}
 	snap := merged["codex-cli"]
 
-	if got := metricUsed(snap.Metrics["client_cli_requests"]); got != 1 {
-		t.Fatalf("client_cli_requests = %v, want 1 (deduped by turn_id)", got)
+	if got := metricUsed(snap.Metrics["client_cli_requests"]); got != 2 {
+		t.Fatalf("client_cli_requests = %v, want 2 (one per JSONL delta)", got)
+	}
+	if got := metricUsed(snap.Metrics["window_requests"]); got != 2 {
+		t.Fatalf("window_requests = %v, want 2 (one per JSONL delta)", got)
+	}
+	if got := metricUsed(snap.Metrics["window_tokens"]); got != 19 {
+		t.Fatalf("window_tokens = %v, want 19 (15+4 JSONL deltas), not keep-latest 4", got)
+	}
+}
+
+func TestApplyCanonicalUsageView_PrefersCodexHookOverJSONLTurnDeltas(t *testing.T) {
+	dbPath, store := openUsageViewTestStore(t)
+
+	now := time.Now().UTC()
+	jsonl := func(messageID string, total int64, offset time.Duration) IngestRequest {
+		return IngestRequest{
+			SourceSystem:  SourceSystem("codex"),
+			SourceChannel: SourceChannelJSONL,
+			OccurredAt:    now.Add(offset),
+			ProviderID:    "codex",
+			AccountID:     "codex-cli",
+			AgentName:     "codex",
+			EventType:     EventTypeMessageUsage,
+			SessionID:     "sess-hook-1",
+			TurnID:        "turn-hook-1",
+			MessageID:     messageID,
+			ModelRaw:      "gpt-5-codex",
+			TokenUsage: core.TokenUsage{
+				InputTokens: int64Ptr(total),
+				TotalTokens: int64Ptr(total),
+				Requests:    int64Ptr(1),
+			},
+			Status: EventStatusOK,
+		}
+	}
+	mustIngestUsageEvent(t, store, jsonl("req-1:3", 15, 0), "jsonl delta 1")
+	mustIngestUsageEvent(t, store, jsonl("req-1:4", 4, time.Second), "jsonl delta 2")
+	mustIngestUsageEvent(t, store, IngestRequest{
+		SourceSystem:  SourceSystem("codex"),
+		SourceChannel: SourceChannelHook,
+		OccurredAt:    now.Add(2 * time.Second),
+		ProviderID:    "codex",
+		AccountID:     "codex-cli",
+		AgentName:     "codex",
+		EventType:     EventTypeMessageUsage,
+		SessionID:     "sess-hook-1",
+		TurnID:        "turn-hook-1",
+		MessageID:     "msg-hook-1",
+		ModelRaw:      "gpt-5-codex",
+		TokenUsage: core.TokenUsage{
+			InputTokens: int64Ptr(19),
+			TotalTokens: int64Ptr(19),
+			Requests:    int64Ptr(1),
+		},
+		Status: EventStatusOK,
+	}, "hook turn total")
+
+	snaps := map[string]core.UsageSnapshot{
+		"codex-cli": {
+			ProviderID: "codex",
+			AccountID:  "codex-cli",
+			Metrics:    map[string]core.Metric{},
+		},
+	}
+	merged, err := applyCanonicalUsageViewForTest(context.Background(), dbPath, snaps)
+	if err != nil {
+		t.Fatalf("apply canonical usage view: %v", err)
+	}
+	snap := merged["codex-cli"]
+	if got := metricUsed(snap.Metrics["window_tokens"]); got != 19 {
+		t.Fatalf("window_tokens = %v, want 19 from hook (not 15+4+19 double-count)", got)
 	}
 	if got := metricUsed(snap.Metrics["window_requests"]); got != 1 {
-		t.Fatalf("window_requests = %v, want 1 (deduped by turn_id)", got)
-	}
-	if got := metricUsed(snap.Metrics["window_tokens"]); got != 24 {
-		t.Fatalf("window_tokens = %v, want 24 from the newest turn event", got)
+		t.Fatalf("window_requests = %v, want 1 hook row", got)
 	}
 }
 

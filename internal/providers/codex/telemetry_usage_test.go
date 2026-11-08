@@ -416,11 +416,32 @@ func TestParseTelemetrySessionFile_UsesTurnIDAsMessageIDFallback(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("events = %d, want 2", len(events))
 	}
-	if events[0].MessageID != "req-1" {
-		t.Fatalf("first message_id = %q, want req-1", events[0].MessageID)
+	if events[0].MessageID != "req-1:3" {
+		t.Fatalf("first message_id = %q, want req-1:3 (request_id plus JSONL line)", events[0].MessageID)
 	}
-	if events[1].MessageID != "req-1" {
-		t.Fatalf("second message_id = %q, want req-1", events[1].MessageID)
+	if events[1].MessageID != "req-1:4" {
+		t.Fatalf("second message_id = %q, want req-1:4 (request_id plus JSONL line)", events[1].MessageID)
+	}
+	if events[0].TurnID != "req-1" || events[1].TurnID != "req-1" {
+		t.Fatalf("turn_id = %q/%q, want req-1 on both deltas", events[0].TurnID, events[1].TurnID)
+	}
+	if events[0].TotalTokens == nil || *events[0].TotalTokens != 15 {
+		t.Fatalf("first delta total_tokens = %+v, want 15", events[0].TotalTokens)
+	}
+	if events[1].TotalTokens == nil || *events[1].TotalTokens != 4 {
+		t.Fatalf("second delta total_tokens = %+v, want 4 (19-15)", events[1].TotalTokens)
+	}
+}
+
+func TestCodexJSONLMessageID(t *testing.T) {
+	if got := codexJSONLMessageID("", "req-1", 3); got != "req-1:3" {
+		t.Fatalf("empty payload message_id = %q, want req-1:3", got)
+	}
+	if got := codexJSONLMessageID("msg-9", "req-1", 12); got != "msg-9:12" {
+		t.Fatalf("explicit message_id = %q, want msg-9:12", got)
+	}
+	if got := codexJSONLMessageID("", "", 7); got != "line:7" {
+		t.Fatalf("empty ids = %q, want line:7", got)
 	}
 }
 

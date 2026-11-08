@@ -431,6 +431,20 @@ func applyTelemetryThreadSettings(state *telemetryParserState, payload *eventPay
 	}
 }
 
+// codexJSONLMessageID makes each token_count line a unique ingest identity.
+// Turn/request ids stay on TurnID so hook events can still match the turn;
+// the line suffix prevents same-channel first-wins from collapsing deltas.
+func codexJSONLMessageID(payloadMessageID, turnID string, lineNumber int) string {
+	base := strings.TrimSpace(payloadMessageID)
+	if base == "" {
+		base = strings.TrimSpace(turnID)
+	}
+	if base == "" {
+		return fmt.Sprintf("line:%d", lineNumber)
+	}
+	return fmt.Sprintf("%s:%d", base, lineNumber)
+}
+
 func parseTelemetrySessionFileFrom(path string, byteOffset int64, lineNumber int, state *telemetryParserState) ([]shared.TelemetryEvent, int64, int, error) {
 	if state == nil {
 		state = newTelemetryParserState(path)
@@ -501,10 +515,11 @@ func parseTelemetrySessionFileFrom(path string, byteOffset int64, lineNumber int
 			if strings.TrimSpace(payload.RequestID) != "" {
 				turnID = strings.TrimSpace(payload.RequestID)
 			}
-			messageID := strings.TrimSpace(payload.MessageID)
-			if messageID == "" {
-				messageID = turnID
-			}
+			// Append the JSONL line so each token_count delta is its own
+			// ingest/dedup key. request_id and turn_context.turn_id persist
+			// across completions in a turn; reusing them as message_id made
+			// chooseInt64 first-wins drop later deltas (15 then +4 → 15).
+			messageID := codexJSONLMessageID(payload.MessageID, turnID, record.LineNumber)
 
 			// A token_count event may name its own model, which overrides the
 			// session/turn default for this turn only -- so it is derived here
