@@ -348,6 +348,33 @@ func TestOAuthClientCredentials(t *testing.T) {
 		t.Errorf("expected glued secret split into multiple candidates, got %d", len(pairs))
 	}
 
+	t.Run("concurrent remember does not panic", func(t *testing.T) {
+		resetCLIOAuthClientCache()
+		var wg sync.WaitGroup
+		for i := 0; i < 16; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for j := 0; j < 32; j++ {
+					got := fallbackClientCandidates()
+					if len(got) == 0 {
+						t.Error("fallbackClientCandidates() returned no candidates")
+						return
+					}
+					_ = got[0]
+					_ = got[len(got)-1]
+					pick := got[j%len(got)]
+					rememberCLIOAuthClient(pick.id, pick.secret)
+				}
+			}()
+		}
+		wg.Wait()
+		got := fallbackClientCandidates()
+		if len(got) == 0 {
+			t.Fatal("fallbackClientCandidates() empty after concurrent remember")
+		}
+	})
+
 	// Primary env vars
 	t.Setenv(oauthClientIDEnv, "my-client-id")
 	t.Setenv(oauthClientSecretEnv, "my-secret")

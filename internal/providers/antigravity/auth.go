@@ -41,7 +41,13 @@ const (
 // CLI binary. The binary ships two clients and the secrets sit adjacent in
 // its string table, so id↔secret pairing is ambiguous — the working pair is
 // discovered by probing the token endpoint at refresh time.
+//
+// cliOAuthClientMu guards both the extracted candidate list and the remembered
+// working pair. rememberCLIOAuthClient runs from concurrent Fetch goroutines
+// (the daemon polls one goroutine per account), so unsynchronized slice
+// replacement can tear the header and panic on index-out-of-range.
 var cliOAuthClientOnce sync.Once
+var cliOAuthClientMu sync.Mutex
 var cliOAuthClientCandidates []struct{ id, secret string }
 
 // cliOAuthClientPath returns the antigravity CLI binary to scan for the
@@ -113,22 +119,59 @@ func containsID(ids []string, id string) bool {
 
 // resetCLIOAuthClientCache drops the cached extracted client (tests only).
 func resetCLIOAuthClientCache() {
+	cliOAuthClientMu.Lock()
+	defer cliOAuthClientMu.Unlock()
 	cliOAuthClientOnce = sync.Once{}
+	cliOAuthClientCandidates = nil
 }
 
 // rememberCLIOAuthClient pins the discovered working (id, secret) pair so
-// subsequent refreshes skip the probe.
+// subsequent refreshes skip the probe. Other extracted candidates stay in
+// the list after the working pair so a later invalid_client can fall through.
 func rememberCLIOAuthClient(id, secret string) {
-	cliOAuthClientCandidates = []struct{ id, secret string }{{id, secret}}
+	working := struct{ id, secret string }{id, secret}
+	cliOAuthClientMu.Lock()
+	defer cliOAuthClientMu.Unlock()
+	cliOAuthClientCandidates = preferOAuthClientPair(cliOAuthClientCandidates, working)
+}
+
+func preferOAuthClientPair(pairs []struct{ id, secret string }, working struct{ id, secret string }) []struct{ id, secret string } {
+	out := make([]struct{ id, secret string }, 0, len(pairs)+1)
+	out = append(out, working)
+	for _, p := range pairs {
+		if p != working {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func cloneOAuthClientPairs(pairs []struct{ id, secret string }) []struct{ id, secret string } {
+	if len(pairs) == 0 {
+		return nil
+	}
+	out := make([]struct{ id, secret string }, len(pairs))
+	copy(out, pairs)
+	return out
 }
 
 // fallbackOAuthClient returns the CLI's embedded OAuth client candidates,
 // extracted once from the local antigravity CLI binary.
 func fallbackOAuthClient() []struct{ id, secret string } {
 	cliOAuthClientOnce.Do(func() {
-		cliOAuthClientCandidates = extractCLIOAuthClientCandidates(cliOAuthClientPath())
+		extracted := extractCLIOAuthClientCandidates(cliOAuthClientPath())
+		cliOAuthClientMu.Lock()
+		// Keep a pair that another goroutine already proved works.
+		if len(cliOAuthClientCandidates) > 0 {
+			cliOAuthClientCandidates = preferOAuthClientPair(extracted, cliOAuthClientCandidates[0])
+		} else {
+			cliOAuthClientCandidates = extracted
+		}
+		cliOAuthClientMu.Unlock()
 	})
-	return cliOAuthClientCandidates
+	cliOAuthClientMu.Lock()
+	defer cliOAuthClientMu.Unlock()
+	return cloneOAuthClientPairs(cliOAuthClientCandidates)
 }
 
 // AuthError represents an authentication condition requiring user action (non-retryable).
@@ -437,20 +480,7 @@ func fallbackClientCandidates() []struct{ id, secret string } {
 	if clientID != "" && clientSecret != "" {
 		return []struct{ id, secret string }{{clientID, clientSecret}}
 	}
-	candidates := fallbackOAuthClient()
-	if len(cliOAuthClientCandidates) == 1 && len(candidates) > 1 {
-		// A remembered working pair: probe it first, then the rest.
-		working := cliOAuthClientCandidates[0]
-		rest := make([]struct{ id, secret string }, 0, len(candidates))
-		rest = append(rest, working)
-		for _, p := range candidates {
-			if p != working {
-				rest = append(rest, p)
-			}
-		}
-		return rest
-	}
-	return candidates
+	return fallbackOAuthClient()
 }
 
 // refreshAccessToken refreshes via the token endpoint, probing extracted
