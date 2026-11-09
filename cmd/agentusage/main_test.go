@@ -20,10 +20,14 @@ var removedCommands = []string{
 	"pricing",
 	"session",
 	"statusline",
-	"telemetry",
 	"tmux",
 	"version",
 	"weekly",
+}
+
+// hiddenCompatCommands remain registered (Hidden) so already-installed hooks keep working.
+var hiddenCompatCommands = []string{
+	"telemetry",
 }
 
 var retainedCommands = []string{
@@ -84,9 +88,35 @@ func TestRootCommands_RetainedCommandsPresent(t *testing.T) {
 		}
 	}
 
-	if len(commandNames) != len(retainedCommands) {
-		t.Errorf("expected exactly %d commands (%v), got %d (%v)",
-			len(retainedCommands), retainedCommands, len(commandNames), commandNames)
+	for _, compat := range hiddenCompatCommands {
+		cmd, _, err := root.Find([]string{compat})
+		if err != nil || cmd == nil || cmd.Name() != compat {
+			t.Errorf("expected hidden compat command %q to be registered, err=%v", compat, err)
+			continue
+		}
+		if !cmd.Hidden {
+			t.Errorf("expected compat command %q to be Hidden", compat)
+		}
+		if !slices.Contains(commandNames, compat) {
+			t.Errorf("expected hidden compat command %q in Commands()", compat)
+		}
+	}
+
+	wantTotal := len(retainedCommands) + len(hiddenCompatCommands)
+	if len(commandNames) != wantTotal {
+		t.Errorf("expected exactly %d commands (%v + hidden %v), got %d (%v)",
+			wantTotal, retainedCommands, hiddenCompatCommands, len(commandNames), commandNames)
+	}
+}
+
+func TestRootCommands_LegacyTelemetryHookAliasResolves(t *testing.T) {
+	root := newRootCommand()
+	cmd, _, err := root.Find([]string{"telemetry", "hook"})
+	if err != nil {
+		t.Fatalf("Find telemetry hook: %v", err)
+	}
+	if cmd == nil || cmd.Name() != "hook" {
+		t.Fatalf("expected hook subcommand under telemetry, got %#v", cmd)
 	}
 }
 
@@ -135,6 +165,15 @@ func TestRootCommands_HelpOutputGroupsAndCompatibility(t *testing.T) {
 	for _, removed := range removedCommands {
 		if strings.Contains(helpOutput, "\n  "+removed+" ") {
 			t.Errorf("removed command %q found in help output", removed)
+		}
+	}
+
+	for _, compat := range hiddenCompatCommands {
+		for _, line := range strings.Split(helpOutput, "\n") {
+			fields := strings.Fields(line)
+			if len(fields) > 0 && fields[0] == compat {
+				t.Errorf("hidden compat command %q found in help output: %q", compat, line)
+			}
 		}
 	}
 
