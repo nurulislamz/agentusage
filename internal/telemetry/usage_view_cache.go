@@ -14,13 +14,19 @@ import (
 // usageViewCache caches the fully aggregated telemetryUsageAgg for a given
 // filter, keyed by (dbPath, providerIDs, accountID, since, todaySince).
 //
-// Each entry stores a content fingerprint (MAX(rowid), COUNT(*)) captured at
-// the time the aggregate was built. On lookup a cheap probe query runs the
-// same MAX/COUNT against the underlying usage_events table; if the fingerprint
-// matches we skip the expensive materialize + 14 aggregate queries.
+// Each entry stores a content fingerprint captured at the time the aggregate
+// was built. On lookup a cheap probe query runs the same fingerprint against
+// the underlying usage_events table; if it matches we skip the expensive
+// materialize + 14 aggregate queries.
 //
-// Retention pruning lowers COUNT(*) so prunes invalidate cleanly. Inserts
-// raise MAX(rowid) so new events invalidate cleanly.
+// The fingerprint covers:
+//   - MAX(rowid): inserts invalidate cleanly
+//   - COUNT(*): retention pruning / deletes invalidate cleanly
+//   - SUM of token/cost/request columns: in-place UPDATEs from
+//     enrichEventByDedupKey (hook overlaying a collector JSONL row) also
+//     invalidate. Rowid and COUNT do not change on UPDATE, so omitting
+//     those sums left window_tokens / window_cost stuck at the pre-enrich
+//     totals until another insert, delete, or process restart.
 //
 // The cache is process-global. It is bounded by a fixed maximum number of
 // entries; on overflow the oldest entry by insertion order is dropped. The
@@ -28,10 +34,29 @@ import (
 // class, typically <50), so a simple cap is sufficient.
 const usageViewCacheMaxEntries = 64
 
+type usageViewFingerprint struct {
+	maxRowID int64
+	count    int64
+	tokens   int64
+	costE6   int64
+	requests int64
+}
+
+func (a usageViewFingerprint) equal(b usageViewFingerprint) bool {
+	return a.maxRowID == b.maxRowID &&
+		a.count == b.count &&
+		a.tokens == b.tokens &&
+		a.costE6 == b.costE6 &&
+		a.requests == b.requests
+}
+
+func (a usageViewFingerprint) empty() bool {
+	return a.maxRowID == 0 && a.count == 0
+}
+
 type usageViewCacheEntry struct {
 	agg        *telemetryUsageAgg
-	maxRowID   int64
-	count      int64
+	fp         usageViewFingerprint
 	insertedAt time.Time
 }
 
@@ -94,20 +119,32 @@ func (s *usageViewCacheStore) reset() {
 	s.order = nil
 }
 
-// probeUsageEventsFingerprint runs a cheap MAX(rowid) + COUNT(*) query against
-// usage_events using the same provider/account filter as the materialization
-// step. It deliberately ignores the Since cutoff so the probe stays index-
-// driven: the cache key already includes Since, so an entry only matches when
-// Since is identical between builder and reader.
-func probeUsageEventsFingerprint(ctx context.Context, db *sql.DB, filter usageFilter) (int64, int64, error) {
+// probeUsageEventsFingerprint runs a cheap identity query against usage_events
+// using the same provider/account filter as the materialization step. It
+// deliberately ignores the Since cutoff so the probe stays index-driven: the
+// cache key already includes Since, so an entry only matches when Since is
+// identical between builder and reader.
+func probeUsageEventsFingerprint(ctx context.Context, db *sql.DB, filter usageFilter) (usageViewFingerprint, error) {
 	providers := normalizeProviderIDs(filter.ProviderIDs)
 	if len(providers) == 0 {
-		return 0, 0, nil
+		return usageViewFingerprint{}, nil
 	}
 
 	args := make([]any, 0, len(providers)+1)
 	var b strings.Builder
-	b.WriteString(`SELECT COALESCE(MAX(rowid), 0), COUNT(*)
+	b.WriteString(`SELECT
+		COALESCE(MAX(rowid), 0),
+		COUNT(*),
+		COALESCE(SUM(
+			COALESCE(total_tokens, 0) +
+			COALESCE(input_tokens, 0) +
+			COALESCE(output_tokens, 0) +
+			COALESCE(reasoning_tokens, 0) +
+			COALESCE(cache_read_tokens, 0) +
+			COALESCE(cache_write_tokens, 0)
+		), 0),
+		COALESCE(CAST(ROUND(SUM(COALESCE(cost_usd, 0)) * 1000000) AS INTEGER), 0),
+		COALESCE(SUM(COALESCE(requests, 0)), 0)
 		FROM usage_events
 		WHERE event_type IN ('message_usage', 'tool_usage')
 		  AND provider_id IN (`)
@@ -126,11 +163,13 @@ func probeUsageEventsFingerprint(ctx context.Context, db *sql.DB, filter usageFi
 		args = append(args, accountID)
 	}
 
-	var maxRowID, count int64
-	if err := db.QueryRowContext(ctx, b.String(), args...).Scan(&maxRowID, &count); err != nil {
-		return 0, 0, fmt.Errorf("probe usage_events fingerprint: %w", err)
+	var fp usageViewFingerprint
+	if err := db.QueryRowContext(ctx, b.String(), args...).Scan(
+		&fp.maxRowID, &fp.count, &fp.tokens, &fp.costE6, &fp.requests,
+	); err != nil {
+		return usageViewFingerprint{}, fmt.Errorf("probe usage_events fingerprint: %w", err)
 	}
-	return maxRowID, count, nil
+	return fp, nil
 }
 
 // loadUsageViewCached returns a cached aggregate if the fingerprint is
@@ -142,34 +181,37 @@ func loadUsageViewCached(
 	db *sql.DB,
 	namespace usageViewCacheNamespace,
 	filter usageFilter,
-) (*telemetryUsageAgg, int64, int64, bool, error) {
+) (*telemetryUsageAgg, usageViewFingerprint, bool, error) {
 	if namespace == "" {
-		return nil, 0, 0, false, nil
+		return nil, usageViewFingerprint{}, false, nil
 	}
 	key := usageViewCacheKey(namespace, filter)
 	entry, hit := globalUsageViewCache.lookup(key)
-	maxRowID, count, err := probeUsageEventsFingerprint(ctx, db, filter)
+	fp, err := probeUsageEventsFingerprint(ctx, db, filter)
 	if err != nil {
-		return nil, 0, 0, false, err
+		return nil, usageViewFingerprint{}, false, err
 	}
 	if !hit || entry == nil {
-		return nil, maxRowID, count, false, nil
+		return nil, fp, false, nil
 	}
-	if entry.maxRowID != maxRowID || entry.count != count {
-		core.Tracef("[usage_view_cache] miss (fingerprint changed) providers=%v account=%s maxRowID=%d→%d count=%d→%d",
-			filter.ProviderIDs, filter.AccountID, entry.maxRowID, maxRowID, entry.count, count)
-		return nil, maxRowID, count, false, nil
+	if !entry.fp.equal(fp) {
+		core.Tracef("[usage_view_cache] miss (fingerprint changed) providers=%v account=%s maxRowID=%d→%d count=%d→%d tokens=%d→%d costE6=%d→%d requests=%d→%d",
+			filter.ProviderIDs, filter.AccountID,
+			entry.fp.maxRowID, fp.maxRowID, entry.fp.count, fp.count,
+			entry.fp.tokens, fp.tokens, entry.fp.costE6, fp.costE6,
+			entry.fp.requests, fp.requests)
+		return nil, fp, false, nil
 	}
 	core.Tracef("[usage_view_cache] hit providers=%v account=%s maxRowID=%d count=%d age=%s",
-		filter.ProviderIDs, filter.AccountID, entry.maxRowID, entry.count, time.Since(entry.insertedAt))
-	return entry.agg, maxRowID, count, true, nil
+		filter.ProviderIDs, filter.AccountID, fp.maxRowID, fp.count, time.Since(entry.insertedAt))
+	return entry.agg, fp, true, nil
 }
 
 func storeUsageViewCache(
 	namespace usageViewCacheNamespace,
 	filter usageFilter,
 	agg *telemetryUsageAgg,
-	maxRowID, count int64,
+	fp usageViewFingerprint,
 ) {
 	if namespace == "" || agg == nil {
 		return
@@ -177,8 +219,7 @@ func storeUsageViewCache(
 	key := usageViewCacheKey(namespace, filter)
 	globalUsageViewCache.store(key, &usageViewCacheEntry{
 		agg:        agg,
-		maxRowID:   maxRowID,
-		count:      count,
+		fp:         fp,
 		insertedAt: time.Now(),
 	})
 }

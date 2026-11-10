@@ -326,8 +326,17 @@ func stampLiveRefreshTime(base, fresh core.UsageSnapshot) core.UsageSnapshot {
 	return merged
 }
 
-// HasChanged reports whether the Cursor status-line state file has been modified since the given time.
+// HasChanged reports whether Cursor usage may have changed since the given time.
+//
+// Live plan buckets come from DashboardService and can move without the
+// status-line file being touched. Authenticated accounts (auth.json / token)
+// therefore always poll, matching Codex: otherwise skipUnchangedProvider
+// caches the first Fetch forever when the status-line path is missing
+// (typical for boxes that only have cli-config.json).
 func (p *Provider) HasChanged(acct core.AccountConfig, since time.Time) (bool, error) {
+	if token, _ := resolveCursorAccessToken(acct); token != "" {
+		return true, nil
+	}
 	path := statusFilePath(acct)
 	if path == "" {
 		return false, nil
