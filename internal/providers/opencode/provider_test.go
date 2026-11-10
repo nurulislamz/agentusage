@@ -2,6 +2,7 @@ package opencode
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -311,6 +312,40 @@ func TestFetch_ConsoleDoubleFailure_DoesNotFabricateZeroBalance(t *testing.T) {
 	}
 	if _, ok := snap.Diagnostics["opencode_console_auth_error"]; !ok {
 		t.Errorf("expected opencode_console_auth_error diagnostic, got diagnostics=%+v", snap.Diagnostics)
+	}
+}
+
+func TestEnrichFromConsole_NoAutoImportWithoutBrowserCookieOptIn(t *testing.T) {
+	origLoadStoredSession := loadStoredSession
+	origLoadBrowserSession := loadBrowserSession
+	t.Cleanup(func() {
+		loadStoredSession = origLoadStoredSession
+		loadBrowserSession = origLoadBrowserSession
+	})
+
+	loadStoredSession = func(accountID string) (config.BrowserSession, bool, error) {
+		return config.BrowserSession{}, false, nil
+	}
+	called := false
+	loadBrowserSession = func(context.Context, core.AccountConfig, browsercookies.Reader) (config.BrowserSession, bool, error) {
+		called = true
+		return config.BrowserSession{
+			Domain:     "opencode.ai",
+			CookieName: "auth",
+			Value:      "host-cookie-should-not-import",
+		}, true, nil
+	}
+
+	snap := core.NewUsageSnapshot("opencode", "opencode-work")
+	err := New().enrichFromConsole(context.Background(), core.AccountConfig{
+		ID:       "opencode-work",
+		Provider: "opencode",
+	}, &snap)
+	if !errors.Is(err, errNoCookieConfigured) {
+		t.Fatalf("enrichFromConsole error = %v, want errNoCookieConfigured", err)
+	}
+	if called {
+		t.Fatal("loadBrowserSession was called without BrowserCookie opt-in")
 	}
 }
 
