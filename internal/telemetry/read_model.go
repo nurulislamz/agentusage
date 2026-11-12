@@ -273,32 +273,10 @@ func hydrateRootsFromLimitSnapshots(ctx context.Context, db *sql.DB, snaps map[s
 }
 
 func loadLatestLimitSnapshot(ctx context.Context, db *sql.DB, providerID, accountID string) (*core.UsageSnapshot, error) {
-	payload, occurredAt, found, err := queryLatestLimitSnapshotPayload(ctx, db, providerID, accountID)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, nil
-	}
-	latestDecoded, ok := decodeStoredLimitSnapshot(providerID, accountID, payload, occurredAt)
-	if !ok {
-		return nil, nil
-	}
-	latest := &latestDecoded
-	latest.SetAttribute("telemetry_root", "limit_snapshot")
-	return latest, nil
-}
-
-func queryLatestLimitSnapshotPayload(
-	ctx context.Context,
-	db *sql.DB,
-	providerID, accountID string,
-) (string, string, bool, error) {
-	var (
-		payload    string
-		occurredAt string
-	)
-	err := db.QueryRowContext(ctx, `
+	// Walk newest-first so a metric-less StatusOK "now" row (e.g. Cursor
+	// cli-config email fallback stamped with time.Now) cannot hide an older
+	// quota root that still carries real usage metrics.
+	rows, err := db.QueryContext(ctx, `
 		SELECT r.source_payload, e.occurred_at
 		FROM usage_events e
 		JOIN usage_raw_events r ON r.raw_event_id = e.raw_event_id
@@ -307,15 +285,30 @@ func queryLatestLimitSnapshotPayload(
 		  AND e.account_id = ?
 		  AND r.source_system = ?
 		ORDER BY e.occurred_at DESC
-		LIMIT 1
-	`, providerID, accountID, string(SourceSystemPoller)).Scan(&payload, &occurredAt)
-	if err == sql.ErrNoRows {
-		return "", "", false, nil
-	}
+		LIMIT 20
+	`, providerID, accountID, string(SourceSystemPoller))
 	if err != nil {
-		return "", "", false, fmt.Errorf("load latest limit snapshot (%s/%s): %w", providerID, accountID, err)
+		return nil, fmt.Errorf("load latest limit snapshot (%s/%s): %w", providerID, accountID, err)
 	}
-	return payload, occurredAt, true, nil
+	defer rows.Close()
+
+	for rows.Next() {
+		var payload, occurredAt string
+		if scanErr := rows.Scan(&payload, &occurredAt); scanErr != nil {
+			return nil, fmt.Errorf("scan latest limit snapshot (%s/%s): %w", providerID, accountID, scanErr)
+		}
+		latestDecoded, ok := decodeStoredLimitSnapshot(providerID, accountID, payload, occurredAt)
+		if !ok {
+			continue
+		}
+		latest := &latestDecoded
+		latest.SetAttribute("telemetry_root", "limit_snapshot")
+		return latest, nil
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate latest limit snapshot (%s/%s): %w", providerID, accountID, err)
+	}
+	return nil, nil
 }
 
 func decodeStoredLimitSnapshot(providerID, accountID, payload, occurredAt string) (core.UsageSnapshot, bool) {
@@ -367,10 +360,19 @@ func decodeStoredLimitSnapshot(providerID, accountID, payload, occurredAt string
 }
 
 func limitSnapshotUsable(s core.UsageSnapshot) bool {
-	if s.Status != "" && s.Status != core.StatusUnknown {
+	if len(s.Metrics) > 0 || len(s.Resets) > 0 {
 		return true
 	}
-	return len(s.Metrics) > 0 || len(s.Resets) > 0
+	// Status-only Auth/Error roots still matter so the UI can surface setup
+	// problems. Metric-less StatusOK/Limited/NearLimit must not replace a
+	// previous quota root — Cursor's cli-config fallback is StatusOK with
+	// only email attributes and would otherwise wipe plan usage.
+	switch s.Status {
+	case core.StatusAuth, core.StatusError:
+		return true
+	default:
+		return false
+	}
 }
 
 func mergeLimitSnapshotRoot(base core.UsageSnapshot, root core.UsageSnapshot) core.UsageSnapshot {
